@@ -480,7 +480,7 @@ async fn bridge(
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
     let mllp_tls = mllp_tls(tree)?;
     let events = match lanes {
-        Lanes::WithEvents => events_lane(cdr, tree).await?,
+        Lanes::WithEvents => events_lane(cdr, state).await?,
         Lanes::All | Lanes::WithoutOperations | Lanes::WithEtl => String::new(),
     };
     let etl = cdm.map_or_else(String::new, |cdm| {
@@ -573,10 +573,11 @@ const EVENTS_READER: &str = "ferrobridge";
 pub(crate) const PARKED_ID: u64 = 1;
 
 /// Parks one synthetic event, clinical seq 17, for the events lane in the
-/// dead-letter store at `store`. It carries one changed composition, so a
-/// replay publishes a message and meets the closed broker, a transient
-/// failure that keeps the replay requested on every pass.
-fn park(store: &Path) -> Result<(), Box<dyn Error>> {
+/// state store at `state`, then gives the lane up for the bridge. It carries
+/// one changed composition, so a retry publishes a message and meets the
+/// closed broker, a transient failure that keeps the retry pending on every
+/// pass.
+async fn park(state: &str) -> Result<(), Box<dyn Error>> {
     let event = Event {
         position: Position::Outbox {
             domain: Domain::Clinical,
@@ -600,12 +601,30 @@ fn park(store: &Path) -> Result<(), Box<dyn Error>> {
         }],
         envelope: serde_json::Map::new(),
     };
-    let parked = ferrobridge_server::change_feed::dead_letter::DeadLetters::open(store)?.park(
-        &ReaderName::new(EVENTS_READER)?,
-        &event,
-        "the consumer met a poisoned failure: the event names no template",
-        5,
-    )?;
+    let store = ferrobridge_server::store::Store::open(&ferrobridge_server::store::Settings {
+        connection: omop_cdm::connection::CdmConnection::new(state, None)?,
+        max_connections: 1,
+        acquire_timeout: Duration::from_secs(5),
+        seal: None,
+    })
+    .await?;
+    let lease = store.lease(
+        ferrobridge_server::store::lease::Lane::new(format!("change-feed:{EVENTS_READER}"))?,
+        Duration::from_secs(30),
+    );
+    let generation = lease.claim().await?.ok_or("the lane is free")?;
+    let term = ferrobridge_server::store::lease::Term::new(lease.clone(), generation);
+    let parked =
+        ferrobridge_server::change_feed::dead_letter::DeadLetters::new(store.pool().clone())
+            .park(
+                &term,
+                &ReaderName::new(EVENTS_READER)?,
+                &event,
+                "the consumer met a poisoned failure: the event names no template",
+                5,
+            )
+            .await?;
+    lease.release(generation).await?;
     if parked == PARKED_ID {
         Ok(())
     } else {
@@ -614,12 +633,11 @@ fn park(store: &Path) -> Result<(), Box<dyn Error>> {
 }
 
 /// Mounts the reference CDR's outbox feed on `cdr`, one synthetic event in
-/// the clinical outbox, parks one more in a dead-letter store under `tree`,
-/// and returns the `[change_feed]` and `[events]` sections that follow it to
-/// a broker nothing listens on.
-async fn events_lane(cdr: &MockServer, tree: &Path) -> Result<String, Box<dyn Error>> {
-    let store = tree.join("dead-letters.redb");
-    park(&store)?;
+/// the clinical outbox, parks one more in the state store at `state`, and
+/// returns the `[change_feed]` and `[events]` sections that follow it to a
+/// broker nothing listens on.
+async fn events_lane(cdr: &MockServer, state: &str) -> Result<String, Box<dyn Error>> {
+    park(state).await?;
     let feed = format!("/ext/admin/outbox/{EVENTS_READER}");
     for (domain, events) in [
         (
@@ -657,12 +675,11 @@ async fn events_lane(cdr: &MockServer, tree: &Path) -> Result<String, Box<dyn Er
         .port();
     Ok(format!(
         "\n[change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\n\
-         poll_interval = \"200ms\"\nbackoff = \"200ms\"\nmax_backoff = \"1s\"\ndead_letters = {store}\n\n\
+         poll_interval = \"200ms\"\nbackoff = \"200ms\"\nmax_backoff = \"1s\"\n\n\
          [events]\nenabled = true\nreader = \"{EVENTS_READER}\"\n\
          url = \"amqp://127.0.0.1:{closed}/%2f\"\nexchange = \"ferroehr.events\"\n\
          confirm_timeout = \"500ms\"\n\
          queues = [{{ name = \"ferroehr.events.analytics\", binding = \"COMPOSITION.*.*\" }}]\n",
         uri = cdr.uri(),
-        store = toml::Value::String(store.display().to_string()),
     ))
 }

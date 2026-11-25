@@ -283,9 +283,9 @@ Verify the new release
 ([verifying a release](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/SECURITY.md#verifying-a-release)),
 then replace the binary or deploy the new image by digest and restart. On
 `SIGTERM` the server drains its requests for up to
-`[server] shutdown_timeout` before it exits. Run one process per identity
-store, so on Kubernetes use the `Recreate` strategy
-([the identity store](../operate/container.md#the-identity-store)).
+`[server] shutdown_timeout` before it exits. Every replica shares the state
+store, so a rolling update keeps the identity map, the links and the facade's
+own resources ([the identity store](../operate/container.md#the-identity-store)).
 
 ### 8(d) Secure decommissioning, and removing user data
 
@@ -298,8 +298,9 @@ directories and schemas you name. To take a deployment out of service and
 remove its data, stop the server, the console and every ETL job, then
 delete:
 
-- the identity map in the `[state]` database (its `0003` tables), which maps
-  subject identifiers to `ehr_id`s and FHIR ids to compositions;
+- the `[state]` database, which holds the identity map (subject identifiers
+  to `ehr_id`s, FHIR ids to compositions), the SMART Health Links and the
+  facade's own App State and launch `Task`s;
 - the directory `[usage_report] state_dir` names, which holds the usage
   report's instance id;
 - the mapping directory, `[operator] mapping_dir` if you set it, and the

@@ -3,8 +3,8 @@
 
 //! The Events page: on a bridge whose events lane cannot reach its broker,
 //! the consumer reads degraded with its cause and the configured topology,
-//! and the event it parked is replayed from the page; on a bridge with no
-//! consumer, the page says so.
+//! and the event it parked is retried from the page with a reason; on a
+//! bridge with no consumer, the page says so.
 
 use std::error::Error;
 
@@ -52,7 +52,7 @@ async fn a_stalled_consumer_reads_degraded_with_its_cause() -> Result<(), Box<dy
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_parked_event_is_replayed_from_the_page() -> Result<(), Box<dyn Error>> {
+async fn a_parked_event_is_retried_from_the_page_with_a_reason() -> Result<(), Box<dyn Error>> {
     if !journeys_enabled() {
         return Ok(());
     }
@@ -69,22 +69,27 @@ async fn a_parked_event_is_replayed_from_the_page() -> Result<(), Box<dyn Error>
             .element(By::XPath("//*[contains(., 'the event names no template')]"))
             .await?;
         browser
+            .element(By::Id(format!("settle-reason-events-{PARKED_ID}")))
+            .await?
+            .send_keys("the template is deployed")
+            .await?;
+        browser
             .element(By::XPath(format!(
-                "//button[@aria-label = 'Replay parked event {PARKED_ID} of events']"
+                "//button[@aria-label = 'Retry parked event {PARKED_ID} of events']"
             )))
             .await?
             .click()
             .await?;
         browser
             .element(By::XPath(
-                "//*[contains(., 'Replay requested: the consumer offers the event again before its next page.')]",
+                "//*[contains(., 'Retry recorded: the consumer offers the event again before its next page.')]",
             ))
             .await?;
-        // The broker is down, so every pass's replay of the parked event
-        // meets a transient failure and the replay stays requested.
+        // The broker is down, so every pass's retry of the parked event
+        // meets a transient failure and the retry stays pending.
         browser.goto(&stack.url("/events")).await?;
         browser
-            .element(By::XPath("//*[normalize-space(.) = 'Replay requested']"))
+            .element(By::XPath("//*[normalize-space(.) = 'Retry pending']"))
             .await?;
         Ok(())
     })

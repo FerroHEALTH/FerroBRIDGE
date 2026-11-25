@@ -9,7 +9,6 @@
 
 use ferrohealth_config::units::Duration;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// The change-feed source.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -23,11 +22,6 @@ pub struct ChangeFeed {
     /// The root of the reference CDR's extensions, the path its
     /// `/admin/outbox` routes live under; `ferroehr` only.
     pub url: String,
-    /// The `redb` file the `aql` source keeps each reader's watermark in.
-    pub watermarks: Option<PathBuf>,
-    /// The `redb` file the consumers park a poisoned event in, and count each
-    /// event's poisoned passes in.
-    pub dead_letters: Option<PathBuf>,
     /// The poisoned passes an event fails before it is parked, 1 to 1000.
     pub max_attempts: u64,
     /// Where an `aql` reader with no watermark starts: `now`, `beginning`, or
@@ -41,6 +35,9 @@ pub struct ChangeFeed {
     pub backoff: Duration,
     /// The longest wait after a failed pass.
     pub max_backoff: Duration,
+    /// How long a replica's lease on a reader holds; the leader renews it
+    /// every third of the period.
+    pub lease: Duration,
 }
 
 impl Default for ChangeFeed {
@@ -49,14 +46,13 @@ impl Default for ChangeFeed {
             enabled: false,
             source: String::from("aql"),
             url: String::new(),
-            watermarks: None,
-            dead_letters: None,
             max_attempts: 5,
             start: String::from("now"),
             page_size: 100,
             poll_interval: Duration::from_secs(1),
             backoff: Duration::from_secs(1),
             max_backoff: Duration::from_secs(60),
+            lease: Duration::from_secs(30),
         }
     }
 }

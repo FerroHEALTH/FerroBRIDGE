@@ -1803,7 +1803,7 @@ because no concept exists. The reference engine has not moved since
   ITS-REST and runs the same per-composition commit. No feature depends on one
   vendor (owner decision 2026-11-02), so the adapter has two sources. The
   vendor-neutral one polls `/query/aql` over `VERSION v[ALL_VERSIONS]` by
-  `commit_audit/time_committed` past a watermark FerroBRIDGE keeps in `redb`,
+  `commit_audit/time_committed` past a watermark FerroBRIDGE keeps in the state store,
   with the version uids finished at the watermark instant so a tie loses
   nothing; it gives no commit order across EHRs and sees a deletion only where
   the CDR answers the deleted version. The reference CDR writes every commit
@@ -2373,7 +2373,12 @@ has one leader across replicas through a row of `lane_lease`: a replica
 takes a free or expired row and its generation moves on, renews at a third
 of the period, and every cursor write locks the row in its own transaction
 and is refused unless it holds the current generation, so a former leader
-paused past its expiry cannot move a cursor. The inbound sources (`0008`)
+paused past its expiry cannot move a cursor. The change feed is the first
+area on the store (`0006`): the watermarks of the AQL source, the dead
+letters with the operator's settlement (who decided, retry or discard, and
+why) and the poisoned-pass counts, every follower write fenced by its
+reader's lease; the reference CDR's feed keeps its cursor in the CDR and
+takes only the lease. The inbound sources (`0008`)
 are versioned rows: one write validates the kind's document, appends the
 version with its committer, derives the tenants and MLLP routes and
 notifies `ferrobridge_sources`, and each replica reloads the named source
@@ -2393,8 +2398,10 @@ whole, and while the session is down every request reads the store;
 PostgreSQL delivers a `NOTIFY` at commit and never on rollback
 (<https://www.postgresql.org/docs/current/sql-notify.html>). `[state.seal]`
 lists the keys stored bodies are sealed under, each named by the id a sealed
-row carries, the first one sealing. The `redb` files stay until each area
-has moved. No specification governs where the bridge keeps its state: our
+row carries, the first one sealing, and the lookup key identifier values are
+stored as an HMAC under. The identity map (section 9), the SMART Health Links
+and the facade's own App State and launch `Task`s live there; the change-feed
+and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
 own design on family precedent.
 
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and

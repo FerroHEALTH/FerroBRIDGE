@@ -4,49 +4,30 @@
 //! The resources the facade keeps itself, because the CDR has no home for
 //! them: SMART App State (`Basic`) and SMART launch `Task`s.
 //!
-//! One `redb` file holds one kind of resource, each under `[type]/[id]` with
-//! its version, as the JSON the client sent plus the `id` and `meta` the
-//! server writes. A deleted resource leaves a tombstone, so a later request
-//! about its id is told it is gone. No specification governs the store: our
-//! own design. A conditional write reads and writes in one `redb` write
-//! transaction (<https://docs.rs/redb/4.3.0/redb/>), so two writers racing
-//! on one version cannot both win.
+//! The state store holds each resource under its type and id with its
+//! version, as the JSON the client sent plus the `id` and `meta` the server
+//! writes, so every replica serves the same resources. A deleted resource
+//! leaves a tombstone, so a later request about its id is told it is gone. A
+//! conditional write holds the row (`SELECT … FOR UPDATE`) from its read to
+//! its write, so two writers racing on one version cannot both win. No
+//! specification governs the store: our own design.
 
 pub mod answer;
 
-use std::path::Path;
-use std::path::PathBuf;
-
 use fhir_types::codec::Object;
-use redb::Database;
-use redb::ReadableDatabase;
-use redb::ReadableTable;
-use redb::TableDefinition;
-use serde::Deserialize;
-use serde::Serialize;
-
-/// `[type]/[id]` to the stored record, as JSON.
-const RESOURCES: TableDefinition<'static, &str, &str> = TableDefinition::new("resources");
+use sqlx::Row as _;
+use sqlx::postgres::PgPool;
 
 /// Why the store could not answer.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum OwnedError {
-    /// The store file could not be opened or created.
-    #[error("the resource store at {path} could not be opened")]
-    Open {
-        /// The path that was tried.
-        path: String,
-        /// What the storage layer reported.
+    /// The state store refused or failed a statement.
+    #[error("a resource store statement failed")]
+    Database {
+        /// What the database reported.
         #[source]
-        source: Box<redb::DatabaseError>,
-    },
-    /// A transaction could not be started or committed.
-    #[error("a resource store transaction did not complete")]
-    Transaction {
-        /// What the storage layer reported.
-        #[source]
-        source: Box<redb::Error>,
+        source: Box<sqlx::Error>,
     },
     /// A stored record is not the shape this version writes, or a resource
     /// could not be written as one.
@@ -60,15 +41,15 @@ pub enum OwnedError {
     },
 }
 
-/// Returns the error a `redb` failure is.
-fn transaction<E: Into<redb::Error>>(source: E) -> OwnedError {
-    OwnedError::Transaction {
-        source: Box::new(source.into()),
+/// Returns the error a database failure is.
+fn database(source: sqlx::Error) -> OwnedError {
+    OwnedError::Database {
+        source: Box::new(source),
     }
 }
 
 /// One record as it is stored.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct Record {
     /// The version, from 1.
     version: u64,
@@ -102,43 +83,20 @@ pub enum Change {
     Delete,
 }
 
-/// The resources of one kind, on disk.
-#[derive(Debug)]
+/// The resources the facade keeps, in the state store.
+#[derive(Debug, Clone)]
 pub struct OwnedStore {
-    /// The open database.
-    database: Database,
-    /// The path it was opened at.
-    path: PathBuf,
+    /// The pool.
+    pool: PgPool,
 }
 
 impl OwnedStore {
-    /// Opens, or creates, the store at `path`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`OwnedError::Open`] when the path cannot be opened or
-    /// created, and [`OwnedError::Transaction`] when the table cannot be
-    /// created.
-    pub fn open(path: &Path) -> Result<Self, OwnedError> {
-        let database = Database::create(path).map_err(|source| OwnedError::Open {
-            path: path.display().to_string(),
-            source: Box::new(source),
-        })?;
-        let write = database.begin_write().map_err(transaction)?;
-        {
-            let _resources = write.open_table(RESOURCES).map_err(transaction)?;
-        }
-        write.commit().map_err(transaction)?;
-        Ok(Self {
-            database,
-            path: path.to_path_buf(),
-        })
-    }
-
-    /// Returns the path the store was opened at.
+    /// Returns the resources of `store`.
     #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn open(store: &crate::store::Store) -> Self {
+        Self {
+            pool: store.pool().clone(),
+        }
     }
 
     /// Stores `resource` as version 1 of a new `resource_type` under a fresh
@@ -147,25 +105,24 @@ impl OwnedStore {
     /// # Errors
     ///
     /// Returns [`OwnedError`] when the write does not commit.
-    pub fn create(&self, resource_type: &str, resource: Object) -> Result<Object, OwnedError> {
+    pub async fn create(
+        &self,
+        resource_type: &str,
+        resource: Object,
+    ) -> Result<Object, OwnedError> {
         let id = uuid::Uuid::new_v4().to_string();
         let key = key_of(resource_type, &id);
         let stamped = stamp(resource, &id, 1);
-        let record = encode(
-            &key,
-            &Record {
-                version: 1,
-                resource: Some(stamped.clone()),
-            },
-        )?;
-        let write = self.database.begin_write().map_err(transaction)?;
-        {
-            let mut table = write.open_table(RESOURCES).map_err(transaction)?;
-            table
-                .insert(key.as_str(), record.as_str())
-                .map_err(transaction)?;
-        }
-        write.commit().map_err(transaction)?;
+        let body = encode(&key, &stamped)?;
+        sqlx::query(
+            "INSERT INTO owned_resource (resource_type, id, version, body) VALUES ($1, $2, 1, $3)",
+        )
+        .bind(resource_type)
+        .bind(&id)
+        .bind(&body)
+        .execute(&self.pool)
+        .await
+        .map_err(database)?;
         Ok(stamped)
     }
 
@@ -175,71 +132,103 @@ impl OwnedStore {
     ///
     /// Returns [`OwnedError`] when the read fails or the record cannot be
     /// read.
-    pub fn get(&self, resource_type: &str, id: &str) -> Result<Option<Held>, OwnedError> {
-        let key = key_of(resource_type, id);
-        let read = self.database.begin_read().map_err(transaction)?;
-        let table = read.open_table(RESOURCES).map_err(transaction)?;
-        let found = table.get(key.as_str()).map_err(transaction)?;
-        found
-            .map(|value| decode(&key, value.value()).map(Held::from))
+    pub async fn get(&self, resource_type: &str, id: &str) -> Result<Option<Held>, OwnedError> {
+        let row = sqlx::query(
+            "SELECT version, body FROM owned_resource WHERE resource_type = $1 AND id = $2 \
+             AND version > 0",
+        )
+        .bind(resource_type)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(database)?;
+        row.map(|row| held_of(&key_of(resource_type, id), &row))
             .transpose()
     }
 
     /// Applies the change `decide` returns for what the store holds under
-    /// `resource_type`/`id`, in one write transaction, and returns what the
-    /// store then holds; a refusal of `decide` writes nothing.
+    /// `resource_type`/`id`, in one transaction that holds the row, and
+    /// returns what the store then holds; a refusal of `decide` writes
+    /// nothing.
     ///
     /// # Errors
     ///
     /// Returns [`OwnedError`] when the transaction fails; the inner
     /// `Err` is `decide`'s refusal.
-    pub fn change<R>(
+    pub async fn change<R>(
         &self,
         resource_type: &str,
         id: &str,
-        decide: impl FnOnce(Option<&Held>) -> Result<Change, R>,
+        decide: impl FnOnce(Option<&Held>) -> Result<Change, R> + Send,
     ) -> Result<Result<Held, R>, OwnedError> {
         let key = key_of(resource_type, id);
-        let write = self.database.begin_write().map_err(transaction)?;
-        let outcome = {
-            let mut table = write.open_table(RESOURCES).map_err(transaction)?;
-            let held = table
-                .get(key.as_str())
-                .map_err(transaction)?
-                .map(|value| decode(&key, value.value()).map(Held::from))
-                .transpose()?;
-            match decide(held.as_ref()) {
-                Err(refusal) => Err(refusal),
-                Ok(change) => {
-                    let version = held
-                        .as_ref()
-                        .map_or(0, Held::version)
-                        .checked_add(1)
-                        .ok_or_else(|| exhausted(&key))?;
-                    let record = match change {
-                        Change::Put(resource) => Record {
-                            version,
-                            resource: Some(stamp(resource, id, version)),
-                        },
-                        Change::Delete => Record {
-                            version,
-                            resource: None,
-                        },
-                    };
-                    let encoded = encode(&key, &record)?;
-                    table
-                        .insert(key.as_str(), encoded.as_str())
-                        .map_err(transaction)?;
-                    Ok(Held::from(record))
-                }
-            }
-        };
-        if outcome.is_ok() {
-            write.commit().map_err(transaction)?;
+        let mut tx = self.pool.begin().await.map_err(database)?;
+        // NOTE: no specification governs this: our own design; a version 0 row
+        // stands for an absent resource, so a create by id has a row to hold.
+        sqlx::query(
+            "INSERT INTO owned_resource (resource_type, id, version) VALUES ($1, $2, 0) \
+             ON CONFLICT (resource_type, id) DO NOTHING",
+        )
+        .bind(resource_type)
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(database)?;
+        let row = sqlx::query(
+            "SELECT version, body FROM owned_resource WHERE resource_type = $1 AND id = $2 \
+             FOR UPDATE",
+        )
+        .bind(resource_type)
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(database)?;
+        let version: i64 = row.try_get("version").map_err(database)?;
+        let held = if version == 0 {
+            None
         } else {
-            write.abort().map_err(transaction)?;
-        }
-        Ok(outcome)
+            Some(held_of(&key, &row)?)
+        };
+        let change = match decide(held.as_ref()) {
+            Err(refusal) => {
+                tx.rollback().await.map_err(database)?;
+                return Ok(Err(refusal));
+            }
+            Ok(change) => change,
+        };
+        let next = held
+            .as_ref()
+            .map_or(0, Held::version)
+            .checked_add(1)
+            .ok_or_else(|| exhausted(&key))?;
+        let stored = i64::try_from(next).map_err(|_overflow| exhausted(&key))?;
+        let record = match change {
+            Change::Put(resource) => Record {
+                version: next,
+                resource: Some(stamp(resource, id, next)),
+            },
+            Change::Delete => Record {
+                version: next,
+                resource: None,
+            },
+        };
+        let body = record
+            .resource
+            .as_ref()
+            .map(|resource| encode(&key, resource))
+            .transpose()?;
+        sqlx::query(
+            "UPDATE owned_resource SET version = $3, body = $4 WHERE resource_type = $1 AND id = $2",
+        )
+        .bind(resource_type)
+        .bind(id)
+        .bind(stored)
+        .bind(&body)
+        .execute(&mut *tx)
+        .await
+        .map_err(database)?;
+        tx.commit().await.map_err(database)?;
+        Ok(Ok(Held::from(record)))
     }
 
     /// Returns every live resource of `resource_type`, in id order.
@@ -247,23 +236,34 @@ impl OwnedStore {
     /// # Errors
     ///
     /// Returns [`OwnedError`] when the read fails or a record cannot be read.
-    pub fn scan(&self, resource_type: &str) -> Result<Vec<Object>, OwnedError> {
-        let start = format!("{resource_type}/");
-        let end = format!("{resource_type}0");
-        let read = self.database.begin_read().map_err(transaction)?;
-        let table = read.open_table(RESOURCES).map_err(transaction)?;
-        let rows = table
-            .range(start.as_str()..end.as_str())
-            .map_err(transaction)?;
-        let mut live = Vec::new();
-        for row in rows {
-            let (key, value) = row.map_err(transaction)?;
-            if let Some(resource) = decode(key.value(), value.value())?.resource {
-                live.push(resource);
-            }
-        }
-        Ok(live)
+    pub async fn scan(&self, resource_type: &str) -> Result<Vec<Object>, OwnedError> {
+        let rows = sqlx::query(
+            "SELECT id, body FROM owned_resource WHERE resource_type = $1 AND body IS NOT NULL \
+             ORDER BY id COLLATE \"C\"",
+        )
+        .bind(resource_type)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(database)?;
+        rows.iter()
+            .map(|row| {
+                let id: String = row.try_get("id").map_err(database)?;
+                let body: serde_json::Value = row.try_get("body").map_err(database)?;
+                decode(&key_of(resource_type, &id), body)
+            })
+            .collect()
     }
+}
+
+/// Returns what a row holds under `key`.
+fn held_of(key: &str, row: &sqlx::postgres::PgRow) -> Result<Held, OwnedError> {
+    let version: i64 = row.try_get("version").map_err(database)?;
+    let version = u64::try_from(version).map_err(|_negative| exhausted(key))?;
+    let body: Option<serde_json::Value> = row.try_get("body").map_err(database)?;
+    Ok(Held::from(Record {
+        version,
+        resource: body.map(|body| decode(key, body)).transpose()?,
+    }))
 }
 
 impl Held {
@@ -307,17 +307,17 @@ fn stamp(mut resource: Object, id: &str, version: u64) -> Object {
     resource
 }
 
-/// Returns `record` as the JSON it is stored as.
-fn encode(key: &str, record: &Record) -> Result<String, OwnedError> {
-    serde_json::to_string(record).map_err(|source| OwnedError::Record {
+/// Returns `resource` as the JSON it is stored as.
+fn encode(key: &str, resource: &Object) -> Result<serde_json::Value, OwnedError> {
+    serde_json::to_value(resource).map_err(|source| OwnedError::Record {
         key: key.to_owned(),
         source: Box::new(source),
     })
 }
 
-/// Returns the record `text` stores under `key`.
-fn decode(key: &str, text: &str) -> Result<Record, OwnedError> {
-    serde_json::from_str(text).map_err(|source| OwnedError::Record {
+/// Returns the resource `body` stores under `key`.
+fn decode(key: &str, body: serde_json::Value) -> Result<Object, OwnedError> {
+    serde_json::from_value(body).map_err(|source| OwnedError::Record {
         key: key.to_owned(),
         source: Box::new(source),
     })
@@ -335,72 +335,41 @@ fn exhausted(key: &str) -> OwnedError {
 
 #[cfg(test)]
 mod tests {
-    use super::Change;
-    use super::Held;
-    use super::OwnedStore;
-    use fhir_types::codec::Object;
-    use fhir_types::codec::Value;
+    use std::time::Duration;
 
-    fn store() -> (tempfile::TempDir, OwnedStore) {
-        let directory = tempfile::tempdir().expect("a directory");
-        let store = OwnedStore::open(&directory.path().join("owned.redb")).expect("the store");
-        (directory, store)
+    use super::{Change, OwnedError, OwnedStore};
+
+    /// A store over a database no server answers.
+    fn unreachable() -> OwnedStore {
+        OwnedStore {
+            pool: sqlx::postgres::PgPoolOptions::new()
+                .acquire_timeout(Duration::from_millis(300))
+                .connect_lazy("postgres://bridge@127.0.0.1:1/state?sslmode=disable")
+                .expect("a lazy pool"),
+        }
     }
 
-    fn basic() -> Object {
-        serde_json::from_str(r#"{"resourceType":"Basic","code":{"text":"x"}}"#).expect("JSON")
-    }
-
-    #[test]
-    fn a_created_resource_carries_its_id_and_first_version() {
-        let (_directory, store) = store();
-        let created = store.create("Basic", basic()).expect("created");
-        let Some(Value::String(id)) = created.get("id") else {
-            panic!("an id");
-        };
-        let Some(Held::Live { version, resource }) = store.get("Basic", id).expect("read") else {
-            panic!("live");
-        };
-        assert_eq!(1, version);
-        assert_eq!(created, resource);
-        let serialized = serde_json::to_value(&resource).expect("JSON");
-        assert_eq!(Some("1"), serialized["meta"]["versionId"].as_str());
-    }
-
-    #[test]
-    fn a_change_moves_the_version_and_a_refusal_writes_nothing() {
-        let (_directory, store) = store();
-        let created = store.create("Basic", basic()).expect("created");
-        let Some(Value::String(id)) = created.get("id") else {
-            panic!("an id");
-        };
-        let refused = store
-            .change("Basic", id, |_held| Err::<Change, &str>("no"))
-            .expect("ran");
-        assert_eq!(Err("no"), refused);
-        let updated = store
-            .change("Basic", id, |_held| Ok::<_, ()>(Change::Put(basic())))
-            .expect("ran")
-            .expect("changed");
-        assert_eq!(2, updated.version());
-        let deleted = store
-            .change("Basic", id, |_held| Ok::<_, ()>(Change::Delete))
-            .expect("ran")
-            .expect("changed");
-        assert_eq!(Held::Deleted { version: 3 }, deleted);
-        assert_eq!(
-            Some(Held::Deleted { version: 3 }),
-            store.get("Basic", id).expect("read")
-        );
-        assert_eq!(Vec::<Object>::new(), store.scan("Basic").expect("scanned"));
-    }
-
-    #[test]
-    fn a_scan_reads_one_type_only() {
-        let (_directory, store) = store();
-        store.create("Basic", basic()).expect("created");
-        store.create("BasicX", basic()).expect("created");
-        store.create("Task", basic()).expect("created");
-        assert_eq!(1, store.scan("Basic").expect("scanned").len());
+    #[tokio::test]
+    async fn an_unreachable_store_refuses_every_call() {
+        let store = unreachable();
+        let basic = serde_json::from_str(r#"{"resourceType":"Basic"}"#).expect("JSON");
+        assert!(matches!(
+            store.create("Basic", basic).await,
+            Err(OwnedError::Database { .. })
+        ));
+        assert!(matches!(
+            store.get("Basic", "x").await,
+            Err(OwnedError::Database { .. })
+        ));
+        assert!(matches!(
+            store
+                .change("Basic", "x", |_held| Ok::<_, ()>(Change::Delete))
+                .await,
+            Err(OwnedError::Database { .. })
+        ));
+        assert!(matches!(
+            store.scan("Basic").await,
+            Err(OwnedError::Database { .. })
+        ));
     }
 }

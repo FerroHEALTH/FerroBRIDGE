@@ -59,7 +59,6 @@ client_ca_file = "target/perf-run/tls/ca.pem"
 enabled = true
 source = "ferroehr"
 url = "http://127.0.0.1:18090/ferroehr/rest/extensions/v1"
-dead_letters = "target/perf-run/dead-letters.redb"
 
 [events]
 enabled = true

@@ -168,10 +168,10 @@ cause; check that the server's user owns `mapping_dir`.
 
 ## dead-letters-unavailable
 
-`500`. The dead-letter store of the change feed (`[change_feed] dead_letters`)
-refused a read or a write, so the parked events cannot be listed or a replay
-cannot be recorded. The server log names the cause; check that the server's
-user owns the file and that the disk has room.
+`500`. The state store that keeps the dead letters of the change feed
+(`[state]`) refused a read or a write, so the parked events cannot be listed
+or a settlement cannot be recorded. The server log names the cause; check
+that the database is reachable.
 
 ## reload-unavailable
 

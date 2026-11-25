@@ -444,29 +444,43 @@ impl Bridge {
         })
     }
 
-    /// Asks for the replay of the event `id` the change-feed consumer
-    /// `consumer` parked, `POST
-    /// {base}operator/events/{consumer}/parked/{id}/replay`.
+    /// Settles the event `id` the change-feed consumer `consumer` parked as
+    /// `decision` says, for `reason`, `POST
+    /// {base}operator/events/{consumer}/parked/{id}/retry` or `…/discard`
+    /// with the reason in the `ferrobridge-reason` header.
     ///
     /// # Errors
-    /// Returns [`BridgeError::Path`] when the base takes no path segments,
-    /// [`BridgeError::Refused`] for any status but `202` (a `404` for a
-    /// consumer or an event the bridge does not know), and the transport
-    /// errors of [`Self::capability_statement`].
-    pub async fn replay_parked(
+    /// Returns [`BridgeError::Reason`] for a reason that is empty, over
+    /// [`editing::MAX_REASON`] characters or not printable ASCII on one line,
+    /// [`BridgeError::Path`] when the base takes no path segments,
+    /// [`BridgeError::Refused`] for any status but `202` for a retry and
+    /// `204` for a discard (a `404` for a consumer or an event the bridge
+    /// does not know), and the transport errors of
+    /// [`Self::capability_statement`].
+    pub async fn settle_parked(
         &self,
         consumer: &str,
         id: u64,
+        decision: ferrobridge_operator_api::events::Decision,
+        reason: &str,
         token: &AccessToken,
     ) -> Result<(), BridgeError> {
+        use ferrobridge_operator_api::events::Decision;
+
+        let reason = editing::reason_header(reason)?;
+        let (verb, answered) = match decision {
+            Decision::Retry => ("retry", StatusCode::ACCEPTED),
+            Decision::Discard => ("discard", StatusCode::NO_CONTENT),
+        };
         let mut url = self.url("operator/events")?;
         url.path_segments_mut()
             .map_err(|()| BridgeError::Path)?
             .push(consumer)
             .push("parked")
             .push(&id.to_string())
-            .push("replay");
-        self.exchange(self.client.post(url), JSON, token, &[StatusCode::ACCEPTED])
+            .push(verb);
+        let request = self.client.post(url).header(editing::REASON, reason);
+        self.exchange(request, JSON, token, &[answered])
             .await
             .map(|_answer| ())
     }

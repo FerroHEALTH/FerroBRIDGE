@@ -234,6 +234,23 @@ impl Case {
             .oneshot(bearing(request, &self.token(scope)))
             .await?)
     }
+
+    /// Sends an empty `POST` of `path` under a token granting `scope`, with
+    /// `reason` in the `ferrobridge-reason` header.
+    async fn post_reason(
+        &self,
+        path: &str,
+        scope: &str,
+        reason: &str,
+    ) -> Result<http::Response<Body>, Box<dyn Error>> {
+        let request = bearing(
+            Request::post(path)
+                .header("ferrobridge-reason", reason)
+                .body(Body::empty())?,
+            &self.token(scope),
+        );
+        Ok(self.app.clone().oneshot(request).await?)
+    }
 }
 
 /// Reads the body of `response` as bytes.

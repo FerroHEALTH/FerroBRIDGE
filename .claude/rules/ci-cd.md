@@ -37,7 +37,8 @@ Fourteen workflows:
   out the generated trees (`docs/ci-cd.md`).
 - `.github/workflows/sonar.yml`: SonarQube Cloud, the multi-language sweep
   over shell, YAML, and JSON. Advisory, gating no merge
-  (`ai-code-review.md`). The instrumented coverage run and the
+  (`ai-code-review.md`). It runs on a push to `main` and weekly, never
+  on a pull request (owner decision, 2026-11-25). The instrumented coverage run and the
   `sonar.projectVersion` derivation sit behind a `hashFiles('Cargo.toml')`
   step gate and start reporting when the workspace lands.
 - `.github/workflows/docs.yml`: the documentation site. It builds the mdBook on

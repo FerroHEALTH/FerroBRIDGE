@@ -10,8 +10,9 @@ use std::collections::BTreeMap;
 
 use super::refusal;
 
-/// A CDR section the feed can read.
-const CDR: &str = "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n";
+/// A CDR section the feed can read and a state store it keeps its cursors
+/// in.
+const CDR: &str = "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n";
 
 #[test]
 fn the_change_feed_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,7 +22,7 @@ fn the_change_feed_is_off_by_default() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!("now", config.change_feed.start);
     assert_eq!(100, config.change_feed.page_size);
     assert_eq!(5, config.change_feed.max_attempts);
-    assert_eq!(None, config.change_feed.dead_letters);
+    assert_eq!(30_000, config.change_feed.lease.as_millis());
     let settings = config.resolve(Process::Server)?;
     assert!(settings.change_feed.is_none());
     Ok(())
@@ -39,12 +40,8 @@ fn every_key_reads_from_the_environment() -> Result<(), Box<dyn std::error::Erro
             String::from("https://ehr.invalid/ferroehr/rest/extensions/v1"),
         ),
         (
-            String::from("FERROBRIDGE__CHANGE_FEED__WATERMARKS"),
-            String::from("/var/lib/ferrobridge/feed.redb"),
-        ),
-        (
-            String::from("FERROBRIDGE__CHANGE_FEED__DEAD_LETTERS"),
-            String::from("/var/lib/ferrobridge/dead-letters.redb"),
+            String::from("FERROBRIDGE__CHANGE_FEED__LEASE"),
+            String::from("12s"),
         ),
         (
             String::from("FERROBRIDGE__CHANGE_FEED__MAX_ATTEMPTS"),
@@ -78,16 +75,7 @@ fn every_key_reads_from_the_environment() -> Result<(), Box<dyn std::error::Erro
         "https://ehr.invalid/ferroehr/rest/extensions/v1",
         section.url
     );
-    assert_eq!(
-        Some(std::path::PathBuf::from("/var/lib/ferrobridge/feed.redb")),
-        section.watermarks
-    );
-    assert_eq!(
-        Some(std::path::PathBuf::from(
-            "/var/lib/ferrobridge/dead-letters.redb"
-        )),
-        section.dead_letters
-    );
+    assert_eq!(12_000, section.lease.as_millis());
     assert_eq!(8, section.max_attempts);
     assert_eq!("beginning", section.start);
     assert_eq!(
@@ -104,7 +92,7 @@ fn every_key_reads_from_the_environment() -> Result<(), Box<dyn std::error::Erro
 
 #[test]
 fn an_enabled_feed_without_a_cdr_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refusal("[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\n")?;
+    let error = refusal("[change_feed]\nenabled = true\n")?;
     assert!(
         matches!(&error, Error::Needs { key, needs } if key == "change_feed.enabled" && needs == "[cdr]"),
         "{error:?}"
@@ -113,10 +101,34 @@ fn an_enabled_feed_without_a_cdr_is_refused() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
+fn an_enabled_feed_without_a_state_store_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal(
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[change_feed]\nenabled = true\n",
+    )?;
+    assert!(
+        matches!(&error, Error::Needs { key, needs } if key == "change_feed.enabled" && needs == "[state]"),
+        "{error:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_redb_keys_of_the_feed_are_gone() {
+    for key in ["watermarks", "dead_letters"] {
+        let refused = Config::from_sources(
+            Some(&format!("[change_feed]\n{key} = \"/tmp/feed.redb\"\n")),
+            &BTreeMap::new(),
+        );
+        assert!(
+            matches!(refused, Err(Error::Parse { .. })),
+            "{key}: {refused:?}"
+        );
+    }
+}
+
+#[test]
 fn an_enabled_feed_no_consumer_follows_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refusal(&format!(
-        "{CDR}[change_feed]\nenabled = true\nwatermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\n"
-    ))?;
+    let error = refusal(&format!("{CDR}[change_feed]\nenabled = true\n"))?;
     assert!(
         matches!(&error, Error::NoConsumer { key } if key == "change_feed.enabled"),
         "{error:?}"
@@ -140,18 +152,8 @@ fn an_unknown_source_is_refused() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn the_aql_source_without_a_watermark_file_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refused_with("")?;
-    assert!(
-        matches!(&error, Error::Missing { key } if key == "change_feed.watermarks"),
-        "{error:?}"
-    );
-    Ok(())
-}
-
-#[test]
 fn a_start_that_names_no_instant_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refused_with("watermarks = \"/tmp/feed.redb\"\nstart = \"yesterday\"\n")?;
+    let error = refused_with("start = \"yesterday\"\n")?;
     assert!(
         matches!(&error, Error::FeedStart { key, .. } if key == "change_feed.start"),
         "{error:?}"
@@ -183,9 +185,7 @@ fn the_ferroehr_source_without_a_usable_url_is_refused() -> Result<(), Box<dyn s
 #[test]
 fn a_page_size_outside_one_to_a_thousand_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     for size in [0_u64, 1001] {
-        let error = refused_with(&format!(
-            "watermarks = \"/tmp/feed.redb\"\npage_size = {size}\n"
-        ))?;
+        let error = refused_with(&format!("page_size = {size}\n"))?;
         assert!(
             matches!(&error, Error::Bound { key, value, .. } if key == "change_feed.page_size" && *value == size),
             "{size}: {error:?}"
@@ -200,12 +200,13 @@ fn a_zero_wait_or_a_ceiling_below_the_backoff_is_refused() -> Result<(), Box<dyn
     for (keys, refused) in [
         ("poll_interval = \"0s\"\n", "change_feed.poll_interval"),
         ("backoff = \"0s\"\n", "change_feed.backoff"),
+        ("lease = \"0s\"\n", "change_feed.lease"),
         (
             "backoff = \"5s\"\nmax_backoff = \"1s\"\n",
             "change_feed.max_backoff",
         ),
     ] {
-        let error = refused_with(&format!("watermarks = \"/tmp/feed.redb\"\n{keys}"))?;
+        let error = refused_with(keys)?;
         assert!(
             matches!(&error, Error::Bound { key, .. } | Error::Span { key, .. } if key == refused),
             "{keys}: {error:?}"
@@ -221,23 +222,10 @@ fn an_unknown_key_is_refused() {
 }
 
 #[test]
-fn an_enabled_feed_without_a_dead_letter_store_is_refused() -> Result<(), Box<dyn std::error::Error>>
-{
-    let error = refused_with("watermarks = \"/tmp/feed.redb\"\n")?;
-    assert!(
-        matches!(&error, Error::Missing { key } if key == "change_feed.dead_letters"),
-        "{error:?}"
-    );
-    Ok(())
-}
-
-#[test]
 fn a_bound_of_poisoned_passes_outside_one_to_a_thousand_is_refused()
 -> Result<(), Box<dyn std::error::Error>> {
     for attempts in [0_u64, 1001] {
-        let error = refused_with(&format!(
-            "watermarks = \"/tmp/feed.redb\"\ndead_letters = \"/tmp/dead-letters.redb\"\nmax_attempts = {attempts}\n"
-        ))?;
+        let error = refused_with(&format!("max_attempts = {attempts}\n"))?;
         assert!(
             matches!(&error, Error::Bound { key, value, .. } if key == "change_feed.max_attempts" && *value == attempts),
             "{attempts}: {error:?}"
