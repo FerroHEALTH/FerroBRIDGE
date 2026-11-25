@@ -1,0 +1,1 @@
+- eehrxf declares `serde` a public dependency, because its public API names serde's traits.
