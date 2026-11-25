@@ -7,15 +7,15 @@
 //!
 //! No specification governs the change feed: our own design.
 
-use super::Config;
-use super::error::Error;
-use super::section::change_feed::ChangeFeed;
 use crate::change_feed::PageSize;
 use crate::change_feed::ReaderName;
 use crate::change_feed::Settings;
 use crate::change_feed::Source;
 use crate::change_feed::aql::Start;
 use crate::change_feed::follow::Polling;
+use crate::config::Config;
+use crate::config::error::Error;
+use crate::config::section::change_feed::ChangeFeed;
 
 /// A change-feed consumer section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,20 +93,13 @@ impl Consumer {
 /// out of range, or no consumer to feed.
 ///
 /// `consumers` counts the consumer sections that are on.
-pub(super) fn resolve_change_feed(
+fn settings(
     section: &ChangeFeed,
     cdr: bool,
     state: bool,
     consumers: usize,
 ) -> Result<Settings, Error> {
-    for (present, needs) in [(cdr, "[cdr]"), (state, "[state]")] {
-        if !present {
-            return Err(Error::Needs {
-                key: String::from("change_feed.enabled"),
-                needs: String::from(needs),
-            });
-        }
-    }
+    super::needs("change_feed.enabled", &[(cdr, "[cdr]"), (state, "[state]")])?;
     let source = match section.source.as_str() {
         "aql" => Source::Aql {
             start: start_of(&section.start)?,
@@ -191,7 +184,7 @@ fn start_of(value: &str) -> Result<Start, Error> {
 /// Returns the extension root `value` names: an http or https base with no
 /// query and no fragment.
 fn root_of(value: &str) -> Result<url::Url, Error> {
-    let root = super::resolve::url_of("change_feed.url", value)?;
+    let root = super::url_of("change_feed.url", value)?;
     if !matches!(root.scheme(), "http" | "https")
         || root.cannot_be_a_base()
         || root.query().is_some()
@@ -203,4 +196,22 @@ fn root_of(value: &str) -> Result<url::Url, Error> {
         });
     }
     Ok(root)
+}
+
+/// Returns the change-feed source of `[change_feed]`, when it is on.
+///
+/// # Errors
+///
+/// Returns the [`Error`] of the section's first fault.
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
+    if !config.change_feed.enabled {
+        return Ok(None);
+    }
+    settings(
+        &config.change_feed,
+        config.cdr.is_some(),
+        config.state.is_some(),
+        Consumer::on(config),
+    )
+    .map(Some)
 }

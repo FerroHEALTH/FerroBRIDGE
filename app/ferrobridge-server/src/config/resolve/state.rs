@@ -5,14 +5,15 @@
 
 use secrecy::ExposeSecret as _;
 
-use super::credentials::{ConnectionKeys, secret};
-use super::error::Error;
-use super::section::state::{State, StateSeal};
+use crate::config::Config;
+use crate::config::credentials::{ConnectionKeys, secret};
+use crate::config::error::Error;
+use crate::config::section::state::{State, StateSeal};
 use crate::store::Settings;
 use crate::store::seal::{KeyId, LookupKey, SealKeys, SealingKey};
 
 /// Returns the store `state` describes, its URL, CA and sealing keys read.
-pub(super) fn resolve(state: &State) -> Result<Settings, Error> {
+fn settings(state: &State) -> Result<Settings, Error> {
     let url = secret("state.url", state.url.as_ref(), state.url_file.as_deref())?.ok_or(
         Error::Missing {
             key: String::from("state.url"),
@@ -103,4 +104,18 @@ fn resolve_seal(seal: &StateSeal) -> Result<SealKeys, Error> {
         keys.collect(),
         LookupKey::new(&lookup),
     ))
+}
+
+/// Returns the state store of `[state]`, when it is present, boxed so the
+/// settings stay small enough to move through a job's future.
+///
+/// # Errors
+///
+/// Returns the [`Error`] of the section's first fault.
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Box<Settings>>, Error> {
+    config
+        .state
+        .as_ref()
+        .map(|state| settings(state).map(Box::new))
+        .transpose()
 }

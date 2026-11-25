@@ -56,6 +56,7 @@ use crate::cdr::Prefer;
 use crate::cdr::VersionAtTime;
 use crate::cdr::answered_by;
 use crate::cdr::commit::CommitContext;
+use crate::cdr::commit::commit_params;
 use crate::cdr::error::CdrError;
 use crate::cdr::if_match_value;
 use crate::cdr::representation;
@@ -157,15 +158,9 @@ macro_rules! party_operations {
         ) -> Result<PartyAnswered<$create_outcome>, CdrError> {
             let headers = commit.headers()?;
             let client = self.cdr.party_call(HeaderMap::new())?;
-            let params = $create_params {
-                prefer: Some(String::from(prefer.as_str())),
-                accept: None,
-                content_type: None,
+            let params = commit_params!($create_params, headers, prefer, {
                 openehr_item_tag: None,
-                openehr_version_item_tag: None,
-                openehr_version: headers.version,
-                openehr_audit_details: headers.audit_details,
-            };
+            });
             let answered = DemographicClient::new(&client).$create(&params, party).await;
             party_answered(&client, answered)
         }
@@ -186,16 +181,10 @@ macro_rules! party_operations {
         ) -> Result<PartyAnswered<$update_outcome>, CdrError> {
             let headers = commit.headers()?;
             let client = self.cdr.party_call(HeaderMap::new())?;
-            let params = $update_params {
+            let params = commit_params!($update_params, headers, prefer, {
                 uid_based_id: String::from(uid_based_id),
                 if_match: if_match_value(preceding),
-                prefer: Some(String::from(prefer.as_str())),
-                accept: None,
-                content_type: None,
-                openehr_version_item_tag: None,
-                openehr_version: headers.version,
-                openehr_audit_details: headers.audit_details,
-            };
+            });
             let answered = DemographicClient::new(&client).$update(&params, party).await;
             party_answered(&client, answered)
         }

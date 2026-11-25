@@ -11,13 +11,10 @@
 //! (<https://hl7.org/fhir/R4/http.html#history>). ITS-REST 1.1.0 Demographic
 //! API, DEVELOPMENT.
 
-use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
-use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::demographic::client::VersionedPartyRevisionHistoryOutcome;
 
@@ -27,6 +24,7 @@ use crate::facade::handlers::Body;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
+use crate::facade::party::Call;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
 use crate::facade::reply::Header;
@@ -34,69 +32,49 @@ use crate::facade::reply::Refusal;
 
 /// `GET [base]/{type}/{id}` of a party type.
 pub(crate) async fn read(
-    facade: &Facade,
-    access: &Access,
-    loaded: &Loaded,
+    call: Call<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    party::admit(access, Permission::Read, resource_type, Some(id))?;
-    let uid = party::party_id(resource_type, id)?;
-    let client = facade.client_for(headers, access).await?;
-    let demographic = party::demographic(&client)?;
-    let class = class_of(loaded)?;
-    let held = party::get(demographic, class, resource_type, uid.value()).await?;
-    answer(facade, loaded, (resource_type, id), &held).await
+    let opened = call
+        .open(Permission::Read, (resource_type, id), Body::Absent)
+        .await?;
+    let held = opened.latest(resource_type).await?;
+    answer(call.facade, call.loaded, (resource_type, id), &held).await
 }
 
 /// `GET [base]/{type}/{id}/_history/{vid}` of a party type.
 ///
 /// A `[vid]` that is no version tree id is `404`.
 pub(crate) async fn vread(
-    facade: &Facade,
-    access: &Access,
-    loaded: &Loaded,
+    call: Call<'_>,
     (resource_type, id, vid): (&str, &str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    party::admit(access, Permission::Read, resource_type, Some(id))?;
-    let uid = party::party_id(resource_type, id)?;
+    let uid = call.admit(Permission::Read, (resource_type, id), Body::Absent)?;
     let tree = crate::facade::handlers::read::version_tree(resource_type, id, vid)?;
-    let client = facade.client_for(headers, access).await?;
-    let demographic = party::demographic(&client)?;
-    let class = class_of(loaded)?;
-    let latest = party::get(demographic, class, resource_type, uid.value()).await?;
+    let opened = call.connect(uid).await?;
+    let latest = opened.latest(resource_type).await?;
+    let (demographic, class) = opened.party()?;
     let version = ObjectVersionId::compose(
         &latest.version.object_id(),
         &latest.version.creating_system_id(),
         &tree,
     );
     let held = party::get(demographic, class, resource_type, version.value()).await?;
-    answer(facade, loaded, (resource_type, id), &held).await
+    answer(call.facade, call.loaded, (resource_type, id), &held).await
 }
 
 /// `GET [base]/{type}/{id}/_history` of a party type: a `history` Bundle,
 /// newest version first.
 pub(crate) async fn history(
-    facade: &Facade,
-    access: &Access,
-    loaded: &Loaded,
+    call: Call<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    party::admit(access, Permission::Read, resource_type, Some(id))?;
-    let uid = party::party_id(resource_type, id)?;
-    let client = facade.client_for(headers, access).await?;
-    let demographic = party::demographic(&client)?;
-    let class = class_of(loaded)?;
+    let opened = call
+        .open(Permission::Read, (resource_type, id), Body::Absent)
+        .await?;
+    let (demographic, class) = opened.party()?;
     let Answered { outcome, upstream } = demographic
-        .revision_history(uid.value())
+        .revision_history(opened.uid.value())
         .await
         .map_err(|error| party::client_refusal(&error))?;
     let VersionedPartyRevisionHistoryOutcome::Ok { body, .. } = outcome else {
@@ -105,9 +83,10 @@ pub(crate) async fn history(
     let mut entries = Vec::new();
     for item in body.items.iter().rev() {
         let held = party::get(demographic, class, resource_type, item.version_id.value()).await?;
-        let accepted = party::accept(loaded, resource_type, id, &held)?;
-        let resource = party::render(facade.renders(), loaded, &accepted, &held.version).await?;
-        entries.push(entry(facade, resource_type, &held.version, resource));
+        let accepted = party::accept(call.loaded, resource_type, id, &held)?;
+        let resource =
+            party::render(call.facade.renders(), call.loaded, &accepted, &held.version).await?;
+        entries.push(entry(call.facade, resource_type, &held.version, resource));
     }
     let mut bundle = Object::new();
     bundle.insert(

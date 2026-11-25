@@ -8,6 +8,7 @@ use http::HeaderMap;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_base::v1_3::base_types::identification::uid_based_id::UidBasedId;
+use openehr_its::rest::client::Client;
 use openehr_its::rest::generated::ehr::CompositionCreateParams;
 use openehr_its::rest::generated::ehr::CompositionDeleteParams;
 use openehr_its::rest::generated::ehr::CompositionGetParams;
@@ -22,8 +23,11 @@ use openehr_its::rest::generated::ehr::client::VersionedCompositionRevisionHisto
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::cdr::commit::CommitContext;
+use crate::cdr::commit::CommitHeaders;
+use crate::cdr::commit::commit_params;
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::EhrId;
+use crate::cdr::transport::Scoped;
 
 use super::Answered;
 use super::CdrClient;
@@ -34,6 +38,24 @@ use super::if_match_value;
 use super::representation;
 
 impl CdrClient {
+    /// Records the commit of `composition` on the request's reach and returns
+    /// its committal headers and the call that carries them.
+    fn composition_commit(
+        &self,
+        touch: crate::cdr::reach::Touch,
+        ehr_id: &EhrId,
+        composition: &Composition,
+        commit: &CommitContext,
+    ) -> Result<(CommitHeaders, Client<Scoped<'_>>), CdrError> {
+        crate::cdr::reach::touched(
+            touch,
+            Some(ehr_id),
+            crate::cdr::reach::composition(composition, None),
+        );
+        let headers = commit.headers()?;
+        Ok((headers, self.call(HeaderMap::new())?))
+    }
+
     /// Commits the first version of a composition into the EHR `ehr_id`.
     ///
     /// The body is canonical JSON, the mandatory composition representation of
@@ -50,24 +72,17 @@ impl CdrClient {
         commit: &CommitContext,
         prefer: Prefer,
     ) -> Result<Answered<CompositionCreateOutcome>, CdrError> {
-        crate::cdr::reach::touched(
+        let (headers, client) = self.composition_commit(
             crate::cdr::reach::Touch::Created,
-            Some(ehr_id),
-            crate::cdr::reach::composition(composition, None),
-        );
-        let headers = commit.headers()?;
-        let client = self.call(HeaderMap::new())?;
-        let params = CompositionCreateParams {
+            ehr_id,
+            composition,
+            commit,
+        )?;
+        let params = commit_params!(CompositionCreateParams, headers, prefer, {
             ehr_id: String::from(ehr_id.as_str()),
-            prefer: Some(String::from(prefer.as_str())),
-            accept: None,
-            content_type: None,
             openehr_item_tag: None,
-            openehr_version_item_tag: None,
-            openehr_version: headers.version,
-            openehr_audit_details: headers.audit_details,
             openehr_template_id: headers.template_id,
-        };
+        });
         let answered = EhrClient::new(&client)
             .composition_create(&params, composition)
             .await;
@@ -93,26 +108,19 @@ impl CdrClient {
         commit: &CommitContext,
         prefer: Prefer,
     ) -> Result<Answered<CompositionUpdateOutcome>, CdrError> {
-        crate::cdr::reach::touched(
+        let (headers, client) = self.composition_commit(
             crate::cdr::reach::Touch::Updated,
-            Some(ehr_id),
-            crate::cdr::reach::composition(composition, None),
-        );
-        let headers = commit.headers()?;
-        let client = self.call(HeaderMap::new())?;
-        let params = CompositionUpdateParams {
+            ehr_id,
+            composition,
+            commit,
+        )?;
+        let params = commit_params!(CompositionUpdateParams, headers, prefer, {
             ehr_id: String::from(ehr_id.as_str()),
             uid_based_id: String::from(versioned_object_uid.value()),
             if_match: if_match_value(preceding),
-            prefer: Some(String::from(prefer.as_str())),
-            accept: None,
-            content_type: None,
             openehr_item_tag: None,
-            openehr_version_item_tag: None,
-            openehr_version: headers.version,
-            openehr_audit_details: headers.audit_details,
             openehr_template_id: headers.template_id,
-        };
+        });
         let answered = EhrClient::new(&client)
             .composition_update(&params, composition)
             .await;
