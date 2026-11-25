@@ -8,7 +8,7 @@
 mod event;
 pub(crate) mod intake;
 mod notification;
-mod recover;
+pub(crate) mod recover;
 mod retry;
 pub(crate) mod store;
 mod subscription;

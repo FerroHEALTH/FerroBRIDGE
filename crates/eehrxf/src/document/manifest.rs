@@ -11,9 +11,9 @@
 //! the WADO-RS `EuMadoWadoEndpoint` of each series, and the creator
 //! organization and device the composition's two author slices require.
 //!
-//! The study's identity, status, modality, start, procedure and description
-//! come from the `ImagingStudy` the imaging report mapping writes from
-//! openEHR. Its series and instances and the services they are retrieved from
+//! The study's identity, status, modality, start, interpreter, procedure and
+//! description come from the `ImagingStudy` the imaging report mapping writes
+//! from openEHR. Its series and instances and the services they are retrieved from
 //! are DICOM facts openEHR does not hold, so the caller supplies them, read
 //! from the image archive (QIDO-RS); the manifest never invents one, and a
 //! manifest without them is refused with a [`ManifestError`].
@@ -512,6 +512,7 @@ fn manifest_study(
         modality: study.modality,
         subject: reference(&format!("Patient/{patient_id}")),
         started: study.started,
+        interpreter: study.interpreter,
         number_of_series: Some(count("series", series.len())?),
         number_of_instances: Some(count("instances", instances)?),
         procedure_code: study.procedure_code,

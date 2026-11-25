@@ -346,11 +346,24 @@ where
     Ok(())
 }
 
-/// Starts the `LISTEN` sessions of the state held in memory: the settings
-/// registers and the running mapping revision.
+/// Starts the replica's one `LISTEN` session, carrying the channel of every
+/// copy it holds in memory: the inbound sources, the settings registers and
+/// the running mapping revision.
 fn listen(state: &crate::state::AppState) {
-    crate::settings::listen(state.registers(), state.store());
-    crate::operator::watch::spawn(state.operator(), state.store());
+    let Some(store) = state.store() else {
+        return;
+    };
+    let listened: Vec<_> = [
+        state.sources().map(|sources| sources.listened()),
+        state.registers().map(|registers| registers.listened()),
+        state.operator().and_then(crate::operator::watch::start),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if !listened.is_empty() {
+        store.listeners(&listened).spawn();
+    }
 }
 
 /// Serves the health routes on `listener` and retries the start after

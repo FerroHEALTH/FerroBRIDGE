@@ -133,12 +133,14 @@ async fn a_patient_s_own_token_is_exchanged_at_the_smart_issuer() -> Result<(), 
     Ok(())
 }
 
-#[tokio::test]
-async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
--> Result<(), Box<dyn Error>> {
-    let world = World::start(Grant::Standard, "").await?;
-    world.mount_own_token().await;
-    let issued = mount_ferrosmart_exchange(&world, summary::UID).await;
+/// Sends `GET path` with `token` to a facade over the patient summary
+/// fixtures and the world's CDR, with the synthetic record mounted, and
+/// returns the answer; `None` when the profile packages are not fetched.
+async fn over_summary(
+    world: &World,
+    path: &str,
+    token: &str,
+) -> Result<Option<http::Response<axum::body::Body>>, Box<dyn Error>> {
     let term = wiremock::MockServer::start().await;
     let client =
         ferrobridge_server::cdr::CdrClient::new(&world.cdr_config.clone().with_demographic(true))?;
@@ -152,14 +154,10 @@ async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
     )
     .await?
     else {
-        return Ok(());
+        return Ok(None);
     };
     summary::mount_terminology(&term).await;
     summary::mount_record(&world.harness.cdr, &[summary::composition()?]).await;
-    let token = mint(
-        &world.key,
-        &patient_claims(&world, summary::UID, "patient/*.rs"),
-    );
     let state = ferrobridge_server::state::AppState::with_health(
         ferrohealth_health::registry::Registry::default(),
     )
@@ -171,12 +169,28 @@ async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
             &crate::facade::server_settings(),
         ),
         crate::facade::auth::bearing(
-            http::Request::get(format!("/fhir/Patient/{}/$summary", summary::UID))
-                .body(axum::body::Body::empty())?,
-            &token,
+            http::Request::get(path).body(axum::body::Body::empty())?,
+            token,
         ),
     )
     .await?;
+    Ok(Some(response))
+}
+
+#[tokio::test]
+async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
+-> Result<(), Box<dyn Error>> {
+    let world = World::start(Grant::Standard, "").await?;
+    world.mount_own_token().await;
+    let issued = mount_ferrosmart_exchange(&world, summary::UID).await;
+    let token = mint(
+        &world.key,
+        &patient_claims(&world, summary::UID, "patient/*.rs"),
+    );
+    let path = format!("/fhir/Patient/{}/$summary", summary::UID);
+    let Some(response) = over_summary(&world, &path, &token).await? else {
+        return Ok(());
+    };
     assert_eq!(http::StatusCode::OK, response.status());
 
     assert_every_call_under(&world.cdr_calls().await, &issued);
@@ -188,5 +202,31 @@ async fn a_patient_s_summary_is_read_from_the_cdr_under_the_exchanged_token()
             .is_some_and(|body| body.contains(&format!("subject_token={token}"))),
         "{exchanges:?}"
     );
+    Ok(())
+}
+
+// NOTE: SMART App Launch 2.2.0, Backend Services, and RFC 8693 §2.1: a
+// `system/` token names no user, so nothing is exchanged (#2139).
+#[tokio::test]
+async fn a_backend_services_read_of_the_launch_patient_is_never_exchanged()
+-> Result<(), Box<dyn Error>> {
+    let world = World::start(Grant::Standard, "").await?;
+    world.mount_own_token().await;
+    mount_ferrosmart_exchange(&world, summary::UID).await;
+    let token = mint(
+        &world.key,
+        &world.issuer.machine_claims("system/Patient.rs"),
+    );
+    let path = format!("/fhir/Patient/{}", summary::UID);
+    let Some(response) = over_summary(&world, &path, &token).await? else {
+        return Ok(());
+    };
+    assert_eq!(http::StatusCode::OK, response.status(), "the patient reads");
+
+    assert!(
+        world.onward_requests().await.is_empty(),
+        "a Backend Services token was exchanged"
+    );
+    assert_every_call_under(&world.cdr_calls().await, &super::OWN_TOKEN);
     Ok(())
 }
