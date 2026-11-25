@@ -12,11 +12,13 @@
 
 use std::error::Error;
 
+#[cfg(feature = "laboratory")]
+use eehrxf::document::metadata::Header;
 use eehrxf::document::metadata::{
     Attestation, COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, DocumentMetadata, FHIR_JSON,
-    Header,
 };
 use eehrxf::document::{Document, DocumentError, LOINC};
+#[cfg(feature = "laboratory")]
 use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
