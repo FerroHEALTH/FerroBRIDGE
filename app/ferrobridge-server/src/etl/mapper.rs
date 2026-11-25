@@ -4,7 +4,8 @@
 //! The OMOCL mapper `etl run` maps every composition with.
 //!
 //! The OMOCL files are read and validated once, at boot, from `[mappings]
-//! omocl` and the console's `[operator] mapping_dir`, so a file that does not load refuses the start. OMOCL maps by
+//! omocl` and the running revision of the console's files, so a file that
+//! does not load refuses the start. OMOCL maps by
 //! archetype and names no template, so a program is compiled the first time a
 //! composition of a template arrives, against the template the runner read
 //! from the CDR, and kept for the rest of the run; a set that does not compile
@@ -40,10 +41,7 @@ use openehr_mapping_core::index::WebTemplateIndex;
 
 use crate::etl::Mapper;
 use crate::etl::SourceComposition;
-use crate::mappings::files::Language;
-use crate::mappings::files::Located;
-use crate::mappings::files::Owner;
-use crate::mappings::files::Root;
+use crate::mappings::tree::Tree;
 
 /// Why the OMOCL mapping set could not be read.
 #[derive(Debug, thiserror::Error)]
@@ -102,43 +100,22 @@ pub fn read_set(directory: &Path) -> Result<MappingSet, MapperError> {
         .map_err(|diagnostics| MapperError::Mappings { diagnostics })
 }
 
-/// Reads and validates the OMOCL files of `roots` as one set, through the
-/// same load the operator reload checks them with.
-///
-/// Each wire path has one owner, the first root that holds a file at it, so
-/// a provisioned file wins over a console file at the same path. Two files
-/// at different paths that define the same mapping are a clash the load
-/// refuses.
+/// Validates the OMOCL files of `tree` as one set, through the same load the
+/// operator reload checks them with; `directory` names the provisioned
+/// directory in a refusal of an empty tree.
 ///
 /// # Errors
 ///
-/// Returns [`MapperError::Read`] when a provisioned directory cannot be read,
-/// [`MapperError::Empty`] naming the first root when no root holds a file,
-/// and [`MapperError::Mappings`] with every diagnostic when a file does not
-/// load.
-pub fn read_roots(roots: &[Root]) -> Result<MappingSet, MapperError> {
-    let located: Vec<Located> = crate::mappings::files::list(roots)
-        .map_err(|crate::walk::Error { path, source }| MapperError::Read { path, source })?
-        .into_iter()
-        .filter(|file| file.language() == Language::Omocl)
-        .collect();
-    if located.is_empty() {
+/// Returns [`MapperError::Empty`] when the tree holds no file and
+/// [`MapperError::Mappings`] with every diagnostic when a file does not load.
+pub fn read_tree(tree: &Tree, directory: Option<&Path>) -> Result<MappingSet, MapperError> {
+    if tree.is_empty() {
         return Err(MapperError::Empty {
-            path: roots
-                .first()
-                .map(|root| root.directory().to_path_buf())
-                .unwrap_or_default(),
+            path: directory.map(Path::to_path_buf).unwrap_or_default(),
         });
     }
-    tracing::info!(
-        files = located.len(),
-        console = located
-            .iter()
-            .filter(|file| file.owner() == Owner::Console)
-            .count(),
-        "the OMOCL mapping set is read"
-    );
-    omocl::model::load::load_set(located.iter().map(Located::path), &FirstPartyConverters)
+    tracing::info!(files = tree.len(), "the OMOCL mapping set is read");
+    crate::mappings::tree::omocl_set(tree)
         .map_err(|diagnostics| MapperError::Mappings { diagnostics })
 }
 

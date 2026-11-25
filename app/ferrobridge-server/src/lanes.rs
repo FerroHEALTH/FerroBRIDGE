@@ -14,7 +14,7 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
-use crate::config::{self, OperatorSettings, Settings};
+use crate::config::{self, Settings};
 use crate::serve_until;
 use crate::state::AppState;
 use crate::terminology::Translator;
@@ -91,24 +91,14 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         set_counts(&mut lanes, "facade", counts);
     }
     if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
-        let base = url::Url::parse(&mounted.settings().base_url)
-            .context("reading [facade] base_url as the address the access records name")?;
-        let store = state.store().context(
-            "the access-record lane keeps its outbox in the state store, and [state] is not set",
-        )?;
-        let log = crate::audit::AccessLog::open(audit, &base, mounted.client().base_url(), store);
-        tracing::info!(
-            lane = "audit",
-            repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
-            "the facade records every access in the audit trail"
-        );
+        let log = start_audit(audit, mounted, &state).await?;
         state = state.with_access_log(Arc::new(log));
     }
     state = start_links(settings, state)?;
-    if let Some(operator) = settings.operator.as_ref() {
+    if settings.operator.is_some() {
         let operator = build_operator(
             settings,
-            operator,
+            state.store(),
             state.facade().cloned(),
             state.operations_handle().cloned(),
         )
@@ -165,9 +155,28 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
     let Some(store) = state.store() else {
         return Ok(state);
     };
-    let sources = crate::sources::Sources::open(store, settings.secrets.as_ref())
-        .context("opening the [secrets] directory the inbound sources name")?;
-    Ok(state.with_sources(Arc::new(sources)))
+    let sources = Arc::new(
+        crate::sources::Sources::open(store, settings.secrets.as_ref())
+            .context("opening the [secrets] directory the inbound sources name")?,
+    );
+    let intake = settings.inbound.map(|inbound| {
+        // TODO(#2048): start the worker pool with the identity-feed handler.
+        crate::inbound::intake::Intake::new(
+            Arc::clone(&sources),
+            crate::inbound::store::InboxStore::new(store.pool().clone()),
+            inbound.body_limit,
+        )
+        .with_recoverer(Arc::new(crate::inbound::recover::Recoverer::new(
+            store.clone(),
+            Arc::clone(&sources),
+            inbound.workers.lease,
+        )))
+    });
+    let state = state.with_sources(sources);
+    Ok(match intake {
+        Some(intake) => state.with_intake(Arc::new(intake)),
+        None => state,
+    })
 }
 
 /// One change-feed consumer, ready to follow its source.
@@ -203,6 +212,24 @@ impl StartedFeed {
             .await;
         })
     }
+}
+
+/// Spawns every change-feed follower and the inbound recovery of `state`,
+/// each on its own task until `stop` reads `true`.
+pub(crate) fn spawn_followers(
+    feeds: Vec<StartedFeed>,
+    state: &AppState,
+    settings: &Settings,
+    stop: &tokio::sync::watch::Sender<bool>,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let (Some(recoverer), Some(inbound)) = (
+        state.intake().and_then(|intake| intake.recoverer()),
+        settings.inbound,
+    ) {
+        followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    followers
 }
 
 /// Opens the change-feed source over the state store once, and starts every
@@ -268,10 +295,11 @@ async fn start_change_feed(
         let name = crate::etl::incremental::NAME;
         let following =
             follower(&feed, feed_settings, &load.reader, name, "omop_incremental").await?;
-        let consumer = crate::etl::incremental::Incremental::start(settings, client.clone())
-            .await
-            .context("starting the incremental OMOP load")?
-            .with_following(following.clone());
+        let consumer =
+            crate::etl::incremental::Incremental::start(settings, state.store(), client.clone())
+                .await
+                .context("starting the incremental OMOP load")?
+                .with_following(following.clone());
         tracing::info!(
             lane = name,
             reader = %load.reader,
@@ -575,22 +603,57 @@ fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::
     }
 }
 
+/// Opens the access-record lane `audit` describes for the facade `mounted`,
+/// its outbox and its category register in the state store of `state`.
+async fn start_audit(
+    audit: &crate::audit::Settings,
+    mounted: &facade::Facade,
+    state: &AppState,
+) -> anyhow::Result<crate::audit::AccessLog> {
+    use anyhow::Context;
+
+    let base = url::Url::parse(&mounted.settings().base_url)
+        .context("reading [facade] base_url as the address the access records name")?;
+    let store = state.store().context(
+        "the access-record lane keeps its outbox in the state store, and [state] is not set",
+    )?;
+    let registers = state.registers().cloned().context(
+        "the access records are classified by a settings register, and [state] is not set",
+    )?;
+    let log = crate::audit::AccessLog::open(
+        audit,
+        (&base, mounted.client().base_url()),
+        store,
+        registers,
+    )
+    .await
+    .context("reading the audit-categories register the access records are classified by")?;
+    tracing::info!(
+        lane = "audit",
+        repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
+        "the facade records every access in the audit trail"
+    );
+    Ok(log)
+}
+
 /// Builds the operator API over the configured mapping directories, with the
 /// running load as the checker sees it.
 ///
-/// The check runs once here, over the inputs `mapping check` reads, and the
-/// search declaration of each context comes from the facade when it runs
-/// (no specification governs the operator surface: our own design).
+/// With the state store, the running revision's console files join the
+/// provisioned ones here and the start is refused when they do not compile;
+/// without it, the check runs once over the inputs `mapping check` reads.
+/// The search declaration of each context comes from the facade when it
+/// runs (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
-    operator_settings: &OperatorSettings,
+    store: Option<&crate::store::Store>,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<crate::operations::lane::OperationsLane>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 
-    let needs_cdr = settings.mappings.is_none()
-        && (settings.mapping_directory.is_some() || operator_settings.mapping_dir.is_some());
+    let needs_cdr =
+        settings.mappings.is_none() && (settings.mapping_directory.is_some() || store.is_some());
     let cdr = match settings.cdr.as_ref() {
         Some(config) if needs_cdr => Some(
             cdr::CdrClient::new(config)
@@ -615,7 +678,7 @@ async fn build_operator(
         let mappings = facade.mappings();
         operator::reload::searches(mappings.programs(), mappings.search())
     });
-    let built = if let Some(mapping_dir) = operator_settings.mapping_dir.clone() {
+    let built = if let Some(store) = store {
         let reloader = operator::reload::Reloader {
             fhirconnect: settings.mapping_directory.clone(),
             templates: settings
@@ -627,29 +690,22 @@ async fn build_operator(
             facade,
             operations,
         };
+        let revisions = crate::mappings::revisions::Revisions::new(store);
+        revisions
+            .baseline()
+            .await
+            .context("recording the baseline revision of the mapping set")?;
         let operator = Arc::new(
             operator::Operator::new(
                 roots,
                 operator::snapshot::Snapshot::new(check::Report::default(), searches),
             )
-            .with_saving(mapping_dir, reloader),
+            .with_saving(revisions, reloader),
         );
-        // NOTE: no specification governs this: our own design; the console's
-        // saved files join the running set at boot, or the start is refused.
-        let worker = Arc::clone(&operator);
-        operator::save::on_blocking_thread(move |thread| {
-            worker
-                .prepare(thread, None)
-                .map(|prepared| worker.apply(prepared))
-        })
-        .await
-        .context("loading the console's mapping files")?
-        .context("loading the console's mapping files")?;
-        let worker = Arc::clone(&operator);
-        tokio::task::spawn_blocking(move || worker.settle(operator::save::on_disk()))
+        operator
+            .converge(operator::watch::When::Always)
             .await
-            .context("recording the console's mapping files as a revision")?
-            .context("recording the console's mapping files as a revision")?;
+            .context("loading the running revision of the console's mapping files")?;
         Arc::try_unwrap(operator).map_err(|_shared| {
             anyhow::anyhow!("the operator API is still shared after its boot load")
         })?
@@ -671,7 +727,7 @@ async fn build_operator(
         lane = "operator",
         roots = built.roots().len(),
         diagnostics = built.snapshot().report().diagnostics().len(),
-        saving = operator_settings.mapping_dir.is_some(),
+        saving = store.is_some(),
         "the operator API is mounted under /operator"
     );
     Ok(built)

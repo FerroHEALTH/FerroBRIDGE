@@ -5,8 +5,6 @@
 //!
 //! No specification governs the configuration: our own design.
 
-use ehds_logging::map::CategoryMap;
-use ehds_logging::map::Matching;
 use ferrohealth_smart::client::outbound::OutboundClient;
 use ferrohealth_smart::config::ServerTls;
 
@@ -16,7 +14,8 @@ use crate::audit::Settings;
 
 /// Returns the lane `audit` describes, refused without the facade it records
 /// for, without `[auth]`, whose callers it names, without `[state]`, which
-/// keeps its outbox, and without a repository or a category map it can read.
+/// keeps its outbox and its category register, and without a repository it
+/// can read.
 ///
 /// `system_id` is the facade's, which the bridge names itself by when
 /// `[audit] source_id` is empty.
@@ -60,18 +59,6 @@ pub(super) fn resolve_audit(
             source,
         }
     })?;
-    // NOTE: openEHR BASE Release 1.3.0, Identification Package, "Composite Identifiers and
-    // Case": template and archetype ids compare case-insensitively.
-    let categories = CategoryMap::declare_with(
-        Matching::OpenEhr,
-        &audit.categories.national,
-        &audit.categories.templates,
-        &audit.categories.archetypes,
-    )
-    .map_err(|source| Error::Categories {
-        key: String::from("audit.categories"),
-        source,
-    })?;
     Ok(Settings {
         feed,
         source_id: if audit.source_id.is_empty() {
@@ -80,6 +67,5 @@ pub(super) fn resolve_audit(
             audit.source_id.clone()
         },
         site: audit.site.clone().filter(|site| !site.is_empty()),
-        categories,
     })
 }

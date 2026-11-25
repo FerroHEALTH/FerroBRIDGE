@@ -5,8 +5,8 @@
 //! the files they came from, the templates and every diagnostic.
 //!
 //! A path in a document is a wire path (`fhirconnect/...`, `omocl/...`) when
-//! the file is under a mapping root, and the file name alone otherwise, so a
-//! document never names a host directory. The documents are the
+//! the file is under a mapping root or is a console file, and the file name
+//! alone otherwise, so a document never names a host directory. The documents are the
 //! `ferrobridge_operator_api::operator` types the operator console reads. No
 //! specification governs the operator surface: our own design.
 
@@ -25,23 +25,42 @@ use crate::mappings::files;
 use crate::mappings::files::Language;
 use crate::mappings::files::Owner;
 use crate::mappings::files::Root;
+use crate::mappings::revisions::Console;
 
-/// The running load: the boot check's report and the search declaration
-/// each context answers searches with.
+/// The running load: the check's report, the search declaration each context
+/// answers searches with, and the console files it compiled.
 #[derive(Debug)]
 pub struct Snapshot {
     /// What the check loaded and raised.
     report: Report,
     /// The search declaration file of each context, by context name.
     searches: BTreeMap<String, PathBuf>,
+    /// The running revision's console files.
+    console: Console,
 }
 
 impl Snapshot {
     /// Returns the snapshot of `report`, with `searches` naming each
-    /// context's search declaration.
+    /// context's search declaration and no console file.
     #[must_use]
-    pub const fn new(report: Report, searches: BTreeMap<String, PathBuf>) -> Self {
-        Self { report, searches }
+    pub fn new(report: Report, searches: BTreeMap<String, PathBuf>) -> Self {
+        Self {
+            report,
+            searches,
+            console: Console::default(),
+        }
+    }
+
+    /// Returns this snapshot compiled with the console files `console`.
+    #[must_use]
+    pub fn with_console(self, console: Console) -> Self {
+        Self { console, ..self }
+    }
+
+    /// Returns the console files this load compiled.
+    #[must_use]
+    pub const fn console(&self) -> &Console {
+        &self.console
     }
 
     /// Returns the check report of the running load.
@@ -138,20 +157,32 @@ impl Snapshot {
         }
     }
 
-    /// Returns every mapping file under `roots` as `GET /operator/mappings`
-    /// lists it.
+    /// Returns every mapping file under `roots`, then every console file a
+    /// provisioned one does not hold, as `GET /operator/mappings` lists them.
     ///
     /// # Errors
     ///
     /// Returns [`crate::walk::Error`] when a directory or a file cannot be
     /// read.
     pub fn listing(&self, roots: &[Root]) -> Result<Vec<Listed>, crate::walk::Error> {
-        let mut listed = Vec::new();
+        let mut found = Vec::new();
         for located in files::list(roots)? {
             let bytes = std::fs::read(located.path()).map_err(|source| crate::walk::Error {
                 path: located.path().to_path_buf(),
                 source,
             })?;
+            found.push((located, std::sync::Arc::from(bytes)));
+        }
+        for (wire, bytes) in self.console.files() {
+            if found.iter().any(|(located, _bytes)| located.wire() == wire) {
+                continue;
+            }
+            if let Some(located) = files::Located::console(wire) {
+                found.push((located, std::sync::Arc::clone(bytes)));
+            }
+        }
+        let mut listed = Vec::new();
+        for (located, bytes) in found {
             let diagnostics = self
                 .report
                 .diagnostics()
@@ -199,14 +230,20 @@ impl Snapshot {
     }
 }
 
-/// Returns how a document names `path`: its wire path under `roots`, or its
-/// file name.
+/// Returns how a document names `path`: its wire path under `roots`, the
+/// wire path a console file is keyed by, or its file name.
 #[must_use]
 pub fn shown(roots: &[Root], path: &Path) -> String {
-    files::wire_path_in(roots, path).unwrap_or_else(|| {
-        path.file_name()
-            .and_then(std::ffi::OsStr::to_str)
-            .unwrap_or_default()
-            .to_owned()
-    })
+    files::wire_path_in(roots, path)
+        .or_else(|| {
+            path.to_str()
+                .and_then(files::Located::console)
+                .map(|located| located.wire().to_owned())
+        })
+        .unwrap_or_else(|| {
+            path.file_name()
+                .and_then(std::ffi::OsStr::to_str)
+                .unwrap_or_default()
+                .to_owned()
+        })
 }

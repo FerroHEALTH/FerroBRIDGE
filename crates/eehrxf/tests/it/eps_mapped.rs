@@ -51,7 +51,7 @@ use openehr_adl::parse::Dialect;
 use openehr_mapping_core::template::TemplateSource;
 
 use super::eps_sections;
-use super::support::{emit, eps, profile_set, vendored};
+use super::support::{annex_iii, emit, eps, profile_set, vendored};
 
 /// The root context of the EPS project.
 const ROOT: &str = "ferrobridge_eu_eps.context";
@@ -77,11 +77,17 @@ const EPS_COMPOSITION: &str = "http://hl7.eu/fhir/eps/StructureDefinition/compos
 /// domain RFC 6761 §6.5 reserves.
 pub(crate) const BASE: &str = "https://gateway.example.org/fhir";
 
-/// The synthetic medicine's code.
-const MEDICINE: &str = "SYN-MEDICINE-0001";
+/// The medicine's ATC code, which MVC 10.1.0 `eHDSIActiveIngredient` lists.
+const MEDICINE: &str = "N02BE01";
 
-/// The synthetic vaccine's code.
-const VACCINE: &str = "SYN-VACCINE-0001";
+/// The vaccine's SNOMED CT code, which MVC 10.1.0 `eHDSIVaccine` lists.
+const VACCINE: &str = "836398006";
+
+/// The ATC code system.
+const ATC: &str = "http://www.whocc.no/atc";
+
+/// The SNOMED CT code system.
+const SNOMED: &str = "http://snomed.info/sct";
 
 /// The ADL 2 operational template of the patient summary template.
 pub(crate) fn template() -> Result<TemplateSource, Box<dyn Error>> {
@@ -111,10 +117,10 @@ pub(crate) fn summary() -> Result<Mapping, Box<dyn Error>> {
     Ok(Mapping::compile_project(&template()?, &EPS)?)
 }
 
-/// A synthetic coded text of the local synthetic code system.
-fn coded(value: &str, code: &str) -> String {
+/// A coded text of `code` in `system`.
+fn coded(system: &str, value: &str, code: &str) -> String {
     format!(
-        r#"{{ "_type": "DV_CODED_TEXT", "value": "{value}", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "http://example.org/fhir/CodeSystem/ferrobridge-products" }}, "code_string": "{code}" }} }}"#
+        r#"{{ "_type": "DV_CODED_TEXT", "value": "{value}", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "{system}" }}, "code_string": "{code}" }} }}"#
     )
 }
 
@@ -161,7 +167,7 @@ fn order(code: &str) -> String {
   "protocol": {{ "_type": "ITEM_TREE", "name": {{ "_type": "DV_TEXT", "value": "Tree" }}, "archetype_node_id": "at0005", "items": [] }}
 }}"#,
         details = details("openEHR-EHR-INSTRUCTION.medication_order.v3"),
-        medicine = coded("Synthetic tablet 500 mg", code),
+        medicine = coded(ATC, "paracetamol", code),
     )
 }
 
@@ -189,7 +195,11 @@ fn administered(code: &str) -> String {
   }}
 }}"#,
         details = details("openEHR-EHR-ACTION.medication.v1"),
-        vaccine = coded("Synthetic vaccine", code),
+        vaccine = coded(
+            SNOMED,
+            "Streptococcus pneumoniae antigen-containing vaccine product",
+            code
+        ),
     )
 }
 
@@ -216,7 +226,7 @@ fn taken(code: &str) -> String {
   }}
 }}"#,
         details = details("openEHR-EHR-ACTION.medication.v1"),
-        medicine = coded("Synthetic tablet 500 mg", code),
+        medicine = coded(ATC, "paracetamol", code),
     )
 }
 
@@ -722,6 +732,7 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
     ] {
         document.with_section(section_of(slice, "Nothing recorded.", None)?)?;
     }
+    document.with_metadata(annex_iii("60591-5"));
     let bundle = document.into_bundle()?;
     let text = serde_json::to_string(&bundle)?;
     let received = ReceivedDocument::read(&text)?;
@@ -795,6 +806,7 @@ fn the_summary_in_the_ips_form_validates_against_bundle_uv_ips() -> Result<(), B
                 .empty_because(EmptyReason::Unavailable),
         )?;
     }
+    document.with_metadata(annex_iii("60591-5"));
     let text = serde_json::to_string(&document.into_bundle()?)?;
     let root: serde_json::Value = serde_json::from_str(&text)?;
     assert_eq!(root["meta"]["profile"][0], IPS_BUNDLE);

@@ -1265,9 +1265,22 @@ exchange format (Article 15), whose content the Commission fixes by
 implementing act. The regulation applies from 2027-03-26, with the exchange
 obligations phased by category group from 2029-03-26 and 2031-03-26
 (Article 105). The implementing act for the format is a planned initiative
-(`PLAN/2026/837`, published 2026-03-30, adoption due 2027-03-26) with no
-published draft on 2026-09-12, so **no profile version is legally pinned**,
-and every target below is a candidate, never a conformance claim. The HL7
+(`PLAN/2026/837`, published 2026-03-30, adoption due 2027-03-26). Its
+draft was published for feedback on 2026-11-23 (Have your say initiative
+17512, vendored under `docs/specs/ehds-eehrxf-draft/`): **the draft is the
+authority for the data sets** (Annexes III to X) and **the Xt-EHR models
+1.0.0 are the logical model the `eehrxf` crate reads** until the
+implementation guide the draft's Art 9 promises for 2027-10-31 is
+published. `eehrxf::draft` crosswalks every annex element to its Xt-EHR
+element, and where the two differ the draft leads. Its Art 6 is the coding
+rule the component follows: a code goes out as recorded, a translation the
+terminology server states `equivalent` or `equal` is added beside it with
+the concept map that made it (`elementSource`) and its equivalence in the
+translator's record, and a code no map covers goes out with its English
+designation from `$lookup` when the content is not in English, the gap
+counted. Value maps come only from the terminology server. The draft names no
+profile package, so **no profile version is legally pinned**, and every
+target below is a candidate, never a conformance claim. The HL7
 Europe implementation guides are the current best proxy for the format, and
 every category has an R4 line, so the R4 pin costs nothing (read 2026-09-12
 from each guide's `package-list.json` and `ImplementationGuide` resource):
@@ -1521,47 +1534,69 @@ listener, and the writes change mapping files, never clinical data. The
 request log names the actor and the file of a write, never its content.
 
 **A mapping file has one owner.** The files under the configured mapping
-directories are provisioned and read-only in the console. A console save goes
-to `[operator] mapping_dir`, a separate writable directory (a volume, since
-`compose.yaml` runs the server with a read-only root file system), and a save
-whose relative path names a provisioned file is refused. The save writes the
-verbatim bytes the editor sent to a temporary file in that directory, syncs
-it and renames it over the target, so a reader sees the old file or the new
-one and never a mix. Nothing writes back to a provisioned directory.
+directories are provisioned and read-only in the console. A console file
+lives in the state store (`0011_baseline_mappings.sql`, §7), and a save whose
+wire path names a provisioned file is refused. The store keeps every set of
+console files as a revision: each file by its wire path and the SHA-256 of
+its verbatim bytes in `mapping_revision`, the bytes once per digest in
+`mapping_blob`, and the revision every replica runs in the one row of
+`mapping_running`. Nothing writes back to a provisioned directory, so the
+server keeps its read-only root file system. Without `[state]`, the operator
+API checks and saves nothing.
 
-**A reload checks the whole set, then swaps.** A save is checked first: the
-draft is compiled with every other file of the set, and a draft that would
-not compile is refused with its diagnostics and never written. A reload
-compiles the provisioned files and the console's files together. Any error
-leaves the running set in place and answers every diagnostic. A clean set
-replaces the running one in a single pointer swap: each request takes the
-set at entry and finishes on it, so a request in flight completes on the old
-set. An ETL run reads the set when it starts.
+**The load path compiles a tree in memory.** Every FHIRconnect, search
+declaration and OMOCL load reads a tree of file bytes by path, keeping each
+file's path for the source positions its diagnostics carry. A provisioned
+directory is one producer of that tree, keyed by path on disk; the running
+revision is the other, keyed by wire path. No file is staged on disk to be
+read back.
 
-**A console OMOCL file reaches `etl run` through the console directory.**
-The bridge runs no OMOCL lane, so a reload only checks OMOCL files; `etl
-run` is a separate process that reads `[mappings] omocl` once at start (#757).
-When the run's configuration turns the operator API on, it also reads
-`mapping_dir/omocl/`, through the file listing and the OMOCL load the reload
-uses, so the run and the reload see the same set. A path has one owner,
-the provisioned file winning a path both directories hold, and two files that
-define one mapping are a clash the load refuses: a save is refused with its
+**A save checks the whole set, then records and swaps.** A save holds the
+`mapping_running` row for its whole transaction, so saves from every replica
+run one at a time. It compiles the running revision's files with the draft
+in place, beside the provisioned files, for every lane. A draft that would
+not compile is refused with its diagnostics, and nothing is recorded or
+moved. A clean set is recorded as a new revision, `mapping_running` moves to
+it, and `pg_notify('ferrobridge_mappings', <id>)` runs in the same
+transaction. The replica then replaces its running set in a single pointer
+swap: each request takes the set at entry and finishes on it, so a request
+in flight completes on the old set. An apply of an earlier or an imported
+revision runs the same way, and an import records a revision that waits for
+an apply. The first start on an empty store records the baseline, revision 1
+with no console file: the provisioned tree at first start, in the same
+transaction that holds `mapping_running`, so replicas starting together
+record it once, and an apply of it runs the provisioned tree alone. A reload compiles the provisioned files and the running revision
+again and records nothing. An ETL run reads the set when it starts.
+
+**Every replica runs the running revision.** Each replica reads the running
+revision at start, and a revision that does not compile refuses the start.
+Its `LISTEN` session (§7) wakes one task on every notification and on every
+connect; the task reads `mapping_running` and, when it names a revision this
+replica does not run, compiles it and swaps it in as a save does. A revision
+that does not compile on a replica, or a store that does not answer, leaves
+that replica's running set in place and is tried again after five seconds.
+
+**A console OMOCL file reaches `etl run` through the running revision.**
+The bridge runs no OMOCL lane, so a save only checks OMOCL files; `etl run`
+is a separate process that reads `[mappings] omocl` once at start (#757).
+When the run's configuration turns the operator API on and names `[state]`,
+it also reads the running revision's OMOCL files, through the same tree the
+save checks, so the run and the save see the same set. A path has one owner,
+the provisioned file winning a path both hold, and two files that define one
+mapping are a clash the load refuses: a save is refused with its
 diagnostics, and a run stops before it calls an upstream.
 
 **A search declaration is checked and swapped with its context.** A
 `*.search.yml` file is part of the set like any FHIRconnect file: the console
-saves it under `mapping_dir/fhirconnect/`, and a reload binds every
+saves it in a revision like any other, and every load binds every
 declaration, provisioned and console, to the programs it compiled (#766). A
 declaration that does not bind is an error diagnostic on its file, so a save
 is refused with it and the running set stays. The facade's programs and its
 search declarations swap in the same pointer swap, so a request never sees a
 declaration of one set over the programs of another.
 
-**Each replica reloads on its own.** With `mapping_dir` on a shared volume, a
-file another replica saved is visible to this one at its next reload or
-restart. The console's reload acts on the replica behind its configured URL.
-Revisions shared across replicas, with history and rollback, are the console
-breadth of v0.0.16.
+No specification governs how the bridge stores and distributes its mapping
+revisions: our own design.
 
 **An operation that commits nothing admits the operator scope.** `$validate`
 is a dry run, and `$tofhir` and `$toopenehr` transform without writing, so
@@ -2405,13 +2440,76 @@ State held in memory listens on one `LISTEN` session per replica, apart
 from the pool: a notification marks the copy stale, a reconnect drops it
 whole, and while the session is down every request reads the store;
 PostgreSQL delivers a `NOTIFY` at commit and never on rollback
-(<https://www.postgresql.org/docs/current/sql-notify.html>). `[state.seal]`
+(<https://www.postgresql.org/docs/current/sql-notify.html>). Operational policy the operator changes at runtime is a settings register
+(`settings_register`, `0002`): each write appends a version naming the version
+it replaces in `If-Match` (a stale writer answers `412`, RFC 9110 §13.1.1) and
+notifies `ferrobridge_settings`, and a register with no version holds its
+default. The first register is `audit-categories`, the Annex II 3.2(c)
+category map; every access record names the revision it was classified under
+as the map digest, a replica refuses to start without the register, and a
+replica that cannot read it later classifies with the newest revision it
+holds and logs a warning naming that revision. The register mechanics and the
+revision field are our own design. `[state.seal]`
 lists the keys stored bodies are sealed under, each named by the id a sealed
 row carries, the first one sealing, and the lookup key identifier values are
 stored as an HMAC under. The identity map (section 9), the SMART Health Links
 and the facade's own App State and launch `Task`s live there; the change-feed
 and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
 own design on family precedent.
+
+**The inbound intake.** No specification governs an inbound patient-event
+intake: ITS-REST 1.1.0 defines no change notification in either direction
+(<https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/>), so
+the intake is our own design, built on the standard of each step. Behind
+`[inbound]`, `POST /inbound/{source}` serves every webhook source of `0008`.
+The raw body is read within the source's `limits.body_limit` and
+`[inbound] body_limit`. The source's verifier runs over the raw bytes before
+any parse, comparing in constant time over a key list: `hmac` (RFC 2104,
+SHA-256 or SHA-512, hex or base64), `standard-webhooks` (`v1` and `v1a` of
+release v1.3.0, `v2a` of its main branch with the producer's endpoint id,
+<https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md>),
+`static-header` and `mtls` (a DNS name the verified client certificate
+carries). A failure answers `401` and stores nothing. The event map selects
+the tenant, entity and stamp by JSON Pointer (RFC 6901) and the action by
+the first matching rule; a probe, an ignored event and an unserved tenant
+answer `200` unstored. The de-duplication key is the SHA-256 of the
+source's event id (`webhook-id`, CloudEvents 1.0.2 `source` and `id`) or of
+the declared fields that tell two events apart. The inbox (`0009`) is
+written before the answer, in one transaction: the event `ON CONFLICT
+(source_id, dedupe_key) DO NOTHING`, the entity's one work item moved to a
+new generation, and `pg_notify('ferrobridge_inbound', …)`. Above the
+source's `limits.max_pending`, or with the store down, the intake answers
+`503` with `Retry-After`. Workers on every replica claim due items through
+a materialized `FOR UPDATE SKIP LOCKED` selection under a lease
+(<https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE>),
+make their remote calls outside any transaction, and give the item back at
+the generation they saw, so an event that arrived during the work runs the
+item again and a fetched source ends in the same state in any arrival order.
+`limits.concurrency` bounds the remote calls in flight per source and tenant
+across replicas, one leased `inbound_slot` row per call, taken and given back
+in two short statements. Idempotence is the inbox key and the generation; the
+failure policy is ours: a network failure, `5xx`, `429` or `423` retries
+after `backoff·2^(n-1)`, capped at `max_backoff`, with jitter, until
+`max_attempts`, and every other refusal parks at once with a fixed reason
+that names no value. An operator settles a parked item (retry or discard,
+recorded with the token's subject and the reason) and replays work by
+entity or by received range through `/operator/sources/{id}/…`.
+Recovery is the receiver's job for a webhook source that retries nothing on
+its own: a source declares a `redeliver` call, made when a replica first
+leads the source and after a run of `503` answers, and `reconcile` polls
+that read the entities changed since a cursor per tenant and mark each one
+due. One replica runs a source's recovery under the lane lease
+`inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
+a transaction that fences the generation that read it. The schedule is our
+own design, since no specification governs it.
+A `fhir-subscription` source receives R4 notifications of the Subscriptions
+R5 Backport IG STU 1.1.0
+(<https://hl7.org/fhir/uv/subscriptions-backport/notifications.html>) on the
+same route, the `rest-hook` channel of the NL Generic Functions notification
+page; each event becomes one work item keyed by the subscription and its
+event number, `fhir_subscription_state` keeps each subscription's status,
+highest event and gap, and the recovery leader recovers a gap through
+`$events` (errors.html).
 
 **Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
 `jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
@@ -3285,8 +3383,8 @@ playground, persisted ETL run reports, and the HL7 v2 ConceptMaps read-only.
 | Operator console shape | `app/ferrobridge-console`, every page drawn on its server from FerroUI's components with FerroUI's script modules on top (#1355), with a backend-for-frontend, its own binary and image; the operator's OIDC session on the console's server, which calls the bridge with the operator's token (section 4.10, #594) | the bridge authenticates every request by bearer token and holds no browser session (#400), so a console the bridge served would add a session and a static-asset surface; FerroFED's A55 is the family precedent; no specification governs the console: our own design | a client-side app served by the bridge; a console inside the server binary |
 | Console crate boundary | the server half links `openehr-mapping-core`, `fhir-types` (`r4`, `terminology`) and `ferrobridge-operator-api` (the serde types of the health and operator documents, #777) and no other workspace crate, and the browser half `openehr-mapping-core` and `ferrobridge-operator-api` alone, enforced by a dependency-closure test | `codegen.md` forbids a consumer shadowing a model the workspace defines (`Diagnostic`, `OperationOutcome`, `CapabilityStatement`, and the bridge's own documents); one contract crate both sides compile against turns a renamed field into a build failure; excluding the engine crates keeps every check, transform and save on the bridge | no workspace crate (shadow types for the three); the console reading the bridge's documents by field name; the engine crates linked so the console compiles mappings itself |
 | Operator API | `/operator` on the bridge's listener, off unless `[operator] enabled`, refused at load without `[auth]`, every route requiring the operator scope (`[auth] product_scope`); the log names actor and file, never content | SMART scopes cover FHIR resources only; the bridge has no admin listener and the writes touch mapping files, never clinical data; no specification governs it: our own design | a second admin listener; an unguarded API on a private network |
-| Mapping ownership and saving | provisioned directories read-only; console saves go to `[operator] mapping_dir`, written to a temporary file, synced and renamed; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a rename is atomic within one file system, so a reader sees the old file or the new one | writing back into the provisioned tree; saving without a check |
-| Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; each replica reloads on its own call or restart | requests in flight finish on the set they started with; a half-loaded set is never served; shared revisions are v0.0.16 | per-file hot reload; a file watcher; reload on save across replicas |
+| Mapping ownership and saving | provisioned directories read-only; console saves recorded as revisions in the state store, one transaction that holds `mapping_running`; a save over a provisioned path is refused | one owner per file (FerroFED A88); the server runs with a read-only root file system; a transaction commits whole, so a replica reads the old revision or the new one | writing back into the provisioned tree; saving without a check |
+| Mapping reload | the whole set compiled, any error keeps the running set; a clean set swapped in one pointer swap that each request reads at entry; every replica compiles the running revision on the notification of a save | requests in flight finish on the set they started with; a half-loaded set is never served | per-file hot reload; a file watcher |
 | Scope of non-committing operations | `$validate`, `$tofhir` and `$toopenehr` admit the operator scope beside their SMART scopes (#598) | none of them writes to the CDR, so an operator testing a mapping needs no clinical write scope | a SMART write scope for the console's dry runs |
 | CORS on the facade | `GET [base]/metadata` and the SMART discovery document answer any origin with `*`; the REST routes under `/fhir` answer the origins `[facade.cors] allowed_origins` lists, by name with `Vary: Origin`, never `*` and never `Access-Control-Allow-Credentials`; the layer runs outside the guard and answers an admitted preflight itself (#1950) | SMART App Launch 2.2.0, App Launch, Considerations for CORS support (any origin on the discovery endpoints, registered origins on the REST API); FHIR R4 Security §6.1.0.3; a resource server holds no client registry, so the list is configuration: our own design | a wildcard on the REST routes; CORS inside the guard, which would hide a `401` from the app |
 

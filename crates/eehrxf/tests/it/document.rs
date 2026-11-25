@@ -33,7 +33,7 @@ use flate2::read::GzDecoder;
 use serde_json::Value;
 
 use super::mapping::COMPOSITION;
-use super::support::eps_package;
+use super::support::{annex_iii, eps_package};
 
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
@@ -204,6 +204,7 @@ pub(crate) fn document_mapped(mapping: &Mapping, runs: usize) -> Result<Bundle, 
         .empty_because(EmptyReason::NilKnown);
         document.with_section(section)?;
     }
+    document.with_metadata(annex_iii("60591-5"));
     Ok(document.into_bundle()?)
 }
 

@@ -8,13 +8,13 @@
 //!
 //! The bridge runs `ferrobridge serve`'s own run path,
 //! `ferrobridge_server::boot::serve_settings`. Its mapping tree holds one
-//! provisioned context and model over the testkit's diagnosis template, an
-//! empty directory the console saves into, and a few of the v2-to-FHIR
-//! guide's maps for the HL7 v2 face.
+//! provisioned context and model over the testkit's diagnosis template and a
+//! few of the v2-to-FHIR guide's maps for the HL7 v2 face; the console saves
+//! into the state store.
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
@@ -198,11 +198,13 @@ pub(crate) struct Stack {
     /// The CDR, kept so it outlives the bridge.
     _cdr: MockServer,
     /// The mapping tree and the templates.
-    tree: tempfile::TempDir,
+    _tree: tempfile::TempDir,
     /// The test OpenID Provider.
     provider: Provider,
     /// The console's base URL.
     console: String,
+    /// The bridge's base URL.
+    bridge_url: String,
     /// The name of the console's session cookie.
     cookie: String,
     /// The operator's access token, which never reaches the browser.
@@ -303,9 +305,10 @@ impl Stack {
         ));
         Ok(Self {
             _cdr: cdr,
-            tree,
+            _tree: tree,
             provider,
             console,
+            bridge_url: bridge,
             cookie,
             access_token,
             bridge: running,
@@ -347,9 +350,18 @@ impl Stack {
         &self.cookie
     }
 
-    /// The directory the console saves its files into.
-    pub(crate) fn console_files(&self) -> PathBuf {
-        self.tree.path().join("console")
+    /// The bytes of the mapping file at the wire path `path`, as the
+    /// bridge's operator API serves it, `None` when it holds none.
+    pub(crate) async fn mapping_file(&self, path: &str) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
+        let answer = reqwest::Client::new()
+            .get(format!("{}/operator/mappings/{path}", self.bridge_url))
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+        if answer.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        Ok(Some(answer.error_for_status()?.bytes().await?.to_vec()))
     }
 }
 
@@ -399,8 +411,8 @@ async fn cdr(port: u16) -> Result<MockServer, Box<dyn Error>> {
 /// specification governs this: our own design).
 const CAPTURE_TREES: &str = "/tmp/ferrobridge-journey-capture";
 
-/// The mapping tree: the provisioned mappings, the template, and the
-/// console's empty directory. A capture's tree (`port` not `0`) is
+/// The mapping tree: the provisioned mappings and the template. A capture's
+/// tree (`port` not `0`) is
 /// [`CAPTURE_TREES`]`/bridge-<port>`, the same path each run and in every
 /// checkout, since the configuration and diagnostics pages draw it; every
 /// other tree is a fresh temporary directory.
@@ -424,7 +436,7 @@ fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
     };
     let mappings = tree.path().join("mappings");
     let templates = tree.path().join("templates");
-    for directory in [&mappings, &templates, &tree.path().join("console")] {
+    for directory in [&mappings, &templates] {
         std::fs::create_dir_all(directory)?;
     }
     std::fs::write(
@@ -471,12 +483,8 @@ async fn bridge(
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, console] = [
-        tree.join("mappings"),
-        tree.join("templates"),
-        tree.join("console"),
-    ]
-    .map(|file| toml::Value::String(file.display().to_string()));
+    let [mappings, templates] = [tree.join("mappings"), tree.join("templates")]
+        .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
     let mllp_tls = mllp_tls(tree)?;
     let events = match lanes {
@@ -499,7 +507,7 @@ async fn bridge(
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
-         [operator]\nenabled = true\nmapping_dir = {console}\n\n\
+         [operator]\nenabled = true\n\n\
          [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n{mllp_tls}\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),

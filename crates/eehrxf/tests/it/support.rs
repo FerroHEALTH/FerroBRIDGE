@@ -388,3 +388,28 @@ pub(crate) fn synthetic() -> Vec<(&'static str, String)> {
         ),
     ]
 }
+
+/// The Annex III document metadata of a synthetic document of the LOINC
+/// document class `code`, at version `1` (draft `EEHRxF` Annex III Table 1,
+/// `version` and `documentCategory`).
+#[cfg(all(
+    feature = "openehr",
+    any(
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging"
+    )
+))]
+pub(crate) fn annex_iii(code: &str) -> eehrxf::document::metadata::DocumentMetadata {
+    eehrxf::document::metadata::DocumentMetadata::new(
+        String::from("1"),
+        fhir_types::r4::codeable_concept::CodeableConcept {
+            coding: vec![fhir_types::r4::coding::Coding {
+                system: Some("http://loinc.org".into()),
+                code: Some(code.into()),
+                ..fhir_types::r4::coding::Coding::default()
+            }],
+            ..fhir_types::r4::codeable_concept::CodeableConcept::default()
+        },
+    )
+}

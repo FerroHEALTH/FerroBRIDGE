@@ -139,11 +139,13 @@ the testkit tool crate. Beside it:
   read-only operator API behind `[operator]` and `[auth]` (#596): the guard
   that admits only a token carrying `auth.product_scope`, the mapping roots
   with every wire path confined to its directory, and the running load as
-  the `check` module reports it; with `[operator] mapping_dir` it checks a
-  draft, saves it beside the provisioned tree and reloads (#597), swapping the
-  facade's and the operations lane's programs, which every request reads once
-  at entry. `src/mappings/compile.rs` is the one FHIRconnect load path the
-  lanes, `mapping check` and the reload share (#725).
+  the `check` module reports it; with `[state]` it checks a draft, records it
+  as the running revision in the state store and reloads (#597, #2058),
+  swapping the facade's and the operations lane's programs, which every
+  request reads once at entry, and `operator::watch` swaps in a revision
+  another replica recorded on its notification. `src/mappings/compile.rs` is
+  the one FHIRconnect load path the lanes, `mapping check` and the reload
+  share (#725), compiling the in-memory tree of `src/mappings/tree.rs`.
   `src/store/` is the PostgreSQL state store behind `[state]` (#2053): one
   pool, the PostgreSQL 19 floor, the baselines under `migrations/state/`
   (`NNNN_baseline_<area>.sql`, grants last) run at start under the advisory
@@ -351,12 +353,16 @@ the testkit tool crate. Beside it:
   that fail a rise, pass a fall and only tighten (#1359); `forwarders.sh`,
   the ratchet of the same kind over the functions that only forward to
   another, which `tools/forwarders` lists (#1414); and `conformance.sh`, the pass-list gate over the six
-  corpora under `conformance/` (sixteen: the two mapping libraries, the
+  corpora under `conformance/` (seventeen: the two mapping libraries, the
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
   FHIR examples packages per version, STU3 to R6, the R4 facade, the draft
   EEHRxF Annex X groups the facade serves, the HL7
-  FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, and
-  the R4 profile validator's agreement with the HL7 FHIR Validator) (a regression fails, a new pass asks for the
+  FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, the
+  R4 profile validator's agreement with the HL7 FHIR Validator, and the
+  draft EEHRxF annexes against the Xt-EHR models 1.0.0), and the four
+  MyHealth@EU corpora HL7's FHIR Validator measures in the `fhir-validator`
+  job (`scripts/checks/fhir-validator.sh --myhealth-eu`: Core, Laboratory and
+  HDR on their CI builds, and the codes against the MVC catalogue), (a regression fails, a new pass asks for the
   list, `--update` rewrites the lists and the shields.io badge JSON).
   `affected.sh` computes the packages a change reaches, which decides the
   CI lanes a pull request runs, and `fast.sh` is the default local gate over

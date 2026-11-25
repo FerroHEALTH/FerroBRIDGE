@@ -28,7 +28,9 @@ mod concept_maps;
 mod configuration;
 mod etl_runs;
 mod events;
+mod inbound;
 mod problem;
+mod registers;
 mod save;
 mod sources;
 mod templates;
@@ -68,7 +70,7 @@ impl Case {
     async fn answering(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(configuration, None, (None, None), None).await
+        Self::build(configuration, None, (None, None), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -76,7 +78,7 @@ impl Case {
     async fn reporting(
         report: ferrobridge_server::change_feed::report::Report,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, Some(report), (None, None), None).await
+        Self::build(None, Some(report), (None, None), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -84,7 +86,7 @@ impl Case {
     async fn keeping(
         history: Arc<ferrobridge_server::etl::history::Store>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (Some(history), None), None).await
+        Self::build(None, None, (Some(history), None), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -92,7 +94,7 @@ impl Case {
     async fn listing(
         directory: Arc<ferrobridge_server::hl7v2::directory::Directory>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (None, Some(directory)), None).await
+        Self::build(None, None, (None, Some(directory)), (None, None)).await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -100,12 +102,21 @@ impl Case {
     async fn sourcing(
         sources: Arc<ferrobridge_server::sources::Sources>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (None, None), Some(sources)).await
+        Self::build(None, None, (None, None), (Some(sources), None)).await
+    }
+
+    /// Builds the tree, the issuer and the router, the operator API
+    /// serving the inbound sources `sources` and the intake `intake`.
+    async fn intake(
+        sources: Arc<ferrobridge_server::sources::Sources>,
+        intake: Arc<ferrobridge_server::inbound::intake::Intake>,
+    ) -> Result<Self, Box<dyn Error>> {
+        Self::build(None, None, (None, None), (Some(sources), Some(intake))).await
     }
 
     /// Builds the case over `configuration`, `consumers`, the run history
     /// `history`, the HL7 v2 face's `concept_maps` and the inbound
-    /// `sources`.
+    /// `sources` and the `intake`.
     async fn build(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
         consumers: Option<ferrobridge_server::change_feed::report::Report>,
@@ -113,7 +124,10 @@ impl Case {
             Option<Arc<ferrobridge_server::etl::history::Store>>,
             Option<Arc<ferrobridge_server::hl7v2::directory::Directory>>,
         ),
-        sources: Option<Arc<ferrobridge_server::sources::Sources>>,
+        (sources, intake): (
+            Option<Arc<ferrobridge_server::sources::Sources>>,
+            Option<Arc<ferrobridge_server::inbound::intake::Intake>>,
+        ),
     ) -> Result<Self, Box<dyn Error>> {
         let tree = tempfile::tempdir()?;
         let mappings = tree.path().join("mappings");
@@ -172,6 +186,10 @@ impl Case {
         };
         let state = match sources {
             Some(sources) => state.with_sources(sources),
+            None => state,
+        };
+        let state = match intake {
+            Some(intake) => state.with_intake(intake),
             None => state,
         };
         let app = ferrobridge_server::router(Arc::new(state), &crate::support::settings());
@@ -524,7 +542,7 @@ fn the_audit_line_names_the_caller_and_the_route_and_never_the_content()
 }
 
 #[tokio::test]
-async fn without_a_mapping_dir_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn Error>> {
+async fn without_a_state_store_the_api_checks_and_saves_nothing() -> Result<(), Box<dyn Error>> {
     let case = Case::new().await?;
     let token = case.token(OPERATOR);
     for request in [

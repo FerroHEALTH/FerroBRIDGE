@@ -47,7 +47,7 @@ use openehr_adl::parse::Dialect;
 use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
-use super::support::{emit, imaging};
+use super::support::{annex_iii, emit, imaging};
 
 mod accounted;
 
@@ -352,6 +352,7 @@ fn round_trip() -> Result<(String, String), Box<dyn Error>> {
     );
     let study = studies.first().ok_or("the mapped study")?.to_string();
     with_sections(&mut out, &study)?;
+    out.with_metadata(annex_iii("18748-4"));
     Ok((received, serde_json::to_string(&out.into_bundle()?)?))
 }
 

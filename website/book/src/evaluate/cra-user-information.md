@@ -173,8 +173,8 @@ The ones to know before you deploy:
   next create of a resource the CDR already holds write a second composition,
   and a lost `[state.seal] lookup_key` leaves every stored digest unreadable
   ([the identity store](../operate/container.md#the-identity-store)).
-- **The operator scope rewrites mappings.** With `[operator] mapping_dir` set,
-  a token that carries `[auth] product_scope` can save and reload the
+- **The operator scope rewrites mappings.** With `[operator]` and `[state]`
+  set, a token that carries `[auth] product_scope` can save and reload the
   mappings that decide what the facade writes into the CDR
   ([the operator API](../operate/operator-api.md)).
 - **`sslmode=disable` on the CDM URL** sends the clinical rows the ETL writes
@@ -252,7 +252,8 @@ data;"
   grants access to patient data, and so does trusting an issuer in
   `[auth.issuer.<name>]`, whose client registry then decides which apps
   reach the facade.
-  `[operator] mapping_dir` lets an operator-scope token change the mappings.
+  `[operator] enabled` with `[state]` lets an operator-scope token change the
+  mappings.
   `[hl7v2] enabled` opens an MLLP listener that writes into the CDR. A name in
   `[telemetry] logged_query_parameters` lets that parameter's value reach the
   log, `[facade.references] fetch_bases` lets the facade fetch from the
@@ -303,8 +304,8 @@ delete:
   facade's own App State and launch `Task`s;
 - the directory `[usage_report] state_dir` names, which holds the usage
   report's instance id;
-- the mapping directory, `[operator] mapping_dir` if you set it, and the
-  templates directory;
+- the mapping directory and the templates directory, and the mapping
+  revisions in the state store;
 - in the CDM database, the schema `[cdm] bridge_schema` names, with the side
   table, the watermarks and the id sequences, and the CDM schema itself if
   the data the ETL wrote there should go too;

@@ -14,10 +14,12 @@ use std::error::Error;
 use std::sync::Arc;
 
 use eehrxf::terminology::Candidate;
+use eehrxf::terminology::ELEMENT_SOURCE;
 use eehrxf::terminology::Operation;
 use eehrxf::terminology::Terminology;
 use eehrxf::terminology::TerminologyError;
 use eehrxf::terminology::accepted;
+use fhir_types::r4::extension::ExtensionValue;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponse;
 use fhir_types::r4::operations::concept_map_translate::ConceptMapTranslateResponseMatch;
 use fhir_types::r4::primitives::Boolean;
@@ -25,6 +27,7 @@ use fhir_types::r4::primitives::Code;
 use http::StatusCode;
 
 use super::LOCAL;
+use super::MAP;
 use super::PREFERRED;
 use super::Script;
 use super::Scripted;
@@ -85,10 +88,57 @@ async fn a_translation_takes_only_equivalent_and_equal_matches() -> TestResult {
         ("equivalent", PREFERRED, "1007"),
     ]))));
     let found = terminology.translate(LOCAL, "L-1", PREFERRED).await?;
+    let taken: Vec<String> = found
+        .iter()
+        .map(|translated| {
+            format!(
+                "{}|{} {} {}",
+                translated
+                    .coding
+                    .system
+                    .as_ref()
+                    .and_then(|s| s.value.as_deref())
+                    .unwrap_or("-"),
+                translated
+                    .coding
+                    .code
+                    .as_ref()
+                    .and_then(|c| c.value.as_deref())
+                    .unwrap_or("-"),
+                translated.equivalence,
+                translated.map.as_deref().unwrap_or("-"),
+            )
+        })
+        .collect();
     assert_eq!(
-        found,
-        [coding(PREFERRED, "1001"), coding(PREFERRED, "1007")]
+        taken,
+        [
+            format!("{PREFERRED}|1001 equal {MAP}"),
+            format!("{PREFERRED}|1007 equivalent {MAP}"),
+        ]
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_translation_names_its_concept_map_on_the_coding() -> TestResult {
+    // NOTE: draft EEHRxF Art 6(2): a mapping carries its provenance; the map travels in
+    // the elementSource extension of the coding it added.
+    let terminology = Terminology::server(Arc::new(Scripted(Script::Translate(vec![(
+        "equivalent",
+        PREFERRED,
+        "1007",
+    )]))));
+    let found = terminology.translate(LOCAL, "L-1", PREFERRED).await?;
+    let extension = found
+        .first()
+        .and_then(|translated| translated.coding.extension.first())
+        .ok_or("the elementSource extension")?;
+    assert_eq!(extension.url, ELEMENT_SOURCE);
+    assert!(matches!(
+        &extension.value,
+        Some(ExtensionValue::Uri(uri)) if uri.value.as_deref() == Some(MAP)
+    ));
     Ok(())
 }
 

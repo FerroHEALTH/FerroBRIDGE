@@ -28,6 +28,7 @@ use openehr_mapping_core::index::WebTemplateIndex;
 use crate::config::Settings;
 use crate::mappings::compile;
 use crate::mappings::compile::TemplateEntry;
+use crate::mappings::tree::Tree;
 
 /// The extensions an OMOCL file carries.
 const OMOCL_EXTENSIONS: [&str; 2] = ["yml", "yaml"];
@@ -302,14 +303,18 @@ pub fn inputs<'a>(
 /// template nor a `404`.
 pub async fn check(inputs: Inputs<'_>) -> Result<Report, Error> {
     let fhirconnect = match inputs.fhirconnect {
-        Some(directory) => Some(crate::walk::mapping_files(directory).map_err(read_error)?),
+        Some(directory) => Some(
+            crate::walk::mapping_files(directory)
+                .and_then(Tree::read)
+                .map_err(read_error)?,
+        ),
         None => None,
     };
     let omocl = match inputs.omocl {
-        Some(directory) => Some(omocl_files(directory)?),
+        Some(directory) => Some(Tree::read(omocl_files(directory)?).map_err(read_error)?),
         None => None,
     };
-    check_files(fhirconnect.as_deref(), inputs.templates, omocl.as_deref()).await
+    check_files(fhirconnect.as_ref(), inputs.templates, omocl.as_ref()).await
 }
 
 /// Returns the OMOCL files under `directory`, sorted.
@@ -324,60 +329,58 @@ pub fn omocl_files(directory: &Path) -> Result<Vec<PathBuf>, Error> {
     .map_err(read_error)
 }
 
-/// Checks the FHIRconnect files `fhirconnect` and the OMOCL files `omocl`,
-/// each when given, and returns every diagnostic.
+/// Checks the FHIRconnect files of `fhirconnect` and the OMOCL files of
+/// `omocl`, each when given, and returns every diagnostic.
 ///
-/// This is [`check`] over file lists, so a caller checks a set that is not a
-/// directory on disk, such as the running set with one file replaced by a
-/// draft.
+/// This is [`check`] over trees in memory, so a caller checks a set that is
+/// not a directory on disk, such as the provisioned files with the running
+/// revision's beside them.
 ///
 /// # Errors
 ///
 /// Returns what [`check`] returns.
 pub async fn check_files(
-    fhirconnect: Option<&[PathBuf]>,
+    fhirconnect: Option<&Tree>,
     templates: Option<Templates<'_>>,
-    omocl: Option<&[PathBuf]>,
+    omocl: Option<&Tree>,
 ) -> Result<Report, Error> {
     let mut report = Report::default();
-    if let Some(files) = fhirconnect {
+    if let Some(tree) = fhirconnect {
         let templates = templates.ok_or_else(|| Error::NoTemplateSource {
-            directory: files
-                .first()
-                .and_then(|file| file.parent())
+            directory: tree
+                .paths()
+                .next()
+                .and_then(Path::parent)
                 .map(Path::to_path_buf)
                 .unwrap_or_default(),
         })?;
-        check_fhirconnect(files, templates, &mut report).await?;
+        check_fhirconnect(tree, templates, &mut report).await?;
     }
-    if let Some(files) = omocl {
-        report.counts.omocl_files = files.len();
-        if let Err(mut diagnostics) =
-            omocl::model::load::load_set(files, &omocl::model::semantic::FirstPartyConverters)
-        {
+    if let Some(tree) = omocl {
+        report.counts.omocl_files = tree.len();
+        if let Err(mut diagnostics) = crate::mappings::tree::omocl_set(tree) {
             report.diagnostics.append(&mut diagnostics);
         }
-        report.omocl_files = files.to_vec();
+        report.omocl_files = tree.paths().map(Path::to_path_buf).collect();
     }
     Ok(report)
 }
 
-/// Loads, resolves and compiles the FHIRconnect files `files` through the one
-/// load path.
+/// Loads, resolves and compiles the FHIRconnect files of `tree` through the
+/// one load path.
 async fn check_fhirconnect(
-    files: &[PathBuf],
+    tree: &Tree,
     templates: Templates<'_>,
     report: &mut Report,
 ) -> Result<(), Error> {
-    report.counts.fhirconnect_files = files.len();
-    let set =
-        match fhirconnect::model::load::load_set(files, &fhirconnect::engine::library::Library) {
-            Ok(set) => set,
-            Err(mut diagnostics) => {
-                report.diagnostics.append(&mut diagnostics);
-                return Ok(());
-            }
-        };
+    report.counts.fhirconnect_files = tree.len();
+    let set = match crate::mappings::tree::fhirconnect_set(tree) {
+        Ok(set) => set,
+        Err(mut diagnostics) => {
+            report.diagnostics.append(&mut diagnostics);
+            return Ok(());
+        }
+    };
     report.counts.contexts = set.contexts().count();
     let mut resolved = match templates {
         Templates::Directory(directory) => {
