@@ -3,8 +3,9 @@
 
 //! Create, update and delete of a party resource.
 //!
-//! A create maps the resource to a party and commits its first version; an
-//! update commits a new version over the one `If-Match` names, or over the
+//! A create maps the resource to a party and commits its first version, and
+//! a party holding relationships a second version that sources them at the
+//! uid the CDR assigned; an update commits a new version over the one `If-Match` names, or over the
 //! latest when the request names none, so a concurrent writer still meets the
 //! `412` the CDR answers; a delete removes the latest version
 //! (<https://hl7.org/fhir/R4/http.html>). Each answers from the party it sent,
@@ -14,6 +15,8 @@
 
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
+use fhirconnect::engine::lens::party_ref::NAMESPACE;
+use fhirconnect::engine::traverse::error::EngineError;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
@@ -35,6 +38,7 @@ use crate::facade::commit::Change;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::read::parse;
 use crate::facade::handlers::write::same_id;
+use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
@@ -62,8 +66,13 @@ pub(crate) async fn create(
     party::unbound(facade, resource_type, built.value())?;
     let client = facade.client_for(headers, access).await?;
     let demographic = party::demographic(&client)?;
-    let commit = commit(facade, loaded, Change::Creation)?;
-    let version = commit_party(demographic, class_of(loaded)?, &built, &commit, None).await?;
+    let class = class_of(loaded)?;
+    let creation = commit(facade, loaded, Change::Creation)?;
+    let modification = commit(facade, loaded, Change::Modification)?;
+    let first = commit_party(demographic, class, &built, &creation, None).await?;
+    let (built, version) = relate(loaded, (demographic, class), &built, &modification, first)
+        .await
+        .map_err(|refused| Refusal::from(refused.with_issue(unrelated(resource_type))))?;
     party::provision::provision(facade, &client, resource_type, &version).await?;
     respond(
         facade,
@@ -102,6 +111,7 @@ pub(crate) async fn update(
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
+    let built = sourced(loaded, &built, uid.value())?;
     let preceding = preceding(headers, &latest.version)?;
     let commit = commit(facade, loaded, Change::Modification)?;
     let version = commit_party(
@@ -153,7 +163,7 @@ pub(crate) async fn delete(
                 .answered;
             match outcome {
                 $outcome::NoContent { .. } => {}
-                _ => return Err(party::refused(&upstream)),
+                _ => return Err(party::refused(&upstream).into()),
             }
         }};
     }
@@ -186,6 +196,65 @@ async fn build(
         .await
         .map(fhirconnect::engine::outcome::Outcome::into_value)
         .map_err(|error| Refusal::from(crate::facade::ingest::refusal::engine_refusal(&error)))
+}
+
+/// Commits the relationships `built` awaits the source of as a second
+/// version over `first`, sourced at the party the CDR created, and returns
+/// the party and version the create answers with.
+///
+/// Every relationship a party holds has the party as its source (RM
+/// Demographic IM, the `PARTY` class, invariant `Relationships_validity`),
+/// and the CDR assigns the uid when it commits the first version.
+async fn relate(
+    loaded: &Loaded,
+    (demographic, class): (Demographic<'_>, PartyClass),
+    built: &CanonicalParty,
+    commit: &CommitContext,
+    first: ObjectVersionId,
+) -> Result<(CanonicalParty, ObjectVersionId), Refused> {
+    if !built.awaits_source() {
+        return Ok((built.clone(), first));
+    }
+    let uid = first.versioned_object_id();
+    let related = loaded
+        .index()
+        .source_relationships(built, uid.value(), NAMESPACE)
+        .map_err(unbuilt)?;
+    let version = commit_party(
+        demographic,
+        class,
+        &related,
+        commit,
+        Some((uid.value(), &first)),
+    )
+    .await?;
+    Ok((related, version))
+}
+
+/// Returns the warning a create whose relationships were not committed adds:
+/// the party stands under its id without them.
+fn unrelated(resource_type: &str) -> Issue {
+    Issue::warning(IssueType::Informational).diagnosing(format!(
+        "the {resource_type} was created in the {} and its relationships were not: it stands \
+         without them until an update writes them",
+        party::LABEL
+    ))
+}
+
+/// Returns `built` with the relationships it awaits sourced at the party
+/// `uid` names.
+fn sourced(loaded: &Loaded, built: &CanonicalParty, uid: &str) -> Result<CanonicalParty, Refusal> {
+    loaded
+        .index()
+        .source_relationships(built, uid, NAMESPACE)
+        .map_err(|error| Refusal::from(unbuilt(error)))
+}
+
+/// Returns the refusal of a party whose relationships do not build.
+fn unbuilt(error: openehr_mapping_core::party::PartyError) -> Refused {
+    crate::facade::ingest::refusal::engine_refusal(&EngineError::PartyBuild {
+        source: Box::new(error),
+    })
 }
 
 /// Returns the commit headers one party write carries.
@@ -242,7 +311,7 @@ async fn commit_party(
     party: &CanonicalParty,
     commit: &CommitContext,
     over: Option<(&str, &ObjectVersionId)>,
-) -> Result<ObjectVersionId, Refusal> {
+) -> Result<ObjectVersionId, Refused> {
     let touch = if over.is_some() {
         crate::cdr::reach::Touch::Updated
     } else {
@@ -255,7 +324,7 @@ async fn commit_party(
             use openehr_its::rest::generated::demographic::client::$updated;
             let typed: $typed =
                 openehr_its::json::from_canonical_value(party.value()).map_err(|error| {
-                    reply::refusal(
+                    Refused::new(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Issue::error(IssueType::Exception)
                             .diagnosing(format!("the built party does not decode: {error}")),

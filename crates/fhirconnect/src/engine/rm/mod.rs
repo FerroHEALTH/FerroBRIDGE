@@ -389,14 +389,22 @@ pub fn entry_time_key(owner: &str, tail: &str) -> Option<&'static str> {
         .map(|row| row.key)
 }
 
-/// The attributes of a party root a party context maps although no template
-/// node holds them, which the party build places on the root.
+/// The `PARTY_REF` attributes of a party node a party context maps although
+/// no template node holds them, which the party build places on their node.
 ///
 /// `ROLE.performer` is a mandatory `PARTY_REF` to "the Version container of
-/// Actor playing the role" (RM Demographic IM, the `ROLE` class), and an
-/// operational template constrains no node for it. No specification governs
-/// a party context: our own design.
-pub const PARTY_ROOTS: &[(&str, &str)] = &[("ROLE", "performer")];
+/// Actor playing the role" (RM Demographic IM, the `ROLE` class), and
+/// `PARTY_RELATIONSHIP.target` names the other party of a relationship; an
+/// operational template constrains no node for either. The relationship's
+/// `source` is the party itself, which the party build writes. No
+/// specification governs a party context: our own design.
+pub const PARTY_REFS: &[(&str, &str)] = &[("ROLE", "performer"), ("PARTY_RELATIONSHIP", "target")];
+
+/// Answers whether `rm_type` owns an attribute of [`PARTY_REFS`].
+#[must_use]
+pub fn holds_party_ref(rm_type: &str) -> bool {
+    PARTY_REFS.iter().any(|&(owner, _)| owner == rm_type)
+}
 
 /// Returns the FLAT family a tail of [`carried::Carried::Family`] below an
 /// `owner` node is written under, `None` when no FLAT key names the attribute.

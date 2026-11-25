@@ -7,6 +7,7 @@
 use std::error::Error;
 
 use axum::body::Body;
+use ferrobridge_testkit::fixtures::FERROBRIDGE_RELATED_PERSON_ID;
 use ferrobridge_testkit::fixtures::FERROEHR_PATIENT_PERSON_ID;
 use ferrobridge_testkit::fixtures::FERROEHR_PROFESSIONAL_PERSON_ID;
 use ferrobridge_testkit::fixtures::ORGANISATION_TEMPLATE_ID;
@@ -265,6 +266,70 @@ pub(super) fn patient() -> Party {
     }
 }
 
+/// The object id of the synthetic related person `PERSON`.
+const RELATED_UID: &str = "a1b2c3d4-0000-4000-8000-0000000000e4";
+
+/// Returns the `PARTY_REF` of the party `uid` names, of `class`.
+fn party_ref(uid: &str, class: &str) -> serde_json::Value {
+    serde_json::json!({
+        "_type": "PARTY_REF",
+        "id": {"_type": "HIER_OBJECT_ID", "value": uid},
+        "namespace": "demographic",
+        "type": class
+    })
+}
+
+/// Returns the coded kind of relationship `mother`, HL7 v3 `RoleCode` `MTH`.
+fn mother() -> serde_json::Value {
+    serde_json::json!({
+        "_type": "DV_CODED_TEXT",
+        "value": "mother",
+        "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "http://terminology.hl7.org/CodeSystem/v3-RoleCode"},
+            "code_string": "MTH"
+        }
+    })
+}
+
+/// Returns the `EHDSRelatedPerson` party: a `PERSON` whose relationship
+/// names the patient as its target and the person itself as its source.
+pub(super) fn related_person() -> Party {
+    Party {
+        resource_type: "RelatedPerson",
+        class: "person",
+        uid: RELATED_UID,
+        held: party_of(
+            "PERSON",
+            "openEHR-DEMOGRAPHIC-PERSON.ferrobridge_related_person.v1",
+            FERROBRIDGE_RELATED_PERSON_ID,
+            RELATED_UID,
+            serde_json::json!({
+                "identities": [{
+                    "_type": "PARTY_IDENTITY",
+                    "name": {"_type": "DV_TEXT", "value": "Name"},
+                    "archetype_node_id": "id5",
+                    "details": tree("id6", "Name structure", serde_json::json!([
+                        element("id9", "Family name", text("Relative"))
+                    ]))
+                }],
+                "relationships": [{
+                    "_type": "PARTY_RELATIONSHIP",
+                    "name": {"_type": "DV_TEXT", "value": "Relationship to the patient"},
+                    "archetype_node_id": "id10",
+                    "details": tree("id11", "Relationship details", serde_json::json!([
+                        element("id12", "Kind of relationship", mother())
+                    ])),
+                    "source": party_ref(RELATED_UID, "PERSON"),
+                    "target": party_ref(PATIENT_UID, "ACTOR")
+                }]
+            }),
+        ),
+        profile: String::from("http://hl7.org/fhir/StructureDefinition/RelatedPerson"),
+        pointer: "/patient/reference",
+    }
+}
+
 /// Holds the read of `party` to its profile and its pointer, and returns the
 /// resource.
 pub(super) async fn serve_party(party: &Party) -> Result<serde_json::Value, Box<dyn Error>> {
@@ -297,11 +362,12 @@ pub(super) async fn serve_party(party: &Party) -> Result<serde_json::Value, Box<
 }
 
 /// Returns the groups served from a party context, by name.
-pub(super) fn party_groups() -> [(&'static str, Party); 3] {
+pub(super) fn party_groups() -> [(&'static str, Party); 4] {
     [
         ("EHDSPatient", patient()),
         ("EHDSHealthProfessional", health_professional()),
         ("EHDSOrganisation", organisation()),
+        ("EHDSRelatedPerson", related_person()),
     ]
 }
 
@@ -428,5 +494,190 @@ async fn a_telecom_writes_its_system_as_the_coded_name_of_its_address() -> Resul
         "patient@synthetic.example", address["details"]["items"][0]["value"]["value"],
         "{sent}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_related_person_reads_its_patient_and_relationship() -> Result<(), Box<dyn Error>> {
+    let read = serve_party(&related_person()).await?;
+    assert_eq!(
+        Some(format!("Patient/{PATIENT_UID}").as_str()),
+        read["patient"]["reference"].as_str(),
+        "{read}"
+    );
+    let coding = &read["relationship"][0]["coding"][0];
+    assert_eq!(
+        (
+            Some("http://terminology.hl7.org/CodeSystem/v3-RoleCode"),
+            Some("MTH")
+        ),
+        (coding["system"].as_str(), coding["code"].as_str()),
+        "{read}"
+    );
+    Ok(())
+}
+
+/// A synthetic `RelatedPerson`: the patient's mother.
+fn related_resource() -> serde_json::Value {
+    serde_json::json!({
+        "resourceType": "RelatedPerson",
+        "patient": { "reference": format!("Patient/{PATIENT_UID}") },
+        "relationship": [{ "coding": [{
+            "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode", "code": "MTH"
+        }]}],
+        "name": [{ "family": "Relative" }]
+    })
+}
+
+/// Mounts the CDR's create of a `PERSON`, answering its first version.
+async fn mount_created(harness: &super::super::super::Harness) {
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/demographic/person"))
+        .respond_with(
+            ResponseTemplate::new(204)
+                .insert_header("ETag", format!("\"{RELATED_UID}::synthetic.example::1\"")),
+        )
+        .mount(&harness.cdr)
+        .await;
+}
+
+/// Returns the bodies the CDR received under `method`, in order.
+async fn sent(
+    harness: &super::super::super::Harness,
+    method: &str,
+) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
+    let requests = harness.cdr.received_requests().await.unwrap_or_default();
+    requests
+        .iter()
+        .filter(|request| request.method.as_str() == method)
+        .map(|request| Ok(serde_json::from_slice(&request.body)?))
+        .collect()
+}
+
+/// RM Demographic IM, the `PARTY` class, invariant `Relationships_validity`:
+/// the source of a party's relationship is the party, whose uid the CDR
+/// assigns when it creates it.
+#[tokio::test]
+async fn a_related_person_create_sources_its_relationship_in_a_second_version()
+-> Result<(), Box<dyn Error>> {
+    let harness = annex_x().await?;
+    mount_created(&harness).await;
+    Mock::given(matchers::method("PUT"))
+        .and(matchers::path(format!("/demographic/person/{RELATED_UID}")))
+        .and(matchers::header(
+            "If-Match",
+            format!("\"{RELATED_UID}::synthetic.example::1\"").as_str(),
+        ))
+        .respond_with(
+            ResponseTemplate::new(204)
+                .insert_header("ETag", format!("\"{RELATED_UID}::synthetic.example::2\"")),
+        )
+        .mount(&harness.cdr)
+        .await;
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir/RelatedPerson")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(related_resource().to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::CREATED, status, "{body}");
+    assert_eq!(Some("2"), body["meta"]["versionId"].as_str(), "{body}");
+    assert_eq!(
+        Some(format!("Patient/{PATIENT_UID}").as_str()),
+        body["patient"]["reference"].as_str(),
+        "{body}"
+    );
+    let created = sent(&harness, "POST").await?;
+    let created = created.first().ok_or("the CDR received the person")?;
+    assert_eq!(None, created.get("relationships"), "{created}");
+    let updated = sent(&harness, "PUT").await?;
+    let relationship = updated
+        .first()
+        .map(|person| &person["relationships"][0])
+        .ok_or("the CDR received the second version")?;
+    assert_eq!(party_ref(RELATED_UID, "PERSON"), relationship["source"]);
+    assert_eq!(party_ref(PATIENT_UID, "ACTOR"), relationship["target"]);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_second_version_answers_the_refusal_and_names_the_unrelated_person()
+-> Result<(), Box<dyn Error>> {
+    let harness = annex_x().await?;
+    mount_created(&harness).await;
+    Mock::given(matchers::method("PUT"))
+        .and(matchers::path(format!("/demographic/person/{RELATED_UID}")))
+        .respond_with(
+            ResponseTemplate::new(412)
+                .insert_header("Content-Type", "application/json")
+                .insert_header("ETag", format!("\"{RELATED_UID}::synthetic.example::2\""))
+                .set_body_json(serde_json::json!({"message": "synthetic refusal"})),
+        )
+        .mount(&harness.cdr)
+        .await;
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir/RelatedPerson")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(related_resource().to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::PRECONDITION_FAILED, status, "{body}");
+    let warning = body["issue"]
+        .as_array()
+        .and_then(|issues| issues.iter().find(|issue| issue["severity"] == "warning"))
+        .ok_or_else(|| format!("no warning in {body}"))?;
+    assert!(
+        warning["diagnostics"]
+            .as_str()
+            .is_some_and(|text| text.contains("relationships were not")),
+        "{body}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_related_person_update_sources_its_relationship_in_its_one_version()
+-> Result<(), Box<dyn Error>> {
+    let harness = annex_x().await?;
+    let held = related_person();
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(format!("/demographic/person/{RELATED_UID}")))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("Content-Type", "application/json")
+                .insert_header("ETag", format!("\"{RELATED_UID}::synthetic.example::1\""))
+                .set_body_json(&held.held),
+        )
+        .mount(&harness.cdr)
+        .await;
+    Mock::given(matchers::method("PUT"))
+        .and(matchers::path(format!("/demographic/person/{RELATED_UID}")))
+        .respond_with(
+            ResponseTemplate::new(204)
+                .insert_header("ETag", format!("\"{RELATED_UID}::synthetic.example::2\"")),
+        )
+        .mount(&harness.cdr)
+        .await;
+    let mut resource = related_resource();
+    resource["id"] = serde_json::Value::from(RELATED_UID);
+    let (status, body) = call(
+        harness.app(),
+        Request::put(format!("/fhir/RelatedPerson/{RELATED_UID}"))
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(resource.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let updated = sent(&harness, "PUT").await?;
+    assert_eq!(
+        1,
+        updated.len(),
+        "the update wrote {} versions",
+        updated.len()
+    );
+    let relationship = &updated[0]["relationships"][0];
+    assert_eq!(party_ref(RELATED_UID, "PERSON"), relationship["source"]);
     Ok(())
 }
