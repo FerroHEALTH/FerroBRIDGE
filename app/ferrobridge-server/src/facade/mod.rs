@@ -67,6 +67,39 @@ use crate::mount::BASE_PATH;
 use crate::terminology::Translator;
 use ferrohealth_usage_report::window::Window;
 
+/// The custodian of the documents the bridge writes: the healthcare
+/// provider that holds the records behind the CDR.
+///
+/// FHIR R4 `Composition.custodian` is the organisation "responsible for
+/// ongoing maintenance of and access to the composition/document
+/// information", and HL7 Europe EU Health Data API
+/// `EehrxfMhdDocumentReference` requires `DocumentReference.custodian`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Custodian {
+    /// Its name.
+    pub name: String,
+    /// Its identifier's system.
+    pub system: String,
+    /// Its identifier's value.
+    pub value: String,
+}
+
+impl Custodian {
+    /// The `Organization` that names the custodian.
+    #[must_use]
+    pub fn organization(&self) -> fhir_types::r4::organization::Organization {
+        fhir_types::r4::organization::Organization {
+            identifier: vec![fhir_types::r4::identifier::Identifier {
+                system: Some(self.system.as_str().into()),
+                value: Some(self.value.as_str().into()),
+                ..fhir_types::r4::identifier::Identifier::default()
+            }],
+            name: Some(self.name.as_str().into()),
+            ..fhir_types::r4::organization::Organization::default()
+        }
+    }
+}
+
 /// What one facade deployment was configured with.
 #[derive(Debug, Clone)]
 pub struct Settings {
@@ -100,6 +133,10 @@ pub struct Settings {
     /// demographic or identity service" (openEHR RM EHR IM Release 1.1.0, the
     /// `EHR_STATUS` class).
     pub ehr_status_system: Option<String>,
+    /// The custodian every document the bridge writes names: the healthcare
+    /// provider that holds the records behind the CDR, the health data
+    /// holder of Regulation (EU) 2025/327, never the bridge.
+    pub custodian: Custodian,
 }
 
 /// The programs and search declarations of one load, which a reload swaps

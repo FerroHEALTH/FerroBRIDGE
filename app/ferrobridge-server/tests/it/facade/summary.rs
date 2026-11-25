@@ -408,6 +408,15 @@ async fn a_patient_s_summary_is_an_ips_document_with_coded_entries() -> Result<(
     let composition = &body["entry"][0]["resource"];
     assert_eq!(composition["resourceType"], "Composition");
     assert_eq!(composition["type"]["coding"][0]["code"], "60591-5");
+    let custodians = of_kind(&body, "Organization")
+        .into_iter()
+        .filter(|organization| organization["identifier"][0]["value"] == "synthetic-hospital")
+        .count();
+    assert_eq!(1, custodians, "the configured health data holder: {body}");
+    assert!(
+        composition["custodian"]["reference"].is_string(),
+        "the Composition names its custodian: {composition}"
+    );
     let patients = of_kind(&body, "Patient");
     let [patient] = patients.as_slice() else {
         return Err(format!("{} patients", patients.len()).into());

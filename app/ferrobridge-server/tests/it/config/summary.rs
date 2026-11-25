@@ -13,7 +13,7 @@ use ferrobridge_server::config::Process;
 /// An enabled facade with `summary` as its `[facade.summary]` table.
 fn with_summary(summary: &str) -> String {
     format!(
-        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[facade.summary]\n{summary}"
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[facade.summary]\n{summary}"
     )
 }
 

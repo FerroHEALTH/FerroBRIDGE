@@ -250,6 +250,7 @@ pub(crate) fn settings() -> Settings {
         language: String::from("en"),
         territory: String::from("GB"),
         ehr_status_system: None,
+        custodian: crate::facade::custodian(),
     }
 }
 
@@ -664,5 +665,15 @@ fn replace_value(composition: &mut serde_json::Value, node: &str, value: &serde_
             }
         }
         _ => {}
+    }
+}
+
+/// The synthetic healthcare provider every test facade names as the custodian
+/// of the documents it writes.
+pub(crate) fn custodian() -> ferrobridge_server::facade::Custodian {
+    ferrobridge_server::facade::Custodian {
+        name: String::from("Synthetic Hospital"),
+        system: String::from("urn:oid:2.999.1.1"),
+        value: String::from("synthetic-hospital"),
     }
 }

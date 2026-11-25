@@ -295,7 +295,7 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
          [terminology]\nendpoint.url = \"{terminology}/r4\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{origin}/fhir\"\n\
          subject_namespace = {NAMESPACE:?}\nsubject_id_form = \"logical_id\"\nsubject_type = \"PERSON\"\n\
-         composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
+         composition_language = \"en\"\ncomposition_territory = \"NL\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n\
          [facade.summary]\nenabled = true\noperator = \"Synthetic operator\"\npackages = [{packages}]\n\n\
          [auth.issuer.ferrosmart]\nissuer = {smart:?}\n\n\
          [state]\nurl = \"{state}?sslmode=disable\"\n\n\

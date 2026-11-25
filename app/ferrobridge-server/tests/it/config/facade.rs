@@ -29,7 +29,7 @@ fn an_enabled_facade_resolves_its_policy() -> Result<(), Box<dyn std::error::Err
         "[auth]\nenabled = false\n\n[facade]\nenabled = true\n",
         "base_url = \"https://bridge.invalid/fhir\"\n",
         "ehr_policy = \"create_on_first_write\"\n",
-        "composition_language = \"en\"\ncomposition_territory = \"GB\"\n",
+        "composition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n",
     );
 
     let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
@@ -53,7 +53,7 @@ fn an_ehr_policy_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dy
 {
     let text = concat!(
         "[auth]\nenabled = false\n\n[facade]\nenabled = true\nehr_policy = \"whatever\"\n",
-        "composition_language = \"en\"\ncomposition_territory = \"GB\"\n",
+        "composition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n",
     );
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
@@ -72,8 +72,7 @@ fn an_ehr_policy_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dy
 #[test]
 fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
-    let text =
-        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_territory = \"GB\"\n";
+    let text = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n";
 
     let error = Config::from_sources(Some(text), &BTreeMap::new())?
         .resolve(Process::Server)
@@ -85,8 +84,38 @@ fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
     Ok(())
 }
 
+#[test]
+fn an_enabled_facade_without_each_custodian_key_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
+    for (dropped, key) in [
+        ("custodian.name", "facade.custodian.name"),
+        (
+            "custodian.identifier_system",
+            "facade.custodian.identifier_system",
+        ),
+        (
+            "custodian.identifier_value",
+            "facade.custodian.identifier_value",
+        ),
+    ] {
+        let text: String = ENABLED
+            .lines()
+            .filter(|line| !line.starts_with(dropped))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+            .resolve(Process::Server)
+            .expect_err("every document the bridge writes names its custodian");
+        match &error {
+            Error::Missing { key: missing } => assert_eq!(key, missing, "{dropped}"),
+            other => return Err(format!("expected a missing key, got {other:?}").into()),
+        }
+    }
+    Ok(())
+}
+
 /// The smallest enabled facade section.
-pub(super) const ENABLED: &str = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n";
+pub(super) const ENABLED: &str = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n";
 
 #[test]
 fn the_search_page_sizes_default_and_resolve_as_configured()
@@ -401,7 +430,7 @@ fn an_unknown_party_search_key_refuses_to_boot() {
 /// The `[facade]` section `extra` adds to, with the two required fields set.
 fn facade_with(extra: &str) -> String {
     format!(
-        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n{extra}"
+        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n{extra}"
     )
 }
 
