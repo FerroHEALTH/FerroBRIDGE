@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSServiceRequest (Table 30), served by the facade as an individual
+# ServiceRequest (draft act Art 7(2), #2087): the HL7 Europe Laboratory
+# Report 2.0.0 ServiceRequest-eu-lab profile over the published
+# KDS_Laborauftrag template, with its requester Organization and specimen.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_service_request.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/laboratory/StructureDefinition/ServiceRequest-eu-lab"
+    version: "2.0.0"
+  template:
+    id: "KDS_Laborauftrag"
+  archetypes:
+    - "INSTRUCTION.service_request.v1"
+    - "CLUSTER.organisation.v1"
+    - "CLUSTER.specimen.v1"
+    - "COMPOSITION.request.v1.ServiceRequest"
+  extensions:
+    - "ferrobridge_kds_laborauftrag"
+  start: "INSTRUCTION.service_request.v1"

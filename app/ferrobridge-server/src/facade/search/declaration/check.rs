@@ -14,6 +14,7 @@ use crate::facade::search::declaration::Node;
 use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
 use crate::facade::search::declaration::Source;
+use crate::facade::search::declaration::Step;
 use crate::facade::search::declaration::file::ParameterFile;
 
 /// The names R4 reserves for the parameters every resource and every search
@@ -126,6 +127,10 @@ fn read_path(
     let node = written.node.as_ref().map(|node| Node {
         class: node.class.clone(),
         archetype: node.archetype.clone(),
+        step: node.contains.as_ref().map(|step| Step {
+            class: step.class.clone(),
+            node_id: step.node.clone(),
+        }),
     });
     let coded = crate::facade::search::template::locate(index, node.as_ref(), written_path, kind)
         .map_err(|reason| DeclarationError::Template {

@@ -51,7 +51,7 @@ async fn a_prefix_match_of_the_string_search_is_no_registration()
     let systems = client(&server, WireVersion::R4)?
         .identifier_systems("NORTHLAB")
         .await?;
-    assert!(systems.is_empty(), "{systems:?}");
+    assert_eq!(Vec::<String>::new(), systems);
     Ok(())
 }
 
@@ -68,7 +68,7 @@ async fn an_unregistered_unique_id_names_no_system() -> Result<(), Box<dyn std::
     let systems = client(&server, WireVersion::R4)?
         .identifier_systems("NORTHLAB")
         .await?;
-    assert!(systems.is_empty());
+    assert_eq!(Vec::<String>::new(), systems);
     Ok(())
 }
 

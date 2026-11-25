@@ -330,7 +330,7 @@ fn source_panel(
 ) -> Html {
     let mut tags = Vec::new();
     if let Some(listed) = listed {
-        tags.push(language_name(listed.language).to_owned());
+        tags.push(language_name(l, listed.language));
         tags.push(crate::pages::parts::owner_word(l, listed.owner));
     }
     let digest = listed.map(|listed| Digest {

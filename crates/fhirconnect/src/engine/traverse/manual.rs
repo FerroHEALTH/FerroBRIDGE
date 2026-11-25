@@ -216,6 +216,16 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 String::from("_type"),
                 serde_json::Value::String(String::from(rm_type)),
             );
+            // NOTE: a structural node such as an ADDRESS is no data value, so what a manual
+            // writes below it (its `name`) is held as its members (`family::name`).
+            if openehr_rm::v1_2::model::is_a(rm_type, crate::resolve::derive::STRUCTURAL) {
+                self.store(Written {
+                    flat_id: target.node().flat_id().clone(),
+                    positions: binding.openehr.clone(),
+                    value: Held::Partial(merged),
+                });
+                continue;
+            }
             let value = RmValue::from_canonical(
                 rm_type,
                 target.node().aql_path().as_str(),

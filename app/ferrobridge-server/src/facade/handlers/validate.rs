@@ -202,12 +202,11 @@ fn unresolved(
 /// would decide it rather than looked up. No specification governs this: our
 /// own design.
 async fn disposition(facade: &Facade, person: &PersonId) -> Result<String, Refusal> {
-    let known = facade.store().ehr_of(person).await.map_err(|error| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),
-        )
-    })?;
+    let known = facade
+        .store()
+        .ehr_of(person)
+        .await
+        .map_err(|error| reply::exception(&error))?;
     Ok(match (known, facade.settings().ehr_policy) {
         (Some(ehr_id), _) => format!(
             "the composition would be written into the EHR {} that the identity map holds for \

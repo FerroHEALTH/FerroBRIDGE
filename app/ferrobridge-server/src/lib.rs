@@ -13,6 +13,7 @@
 #![doc(test(attr(deny(warnings))))]
 
 pub mod aql;
+pub mod assurance;
 pub mod audit;
 pub mod banner;
 pub mod boot;
@@ -456,8 +457,10 @@ async fn serve_command(settings: Settings) -> anyhow::Result<()> {
 /// of a request under `/fhir` when the state carries a resource server and
 /// leaves the facade open when it does not.
 ///
+/// Inside the guard, [`assurance::require`] refuses a caller below the
+/// assurance level `[assurance] fhir` names, before any record is taken.
 /// With `[audit]` on, every facade access an authenticated caller makes
-/// passes the layer of [`facade::audit::record`] inside the guard, which
+/// passes the layer of [`facade::audit::record`] inside that, which
 /// records it and refuses it when its record has no place.
 ///
 /// Outside the guard, [`facade::cors::apply`] answers the CORS of the FHIR
@@ -523,6 +526,12 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
         routes = routes.layer(axum::middleware::from_fn_with_state(
             Arc::new(recording),
             facade::audit::record,
+        ));
+    }
+    if let Some(smart) = state.auth() {
+        routes = routes.layer(axum::middleware::from_fn_with_state(
+            smart.assurance(assurance::RouteClass::Fhir),
+            assurance::require,
         ));
     }
     let routes = routes.layer(facade::guard::layer(state.auth().map(AsRef::as_ref)));

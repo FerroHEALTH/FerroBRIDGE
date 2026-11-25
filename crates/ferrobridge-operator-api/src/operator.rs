@@ -126,6 +126,8 @@ pub enum Language {
     Fhirconnect,
     /// OMOCL files.
     Omocl,
+    /// FHIR Mapping Language maps (FHIR R4 §7.7).
+    Structuremap,
 }
 
 /// Who owns a mapping file.

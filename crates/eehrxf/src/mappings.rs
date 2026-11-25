@@ -507,31 +507,73 @@ pub const TEST_REPORT: Project = Project {
 /// The draft `EEHRxF` Annex X project: the common data groups served as
 /// individual resources (draft act Art 7(2)).
 ///
-/// Each context maps one group over FerroBRIDGE's patient summary template
-/// or its EHDS record template, to the profile HL7 Europe Base and Core
-/// 2.0.1 gives the group (the FHIR R4 `bodyweight` profile for a simple
-/// observation), with the search declaration a FHIR facade reads beside it:
-/// the IHE `QEDm` 3.0.0 PCC-44 searches of the group's option
-/// (2:3.44.4.1.2.1). Its contexts map more than one template, so a
+/// Each context maps one group over FerroBRIDGE's patient summary template,
+/// its EHDS record or EHDS medication administration template, the published
+/// `KDS_Laborbericht` or `KDS_Laborauftrag`, or a demographic party, to the
+/// HL7 Europe profile the `eehrxf` crosswalk names for the group (Base and
+/// Core 2.0.1, Laboratory Report 2.0.0, Patient Summary 1.0.0-ballot,
+/// Hospital Discharge Report 1.0.0), the HL7 International Patient Summary
+/// 2.0.1 pregnancy profiles, or the FHIR R4 `bodyweight` profile, with the
+/// search declaration a FHIR facade reads beside it: the IHE `QEDm` 3.0.0
+/// PCC-44 searches of the group's option (2:3.44.4.1.2.1). Its contexts map more than one template, so a
 /// [`crate::mapping::Mapping`] compiles it one context at a time
 /// ([`Project::with_context`]).
 pub const ANNEX_X: Project = Project {
     directory: "annex-x",
     contexts: &[
+        "ferrobridge_ehds_advance_directive.context",
+        "ferrobridge_ehds_alert.context",
         "ferrobridge_ehds_allergy_intolerance.context",
+        "ferrobridge_ehds_body_structure.context",
+        "ferrobridge_ehds_care_plan.context",
         "ferrobridge_ehds_condition.context",
+        "ferrobridge_ehds_device_use.context",
+        "ferrobridge_ehds_diagnostic_report.context",
+        "ferrobridge_ehds_encounter.context",
+        "ferrobridge_ehds_health_professional.context",
         "ferrobridge_ehds_immunisation.context",
+        "ferrobridge_ehds_laboratory_observation.context",
+        "ferrobridge_ehds_location.context",
+        "ferrobridge_ehds_medication_administration.context",
         "ferrobridge_ehds_medication_use.context",
         "ferrobridge_ehds_observation.context",
+        "ferrobridge_ehds_organisation.context",
+        "ferrobridge_ehds_patient.context",
+        "ferrobridge_ehds_pregnancy_history.context",
+        "ferrobridge_ehds_pregnancy_status.context",
         "ferrobridge_ehds_procedure.context",
+        "ferrobridge_ehds_service_request.context",
+        "ferrobridge_ehds_specimen.context",
+        "ferrobridge_ehds_travel_history.context",
     ],
     searches: &[
+        shipped!("annex-x", "ferrobridge_ehds_advance_directive.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_alert.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_allergy_intolerance.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_body_structure.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_care_plan.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_condition.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_device_use.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_diagnostic_report.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_encounter.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_immunisation.search.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_laboratory_observation.search.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_location.search.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_medication_administration.search.yml"
+        ),
         shipped!("annex-x", "ferrobridge_ehds_medication_use.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_observation.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_pregnancy_history.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_pregnancy_status.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_procedure.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_service_request.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_specimen.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_travel_history.search.yml"),
     ],
     files: &[
         shipped!(
@@ -544,6 +586,17 @@ pub const ANNEX_X: Project = Project {
         ),
         shipped!("annex-x", "ferrobridge_ehds_condition.context.yml"),
         shipped!("annex-x", "ferrobridge_problem_diagnosis.v1.Condition.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_diagnostic_report.context.yml"),
+        shipped!("annex-x", "ferrobridge_laboratory_test_result.v1.yml"),
+        shipped!("annex-x", "ferrobridge_laboratory_test_analyte.v1.yml"),
+        shipped!("annex-x", "ferrobridge_specimen.v1.yml"),
+        shipped!("annex-x", "ferrobridge_eu_laboratory_result.yml"),
+        shipped!("annex-x", "ferrobridge_eu_laboratory_analyte.yml"),
+        shipped!("annex-x", "ferrobridge_eu_laboratory_specimen.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_laboratory_observation.context.yml"
+        ),
         shipped!("annex-x", "ferrobridge_ehds_immunisation.context.yml"),
         shipped!("annex-x", "ferrobridge_medication.v1.Immunization.yml"),
         shipped!("annex-x", "ferrobridge_ehds_medication_use.context.yml"),
@@ -555,6 +608,71 @@ pub const ANNEX_X: Project = Project {
         shipped!("annex-x", "ferrobridge_body_weight.v2.Observation.yml"),
         shipped!("annex-x", "ferrobridge_ehds_procedure.context.yml"),
         shipped!("annex-x", "ferrobridge_procedure.v1.Procedure.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_device_use.context.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_device_summary.v0.DeviceUseStatement.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_specimen.context.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_patient.context.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_patient.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_health_professional.context.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_health_professional.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_organisation.context.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_organisation.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_service_request.context.yml"),
+        shipped!("annex-x", "ferrobridge_service_request.v1.yml"),
+        shipped!("annex-x", "ferrobridge_request.v1.ServiceRequest.yml"),
+        shipped!("annex-x", "ferrobridge_organisation.v1.yml"),
+        shipped!("annex-x", "ferrobridge_kds_laborauftrag.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_alert.context.yml"),
+        shipped!("annex-x", "ferrobridge_precaution.v1.Flag.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_advance_directive.context.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_advance_care_directive.v2.Consent.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_media_file.v1.Attachment.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_body_structure.context.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_anatomical_location.v1.BodyStructure.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_care_plan.context.yml"),
+        shipped!("annex-x", "ferrobridge_care_plan_request.v0.CarePlan.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_pregnancy_status.context.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_pregnancy_assertion.v0.Observation.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_pregnancy_history.context.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_obstetric_summary.v1.Observation.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_travel_history.context.yml"),
+        shipped!("annex-x", "ferrobridge_travel_event.v0.Observation.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_medication_administration.context.yml"
+        ),
+        shipped!(
+            "annex-x",
+            "ferrobridge_medication.v1.MedicationAdministration.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_dosage.v2.AdministeredDosage.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_encounter.v1.MedicationAdministration.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_encounter.context.yml"),
+        shipped!("annex-x", "ferrobridge_encounter.v1.Encounter.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_encounter.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_location.context.yml"),
+        shipped!("annex-x", "ferrobridge_encounter.v1.Location.yml"),
     ],
     accounted: &[],
     followed: &[],

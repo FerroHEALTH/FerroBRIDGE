@@ -281,24 +281,8 @@ fn answer(
         total: found.total,
         self_link: page_url(current.as_deref()),
         next_link: next.as_deref().map(|cursor| page_url(Some(cursor))),
-        outcome: request
-            .ignored
-            .iter()
-            .map(|name| {
-                Issue::warning(IssueType::NotSupported)
-                    .diagnosing(format!(
-                        "{name} is not supported here and was ignored, as Prefer: handling=lenient asks"
-                    ))
-                    .at(name.clone())
-            })
-            .collect(),
+        outcome: super::ignored_issues(&request.ignored),
     };
-    let body = bundle::searchset(&envelope, &found.matches).map_err(|error| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),
-        )
-    })?;
     tracing::info!(
         resource_type,
         matches = found.matches.len(),
@@ -306,7 +290,7 @@ fn answer(
         counted = found.total.is_some(),
         "the party search answered"
     );
-    Ok(reply::resource(StatusCode::OK, &body, &[]))
+    super::searchset_reply(&envelope, &found.matches)
 }
 
 /// Returns the party uids `rows` name.

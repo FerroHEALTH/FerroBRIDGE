@@ -694,14 +694,14 @@ of the controller's `ACCESS_POLICY` is read under the bridge's own token with
 |---|---|---|
 | create | `POST [base]/Consent` | `201` with the `Location` of the first directive created |
 | read | `GET [base]/Consent/{id}` | the `Consent` of one directive in force |
-| search | `GET [base]/Consent?patient=Patient/{id}` | a `searchset` of every directive in force |
+| search | `GET [base]/Consent?patient=Patient/{id}` | a `searchset` of every directive in force, `scope` (R4) narrowing it |
 | `$bppc` import | `POST [base]/Consent/$bppc?patient=…&evidence=…` | `201` with an `OperationOutcome` naming each `Consent` created |
 | `$bppc` export | `GET [base]/Consent/$bppc?patient=…` | a `collection` Bundle of `Binary` documents |
 | `$appc` import | `POST [base]/Consent/$appc?patient=…` | `201` with an `OperationOutcome` naming each `Consent` created |
 | `$appc` export | `GET [base]/Consent/$appc?patient=…` | a `collection` Bundle holding one `Binary` document |
 
 The `CapabilityStatement` lists `Consent` with `create`, `read` and
-`search-type`, the `patient` parameter, and the two operations. A `Consent` is
+`search-type`, the `patient` and `scope` parameters, and the two operations. A `Consent` is
 R4 unless the media type names R5, `application/fhir+json; fhirVersion=5.0`
 in `Content-Type` for a create or in `Accept` for a read or a search (FHIR R4
 `versioning.html`, version negotiation); the answer carries the same media
@@ -895,8 +895,14 @@ individual resources as well as inside documents. The `eehrxf` crate ships
 the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
 (`eehrxf::mappings::ANNEX_X`), with a search declaration beside each
 context. Point `[mappings] directory` at a copy of it
-(`ANNEX_X.write_to(dir)` writes one) and load its two templates into the
-CDR: FerroBRIDGE's patient summary template and its EHDS record template.
+(`ANNEX_X.write_to(dir)` writes one) and load its templates into the
+CDR: FerroBRIDGE's patient summary template, its EHDS record and EHDS
+medication administration templates and the published `KDS_Laborbericht`
+and `KDS_Laborauftrag`. The party groups are party contexts, so
+the project needs `[cdr] demographic` and the reference CDR's patient and
+healthcare professional `PERSON` definitions with an `ORGANISATION`
+template; each party resource claims the profile its context names, as an
+entry's resource does.
 
 | Annex X group | Resource | Profile | Search (IHE QEDm 3.0.0 PCC-44) |
 |---|---|---|---|
@@ -907,10 +913,83 @@ CDR: FerroBRIDGE's patient summary template and its EHDS record template.
 | EHDSImmunisation | `Immunization` | `immunization-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.6) |
 | EHDSObservation | `Observation` | FHIR R4 `bodyweight` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
 | EHDSProcedure | `Procedure` | `procedure-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.7) |
+| EHDSLaboratoryObservation | `Observation` | `Observation-resultslab-eu-lab` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSSpecimen | `Specimen` | `Specimen-eu-lab` | `patient` |
+| EHDSServiceRequest | `ServiceRequest` | `ServiceRequest-eu-lab` | `patient` |
+| EHDSDeviceUse | `DeviceUseStatement` | `deviceUseStatement-eu-eps` | `patient` with `_include=DeviceUseStatement:device` |
+| EHDSDevice | `Device` | `device-eu-eps` | read, and included by the statement that names it |
+| EHDSDosage | the `dosage` of a `MedicationStatement` | | as its statement |
+| EHDSEndpoint | `Endpoint` | FHIR R4 `Endpoint` | `_id`, `connection-type`, `status`; read-only from the configuration |
+| EHDSPatient | `Patient` | `patient-eu-core` | read, from the reference CDR's patient `PERSON` |
+| EHDSHumanName | the `name` of a `Patient` or `Practitioner` | | as its party |
+| EHDSAddress | the `address` of a `Patient` | | as its patient |
+| EHDSTelecom | the `telecom` of a `Patient` | | as its patient; the system is the coded name of the electronic `ADDRESS` |
+| EHDSHealthProfessional | `Practitioner` | `practitioner-eu-core` | read, from the reference CDR's healthcare professional `PERSON` |
+| EHDSOrganisation | `Organization` | `organization-eu-core` | read, from an `ORGANISATION` |
+| EHDSAlert | `Flag` | `flag-patient-eu-core` | `patient`, `date`; from the CKM precaution |
+| EHDSAdvanceDirective | `Consent` | `consent-eu-eps` | `patient` with `scope=adr`, `date` |
+| EHDSAttachment | the `sourceAttachment` of an advance directive's `Consent` | | as its consent |
+| EHDSBodyStructure | `BodyStructure` | `bodyStructure-eu-core` | `patient` |
+| EHDSCarePlan | `CarePlan` | `carePlan-eu-hdr` | `patient`, `date` |
+| EHDSCurrentPregnancyStatus | `Observation` | `Observation-pregnancy-status-uv-ips` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSPregnancyHistory | `Observation` | `Observation-pregnancy-outcome-uv-ips` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSTravelHistory | `Observation` | `observation-travel-eu-eps` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSMedicationAdministration | `MedicationAdministration` | `medicationAdministration-eu-hdr` | `patient`, `effective-time` |
+| EHDSAdministeredDosage | the `dosage` of a `MedicationAdministration` | | as its administration |
+| EHDSEncounter | `Encounter` | `encounter-eu-hdr` | `patient`, `date` |
+| EHDSLocation | `Location` | `location-eu-core` | `name`; read-only from the encounter's context |
+| (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category`, `code` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
 
-The profiles other than `bodyweight` are HL7 Europe Base and Core 2.0.1.
+The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device,
+consent and travel profiles HL7 Europe Patient Summary 1.0.0-ballot, the
+care plan, administration and encounter profiles HL7 Europe Hospital
+Discharge Report 1.0.0, the pregnancy profiles the HL7 International Patient
+Summary 2.0.1 ones the `eehrxf` crosswalk names, and the others but
+`bodyweight` HL7 Europe Base and Core 2.0.1. A group QEDm names no search
+for answers the FHIR R4 base `patient` parameter and `_id`. A laboratory report
+carries the v2-0074 category `LAB` and each analyte the category
+`laboratory`, both `fixed`. The report's code is the test name under the
+repeating event of `KDS_Laborbericht`, so its `code` binds the event inside
+the result with `contains`, and a report matches when any of its events
+carries the code.
+No openEHR content carries a technical endpoint, so the facade serves
+EHDSEndpoint from its own configuration, FerroBRIDGE's own design: `fhir`,
+its FHIR base (`hl7-fhir-rest`), and `dicom-wado-rs`, the DICOMweb service
+[`[facade.endpoint]`](../operate/configuration.md#facadeendpoint) names. HL7 Europe
+gives Endpoint no profile. No patient compartment holds an `Endpoint`, so a
+`patient/` token reaches none.
 A body weight observation carries the category `vital-signs` and the LOINC
-code `29463-7` the profile fixes, so both are `fixed` tokens. The
+code `29463-7` the profile fixes, so both are `fixed` tokens. The pregnancy
+and travel observations carry the category `social-history` and their LOINC
+codes, `82810-3`, `11636-8` (live births) and `94651-7`, as `fixed` tokens
+too.
+
+The CKM publishes no alert archetype, so the precaution
+(`EVALUATION.precaution.v1`), a warning to heed in the care of the patient,
+carries EHDSAlert: FerroBRIDGE's own choice. The facade serves the access
+directives of the CDR as `Consent` too. A search returns every matching
+`Consent` (FHIR R4 search, §3.1.1), so a `Consent` search without `scope`
+answers the patient's access directives first and then the advance
+directives, paged as one searchset; it takes `patient`, `scope` and the
+paging parameters, and refuses any other parameter, since the access
+directives cannot match it. `scope=adr` reaches the advance directives
+alone, with their `date`, and `scope=patient-privacy` the access directives
+alone (R4 `Consent.scope`). A read reaches the access directives for a
+64-hex-digit id and the advance directives for any other: an advance
+directive's id is a 52-character FHIRconnect deterministic id, so the two
+never meet. A search of both answers FHIR R4 only. A medication administration has a template
+of its own, because the EHDS record template holds `ACTION.medication.v1`
+for an immunisation and a template overlay leaves no trace in the data that
+would tell the two apart. openEHR has no party class for a place, so each
+encounter composition gives one read-only Location from its
+`EVENT_CONTEXT`: its `location` as the name and its `health_care_facility`
+as the managing organization, FerroBRIDGE's own design; a write of a
+Location answers `405`, and a type whose contexts only read declares no
+write. Draft Annex X gives `EHDSPatient.identifier.type` the cardinality
+1..1, so a `Patient` write whose identifier has no type answers `422`. NI
+and SS take HL7 v2-0203, and HI, HIN, REGPID and REGION the FerroTERM code
+system `https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type`, since no
+code system for them is published. The
 `conformance/eehrxf-annex-x` pass list records the groups served, and its
 badge counts them out of 33.
 
@@ -1060,6 +1139,24 @@ attribute below it. A `date` may also name `time/value` under an `ACTION`
 and `data[atNNNN]/origin/value` under an `OBSERVATION`: the RM defines both
 instants, each once, and the Web Template leaves them out.
 
+A value under a node that repeats inside its archetype, such as the data of
+an `OBSERVATION`'s events, binds that node with `contains`, its RM class and
+at-code, and gives the path relative to it:
+
+```yaml
+    node:
+      class: OBSERVATION
+      archetype: openEHR-EHR-OBSERVATION.laboratory_test_result.v1
+      contains: { class: EVENT, node: at0002 }
+    path: data[at0003]/items[at0005,'Labortest-Bezeichnung']/value
+```
+
+The query reads `CONTAINS OBSERVATION[<archetype>] CONTAINS EVENT n0[at0002]`
+(QUERY AQL 1.1.0 §3.13.2.2), so the entry matches when any of its events
+does, and the bound node is never one inside an archetype slotted below the
+root. A path names the Web Template's name predicate where the template
+gives the node a name.
+
 A `token` whose value the mapping writes as a constant, such as the category
 of every observation a context maps, has no openEHR path to compare. Declare
 it with `fixed`, the one coding every resource of the context carries, and no
@@ -1104,7 +1201,8 @@ node the template does not hold, a path the template does not hold, a path
 that crosses a node which may occur more than once below the bound one (bind
 that node instead), a token over a value that is not coded, a path that is not
 one AQL path, a query that does not parse as AQL, two declarations of one
-resource type over one template, two declarations of one type that state
+resource type over one template whose contexts do not each start at an
+archetype of their own, two declarations of one type that state
 different parameters or includes, a `fixed` coding beside a `node` or a
 `path` or on a type other than `token`, an `include` code that is no standard
 R4 reference parameter of the type, and a parameter that takes the code of a standard R4

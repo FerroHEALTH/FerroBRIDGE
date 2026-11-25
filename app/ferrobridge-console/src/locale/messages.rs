@@ -255,6 +255,7 @@ messages! {
     #[doc = "A provisioned file."] OwnerProvisioned = "owner-provisioned",
     #[doc = "A provisioned file's tag tooltip."] OwnerProvisionedTitle = "owner-provisioned-title",
     #[doc = "A console file."] OwnerConsole = "owner-console",
+    #[doc = "The FHIR Mapping Language, as a file's language."] LanguageStructuremap = "language-structuremap",
     #[doc = "A console file's tag tooltip."] OwnerConsoleTitle = "owner-console-title",
     #[doc = "The Language filter menu's name."] FilterShowLanguages = "filter-show-languages",
     #[doc = "The Owner filter menu's name."] FilterShowOwners = "filter-show-owners",

@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM OBSERVATION.pregnancy_assertion.v0
+# (revision 0.0.1-alpha) to a FHIR R4 Observation, the draft EEHRxF Annex X
+# data group EHDSCurrentPregnancyStatus: LOINC 82810-3 (Pregnancy status)
+# with the assertion as the LOINC answer the IPS profile binds, pregnant
+# (LA15173-0) or not pregnant (LA26683-5).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: OBSERVATION.pregnancy_assertion.v0.Observation
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.pregnancy_assertion.v0
+    revision: 0.0.1-alpha
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "statusCode"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "pregnancyStatus"
+        fhir:
+          - path: "status"
+            value: "final"
+          - path: "category.coding.system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "category.coding.code"
+            value: "social-history"
+          - path: "code.coding.system"
+            value: "http://loinc.org"
+          - path: "code.coding.code"
+            value: "82810-3"
+
+  - name: "effective"
+    with:
+      fhir: "$resource.effective.as(DateTime)"
+      openehr: "$archetype/data[at0001]/events[at0016]/time"
+
+  - name: "value"
+    with:
+      fhir: "$resource.value.as(CodeableConcept).coding"
+      openehr: "$archetype/data[at0001]/events[at0016]/data[at0003]/items[at0004]/value"
+    manual:
+      - name: "pregnant"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "LA15173-0"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "code"
+          operator: "one of"
+          criteria: "LA15173-0"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at0005"
+          - path: "value"
+            value: "Pregnant"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0005"
+      - name: "notPregnant"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "LA26683-5"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "code"
+          operator: "one of"
+          criteria: "LA26683-5"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at0007"
+          - path: "value"
+            value: "Not pregnant"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0007"

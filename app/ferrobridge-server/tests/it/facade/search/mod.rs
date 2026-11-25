@@ -169,7 +169,14 @@ async fn mount_count(cdr: &MockServer, compositions: &[serde_json::Value]) {
 
 /// Returns how many nodes of `archetype` `value` is or holds, at any depth.
 fn contained(value: &serde_json::Value, archetype: &str) -> usize {
-    let own = usize::from(value["archetype_node_id"].as_str() == Some(archetype));
+    // NOTE: an ADL 2 template's data names the archetype with its full version,
+    // `<id>.v2.0.0`, which the major version `<id>.v2` a query names identifies.
+    let own = usize::from(
+        value["archetype_node_id"]
+            .as_str()
+            .and_then(|id| id.strip_prefix(archetype))
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with('.')),
+    );
     let below: usize = match value {
         serde_json::Value::Object(members) => members
             .values()
