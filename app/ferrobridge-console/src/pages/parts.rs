@@ -137,11 +137,11 @@ pub fn owner_word(l: &Locale, owner: Owner) -> String {
 
 /// The name of a mapping `language`.
 #[must_use]
-pub const fn language_name(language: Language) -> &'static str {
+pub fn language_name(l: &Locale, language: Language) -> String {
     match language {
-        Language::Fhirconnect => "FHIRconnect",
-        Language::Omocl => "OMOCL",
-        Language::Structuremap => "FHIR Mapping Language",
+        Language::Fhirconnect => String::from("FHIRconnect"),
+        Language::Omocl => String::from("OMOCL"),
+        Language::Structuremap => tr(l, Msg::LanguageStructuremap),
     }
 }
 

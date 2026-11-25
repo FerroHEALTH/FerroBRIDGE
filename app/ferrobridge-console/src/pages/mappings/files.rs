@@ -169,7 +169,7 @@ fn files_toolbar(l: &Locale, filters: &FileFilters, listing: &[Listed]) -> Html 
             };
             FilterChoice::new(
                 language_key(language),
-                language_name(language),
+                language_name(l, language),
                 counted(&with),
                 filters.languages.is_empty() || filters.languages.contains(&language),
             )
@@ -238,7 +238,7 @@ fn files_chips(l: &Locale, filters: &FileFilters, total: u32, all: usize) -> Opt
         let value = filters
             .languages
             .iter()
-            .map(|language| language_name(*language))
+            .map(|language| language_name(l, *language))
             .collect::<Vec<_>>()
             .join(", ");
         chips.push(FilterChip {
