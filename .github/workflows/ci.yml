@@ -385,6 +385,11 @@ jobs:
         with:
           persist-credentials: false
       - run: bash scripts/checks/versions.sh
+      # The post-quantum inventory: every row well formed and every location
+      # in the tree, and the table in docs/post-quantum.md and the README badge
+      # counted from it (#2177).
+      - run: bash scripts/checks/post-quantum.sh --self-test
+      - run: bash scripts/checks/post-quantum.sh
       # Every released changelog section against its text at its tag, which
       # it fetches from origin when the shallow checkout lacks it.
       - run: bash scripts/checks/changelog-released.sh
