@@ -61,6 +61,7 @@ expression: refused
     "model/composition/org.highmed/fall.v1.Encounter.yml:82 fc-unknown-template-node"
   ],
   "model/composition/org.highmed/person.v1.Patient.yml": [
+    "model/composition/org.highmed/person.v1.Patient.yml:11 fc-archetype-revision-mismatch",
     "model/composition/org.highmed/person.v1.Patient.yml:18 fc-unknown-fhir-element",
     "model/composition/org.highmed/person.v1.Patient.yml:23 fc-unknown-fhir-element",
     "model/composition/org.highmed/person.v1.Patient.yml:30 fc-unknown-fhir-element",

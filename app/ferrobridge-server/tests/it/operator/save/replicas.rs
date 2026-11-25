@@ -25,7 +25,9 @@ async fn a_save_on_one_replica_runs_on_the_other_after_the_notification()
     let first = Case::over(&store, None).await?;
     let second_store = crate::store::open(postgres.url()).await?;
     let second = Case::over(&second_store, Some(postgres)).await?;
-    ferrobridge_server::operator::watch::spawn(Some(&second.operator), Some(&second_store));
+    let listened = ferrobridge_server::operator::watch::start(&second.operator)
+        .ok_or("the second replica saves revisions")?;
+    second_store.listeners(&[listened]).spawn();
     for (name, text) in [
         ("ferrobridge_console.yml", MODEL),
         ("ferrobridge_console.context.yml", CONTEXT),

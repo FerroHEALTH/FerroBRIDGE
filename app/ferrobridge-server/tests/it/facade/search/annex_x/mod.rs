@@ -33,6 +33,8 @@ use ferrobridge_testkit::fixtures::FERROBRIDGE_EHDS_RECORD_TEMPLATE;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_EHDS_RECORD_TEMPLATE_ID;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID;
+use ferrobridge_testkit::fixtures::FERROBRIDGE_RELATED_PERSON_ADL2;
+use ferrobridge_testkit::fixtures::FERROBRIDGE_RELATED_PERSON_ID;
 use ferrobridge_testkit::fixtures::FERROEHR_PATIENT_PERSON_ADL2;
 use ferrobridge_testkit::fixtures::FERROEHR_PATIENT_PERSON_ID;
 use ferrobridge_testkit::fixtures::FERROEHR_PROFESSIONAL_PERSON_ADL2;
@@ -121,6 +123,35 @@ async fn mount_template(cdr: &MockServer, id: &str, template: String) {
         .await;
 }
 
+/// Mounts the templates of the party contexts.
+async fn mount_parties(cdr: &MockServer) -> Result<(), Box<dyn Error>> {
+    for (id, source) in [
+        (FERROEHR_PATIENT_PERSON_ID, FERROEHR_PATIENT_PERSON_ADL2),
+        (
+            FERROEHR_PROFESSIONAL_PERSON_ID,
+            FERROEHR_PROFESSIONAL_PERSON_ADL2,
+        ),
+        (
+            FERROBRIDGE_RELATED_PERSON_ID,
+            FERROBRIDGE_RELATED_PERSON_ADL2,
+        ),
+    ] {
+        mount_template(cdr, id, party_template(source)?).await;
+    }
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(format!(
+            "/definition/template/adl1.4/{ORGANISATION_TEMPLATE_ID}"
+        )))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("Content-Type", "application/xml")
+                .set_body_string(ORGANISATION_OPT),
+        )
+        .mount(cdr)
+        .await;
+    Ok(())
+}
+
 /// Returns a harness whose facade runs the Annex X project, its subject
 /// bound to the suite's EHR.
 async fn annex_x() -> Result<Harness, Box<dyn Error>> {
@@ -198,26 +229,7 @@ async fn annex_x_over(
             .mount(&cdr)
             .await;
     }
-    for (id, source) in [
-        (FERROEHR_PATIENT_PERSON_ID, FERROEHR_PATIENT_PERSON_ADL2),
-        (
-            FERROEHR_PROFESSIONAL_PERSON_ID,
-            FERROEHR_PROFESSIONAL_PERSON_ADL2,
-        ),
-    ] {
-        mount_template(&cdr, id, party_template(source)?).await;
-    }
-    Mock::given(matchers::method("GET"))
-        .and(matchers::path(format!(
-            "/definition/template/adl1.4/{ORGANISATION_TEMPLATE_ID}"
-        )))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("Content-Type", "application/xml")
-                .set_body_string(ORGANISATION_OPT),
-        )
-        .mount(&cdr)
-        .await;
+    mount_parties(&cdr).await?;
     let directory = Path::new(ANNEX_X);
     let set = programs::read_set(directory)?;
     let base = format!("{}/", cdr.uri()).parse()?;

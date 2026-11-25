@@ -9,8 +9,9 @@
 # a dispensation to the MPD resources (`medication::mapped`), also write it
 # to the directory EEHRXF_EMIT_DIR names, and so do the server's
 # Patient/$summary and SMART Health Link suites with each document they
-# serve; this script runs HL7's FHIR Validator over every one of them and
-# fails on an error. Its results
+# serve, and the one that writes a MyHealth@EU vaccination history (`euvac`);
+# this script runs HL7's FHIR Validator over every one of them and fails on an
+# error. Its results
 # are the evidence the component's page cites for the exchange format
 # (Regulation (EU) 2025/327 Art 15, Annex II 2.2); the validator is never
 # shipped.
@@ -23,14 +24,16 @@
 # fetched (hl7.fhir.uv.ips 2.0.1, hl7.fhir.eu.eps 1.0.0-ballot, hl7.fhir.eu.base 2.0.1,
 # hl7.fhir.eu.laboratory 2.0.0, hl7.fhir.eu.mpd 1.0.0, hl7.fhir.eu.hdr 1.0.0,
 # hl7.fhir.eu.imaging 1.0.0-ballot, hl7.fhir.eu.imaging-manifest 1.0.0-ballot
-# and hl7.eu.fhir.xshare-yb 0.3.0 with their dependency closure). This
+# hl7.eu.fhir.xshare-yb 0.3.0 and myhealth.eu.fhir.euvac 10.0.0-preview with
+# their dependency closure). This
 # script adds the vendored MyHealth@EU Master Value Sets Catalogue, whose
 # value sets the patient summary profiles bind, and the remaining-dispensations
 # extension eehrxf publishes. Each guide's documents run on their own, so no
 # closure reads another guide's documents: a discharge report with
 # hl7.fhir.eu.hdr 1.0.0 and the catalogue loaded, an imaging report with
 # hl7.fhir.eu.imaging 1.0.0-ballot loaded, an imaging study manifest with
-# hl7.fhir.eu.imaging-manifest 1.0.0-ballot loaded, and every other document with the
+# hl7.fhir.eu.imaging-manifest 1.0.0-ballot loaded, a vaccination history with
+# the MyHealth@EU Vaccination guide 10.0.0-preview loaded, and every other document with the
 # other four guides, IPS 2.0.1, the catalogue and the extension loaded. Every
 # patient summary also runs once more with the xShare Yellow Button guide
 # 0.3.0 and the catalogue loaded, held to the profile the guide's provider
@@ -57,7 +60,8 @@
 # conformance/myhealth-eu-*/. It reads the component's own documents, those
 # the eehrxf suites write (`eehrxf-*.json`): each laboratory report against the guide's
 # laboratory Bundle profile, each discharge report against its discharge
-# Bundle profile, every document entry of a type the Core guide profiles
+# Bundle profile, each vaccination history against the Vaccination guide's
+# Bundle profile it claims, every document entry of a type the Core guide profiles
 # against that Core profile, and every coded element a Core profile binds
 # to a Master Value Sets Catalogue value set against it. A case passes when the
 # validator reports no error, no fatal issue and no unchecked profile for it;
@@ -146,6 +150,11 @@ readonly MANIFEST_IG="hl7.fhir.eu.imaging-manifest#1.0.0-ballot"
 # Report guide.
 readonly HDR_BUNDLE="http://hl7.eu/fhir/hdr/StructureDefinition/bundle-eu-hdr"
 readonly HDR_IG="hl7.fhir.eu.hdr#1.0.0"
+
+# The MyHealth@EU vaccination history a run validates over the MyHealth@EU
+# Vaccination guide, a preview (#2168).
+readonly EUVAC_BUNDLE="http://fhir.ehdsi.eu/euvac/StructureDefinition/bundle-euvac-myhealtheu"
+readonly EUVAC_IG="myhealth.eu.fhir.euvac#10.0.0-preview"
 
 # The patient summary documents, and the guide and profile the xShare Yellow
 # Button holds a Patient Summary to (xShare Yellow Button 0.3.0, Information
@@ -299,9 +308,8 @@ validate() {
 
 # run DOCUMENTS OUT: prepares the jar and the package cache, runs the
 # validator offline over every document in DOCUMENTS and judges its output.
-# An imaging report, an imaging study manifest and a discharge report are
-# each validated in a run of
-# their own, over their guide's closure: one validator context holding
+# An imaging report, an imaging study manifest, a discharge report and a
+# vaccination history are each validated in a run of their own, over their guide's closure: one validator context holding
 # several closures read the laboratory report against the imaging guide's
 # dependencies too (no specification governs this: our own design).
 run() {
@@ -318,7 +326,7 @@ run() {
     tar -xzf "$MVC" -C "$CACHE/$name"
   fi
   mkdir -p "$out/xshare-yb"
-  local docs=() general=() imaging=() manifest=() discharge=() summaries=() doc copies
+  local docs=() general=() imaging=() manifest=() discharge=() euvac=() summaries=() doc copies
   copies="$(cd "$out/xshare-yb" && pwd)"
   for doc in "$documents"/*.json; do
     [[ -f "$doc" ]] || continue
@@ -334,6 +342,8 @@ run() {
       manifest+=("$doc")
     elif jq -e --arg bundle "$HDR_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       discharge+=("$doc")
+    elif jq -e --arg bundle "$EUVAC_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
+      euvac+=("$doc")
     else
       general+=("$doc")
     fi
@@ -361,6 +371,10 @@ run() {
   if [[ "${#discharge[@]}" -gt 0 ]]; then
     validate "$out" discharge "${discharge[@]}" -- "$HDR_IG" "$name" > "$out/discharge.bundle.json" || return 1
     parts+=("$out/discharge.bundle.json")
+  fi
+  if [[ "${#euvac[@]}" -gt 0 ]]; then
+    validate "$out" euvac "${euvac[@]}" -- "$EUVAC_IG" > "$out/euvac.bundle.json" || return 1
+    parts+=("$out/euvac.bundle.json")
   fi
   if [[ "${#summaries[@]}" -gt 0 ]]; then
     validate "$out" xshare-yb "${summaries[@]}" -- "$XSHARE_IG" 'hl7.fhir.eu.eps#1.0.0-ballot' "$name" \
@@ -458,7 +472,7 @@ myhealth_eu() {
       *) mvc="myhealth.eu.fhir.mvc-package#$ver" ;;
     esac
   done
-  mkdir -p "$out/core" "$out/laboratory" "$out/hdr"
+  mkdir -p "$out/core" "$out/laboratory" "$out/hdr" "$out/euvac"
   local profiles
   profiles="$(jq -s -c '[.[] | select(.resourceType == "StructureDefinition" and .kind == "resource" and .derivation == "constraint")]
     | group_by(.type) | map(select(length == 1) | {key: .[0].type, value: .[0].url}) | from_entries' \
@@ -470,6 +484,8 @@ myhealth_eu() {
       jq --arg p "http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/laboratory/$stem.json"
     elif jq -e --arg b "$HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
       jq --arg p "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/hdr/$stem.json"
+    elif jq -e --arg b "$EUVAC_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+      cp "$doc" "$out/euvac/$stem.json"
     fi
     jq -c --argjson profiles "$profiles" '
       select(.resourceType == "Bundle") | .entry // [] | to_entries[]
@@ -482,6 +498,7 @@ myhealth_eu() {
   measure_guide myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
   measure_guide myhealth-eu-laboratory "$out" "$out/laboratory" "$lab" || return 1
   measure_guide myhealth-eu-hdr "$out" "$out/hdr" "$hdr" || return 1
+  measure_guide myhealth-eu-euvac "$out" "$out/euvac" "$EUVAC_IG" || return 1
   mvc_codes "$out/core" "docs/specs/fhir-packages/$core/package" "docs/specs/fhir-packages/$mvc/package" "$out"
 }
 

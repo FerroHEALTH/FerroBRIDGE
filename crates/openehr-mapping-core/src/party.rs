@@ -15,6 +15,10 @@ use openehr_its::json::JsonParseError;
 use openehr_rm::v1_2::demographic::organisation::Organisation;
 use openehr_rm::v1_2::demographic::person::Person;
 use openehr_rm::v1_2::demographic::role::Role;
+use openehr_rm::v1_2::paths::PathSegment;
+use openehr_rm::v1_2::paths::RmPath;
+use openehr_rm::v1_2::paths::write::SetPathError;
+use openehr_rm::v1_2::typing::RmType;
 use openehr_sdt::flat::build::BuildOptions;
 use openehr_sdt::flat::error::FlatError;
 use serde_json::Map;
@@ -28,6 +32,18 @@ use crate::template::PathError;
 
 /// The member that names an object's RM class in canonical JSON.
 const TYPE: &str = "_type";
+
+/// The RM class of a relationship a party holds.
+const RELATIONSHIP: &str = "PARTY_RELATIONSHIP";
+
+/// The `PARTY.relationships` attribute.
+const RELATIONSHIPS: &str = "relationships";
+
+/// The `PARTY_RELATIONSHIP.source` attribute.
+const SOURCE: &str = "source";
+
+/// One member of a relationship: its path in the party and its value.
+type Member = (RmPath, Value);
 
 /// The RM release a built party names in `ARCHETYPED.rm_version`.
 ///
@@ -129,7 +145,7 @@ pub enum PartyError {
         class: PartyClass,
         /// What the strict decode refused.
         #[source]
-        source: Box<JsonParseError>,
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// The party does not validate against its template, the RM invariants
     /// or the RM-mandated openEHR terminology
@@ -150,6 +166,27 @@ pub enum PartyError {
         /// The template.
         template_id: String,
     },
+    /// A value writes the `source` of a `PARTY_RELATIONSHIP`, which is always
+    /// the party that holds it.
+    #[error(
+        "the value at `{place}` writes PARTY_RELATIONSHIP.source, which is the party that holds \
+         the relationship (RM Demographic IM, the PARTY class, invariant Relationships_validity)"
+    )]
+    RelationshipSource {
+        /// The flat id of the relationship node.
+        place: String,
+    },
+    /// A member of a relationship does not write into the built party.
+    #[error("`{path}` does not write into the party built against `{template_id}`")]
+    RelationshipWrite {
+        /// The template.
+        template_id: String,
+        /// The path of the member.
+        path: String,
+        /// Why the write was refused.
+        #[source]
+        source: Box<SetPathError>,
+    },
     /// The party was built against another template.
     #[error("the party names the template `{found}`, not `{expected}`")]
     TemplateMismatch {
@@ -169,10 +206,13 @@ pub struct CanonicalParty {
     template_id: String,
     /// The class of the party.
     class: PartyClass,
+    /// The relationships the party holds once its uid names their source.
+    unsourced: Vec<Value>,
 }
 
 impl CanonicalParty {
-    /// Returns the canonical JSON of the party.
+    /// Returns the canonical JSON of the party, without the relationships it
+    /// awaits the source of ([`Self::awaits_source`]).
     #[must_use]
     pub const fn value(&self) -> &Value {
         &self.value
@@ -194,6 +234,14 @@ impl CanonicalParty {
     #[must_use]
     pub const fn class(&self) -> PartyClass {
         self.class
+    }
+
+    /// Answers whether the party holds relationships that [`Self::value`]
+    /// leaves out until [`WebTemplateIndex::source_relationships`] names
+    /// their source.
+    #[must_use]
+    pub const fn awaits_source(&self) -> bool {
+        !self.unsourced.is_empty()
     }
 }
 
@@ -235,6 +283,7 @@ impl WebTemplateIndex {
         let mut flat = Map::new();
         let mut performed = false;
         let (values, names) = self.split_names(values)?;
+        let mut members = Vec::new();
         for value in values {
             if self.party_value(value)? {
                 let Value::Object(ref members) = value.value else {
@@ -247,6 +296,8 @@ impl WebTemplateIndex {
                     performed |= attribute == "performer" && !member.is_null();
                     flat.insert(format!("{root}/{attribute}|raw"), member.clone());
                 }
+            } else if let Some(written) = self.relationship_members(value)? {
+                members.extend(written);
             } else {
                 flat.insert(self.flat_key(value)?.to_string(), value.value.clone());
             }
@@ -262,23 +313,152 @@ impl WebTemplateIndex {
         };
         let document = openehr_sdt::flat::sim::flat::parse_flat(&flat).map_err(refused)?;
         let options = BuildOptions::default().with_rm_version(RM_RELEASE);
-        let built = openehr_sdt::flat::build::build_party(&document, self.web_template(), &options)
-            .map_err(|source| match source {
-                FlatError::PartyDecode { source, .. } => PartyError::Invalid {
-                    template_id: self.template_id().to_owned(),
-                    class: kind,
-                    source: Box::new(source),
-                },
-                other => refused(other),
-            })?;
-        let mut built = built;
+        let mut built =
+            openehr_sdt::flat::build::build_root(&document, self.web_template(), &options)
+                .map_err(|source| match source {
+                    FlatError::RawDecode { source, .. } => PartyError::Invalid {
+                        template_id: self.template_id().to_owned(),
+                        class: kind,
+                        source: Box::new(source),
+                    },
+                    other => refused(other),
+                })?;
         self.write_names(&mut built, names)?;
-        let value = decode(kind, &built).map_err(|source| PartyError::Invalid {
+        self.write_members(&mut built, members)?;
+        let unsourced = take_relationships(&mut built);
+        let mut party = self.decoded(kind, &built)?;
+        party.unsourced = unsourced;
+        Ok(party)
+    }
+
+    /// Returns `party` with the relationships it awaits written in, each
+    /// sourced at the party `uid` names in `namespace`.
+    ///
+    /// Every relationship a party holds has the party as its source (RM
+    /// Demographic IM, the `PARTY` class, invariant `Relationships_validity`),
+    /// and a CDR assigns a new party's uid when it commits it, so a party
+    /// built from node values holds its relationships aside until that uid is
+    /// known.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PartyError::Invalid`] when the result does not decode as the
+    /// party's class and [`PartyError::Unvalidated`] when it does not
+    /// validate against the template.
+    pub fn source_relationships(
+        &self,
+        party: &CanonicalParty,
+        uid: &str,
+        namespace: &str,
+    ) -> Result<CanonicalParty, PartyError> {
+        if !party.awaits_source() {
+            return Ok(party.clone());
+        }
+        let source = serde_json::json!({
+            "_type": "PARTY_REF",
+            "id": {"_type": "HIER_OBJECT_ID", "value": uid},
+            "namespace": namespace,
+            "type": party.class.rm_type(),
+        });
+        let mut value = party.value.clone();
+        let sourced = party.unsourced.iter().cloned().map(|mut relationship| {
+            if let Value::Object(ref mut members) = relationship {
+                members.insert(String::from(SOURCE), source.clone());
+            }
+            relationship
+        });
+        if let Value::Object(ref mut members) = value {
+            match members
+                .entry(RELATIONSHIPS)
+                .or_insert_with(|| Value::Array(Vec::new()))
+            {
+                Value::Array(held) => held.extend(sourced),
+                other => *other = Value::Array(sourced.collect()),
+            }
+        }
+        self.decoded(party.class, &value)
+    }
+
+    /// Returns `value` decoded strictly as `kind` and validated against the
+    /// template.
+    fn decoded(&self, kind: PartyClass, value: &Value) -> Result<CanonicalParty, PartyError> {
+        let value = decode(kind, value).map_err(|source| PartyError::Invalid {
             template_id: self.template_id().to_owned(),
             class: kind,
             source: Box::new(source),
         })?;
         self.validated(kind, value)
+    }
+
+    /// Returns the members a value at a `PARTY_RELATIONSHIP` node writes into
+    /// that relationship, each with its path in the party, or `None` for a
+    /// value at any other node.
+    ///
+    /// An operational template constrains no node for the `PARTY_REF`
+    /// `target` of a relationship, so a value at the relationship node
+    /// carries it, and it is written into the built party at the
+    /// relationship's instance path. No specification governs this: our own
+    /// design.
+    fn relationship_members(&self, value: &NodeValue) -> Result<Option<Vec<Member>>, PartyError> {
+        let Place::Node {
+            ref flat_id,
+            ref occurrences,
+        } = value.place
+        else {
+            return Ok(None);
+        };
+        let node = self.node_by_flat_id(flat_id)?;
+        if node.rm_type() != RELATIONSHIP {
+            return Ok(None);
+        }
+        let place = || flat_id.as_str().to_owned();
+        let Value::Object(ref members) = value.value else {
+            return Err(PartyError::UnsupportedValue {
+                place: place(),
+                reason: "no object",
+            });
+        };
+        let at = self.instance_path(node, occurrences)?;
+        members
+            .iter()
+            .filter(|&(attribute, _)| attribute != TYPE)
+            .map(|(attribute, member)| {
+                if attribute == SOURCE {
+                    return Err(PartyError::RelationshipSource { place: place() });
+                }
+                if openehr_rm::v1_2::model::attribute(RELATIONSHIP, attribute).is_none() {
+                    return Err(PartyError::UnknownAttribute {
+                        path: format!("{at}/{attribute}"),
+                        class: String::from(RELATIONSHIP),
+                        attribute: attribute.clone(),
+                    });
+                }
+                let mut path = at.clone();
+                path.segments.push(PathSegment {
+                    attribute: attribute.clone(),
+                    predicate: openehr_rm::v1_2::paths::Predicate::default(),
+                    descendant: false,
+                });
+                Ok((path, member.clone()))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    }
+
+    /// Writes each of `members` into `built`, an instance of the template's
+    /// root.
+    fn write_members(&self, built: &mut Value, members: Vec<Member>) -> Result<(), PartyError> {
+        let root = RmType::simple(self.root().rm_type());
+        for (path, member) in members {
+            openehr_rm::v1_2::paths::write::set_at_path(built, &root, &path, member).map_err(
+                |source| PartyError::RelationshipWrite {
+                    template_id: self.template_id().to_owned(),
+                    path: path.to_string(),
+                    source: Box::new(source),
+                },
+            )?;
+        }
+        Ok(())
     }
 
     /// Wraps canonical JSON a CDR served as a party of this template, decoded
@@ -294,12 +474,7 @@ impl WebTemplateIndex {
     pub fn accept_party(&self, value: &Value) -> Result<CanonicalParty, PartyError> {
         let kind = self.party_kind()?;
         self.performed(kind, value)?;
-        let value = decode(kind, value).map_err(|source| PartyError::Invalid {
-            template_id: self.template_id().to_owned(),
-            class: kind,
-            source: Box::new(source),
-        })?;
-        self.validated(kind, value)
+        self.decoded(kind, value)
     }
 
     /// Returns `value` as a party of `kind` once it validates against the
@@ -320,6 +495,7 @@ impl WebTemplateIndex {
             value,
             template_id: self.template_id().to_owned(),
             class: kind,
+            unsourced: Vec::new(),
         })
     }
 
@@ -395,6 +571,19 @@ impl WebTemplateIndex {
             return Err(unsupported("not a whole value under `raw`"));
         }
         Ok(self.node_by_flat_id(flat_id)?.flat_id() == self.root().flat_id())
+    }
+}
+
+/// Takes the relationships out of `built`, which holds none of them once
+/// they are taken.
+fn take_relationships(built: &mut Value) -> Vec<Value> {
+    let Value::Object(ref mut members) = *built else {
+        return Vec::new();
+    };
+    match members.remove(RELATIONSHIPS) {
+        Some(Value::Array(relationships)) => relationships,
+        Some(other) => vec![other],
+        None => Vec::new(),
     }
 }
 

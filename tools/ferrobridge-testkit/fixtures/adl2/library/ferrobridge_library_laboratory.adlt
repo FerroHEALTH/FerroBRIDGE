@@ -38,9 +38,9 @@ definition
     COMPOSITION[at0000.1] matches {
         /content matches {
             use_archetype OBSERVATION[at0000.2, openEHR-EHR-OBSERVATION.laboratory_test_result-ferrobridge.v1]
-            use_archetype INSTRUCTION[at0000.3, openEHR-EHR-INSTRUCTION.service_request.v1]
-            use_archetype EVALUATION[at0000.4, openEHR-EHR-EVALUATION.vital_status.v1]
-            use_archetype ACTION[at0000.5, openEHR-EHR-ACTION.informed_consent.v0]
+            use_archetype INSTRUCTION[at0000.3, openEHR-EHR-INSTRUCTION.service_request.v1.1.3-alpha]
+            use_archetype EVALUATION[at0000.4, openEHR-EHR-EVALUATION.vital_status.v1.0.1-alpha]
+            use_archetype ACTION[at0000.5, openEHR-EHR-ACTION.informed_consent.v0.0.1-alpha]
         }
     }
 

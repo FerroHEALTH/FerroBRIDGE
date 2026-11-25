@@ -35,6 +35,7 @@ per serialisation, and no default feature:
 | Feature | What it adds |
 |---|---|
 | `patient-summary`, `prescription`, `dispensation`, `imaging`, `laboratory`, `discharge` | the category of Art 14(1)(a) to (f): its Xt-EHR logical model, its obligations profile and its [crosswalk](category-crosswalks.md) to the HL7 Europe profiles |
+| `vaccination` | the MyHealth@EU vaccination history, outside the Art 14(1) categories: the crosswalk from the Xt-EHR `EHDSImmunisation` model to `vaccination-myhealtheu-euvac`, and with `fhir-r4` the [vaccination history document](#the-vaccination-history) |
 | `fhir-r4` | the exchange format in FHIR R4: the patient summary document, the prescription and dispensation records, a [received document](receiving-documents.md) read and checked, the terminology rules and the record of each transformation; it compiles no openEHR crate |
 | `openehr` | turns on `fhir-r4`, and maps openEHR compositions to the exchange format and back through FHIRconnect 1.0.0 contexts run in process by the `fhirconnect` crate |
 
@@ -102,6 +103,49 @@ four ways:
   corpus with a pass list under `conformance/myhealth-eu-*/`, so a case that
   stops passing fails the job, and its README badge shows the count. A badge
   is a self-test against the named CI build, never a certification.
+- **The MyHealth@EU Vaccination guide:** the same job validates each
+  vaccination history in a run of its own against `myhealth.eu.fhir.euvac`
+  10.0.0-preview and its dependency closure, and measures it as the
+  `myhealth-eu-euvac` corpus. The guide is a preview, not a release, and its
+  badge names the preview.
+
+## The vaccination history
+
+MyHealth@EU Requirements Catalogue v10.0.0 §1.24 asks the contact point of a
+patient's country of affiliation to make the patient's vaccination history
+available to a health professional abroad. Vaccination is none of the
+priority categories of Art 14(1), so the document follows the MyHealth@EU
+Vaccination guide (`myhealth.eu.fhir.euvac` 10.0.0-preview, canonical
+`http://fhir.ehdsi.eu/euvac`), behind the `vaccination` feature:
+
+- **The document:** `VACCINATION_HISTORY_FORM` writes a
+  `bundle-euvac-myhealtheu` whose `composition-euvac-myhealtheu` is of
+  type LOINC 11369-6 and holds the one `immunisations` section. The form
+  refuses a document with no immunisation, since the bundle's
+  `entry:immunisation` slice is `1..*`, and one without a legal
+  authentication, since `Composition.attester:legalAuthenticator` is `1..1`;
+  the authentication comes from the Annex III metadata.
+- **The mapping:** the shipped `euvac` project maps the immunisations
+  section of FerroBRIDGE's patient summary template, the CKM vaccination
+  list. Each dose of `ACTION.medication.v1` administered (`at0006`) or
+  aborted (`at0158`) there is a `vaccination-myhealtheu-euvac` with its
+  vaccine, time, route and comment. The sequence number (`at0025`) is
+  `protocolApplied.doseNumberPositiveInt`, and a dose without one carries a
+  data-absent-reason, which the run declares as a loss. The composition's
+  territory is the vaccination country, a `location-myhealtheu-core` the
+  profile requires (`Immunization.location` 1..1). Which territory stands
+  for the vaccination country is FerroBRIDGE's own design.
+
+```mermaid
+sequenceDiagram
+    participant Caller as Gateway
+    participant Mapping as euvac project
+    participant Doc as Document
+    Caller->>Mapping: patient summary composition
+    Mapping-->>Caller: Composition, Immunization, Location, Provenance
+    Caller->>Doc: patient, authors, mapped composition, Annex III metadata
+    Doc-->>Caller: bundle-euvac-myhealtheu
+```
 
 ## The Annex III metadata
 
@@ -203,6 +247,7 @@ the crate's tests:
 | HL7 Europe Imaging Manifest (`hl7.fhir.eu.imaging-manifest`) | 1.0.0-ballot | the imaging study manifest |
 | HL7 Europe Hospital Discharge Report (`hl7.fhir.eu.hdr`) | 1.0.0 | the discharge report crosswalk and document |
 | MyHealth@EU Master Value Sets Catalogue (`myhealth.eu.fhir.mvc-package`) | 9.1.0 | the preferred system of each terminology |
+| MyHealth@EU Vaccination (`myhealth.eu.fhir.euvac`) | 10.0.0-preview, a preview | the vaccination crosswalk and the vaccination history document |
 
 ## Where it stands
 
@@ -222,7 +267,9 @@ imaging project, over FerroBRIDGE's template of published CKM archetypes,
 and received as a `BundleReportEuImaging`. The discharge report is
 [mapped from and into openEHR](discharge-mapping.md) through the shipped
 HDR project over FerroBRIDGE's discharge report template and received as a
-`bundle-eu-hdr`. The open
+`bundle-eu-hdr`. The vaccination history is
+[mapped from openEHR](#the-vaccination-history) through the shipped `euvac`
+project and written as a `bundle-euvac-myhealtheu`. The open
 work is on the [tracker](https://github.com/FerroHEALTH/FerroBRIDGE/issues).
 The profiles this repository's own FHIR facade maps to, category by category,
 are on [EHDS readiness](ehds-readiness.md).

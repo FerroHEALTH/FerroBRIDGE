@@ -105,9 +105,17 @@ fn mapping() -> Result<Mapping, Box<dyn Error>> {
 /// The run settings: a synthetic engine device, a fixed instant and the
 /// composition defaults a received document does not state.
 fn settings() -> Settings {
-    Settings::new("Device/ferrobridge-eehrxf-test", NOW)
-        .with_defaults(Defaults::at(NOW).with_language("en").with_territory("NL"))
+    Settings::new("Device/ferrobridge-eehrxf-test", NOW).with_defaults(
+        Defaults::at(NOW)
+            .with_language("en")
+            .with_territory("NL")
+            .with_composer(COMPOSER),
+    )
 }
+
+/// The reporting clinician a received document does not state, the
+/// composition's composer.
+const COMPOSER: &str = "Synthetic Radiologist";
 
 /// Decodes the FHIR JSON `value` as the R4 resource of `kind`.
 fn resource(kind: &str, value: &Value) -> Result<Resource, Box<dyn Error>> {
@@ -447,6 +455,21 @@ fn a_received_imaging_report_maps_into_one_composition_that_keeps_it() -> Result
             "the performing organization is in the imaging service slot: {structured}"
         );
     }
+    Ok(())
+}
+
+// NOTE: draft EEHRxF Annex VII EHDSImagingStudy header.author[x] is the reporting clinician, the RM
+// COMPOSITION.composer of the imaging report.
+#[test]
+fn the_study_mapped_out_names_the_composer_as_its_interpreter() -> Result<(), Box<dyn Error>> {
+    let (_, written) = round_trip()?;
+    let output: Value = serde_json::from_str(&written)?;
+    let study = only(&output, "ImagingStudy")?;
+    assert_eq!(
+        study.pointer("/interpreter/0/display"),
+        Some(&serde_json::json!(COMPOSER)),
+        "{study}"
+    );
     Ok(())
 }
 

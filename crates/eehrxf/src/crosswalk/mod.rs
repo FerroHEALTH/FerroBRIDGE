@@ -28,6 +28,8 @@ pub mod patient_summary;
 pub mod prescription;
 #[cfg(feature = "laboratory")]
 pub mod test_report;
+#[cfg(feature = "vaccination")]
+pub mod vaccination;
 
 use std::collections::BTreeSet;
 
@@ -81,6 +83,43 @@ impl Populate {
             list.iter()
                 .any(|obligation| obligation.binds(populate.code(), PRODUCER))
         })
+    }
+}
+
+#[cfg(any(
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "vaccination"
+))]
+/// The shall obligation of a row.
+pub(crate) const SHALL: Option<Populate> = Some(Populate::Shall);
+#[cfg(any(
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "vaccination"
+))]
+/// The should obligation of a row.
+pub(crate) const SHOULD: Option<Populate> = Some(Populate::Should);
+
+#[cfg(any(
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "vaccination"
+))]
+/// The row of `path`, its eHealth Network ids, its producer obligation and
+/// the profile element that carries it, fed by no context.
+pub(crate) const fn uncontexted(
+    path: &'static str,
+    ehn: &'static [&'static str],
+    producer: Option<Populate>,
+    eps: &'static str,
+) -> Row {
+    Row {
+        path,
+        ehn,
+        producer,
+        eps,
+        contexts: &[],
     }
 }
 

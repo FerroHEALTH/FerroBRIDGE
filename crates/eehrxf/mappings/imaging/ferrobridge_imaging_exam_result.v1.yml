@@ -278,6 +278,14 @@ mappings:
                       - path: "profile"
                         value: "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging"
 
+              # NOTE: draft EEHRxF Annex VII EHDSImagingStudy header.author[x] is the study's
+              # interpreter, the clinician who reported it, the RM COMPOSITION.composer.
+              - name: "studyInterpreter"
+                unidirectional: "openEHR->fhir"
+                with:
+                  fhir: "$fhirRoot.interpreter"
+                  openehr: "$composition/composer"
+
               - name: "studyInstanceIdentifier"
                 with:
                   fhir: "$fhirRoot.identifier"

@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The model mapping of EHDSRelatedPerson over FerroBRIDGE's related person
+# PERSON definition: the identifiers, the name with its parts, the date of
+# birth, the patient as the target of the PERSON's relationship and the kind
+# of relationship coded in its details.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_ehds_related_person
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-DEMOGRAPHIC-PERSON.ferrobridge_related_person.v1
+    revision: 1.0.0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/RelatedPerson
+
+mappings:
+  - name: "identifier"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$archetype/details[id2]/items[id3]"
+  - name: "birthDate"
+    with:
+      fhir: "$resource.birthDate"
+      openehr: "$archetype/details[id2]/items[id4]"
+  - name: "name"
+    with:
+      fhir: "$resource.name"
+      openehr: "$archetype/identities[id5]/details[id6]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "fullName"
+          with:
+            fhir: "text"
+            openehr: "items[id7]"
+        - name: "givenName"
+          with:
+            fhir: "given"
+            openehr: "items[id8]"
+        - name: "familyName"
+          with:
+            fhir: "family"
+            openehr: "items[id9]"
+  - name: "patient"
+    with:
+      fhir: "$resource.patient"
+      openehr: "$archetype/relationships[id10]/target"
+  - name: "relationship"
+    with:
+      fhir: "$resource.relationship"
+      openehr: "$archetype/relationships[id10]/details[id11]/items[id12]"

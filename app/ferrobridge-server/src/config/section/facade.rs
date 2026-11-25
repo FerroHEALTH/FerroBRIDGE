@@ -72,6 +72,9 @@ pub struct Facade {
     pub summary: FacadeSummary,
     /// The bridge's technical endpoints, served as `Endpoint`.
     pub endpoint: FacadeEndpoint,
+    /// The IHE MHD 4.2.3 Document Responder, served as `DocumentReference`
+    /// and `List`.
+    pub mhd: FacadeMhd,
 }
 
 impl Default for Facade {
@@ -99,6 +102,7 @@ impl Default for Facade {
             summary: FacadeSummary::default(),
             cors: FacadeCors::default(),
             endpoint: FacadeEndpoint::default(),
+            mhd: FacadeMhd::default(),
         }
     }
 }
@@ -277,6 +281,20 @@ pub struct FacadeEndpoint {
     /// The absolute `DICOMweb` WADO-RS base the imaging studies are retrieved
     /// from; empty serves none.
     pub dicomweb_wado_rs: String,
+}
+
+/// The IHE MHD 4.2.3 Document Responder: the Find Document Lists [ITI-66],
+/// Find Document References [ITI-67] and Retrieve Document [ITI-68]
+/// transactions over the documents the Composition contexts assemble.
+///
+/// Off, `DocumentReference` and `List` are ordinary resource types a program
+/// may map. On, the facade serves them itself, and a chained
+/// `patient.identifier` needs `[facade.identifier_search]`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeMhd {
+    /// Whether the Document Responder is served.
+    pub enabled: bool,
 }
 
 /// The patient summary (HL7 IPS 2.0.1 `OperationDefinition/summary`), served
