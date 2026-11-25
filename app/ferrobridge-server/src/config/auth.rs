@@ -9,8 +9,8 @@ use ferrohealth_smart::basic::PasswordStore;
 use ferrohealth_smart::config::BasicGrants;
 use ferrohealth_smart::config::ConfigError;
 
-use super::error::Error;
 use super::Config;
+use super::error::Error;
 use crate::smart::OPERATOR_SCOPE;
 use crate::smart::SmartSettings;
 

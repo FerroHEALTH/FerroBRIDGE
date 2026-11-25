@@ -866,7 +866,10 @@ fn an_assurance_minimum_reaches_the_settings_over_the_issuer_mapping()
         Some(ferrohealth_smart::assurance::AssuranceLevel::Substantial),
         resolved.assurance.fhir
     );
-    let mapped = resolved.issuers[0].assurance.as_ref().ok_or("the mapping")?;
+    let mapped = resolved.issuers[0]
+        .assurance
+        .as_ref()
+        .ok_or("the mapping")?;
     assert_eq!(2, mapped.levels.len());
     Ok(())
 }
