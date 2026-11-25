@@ -57,8 +57,8 @@
 # the eehrxf suites write (`eehrxf-*.json`): each laboratory report against the guide's
 # laboratory Bundle profile, each discharge report against its discharge
 # Bundle profile, every document entry of a type the Core guide profiles
-# against that Core profile, and every coding the documents carry against
-# the value sets of the Master Value Sets Catalogue. A case passes when the
+# against that Core profile, and every coded element a Core profile binds
+# to a Master Value Sets Catalogue value set against it. A case passes when the
 # validator reports no error, no fatal issue and no unchecked profile for it;
 # the mode fails only when it cannot measure.
 #
@@ -470,29 +470,75 @@ myhealth_eu() {
   measure_guide myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
   measure_guide myhealth-eu-laboratory "$out" "$out/laboratory" "$lab" || return 1
   measure_guide myhealth-eu-hdr "$out" "$out/hdr" "$hdr" || return 1
-  mvc_codes "$documents" "docs/specs/fhir-packages/$mvc/package" "$out"
+  mvc_codes "$out/core" "docs/specs/fhir-packages/$core/package" "docs/specs/fhir-packages/$mvc/package" "$out"
 }
 
-# mvc_codes DOCUMENTS PACKAGE OUT: one case per distinct system and code the
-# documents carry, passing when a value set of the catalogue PACKAGE lists
-# the code or includes its whole system.
+# mvc_codes CASES CORE MVC OUT: one case per coded element of each Core
+# entry under CASES at which its Core profile (from package CORE) binds a
+# value set required or extensible, when that value set and every value set
+# it includes come from the catalogue MVC or the Core guide. The case passes
+# when a coding of the element is in the value set's members. Text alone
+# fails at a required binding and is no case at an extensible one, which
+# admits it (FHIR R4 terminologies §4.1.1.3). An element no catalogue value
+# set binds is no case.
 mvc_codes() {
-  local documents="$1" package="$2" out="$3" results="${FERROBRIDGE_CONFORMANCE_OUT:-target/conformance}"
+  local cases="$1" core="$2" mvc="$3" out="$4" results="${FERROBRIDGE_CONFORMANCE_OUT:-target/conformance}"
   mkdir -p "$results"
   jq -s -c '
-    [.[] | select(.resourceType == "ValueSet") | .compose.include[]? | select(.system != null)] as $inc
-    | {codes: ([$inc[] | .system as $s | .concept[]? | "\($s)|\(.code)"] | unique),
-       whole: ([$inc[] | select(.concept == null and .filter == null and .valueSet == null) | .system] | unique)}' \
-    "$package"/ValueSet-*.json > "$out/mvc-index.json"
-  jq -s -c '[.[] | .. | objects | select((.system | type) == "string" and (.code | type) == "string") | "\(.system)|\(.code)"] | unique' \
-    "$documents"/eehrxf-*.json |
-    jq -c --slurpfile index "$out/mvc-index.json" '
-      ($index[0].codes | map({key: ., value: true}) | from_entries) as $codes
-      | ($index[0].whole | map({key: ., value: true}) | from_entries) as $whole
-      | {corpus: "myhealth-eu-mvc", total: length,
-         cases: [.[] | (split("|")[0]) as $s
-           | if $codes[.] or $whole[$s] then {id: ., passed: true}
-             else {id: ., passed: false, failure: "no value set of the catalogue lists this code"} end]}' \
+    map(select(.resourceType == "ValueSet"))
+    | map({key: .url, value: [.compose.include[]? | {system, codes: [.concept[]?.code],
+        sets: [.valueSet[]? | sub("\\|.*$"; "")], filtered: (.filter != null)}]})
+    | from_entries' "$mvc"/ValueSet-*.json "$core"/ValueSet-*.json > "$out/mvc-valuesets.json"
+  jq -s -c --slurpfile sets "$out/mvc-valuesets.json" '
+    $sets[0] as $m
+    | def members($url; $seen):
+        if ($seen | index($url)) != null then []
+        elif $m[$url] == null then null
+        else [$m[$url][] as $i
+          | if ($i.sets | length) > 0 then ($i.sets[] | members(.; $seen + [$url]))
+            elif $i.filtered then null
+            elif ($i.codes | length) > 0 then ($i.codes | map("\($i.system)|\(.)"))
+            else ["\($i.system)|*"] end]
+          | if any(.[]; . == null) then null else add // [] end
+        end;
+      map(select(.resourceType == "StructureDefinition"))
+      | map({key: .url, value: [.snapshot.element[]
+          | select(.sliceName == null and (.id | test(":|\\.extension|\\.modifierExtension") | not))
+          | select(.binding.valueSet != null and (.binding.strength == "required" or .binding.strength == "extensible"))
+          | (.binding.valueSet | sub("\\|.*$"; "")) as $vs
+          | members($vs; []) as $members
+          | select($members != null)
+          | {path: .path, valueSet: $vs, strength: .binding.strength, members: ($members | map({key: ., value: true}) | from_entries)}]})
+      | from_entries' "$core"/StructureDefinition-*.json > "$out/mvc-bindings.json"
+  local file
+  for file in "$cases"/*.json; do
+    [[ -f "$file" ]] || continue
+    jq -c --arg stem "$(basename "$file" .json)" --slurpfile bindings "$out/mvc-bindings.json" '
+      def at($parts):
+        if type == "array" then .[] | at($parts)
+        elif ($parts | length) == 0 then .
+        elif type == "object" then
+          ($parts[0]) as $p
+          | (if ($p | endswith("[x]")) then ($p | rtrimstr("[x]")) as $pre
+              | to_entries[] | select((.key | startswith($pre)) and ((.key | ltrimstr($pre) | .[0:1]) | test("^[A-Z]$"))) | .value
+            else .[$p] // empty end)
+          | at($parts[1:])
+        else empty end;
+      . as $resource
+      | ($bindings[0][(.meta.profile // [])[0] // ""] // [])[]
+      | . as $binding
+      | $resource | at($binding.path | split(".") | .[1:])
+      | select(type == "object")
+      | (if has("coding") then [.coding[] | select(.system != null and .code != null) | "\(.system)|\(.code)"]
+         elif (.system | type) == "string" and (.code | type) == "string" then ["\(.system)|\(.code)"]
+         else [] end) as $codings
+      | select(($codings | length) > 0 or (has("text") and $binding.strength == "required"))
+      | {id: "\($stem) \($binding.path) \(if ($codings | length) > 0 then ($codings | join(",")) else "(text only)" end)",
+         passed: any($codings[]; . as $c | $binding.members[$c] or $binding.members[($c | split("|")[0]) + "|*"]),
+         valueSet: $binding.valueSet}' "$file"
+  done | jq -s -c 'unique_by(.id)
+    | {corpus: "myhealth-eu-mvc", total: length,
+       cases: map(if .passed then {id, passed} else {id, passed, failure: "no coding is in \(.valueSet)"} end)}' \
     > "$results/myhealth-eu-mvc.json"
   echo "myhealth-eu: myhealth-eu-mvc $(jq '[.cases[] | select(.passed)] | length' "$results/myhealth-eu-mvc.json") / $(jq .total "$results/myhealth-eu-mvc.json")"
 }
