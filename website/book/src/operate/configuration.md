@@ -639,6 +639,28 @@ id = "2026-05"
 key_file = "/run/secrets/state_seal_2026_05"
 ```
 
+### `[secrets]`
+
+The directory the secrets an inbound source names are read from: one file
+per secret, named by the secret's name, read at start and read again every
+`poll_seconds`, so a secret added or rotated reaches every replica without a
+restart. A source names a secret (`{"secret": "nedap-ons-prod-hmac"}`) and
+never holds its value; a write that names a secret the directory does not
+hold is refused, and a secret missing at runtime fails the source closed with
+`503`. On Kubernetes, mount one Secret as a volume without `subPath`, since a
+`subPath` mount never updates; in compose, write a new file beside the old one
+and rename it over it.
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `dir` | none, required when the section is present | no | The directory |
+| `poll_seconds` | `10` | no | Seconds between two reads of the directory, at least 1 |
+
+```toml
+[secrets]
+dir = "/run/secrets/ferrobridge-sources"
+```
+
 ### `[etl]`
 
 The OMOP ETL jobs `ferrobridge etl run` and `ferrobridge etl fhir` run. Both queries are parsed and
@@ -904,11 +926,11 @@ maps `Basic` is then a boot error, and a reload that adds one is refused.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Basic` is the SMART App State endpoint |
-| `store` | `app-state.redb` | The file the App State resources are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. App State can
-hold an app's keys, so keep the file on storage you protect as you protect the
-CDR's. The store and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. The resources
+live in the state store, so the endpoint needs `[state]`. App State can hold an
+app's keys, so protect the state database as you protect the CDR's. The store
+is FerroBRIDGE's own design.
 
 ### `[facade.launch_task]`
 
@@ -922,10 +944,10 @@ SMART launch), served as `Task` at the facade's base (the Integrate page,
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Task` is the launch endpoint |
-| `store` | `launch-tasks.redb` | The file the launch `Task`s are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
-and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The `Task`s
+live in the state store, so the endpoint needs `[state]`. The store is
+FerroBRIDGE's own design.
 
 ### `[facade.endpoint]`
 
@@ -1268,40 +1290,38 @@ scopes = ["user/Condition.rs", "user/Observation.rs"]
 
 ### `[hl7v2]`
 
-The HL7 v2 face: an MLLP listener whose messages are written into the CDR
-through the facade's ingest service. It is off until `enabled` is true, and an
-enabled face with the facade off is a boot error naming `hl7v2.enabled` and
-`facade.enabled`. This lane reaches identifiable data. The
+The HL7 v2 face's listeners: MLLP whose messages are written into the CDR
+through the facade's ingest service. It is off until `enabled` is true, and
+an enabled face needs `[facade] enabled`, [`[state]`](#state) and at least
+one listener. This lane reaches identifiable data. The senders are MLLP
+sources the operator API writes ([inbound sources](operator-api.md#inbound-sources)),
+each with its routes by MSH-3 and MSH-4 and how its messages are read and
+committed, so adding a device needs no restart and no new port. The
 [HL7 v2 face](hl7v2-face.md) page states what it does with a message and how
 it answers.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `false` | Whether the MLLP listener runs |
-| `listen` | `127.0.0.1:2575` | The socket address the listener binds |
-| `default_charset` | `ASCII` | The HL7 table 0211 code a message with an empty MSH-18 is read in |
-| `unmapped_entries` | `skip_and_count` | `skip_and_count` or `refuse`, for an entry no program maps |
-| `ehr_policy` | the facade's | `existing` or `create_on_first_write`, for the face alone |
-| `profiles` | `[]` | `{ resource_type, profile }` pairs: the profile a resource of that R4 type claims when the guide wrote none |
+| `enabled` | `false` | Whether the MLLP listeners run |
+| `listen` | `127.0.0.1:2575` | The socket address the TLS listener binds |
 | `idle_timeout` | `"5min"` | How long a connection may sit between messages; `"0s"` keeps it open |
 | `frame_timeout` | `"30s"` | How long one frame may take to arrive whole; `"0s"` waits |
 | `frame_limit` | `"1MiB"` | The largest message one frame may carry |
-| `log_outcomes` | `false` | Whether an `AE` or `AR` also logs the counted outcomes by kind at debug level |
-| `facility_identifier_issuer` | none | The issuer a facility's namespace id (HD.1) is written under, the issuer the CDR client's declared facilities name it by |
-| `senders` | none, required | The MSH-4 sending facilities accepted, at least one: `{ namespace_id }` or `{ universal_id, universal_id_type }`, each with its `certificate_subject` and an optional `origin = "device"` with its `device_identifier_issuer` |
-| `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none, required | The PEM chain and key the MLLP listener serves over TLS, and the authorities a sender's client certificate must chain to |
+| `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none | The PEM chain and key the TLS listener serves, and the authorities a sender's client certificate must chain to; the TLS listener runs when they are set. The authorities file is read again when its modification time changes, so a rotated file is in force for the next handshake without a restart |
+| `plain.bind` | none | The socket address of a second listener with no TLS, for the devices that cannot speak it; never the TLS listener's port |
 
-A resource type the R4 element table does not name, a profile that is not a
-URL, a resource type listed twice, and a sender that names neither a
-namespace id alone nor a universal id with its type are each a boot error
-naming the key.
+A table that names some TLS files and not others, a `frame_limit` of
+`"0B"`, and a plain listener on the TLS listener's port are each a boot
+error naming the key.
 
 ### `[change_feed]`
 
 The source the change-feed consumers follow: the commits of the CDR, read
 after each consumer's own watermark. It is off until `enabled` is true, and
-an enabled feed is a boot error without a `[cdr]` section, and while no
-consumer section is switched on. The [change feed](../integrate/change-feed.md)
+an enabled feed is a boot error without a `[cdr]` section, without a
+[`[state]`](#state) section, which keeps the watermarks of the `aql` source,
+the dead letters and the reader leases, and while no consumer section is
+switched on. The [change feed](../integrate/change-feed.md)
 page states what each source reads and what it cannot guarantee. No
 specification governs the change feed: it is FerroBRIDGE's own design.
 
@@ -1310,17 +1330,16 @@ specification governs the change feed: it is FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the consumers follow the source |
 | `source` | `aql` | `aql`, the poll of `/query/aql` that works against any CDR, or `ferroehr`, the reference CDR's outbox feed |
 | `url` | none | `ferroehr` only, required: the root of the CDR's extensions, the path `/admin/outbox` lives under |
-| `watermarks` | none | `aql` only, required: the `redb` file each reader's watermark is kept in |
 | `start` | `now` | `aql` only: where a reader with no watermark starts, `now`, `beginning` or an RFC 3339 instant |
-| `dead_letters` | none, required | The `redb` file the consumers park a poisoned event in and count its poisoned passes in; keep it beside `watermarks` |
 | `max_attempts` | `5` | How many passes an event may fail with a poisoned failure before it is parked, 1 to 1000 |
 | `page_size` | `100` | How many events one read asks for, 1 to 1000 |
 | `poll_interval` | `"1s"` | How long a consumer waits after a read that found no full page |
 | `backoff` | `"1s"` | How long a consumer waits after its first failed read, doubled per failure |
 | `max_backoff` | `"1min"` | The longest wait after a failed read, at least `backoff` |
+| `lease` | `"30s"` | How long a replica's lease on a reader holds; the leader renews it every third of the period, and another replica takes the reader over once it runs out |
 
-A missing `dead_letters`, an unknown `source`, a `start` that names no
-instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `"0s"`,
+An unknown `source`, a `start` that names no
+instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait or a `lease` of `"0s"`,
 and a `url` that is no http or https base without a query or a fragment are
 each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
@@ -1367,7 +1386,6 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the lane delivers |
 | `reader` | none, required | The reader name the lane follows the change feed under, another than `[events] reader` and `[omop_incremental] reader`: `A-Z`, `a-z`, `0-9`, `_`, `-` and `.`, at most 128 characters |
 | `cleartext` | `false` | Whether an `http` base is accepted, for a TLS terminator beside the bridge |
-| `emitted` | none, required | The `redb` file the record of what was delivered for each composition is kept in, identifiers only |
 | `endpoint.url` | none, required | The FHIR service base each Bundle is posted to, `https` without a query or a fragment, never the facade's own `base_url` |
 | `endpoint.timeout` | `"30s"` | How long one delivery may take |
 | `endpoint.connect_timeout` | unset | How long opening the connection may take; unset, only `timeout` bounds it |
@@ -1391,7 +1409,7 @@ The incremental OMOP load: a consumer of the change feed that commits each
 changed composition to the CDM database through the same step `etl run`
 commits it with. It is off until `enabled` is true, and an enabled load is a
 boot error without `[change_feed] enabled`, `[etl]`, `[cdm]` and an OMOCL
-directory (`[mappings] omocl`, or `[operator] mapping_dir`). It reads the
+directory (`[mappings] omocl`, or `[operator] enabled` with `[state]`). It reads the
 `[etl]` concepts, visits, derived-table scope and deletion policy, and leaves
 `[etl] aql` unused. The [OMOP ETL](../integrate/omop-etl.md#the-incremental-load)
 page states what it reads and writes. No specification governs the
@@ -1413,14 +1431,17 @@ concept resolver cannot reach refuse the start. Over `[change_feed] source =
 The person's SMART Health Links, the one-time share of their patient
 summary (SMART Health Cards and Links 1.0.0; the Integrate page,
 [The Yellow Button API](../integrate/yellow-button.md)). On, the server needs
-`[facade.summary]` and `[auth]`, and opens the store at boot; a store that
-cannot be opened refuses the start. The store is one `redb` file, so the lane
-runs on one replica.
+`[facade.summary]`, `[auth]`, `[state]` and `[state.seal]`. The links live in
+the state store, so every replica serves and revokes the same ones: each
+change of a link holds its row, so a file location is served once and the
+passcode attempts and the answers are counted across replicas. A link's
+manifest id, its handle and each location token are stored as their SHA-256,
+the handle also sealed so its owner can list it, and the sweep of expired
+links runs on one replica at a time.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the `/shl` routes are served |
-| `store` | none | The `redb` file the links are kept in. Required when on |
 | `base_url` | none | The public origin a receiver reaches the bridge at, such as `https://bridge.example.org`. A link's URL is this origin, `/shl/m/` and 43 characters, and the start is refused when that passes 128 characters. Required when on |
 | `default_expiry` | `"24h"` | How long a link lives when its creator names no `exp` |
 | `max_expiry` | `"7d"` | The longest a link may live |
@@ -1437,7 +1458,8 @@ record per facade access an authenticated caller makes, and one system import
 record per message the HL7 v2 face commits, each sent as a FHIR R4
 `AuditEvent` over the IHE ITI-20 ATX: FHIR Feed to an Audit Record
 Repository. It is off until `enabled` is true, and an enabled lane needs
-`[facade] enabled` and `[auth]`. The [access record](access-record.md) page
+`[facade] enabled`, `[auth]` and [`[state]`](#state), whose audit outbox
+the records wait in. The [access record](access-record.md) page
 states what each surface records and where. The section's shape is
 FerroBRIDGE's own design.
 
@@ -1451,10 +1473,6 @@ FerroBRIDGE's own design.
 | `endpoint.retry` | 3 tries, `"200ms"` doubling to `"1min"` | The tries of one delivery, and `max_backoff` the wait between two rounds of tries |
 | `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`) |
 | `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
-| `spool_dir` | none, required | The directory records wait in until the repository takes them; created when absent, and refused when its group or other users can reach it |
-| `max_records` | `10000` | The most records the spool holds at once |
-| `max_size` | `"64MiB"` | The most bytes the spool holds at once |
-| `write_timeout` | `"2s"` | The longest storing one record may take |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
 | `categories.national` | `[]` | The national categories the map may name, each `<system>\|<code>` |
@@ -1462,23 +1480,24 @@ FerroBRIDGE's own design.
 | `categories.archetypes` | `{}` | Each archetype id to its categories or to `"none"`; a template key wins for the same object |
 
 Template and archetype keys compare without case, as openEHR BASE compares
-every composite identifier. A missing `endpoint.url` or `spool_dir`, an `http`
-base without `cleartext`, a zero bound, a category code that names no
-category, and the lane without the facade or `[auth]` are each a boot error
-naming the key. A spool directory that cannot be opened refuses the start.
+every composite identifier. A missing `endpoint.url`, an `http` base without
+`cleartext`, a zero timeout, a category code that names no category, and the
+lane without the facade, `[auth]` or `[state]` are each a boot error naming
+the key.
 
 ### `[operator]`
 
 The operator API under `/operator`, which an operator console reads the
 engine state and the mapping files through. It is off until `enabled` is
 true, and it needs `[auth]`: an `[operator]` section turned on while
-`[auth]` is off, or names no issuer, refuses the start. The [operator API](operator-api.md) page
+`[auth]` is off, or names no issuer, refuses the start. With `[state]`, it
+saves the console's mapping files as revisions in the state store; without
+it, it checks and saves nothing. The [operator API](operator-api.md) page
 has the routes and the scope.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the operator routes are mounted, each requiring a token that carries the operator scope, `[auth] product_scope` |
-| `mapping_dir` | none | The writable directory console saves go to (`<mapping_dir>/fhirconnect/`); unset, the API checks and saves nothing. Keep it on its own volume when the root file system is read-only |
 
 ### `[operations]`
 

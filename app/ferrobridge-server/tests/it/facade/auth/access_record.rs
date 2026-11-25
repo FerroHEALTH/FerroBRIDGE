@@ -64,7 +64,7 @@ use crate::facade::stub::mount_read;
 /// The category the fixture template is mapped to in these cases.
 const CATEGORY: &str = "Patient-Summaries";
 
-/// One case: the facade, its issuer, the repository and the spool.
+/// One case: the facade, its issuer, the repository and the state store.
 struct Recorded {
     /// The facade over the stub CDR.
     harness: Harness,
@@ -78,22 +78,26 @@ struct Recorded {
     arr: MockServer,
     /// The access-record lane.
     log: Arc<AccessLog>,
-    /// The spool's directory, kept for the case.
-    _spool: tempfile::TempDir,
+    /// The state store the outbox lives in.
+    store: ferrobridge_server::store::Store,
+    /// The state store's container, kept for the case.
+    _postgres: ferrobridge_testkit::containers::Postgres,
 }
 
-/// Returns a case over `harness` whose spool holds at most `max_bytes`.
-async fn recorded(harness: Harness, max_bytes: u64) -> Result<Recorded, Box<dyn Error>> {
-    recorded_under(harness, max_bytes, |issuer| Ok(issuer.settings())).await
+/// Returns a case over `harness`, `None` unless `FERROBRIDGE_E2E=1`.
+async fn recorded(harness: Harness) -> Result<Option<Recorded>, Box<dyn Error>> {
+    recorded_under(harness, |issuer| Ok(issuer.settings())).await
 }
 
-/// Returns a case over `harness` whose spool holds at most `max_bytes`, its
-/// resource server reading the issuer as `settings` describe it.
+/// Returns a case over `harness`, its resource server reading the issuer as
+/// `settings` describe it; `None` unless `FERROBRIDGE_E2E=1`.
 async fn recorded_under(
     harness: Harness,
-    max_bytes: u64,
     settings: fn(&Issuer) -> Result<SmartSettings, Box<dyn Error>>,
-) -> Result<Recorded, Box<dyn Error>> {
+) -> Result<Option<Recorded>, Box<dyn Error>> {
+    let Some((postgres, store)) = crate::audit::state().await? else {
+        return Ok(None);
+    };
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let authority = authority(settings(&issuer)?).await;
@@ -108,23 +112,18 @@ async fn recorded_under(
         &BTreeMap::from([(template, Declared::Codes(vec![CATEGORY.to_owned()]))]),
         &BTreeMap::new(),
     )?;
-    let spool = tempfile::tempdir()?;
-    let log = crate::audit::access_log(
-        &arr,
-        spool.path(),
-        harness.facade.client().base_url(),
-        categories,
-        max_bytes,
-    )?;
-    Ok(Recorded {
+    let log =
+        crate::audit::access_log(&arr, &store, harness.facade.client().base_url(), categories)?;
+    Ok(Some(Recorded {
         harness,
         issuer,
         key,
         authority,
         arr,
         log,
-        _spool: spool,
-    })
+        store,
+        _postgres: postgres,
+    }))
 }
 
 impl Recorded {
@@ -188,7 +187,9 @@ fn assert_access(record: &serde_json::Value, cdr: &str) {
 
 #[tokio::test]
 async fn a_create_is_recorded_as_a_create() -> Result<(), Box<dyn Error>> {
-    let case = recorded(harness().await, 64 << 20).await?;
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
     mount_ehr(&case.harness.cdr).await;
     mount_create(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
     let response = raw(
@@ -228,7 +229,9 @@ async fn created(case: &Recorded) -> Result<String, Box<dyn Error>> {
 
 #[tokio::test]
 async fn a_read_is_recorded_as_a_read_of_the_resource() -> Result<(), Box<dyn Error>> {
-    let case = recorded(harness().await, 64 << 20).await?;
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
     let id = created(&case).await?;
     mount_read(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
     let response = raw(
@@ -251,7 +254,9 @@ async fn a_read_is_recorded_as_a_read_of_the_resource() -> Result<(), Box<dyn Er
 
 #[tokio::test]
 async fn an_update_is_recorded_as_an_update() -> Result<(), Box<dyn Error>> {
-    let case = recorded(harness().await, 64 << 20).await?;
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
     let id = created(&case).await?;
     mount_read(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
     Mock::given(matchers::method("PUT"))
@@ -287,7 +292,9 @@ async fn an_update_is_recorded_as_an_update() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn a_transaction_of_creates_is_recorded_as_a_create() -> Result<(), Box<dyn Error>> {
-    let case = recorded(harness().await, 64 << 20).await?;
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
     mount_ehr(&case.harness.cdr).await;
     mount_echo(&case.harness.cdr, ECHOED, Echo::Sent).await;
     let bundle = serde_json::json!({
@@ -314,7 +321,9 @@ async fn a_transaction_of_creates_is_recorded_as_a_create() -> Result<(), Box<dy
 async fn a_search_is_recorded_as_a_query() -> Result<(), Box<dyn Error>> {
     let harness =
         crate::facade::search_harness(ferrobridge_server::facade::search::Limits::default()).await;
-    let case = recorded(harness, 64 << 20).await?;
+    let Some(case) = recorded(harness).await? else {
+        return Ok(());
+    };
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/query/aql"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -344,9 +353,12 @@ async fn a_search_is_recorded_as_a_query() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn an_access_whose_record_has_no_place_is_refused_before_the_cdr()
+async fn an_access_whose_record_the_outbox_cannot_take_is_refused_before_the_cdr()
 -> Result<(), Box<dyn Error>> {
-    let case = recorded(harness().await, 1024).await?;
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
+    case.store.pool().close().await;
     mount_ehr(&case.harness.cdr).await;
     mount_create(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
     let response = raw(
@@ -368,7 +380,9 @@ async fn an_access_whose_record_has_no_place_is_refused_before_the_cdr()
 
 #[tokio::test]
 async fn a_request_the_guard_refuses_leaves_no_record() -> Result<(), Box<dyn Error>> {
-    let case = recorded(harness().await, 64 << 20).await?;
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
     let response = raw(case.app(), post_condition(&condition())).await?;
     assert_eq!(StatusCode::UNAUTHORIZED, response.status());
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -385,7 +399,9 @@ async fn a_request_the_guard_refuses_leaves_no_record() -> Result<(), Box<dyn Er
 
 #[tokio::test]
 async fn a_machine_s_access_is_recorded_naming_its_client() -> Result<(), Box<dyn Error>> {
-    let case = recorded(harness().await, 64 << 20).await?;
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
     mount_ehr(&case.harness.cdr).await;
     mount_create(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
     let token = mint(&case.key, &case.issuer.machine_claims("system/Condition.c"));
@@ -443,9 +459,14 @@ fn details(record: &serde_json::Value, kind: &str) -> Vec<String> {
 }
 
 /// Creates the Condition of `p-1` behind `FerroSMART` under a `patient/`
-/// token naming `fhir_user`, and returns the one record of the access.
-async fn created_behind_ferrosmart(fhir_user: &str) -> Result<serde_json::Value, Box<dyn Error>> {
-    let case = recorded_under(harness().await, 64 << 20, behind_ferrosmart).await?;
+/// token naming `fhir_user`, and returns the one record of the access;
+/// `None` unless `FERROBRIDGE_E2E=1`.
+async fn created_behind_ferrosmart(
+    fhir_user: &str,
+) -> Result<Option<serde_json::Value>, Box<dyn Error>> {
+    let Some(case) = recorded_under(harness().await, behind_ferrosmart).await? else {
+        return Ok(None);
+    };
     let own = condition_of("p-1");
     mount_ehr(&case.harness.cdr).await;
     mount_create(
@@ -464,14 +485,16 @@ async fn created_behind_ferrosmart(fhir_user: &str) -> Result<serde_json::Value,
     .await?;
     assert_eq!(StatusCode::CREATED, response.status(), "the create");
     let records = case.records(1).await?;
-    Ok(records.first().ok_or("one record")?.clone())
+    Ok(Some(records.first().ok_or("one record")?.clone()))
 }
 
 #[tokio::test]
 async fn a_ferrosmart_patient_s_own_access_is_recorded_as_the_person_s_own()
 -> Result<(), Box<dyn Error>> {
     // Regulation (EU) 2025/327 Art 9: the access record names the patient's own access.
-    let record = created_behind_ferrosmart("Patient/p-1").await?;
+    let Some(record) = created_behind_ferrosmart("Patient/p-1").await? else {
+        return Ok(());
+    };
     assert_eq!(
         vec![String::from("self")],
         details(&record, "binding"),
@@ -483,7 +506,9 @@ async fn a_ferrosmart_patient_s_own_access_is_recorded_as_the_person_s_own()
 #[tokio::test]
 async fn a_professional_with_patient_scopes_is_not_the_person_s_own() -> Result<(), Box<dyn Error>>
 {
-    let record = created_behind_ferrosmart("Practitioner/pr-1").await?;
+    let Some(record) = created_behind_ferrosmart("Practitioner/pr-1").await? else {
+        return Ok(());
+    };
     assert!(details(&record, "binding").is_empty(), "{record}");
     Ok(())
 }

@@ -8,13 +8,13 @@
 //!
 //! The bridge runs `ferrobridge serve`'s own run path,
 //! `ferrobridge_server::boot::serve_settings`. Its mapping tree holds one
-//! provisioned context and model over the testkit's diagnosis template, an
-//! empty directory the console saves into, and a few of the v2-to-FHIR
-//! guide's maps for the HL7 v2 face.
+//! provisioned context and model over the testkit's diagnosis template and a
+//! few of the v2-to-FHIR guide's maps for the HL7 v2 face; the console saves
+//! into the state store.
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
@@ -198,11 +198,13 @@ pub(crate) struct Stack {
     /// The CDR, kept so it outlives the bridge.
     _cdr: MockServer,
     /// The mapping tree and the templates.
-    tree: tempfile::TempDir,
+    _tree: tempfile::TempDir,
     /// The test OpenID Provider.
     provider: Provider,
     /// The console's base URL.
     console: String,
+    /// The bridge's base URL.
+    bridge_url: String,
     /// The name of the console's session cookie.
     cookie: String,
     /// The operator's access token, which never reaches the browser.
@@ -303,9 +305,10 @@ impl Stack {
         ));
         Ok(Self {
             _cdr: cdr,
-            tree,
+            _tree: tree,
             provider,
             console,
+            bridge_url: bridge,
             cookie,
             access_token,
             bridge: running,
@@ -347,9 +350,18 @@ impl Stack {
         &self.cookie
     }
 
-    /// The directory the console saves its files into.
-    pub(crate) fn console_files(&self) -> PathBuf {
-        self.tree.path().join("console")
+    /// The bytes of the mapping file at the wire path `path`, as the
+    /// bridge's operator API serves it, `None` when it holds none.
+    pub(crate) async fn mapping_file(&self, path: &str) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
+        let answer = reqwest::Client::new()
+            .get(format!("{}/operator/mappings/{path}", self.bridge_url))
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+        if answer.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        Ok(Some(answer.error_for_status()?.bytes().await?.to_vec()))
     }
 }
 
@@ -399,8 +411,8 @@ async fn cdr(port: u16) -> Result<MockServer, Box<dyn Error>> {
 /// specification governs this: our own design).
 const CAPTURE_TREES: &str = "/tmp/ferrobridge-journey-capture";
 
-/// The mapping tree: the provisioned mappings, the template, and the
-/// console's empty directory. A capture's tree (`port` not `0`) is
+/// The mapping tree: the provisioned mappings and the template. A capture's
+/// tree (`port` not `0`) is
 /// [`CAPTURE_TREES`]`/bridge-<port>`, the same path each run and in every
 /// checkout, since the configuration and diagnostics pages draw it; every
 /// other tree is a fresh temporary directory.
@@ -424,7 +436,7 @@ fn tree(port: u16) -> Result<tempfile::TempDir, Box<dyn Error>> {
     };
     let mappings = tree.path().join("mappings");
     let templates = tree.path().join("templates");
-    for directory in [&mappings, &templates, &tree.path().join("console")] {
+    for directory in [&mappings, &templates] {
         std::fs::create_dir_all(directory)?;
     }
     std::fs::write(
@@ -471,16 +483,12 @@ async fn bridge(
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, console] = [
-        tree.join("mappings"),
-        tree.join("templates"),
-        tree.join("console"),
-    ]
-    .map(|file| toml::Value::String(file.display().to_string()));
+    let [mappings, templates] = [tree.join("mappings"), tree.join("templates")]
+        .map(|file| toml::Value::String(file.display().to_string()));
     let operations = matches!(lanes, Lanes::All | Lanes::WithEvents | Lanes::WithEtl);
     let mllp_tls = mllp_tls(tree)?;
     let events = match lanes {
-        Lanes::WithEvents => events_lane(cdr, tree).await?,
+        Lanes::WithEvents => events_lane(cdr, state).await?,
         Lanes::All | Lanes::WithoutOperations | Lanes::WithEtl => String::new(),
     };
     let etl = cdm.map_or_else(String::new, |cdm| {
@@ -499,9 +507,8 @@ async fn bridge(
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
-         [operator]\nenabled = true\nmapping_dir = {console}\n\n\
-         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n\
-         senders = [{{ namespace_id = \"NORTHLAB\", certificate_subject = \"northlab.example.org\" }}]\n{mllp_tls}\n\
+         [operator]\nenabled = true\n\n\
+         [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n{mllp_tls}\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),
@@ -574,10 +581,11 @@ const EVENTS_READER: &str = "ferrobridge";
 pub(crate) const PARKED_ID: u64 = 1;
 
 /// Parks one synthetic event, clinical seq 17, for the events lane in the
-/// dead-letter store at `store`. It carries one changed composition, so a
-/// replay publishes a message and meets the closed broker, a transient
-/// failure that keeps the replay requested on every pass.
-fn park(store: &Path) -> Result<(), Box<dyn Error>> {
+/// state store at `state`, then gives the lane up for the bridge. It carries
+/// one changed composition, so a retry publishes a message and meets the
+/// closed broker, a transient failure that keeps the retry pending on every
+/// pass.
+async fn park(state: &str) -> Result<(), Box<dyn Error>> {
     let event = Event {
         position: Position::Outbox {
             domain: Domain::Clinical,
@@ -601,12 +609,30 @@ fn park(store: &Path) -> Result<(), Box<dyn Error>> {
         }],
         envelope: serde_json::Map::new(),
     };
-    let parked = ferrobridge_server::change_feed::dead_letter::DeadLetters::open(store)?.park(
-        &ReaderName::new(EVENTS_READER)?,
-        &event,
-        "the consumer met a poisoned failure: the event names no template",
-        5,
-    )?;
+    let store = ferrobridge_server::store::Store::open(&ferrobridge_server::store::Settings {
+        connection: omop_cdm::connection::CdmConnection::new(state, None)?,
+        max_connections: 1,
+        acquire_timeout: Duration::from_secs(5),
+        seal: None,
+    })
+    .await?;
+    let lease = store.lease(
+        ferrobridge_server::store::lease::Lane::new(format!("change-feed:{EVENTS_READER}"))?,
+        Duration::from_secs(30),
+    );
+    let generation = lease.claim().await?.ok_or("the lane is free")?;
+    let term = ferrobridge_server::store::lease::Term::new(lease.clone(), generation);
+    let parked =
+        ferrobridge_server::change_feed::dead_letter::DeadLetters::new(store.pool().clone())
+            .park(
+                &term,
+                &ReaderName::new(EVENTS_READER)?,
+                &event,
+                "the consumer met a poisoned failure: the event names no template",
+                5,
+            )
+            .await?;
+    lease.release(generation).await?;
     if parked == PARKED_ID {
         Ok(())
     } else {
@@ -615,12 +641,11 @@ fn park(store: &Path) -> Result<(), Box<dyn Error>> {
 }
 
 /// Mounts the reference CDR's outbox feed on `cdr`, one synthetic event in
-/// the clinical outbox, parks one more in a dead-letter store under `tree`,
-/// and returns the `[change_feed]` and `[events]` sections that follow it to
-/// a broker nothing listens on.
-async fn events_lane(cdr: &MockServer, tree: &Path) -> Result<String, Box<dyn Error>> {
-    let store = tree.join("dead-letters.redb");
-    park(&store)?;
+/// the clinical outbox, parks one more in the state store at `state`, and
+/// returns the `[change_feed]` and `[events]` sections that follow it to a
+/// broker nothing listens on.
+async fn events_lane(cdr: &MockServer, state: &str) -> Result<String, Box<dyn Error>> {
+    park(state).await?;
     let feed = format!("/ext/admin/outbox/{EVENTS_READER}");
     for (domain, events) in [
         (
@@ -658,12 +683,11 @@ async fn events_lane(cdr: &MockServer, tree: &Path) -> Result<String, Box<dyn Er
         .port();
     Ok(format!(
         "\n[change_feed]\nenabled = true\nsource = \"ferroehr\"\nurl = \"{uri}/ext\"\n\
-         poll_interval = \"200ms\"\nbackoff = \"200ms\"\nmax_backoff = \"1s\"\ndead_letters = {store}\n\n\
+         poll_interval = \"200ms\"\nbackoff = \"200ms\"\nmax_backoff = \"1s\"\n\n\
          [events]\nenabled = true\nreader = \"{EVENTS_READER}\"\n\
          url = \"amqp://127.0.0.1:{closed}/%2f\"\nexchange = \"ferroehr.events\"\n\
          confirm_timeout = \"500ms\"\n\
          queues = [{{ name = \"ferroehr.events.analytics\", binding = \"COMPOSITION.*.*\" }}]\n",
         uri = cdr.uri(),
-        store = toml::Value::String(store.display().to_string()),
     ))
 }

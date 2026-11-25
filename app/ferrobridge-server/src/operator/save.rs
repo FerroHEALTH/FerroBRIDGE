@@ -3,17 +3,14 @@
 
 //! Checking a draft, saving it and reloading the set.
 //!
-//! A draft is written next to where it will live, compiled with every other
-//! file of the set, and only a draft that compiles for every lane is renamed
-//! over its target, after its bytes and the directory entry are synced, so a
-//! reader sees the old file or the new one. A save goes to `[operator]
-//! mapping_dir` only; a path a provisioned file holds is refused. The audit
-//! line names the caller, the file, the two digests and the reason, never the
+//! A draft is compiled in memory with every other file of the set. A save
+//! holds the running revision for its whole change, compiles the running
+//! revision's files with the draft in place, and records them as the new
+//! running revision only when they compile for every lane; every replica then
+//! swaps them in. A path a provisioned file holds is refused. The audit line
+//! names the caller, the file, the two digests and the reason, never the
 //! bytes. No specification governs the operator surface: our own design.
 
-use std::io::Write as _;
-use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::body::Bytes;
@@ -27,26 +24,20 @@ use http::StatusCode;
 use http::header;
 
 use crate::mappings::files;
+use crate::mappings::files::Draft;
+use crate::mappings::revisions::{Change, Console, Entry, Files, Recording};
 use crate::operator::Operator;
 use crate::operator::guard::AUDIT_TARGET;
-use crate::operator::reload::Draft;
 use crate::operator::reload::Prepared;
 use crate::operator::reload::ReloadError;
-use crate::operator::reload::Reloader;
-use crate::operator::revisions::{BRIDGE, Entry};
 use crate::problem::{Kind, refuse};
-use ferrobridge_operator_api::revisions::Origin;
+use ferrobridge_operator_api::revisions::{Origin, Revision};
 
 /// The header a save names its reason in.
 pub const REASON: &str = "ferrobridge-reason";
 
 /// The longest reason a save may give, in characters.
 const MAX_REASON: usize = 200;
-
-/// The directory under `mapping_dir` a checked draft is staged in.
-///
-/// The `..` prefix keeps it out of every mapping walk.
-pub(crate) const DRAFTS: &str = "..drafts";
 
 /// The query of a draft check: the wire path the draft stands for.
 #[derive(Debug, serde::Deserialize)]
@@ -62,39 +53,28 @@ pub async fn check(
     Query(query): Query<CheckQuery>,
     body: Bytes,
 ) -> Response {
-    let Some(mapping_dir) = operator.mapping_dir.clone() else {
+    if operator.reloader.is_none() {
         return Failure::Unconfigured.into_response();
-    };
-    let relative = match files::relative(&query.path) {
-        Ok((root, relative)) if files::Language::of_root(root).is_some() => relative,
+    }
+    match files::relative(&query.path) {
+        Ok((root, _relative)) if files::Language::of_root(root).is_some() => {}
         Ok(_) | Err(_) => return Failure::BadEntry.into_response(),
-    };
-    let staged = mapping_dir
-        .join(DRAFTS)
-        .join(uuid::Uuid::new_v4().to_string())
-        .join(&relative);
+    }
     let draft = Draft {
         wire: query.path,
-        path: staged.clone(),
+        bytes: Arc::from(body.to_vec()),
     };
     let checked = blocking(Arc::clone(&operator), move |operator, thread| {
-        write_durably(&draft.path, &body).map_err(Failure::Write)?;
-        let outcome = operator.prepare(thread, Some(&draft));
-        let staging = draft.path.ancestors().nth(relative.components().count());
-        if let Some(staging) = staging {
-            remove_quietly(staging);
-        }
-        Ok((outcome, draft))
+        let snapshot = operator.snapshot();
+        Ok(operator.prepare(thread, snapshot.console().files(), Some(&draft)))
     })
     .await;
     match checked {
-        Ok((Ok(prepared), draft)) => {
-            axum::Json(operator.load_report(prepared.report(), Some(&draft))).into_response()
+        Ok(Ok(prepared)) => axum::Json(operator.load_report(prepared.report())).into_response(),
+        Ok(Err(ReloadError::Rejected(report))) => {
+            axum::Json(operator.load_report(&report)).into_response()
         }
-        Ok((Err(ReloadError::Rejected(report)), draft)) => {
-            axum::Json(operator.load_report(&report, Some(&draft))).into_response()
-        }
-        Ok((Err(error), _)) => unavailable(&error),
+        Ok(Err(error)) => unavailable(&error),
         Err(failure) => failure.into_response(),
     }
 }
@@ -109,17 +89,10 @@ pub async fn save(
     body: Bytes,
 ) -> Response {
     let subject = subject_of(&access).to_owned();
-    let Some(mapping_dir) = operator.mapping_dir.clone() else {
+    if operator.reloader.is_none() {
         return Failure::Unconfigured.into_response();
-    };
-    let Some((language, relative)) = files::relative(&wire)
-        .ok()
-        .and_then(|(root, relative)| Some((files::Language::of_root(root)?, relative)))
-    else {
-        return Failure::BadEntry.into_response();
-    };
-    let target = language.console_directory(&mapping_dir).join(&relative);
-    if !files::is_mapping(&target) {
+    }
+    if files::Located::console(&wire).is_none() {
         return Failure::BadEntry.into_response();
     }
     let Some(reason) = reason(&headers) else {
@@ -133,9 +106,7 @@ pub async fn save(
     let saved = blocking(Arc::clone(&operator), {
         let wire = wire.clone();
         let change = (subject.clone(), reason.clone());
-        move |operator, thread| {
-            operator.save_blocking(thread, &wire, &target, &body, &precondition, &change)
-        }
+        move |operator, thread| operator.save_blocking(thread, &wire, &body, &precondition, &change)
     })
     .await;
     let (status, old_digest, response) = match saved {
@@ -176,23 +147,22 @@ pub async fn save(
     response
 }
 
-/// `POST /operator/reload`: compiles the files on disk and swaps them in.
+/// `POST /operator/reload`: compiles the provisioned files and the running
+/// revision again and swaps them in.
 pub async fn reload(State(operator): State<Arc<Operator>>, access: Access) -> Response {
     let reloaded = blocking(Arc::clone(&operator), |operator, thread| {
-        let reloaded = operator
-            .prepare(thread, None)
-            .map(|prepared| operator.apply(prepared));
-        if reloaded.is_ok() {
-            operator.settle(on_disk()).map_err(Failure::Store)?;
-        }
-        Ok(reloaded)
+        let revisions = operator.revisions().ok_or(Failure::Unconfigured)?;
+        let console = thread.wait(revisions.console()).map_err(Failure::Store)?;
+        Ok(operator
+            .prepare(thread, console.files(), None)
+            .map(|prepared| operator.apply(prepared, console)))
     })
     .await;
     let response = match reloaded {
         Ok(Ok(report)) => axum::Json(report).into_response(),
         Ok(Err(ReloadError::Rejected(report))) => (
             StatusCode::UNPROCESSABLE_ENTITY,
-            axum::Json(operator.load_report(&report, None)),
+            axum::Json(operator.load_report(&report)),
         )
             .into_response(),
         Ok(Err(error)) => unavailable(&error),
@@ -265,7 +235,7 @@ impl Precondition {
 /// How a save ended, short of a failure to write.
 #[derive(Debug)]
 pub enum Saved {
-    /// The file was written and the set reloaded.
+    /// The file was recorded in a running revision and the set reloaded.
     Done {
         /// The digest the file had before, when it existed.
         old: Option<String>,
@@ -279,7 +249,7 @@ pub enum Saved {
         /// The report naming every diagnostic.
         report: ferrobridge_operator_api::operator::LoadReport,
     },
-    /// The file was written and the reload did not run to the end, so the
+    /// The check did not run to the end, so nothing was recorded and the
     /// running set is the old one.
     Unreloaded {
         /// The digest the file had before.
@@ -287,6 +257,15 @@ pub enum Saved {
         /// Why the reload stopped.
         error: ReloadError,
     },
+}
+
+/// Why a set of console files did not compile into one that runs.
+#[derive(Debug)]
+pub enum Refused {
+    /// An error diagnostic, with the report by wire path.
+    Rejected(ferrobridge_operator_api::operator::LoadReport),
+    /// The check could not run to the end.
+    Unavailable(ReloadError),
 }
 
 /// Why a check or a save stopped before it compiled.
@@ -304,17 +283,11 @@ pub enum Failure {
     /// A provisioned file holds the path.
     #[error("a provisioned file holds this path, and the console never writes one")]
     Provisioned,
-    /// The draft or the saved file could not be written.
-    #[error("the draft could not be written")]
-    Write(#[source] std::io::Error),
-    /// The current file could not be read.
-    #[error("the current file could not be read")]
-    Read(#[source] std::io::Error),
     /// The blocking task did not finish.
     #[error("the operator task did not finish")]
     Task(#[source] tokio::task::JoinError),
-    /// No `[operator] mapping_dir` is configured.
-    #[error("no [operator] mapping_dir is configured")]
+    /// No `[state]` is configured, so nothing is saved.
+    #[error("no [state] is configured")]
     Unconfigured,
     /// No revision has the id.
     #[error("no revision has this id")]
@@ -327,7 +300,7 @@ pub enum Failure {
     Archive(#[source] crate::operator::revisions::archive::ArchiveError),
     /// The revision store could not be read or written.
     #[error("the revision store could not be read or written")]
-    Store(#[source] crate::operator::revisions::StoreError),
+    Store(#[source] crate::mappings::revisions::RevisionError),
 }
 
 impl IntoResponse for Failure {
@@ -347,7 +320,7 @@ impl IntoResponse for Failure {
             ),
             Self::Unconfigured => refuse(
                 Kind::NotConfigured,
-                "no [operator] mapping_dir is configured, so the operator API checks and saves nothing",
+                "no [state] is configured, so the operator API checks and saves nothing",
             ),
             Self::UnknownRevision => refuse(Kind::NotFound, "no revision has this id"),
             Self::BadEntry => refuse(
@@ -358,14 +331,14 @@ impl IntoResponse for Failure {
                 Kind::BadArchive,
                 "the body is no mapping-set archive the bridge reads",
             ),
-            Self::Write(_) | Self::Read(_) | Self::Task(_) | Self::Store(_) => {
+            Self::Task(_) | Self::Store(_) => {
                 tracing::error!(
                     error = ferrohealth_server::run::chain(&self),
-                    "an operator save could not reach the file system"
+                    "an operator save could not reach the state store"
                 );
                 refuse(
                     Kind::Unwritable,
-                    "the mapping directory could not be written",
+                    "the mapping revisions could not be read or written",
                 )
             }
         }
@@ -373,173 +346,123 @@ impl IntoResponse for Failure {
 }
 
 impl Operator {
-    /// Checks and compiles the set on disk, `draft` standing in for one file.
+    /// Checks and compiles the provisioned files with the console files
+    /// `console`, `draft` standing in for one file.
     ///
     /// # Errors
     ///
-    /// Returns what [`Reloader::prepare`] returns, and [`ReloadError::Read`]
-    /// when a directory cannot be listed.
+    /// Returns what [`crate::operator::reload::Reloader::prepare`] returns,
+    /// [`ReloadError::Read`] when a directory cannot be listed and
+    /// [`ReloadError::Unconfigured`] when this surface reloads nothing.
     pub(crate) fn prepare(
         &self,
         thread: &OnBlockingThread,
+        console: &Files,
         draft: Option<&Draft>,
     ) -> Result<Prepared, ReloadError> {
-        self.prepare_over(thread, &self.roots, draft)
-    }
-
-    /// Checks and compiles the set the files under `roots` make, `draft`
-    /// standing in for one file.
-    ///
-    /// # Errors
-    ///
-    /// Returns what [`Operator::prepare`] returns.
-    pub(crate) fn prepare_over(
-        &self,
-        thread: &OnBlockingThread,
-        roots: &[files::Root],
-        draft: Option<&Draft>,
-    ) -> Result<Prepared, ReloadError> {
-        let reloader = self
-            .reloader
-            .as_ref()
-            .ok_or(ReloadError::Read(crate::walk::Error {
-                path: PathBuf::new(),
-                source: std::io::Error::other("the operator API has no reload configured"),
-            }))?;
-        let sources = Reloader::sources(roots, draft)?;
+        let reloader = self.reloader.as_ref().ok_or(ReloadError::Unconfigured)?;
+        let sources = files::sources(&self.roots, console, draft).map_err(ReloadError::Read)?;
         thread.wait(reloader.prepare(&sources))
     }
 
-    /// Swaps `prepared` in and returns the report of the new set, or `None`
-    /// when this surface reloads nothing.
+    /// Checks and compiles the provisioned files with the console files
+    /// `console`, a rejection's report already shown by wire path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refused::Rejected`] with the report when a diagnostic is an
+    /// error, and [`Refused::Unavailable`] when the check could not run.
+    pub(crate) fn compile(
+        &self,
+        thread: &OnBlockingThread,
+        console: &Files,
+    ) -> Result<Prepared, Refused> {
+        self.prepare(thread, console, None)
+            .map_err(|error| match error {
+                ReloadError::Rejected(report) => Refused::Rejected(self.load_report(&report)),
+                error => Refused::Unavailable(error),
+            })
+    }
+
+    /// Swaps `prepared`, compiled with `console`, in and returns the report
+    /// of the new set, or `None` when this surface reloads nothing.
     pub fn apply(
         &self,
         prepared: Prepared,
+        console: Console,
     ) -> Option<ferrobridge_operator_api::operator::LoadReport> {
-        let snapshot = self.reloader.as_ref()?.apply(prepared);
-        let report = self.load_report(snapshot.report(), None);
+        let snapshot = self
+            .reloader
+            .as_ref()?
+            .apply(prepared)
+            .with_console(console);
+        let report = self.load_report(snapshot.report());
         self.replace(snapshot);
         Some(report)
     }
 
-    /// Saves `body` at `target`, the console file `wire` names, when the
-    /// precondition holds and the set compiles with it.
+    /// Saves `body` as the console file `wire` names, in a new running
+    /// revision, when the precondition holds and the set compiles with it.
     fn save_blocking(
         &self,
         thread: &OnBlockingThread,
         wire: &str,
-        target: &Path,
         body: &[u8],
         precondition: &Precondition,
         (author, reason): &(String, String),
     ) -> Result<Saved, Failure> {
-        if files::resolve(&self.provisioned_roots(), wire).is_ok() {
+        if files::resolve(&self.roots, wire).is_ok() {
             return Err(Failure::Provisioned);
         }
-        self.settle(on_disk()).map_err(Failure::Store)?;
-        let old = match std::fs::read(target) {
-            Ok(bytes) => Some(files::sha256(&bytes)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(Failure::Read(error)),
-        };
+        let revisions = self.revisions().ok_or(Failure::Unconfigured)?;
+        let mut change = thread.wait(revisions.change()).map_err(Failure::Store)?;
+        let mut contents = thread
+            .wait(change.running_files())
+            .map_err(Failure::Store)?;
+        let old = contents.get(wire).map(|bytes| files::sha256(bytes));
         if *precondition == Precondition::Missing {
             return Err(Failure::PreconditionRequired);
         }
         if !precondition.holds(old.as_deref()) {
             return Err(Failure::PreconditionFailed { old });
         }
-        let staged = staging_path(target);
-        write_durably(&staged, body).map_err(Failure::Write)?;
-        let draft = Draft {
-            wire: wire.to_owned(),
-            path: staged.clone(),
+        contents.insert(wire.to_owned(), Arc::from(body));
+        let prepared = match self.compile(thread, &contents) {
+            Ok(prepared) => prepared,
+            Err(Refused::Rejected(report)) => return Ok(Saved::Rejected { old, report }),
+            Err(Refused::Unavailable(error)) => return Ok(Saved::Unreloaded { old, error }),
         };
-        match self.prepare(thread, Some(&draft)) {
-            Ok(_prepared) => {}
-            Err(ReloadError::Rejected(report)) => {
-                remove_quietly(&staged);
-                return Ok(Saved::Rejected {
-                    old,
-                    report: self.load_report(&report, Some(&draft)),
-                });
-            }
-            Err(error) => {
-                remove_quietly(&staged);
-                return Ok(Saved::Unreloaded { old, error });
-            }
-        }
-        std::fs::rename(&staged, target).map_err(|error| {
-            remove_quietly(&staged);
-            Failure::Write(error)
-        })?;
-        sync_directory(target).map_err(Failure::Write)?;
-        match self.prepare(thread, None) {
-            Ok(prepared) => {
-                let report = self.apply(prepared);
-                self.settle(Entry {
-                    origin: Origin::Save,
-                    author: author.clone(),
-                    reason: reason.clone(),
-                    applied: true,
-                    source: None,
-                })
-                .map_err(Failure::Store)?;
-                Ok(Saved::Done { old, report })
-            }
-            Err(error) => Ok(Saved::Unreloaded { old, error }),
-        }
+        let entry = Entry {
+            origin: Origin::Save,
+            author: author.clone(),
+            reason: reason.clone(),
+            source: None,
+        };
+        let (_revision, report) = self.run(thread, (change, entry), prepared, contents)?;
+        Ok(Saved::Done { old, report })
     }
-}
 
-/// Returns the entry of a revision the bridge records for console files it
-/// finds changed on disk.
-pub(crate) fn on_disk() -> Entry {
-    Entry {
-        origin: Origin::Reload,
-        author: String::from(BRIDGE),
-        reason: String::from("the console files changed on disk"),
-        applied: true,
-        source: None,
-    }
-}
-
-/// Returns the staging file a save of `target` writes first: a `..`-prefixed
-/// sibling, so the rename stays in one directory and no walk reads it.
-fn staging_path(target: &Path) -> PathBuf {
-    let name = target
-        .file_name()
-        .and_then(std::ffi::OsStr::to_str)
-        .unwrap_or("mapping");
-    target.with_file_name(format!("..{name}.{}.tmp", uuid::Uuid::new_v4()))
-}
-
-/// Writes `bytes` to `path`, creating its directories, and syncs the file.
-pub(crate) fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let mut file = std::fs::File::create(path)?;
-    file.write_all(bytes)?;
-    file.sync_all()
-}
-
-/// Syncs the directory holding `path`, so a rename into it survives a crash.
-pub(crate) fn sync_directory(path: &Path) -> std::io::Result<()> {
-    match path.parent() {
-        Some(parent) => std::fs::File::open(parent)?.sync_all(),
-        None => Ok(()),
-    }
-}
-
-/// Removes a staged file or directory, logging a failure.
-fn remove_quietly(path: &Path) {
-    let removed = if path.is_dir() {
-        std::fs::remove_dir_all(path)
-    } else {
-        std::fs::remove_file(path)
-    };
-    if let Err(error) = removed {
-        tracing::warn!(%error, "an operator draft could not be removed");
+    /// Records `contents` under `entry` as the running revision through
+    /// `change`, then swaps `prepared`, compiled with them, in; returns the
+    /// revision and the report of the new set.
+    pub(crate) fn run(
+        &self,
+        thread: &OnBlockingThread,
+        (change, entry): (Change, Entry),
+        prepared: Prepared,
+        contents: Files,
+    ) -> Result<
+        (
+            Revision,
+            Option<ferrobridge_operator_api::operator::LoadReport>,
+        ),
+        Failure,
+    > {
+        let revision = thread
+            .wait(change.record(entry, &contents, Recording::Run))
+            .map_err(Failure::Store)?;
+        let report = self.apply(prepared, Console::new(Some(revision.id.clone()), contents));
+        Ok((revision, report))
     }
 }
 

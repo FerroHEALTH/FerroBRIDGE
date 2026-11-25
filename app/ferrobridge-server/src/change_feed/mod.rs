@@ -34,6 +34,8 @@ use crate::cdr::error::CdrError;
 use crate::cdr::error::Upstream;
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
+use crate::store::lease::LeaseError;
+use crate::store::lease::Term;
 
 /// The most events one page asks for: the bound of the reference CDR's feed,
 /// which the AQL source keeps too.
@@ -385,6 +387,15 @@ pub struct Page {
 /// A source of commit events, each reader with its own cursor.
 #[async_trait::async_trait]
 pub trait ChangeFeed: fmt::Debug + Send + Sync {
+    /// Prepares the cursor of `reader` once its follower holds the lane
+    /// under `term`.
+    ///
+    /// # Errors
+    /// Returns [`FeedError`] when the cursor cannot be prepared.
+    async fn begin(&self, _reader: &ReaderName, _term: &Term) -> Result<(), FeedError> {
+        Ok(())
+    }
+
     /// Returns up to `limit` events after the cursor of `reader`, without
     /// moving it.
     ///
@@ -392,12 +403,30 @@ pub trait ChangeFeed: fmt::Debug + Send + Sync {
     /// Returns [`FeedError`] for every answer that is not a page.
     async fn page(&self, reader: &ReaderName, limit: PageSize) -> Result<Page, FeedError>;
 
-    /// Moves the cursor of `reader` to `last`, the last event it has fully
-    /// processed.
+    /// Moves the cursor the bridge keeps for `reader` to `last` inside the
+    /// follower's transaction, none for a source that keeps the cursor on
+    /// the CDR.
+    ///
+    /// # Errors
+    /// Returns [`FeedError`] when the cursor cannot be moved.
+    async fn record(
+        &self,
+        _ledger: &mut Ledger<'_>,
+        _reader: &ReaderName,
+        _last: &Position,
+    ) -> Result<(), FeedError> {
+        Ok(())
+    }
+
+    /// Tells the source that `reader` has fully processed `last`, once the
+    /// follower's transaction committed; nothing for a source whose cursor
+    /// the bridge keeps.
     ///
     /// # Errors
     /// Returns [`FeedError`] for every answer that did not move the cursor.
-    async fn acknowledge(&self, reader: &ReaderName, last: &Position) -> Result<(), FeedError>;
+    async fn acknowledge(&self, _reader: &ReaderName, _last: &Position) -> Result<(), FeedError> {
+        Ok(())
+    }
 
     /// Returns the positions the bridge keeps itself for the reader, none for
     /// a source that keeps the cursor on the CDR.
@@ -406,6 +435,58 @@ pub trait ChangeFeed: fmt::Debug + Send + Sync {
     /// Returns [`FeedError`] when the kept positions cannot be read.
     async fn positions(&self, _reader: &ReaderName) -> Result<Vec<Position>, FeedError> {
         Ok(Vec::new())
+    }
+}
+
+/// The transaction a follower commits one pass's progress in, opened on its
+/// first use and fenced by the follower's lease.
+#[derive(Debug)]
+pub struct Ledger<'t> {
+    /// The lease the follower holds.
+    term: &'t Term,
+    /// The transaction, once a write asked for it.
+    tx: Option<sqlx::Transaction<'static, sqlx::Postgres>>,
+}
+
+impl<'t> Ledger<'t> {
+    /// Returns a ledger of no write yet under `term`.
+    #[must_use]
+    pub const fn new(term: &'t Term) -> Self {
+        Self { term, tx: None }
+    }
+
+    /// Returns the lease the follower holds.
+    #[must_use]
+    pub const fn term(&self) -> &Term {
+        self.term
+    }
+
+    /// Returns the transaction, opening it and fencing it by the lease on
+    /// first use.
+    ///
+    /// # Errors
+    /// Returns [`FeedError::Store`] when the transaction cannot be opened and
+    /// [`FeedError::Lease`] when the lease is no longer the lane's.
+    pub async fn connection(&mut self) -> Result<&mut sqlx::PgConnection, FeedError> {
+        let tx = if let Some(tx) = self.tx.take() {
+            tx
+        } else {
+            let mut tx = self.term.pool().begin().await?;
+            self.term.fence(&mut tx).await?;
+            tx
+        };
+        Ok(&mut **self.tx.insert(tx))
+    }
+
+    /// Commits the transaction, when a write opened one.
+    ///
+    /// # Errors
+    /// Returns [`FeedError::Store`] when the commit fails.
+    pub async fn commit(self) -> Result<(), FeedError> {
+        if let Some(tx) = self.tx {
+            tx.commit().await?;
+        }
+        Ok(())
     }
 }
 
@@ -474,12 +555,17 @@ pub enum FeedError {
         /// The position.
         position: Position,
     },
-    /// The watermark store refused a read or a write.
-    #[error("the watermark store refused the call")]
-    Store {
-        /// What `redb` reported.
-        #[source]
-        source: Box<redb::Error>,
+    /// The state store refused a read or a write.
+    #[error("the state store refused the call")]
+    Store(#[from] sqlx::Error),
+    /// The follower no longer leads its lane.
+    #[error("the follower no longer leads its lane")]
+    Lease(#[from] LeaseError),
+    /// A page was asked for a reader whose cursor was never prepared.
+    #[error("the cursor of reader {reader} was never prepared")]
+    NotBegun {
+        /// The reader.
+        reader: ReaderName,
     },
     /// The acknowledged position lies at or before the stored watermark.
     #[error("the watermark of reader {reader} is past {position}")]
@@ -488,15 +574,6 @@ pub enum FeedError {
         reader: ReaderName,
         /// The position acknowledged.
         position: Position,
-    },
-    /// The stored watermark does not read.
-    #[error("the stored watermark of reader {reader} does not read")]
-    Watermark {
-        /// The reader.
-        reader: ReaderName,
-        /// Why.
-        #[source]
-        source: serde_json::Error,
     },
     /// A page body that is not the documented page.
     #[error("the feed answered a page that does not read: {reason}")]
@@ -523,9 +600,10 @@ impl FeedError {
             Self::Cdr { .. }
             | Self::Malformed { .. }
             | Self::Foreign { .. }
-            | Self::Store { .. }
-            | Self::Behind { .. }
-            | Self::Watermark { .. } => None,
+            | Self::Store(_)
+            | Self::Lease(_)
+            | Self::NotBegun { .. }
+            | Self::Behind { .. } => None,
         }
     }
 }
@@ -535,8 +613,6 @@ impl FeedError {
 pub enum Source {
     /// The vendor-neutral AQL source.
     Aql {
-        /// The `redb` file of the watermarks.
-        watermarks: std::path::PathBuf,
         /// Where a reader with no watermark starts.
         start: aql::Start,
     },
@@ -554,29 +630,28 @@ pub struct Settings {
     pub source: Source,
     /// How the followers pace their reads.
     pub polling: follow::Polling,
-    /// The `redb` file of the parked events.
-    pub dead_letters: std::path::PathBuf,
+    /// How long a follower's lease on its lane holds before it is renewed.
+    pub lease: std::time::Duration,
     /// The poisoned passes an event fails before it is parked.
     pub max_attempts: std::num::NonZeroU32,
 }
 
-/// Returns the source `settings` names, reached through `cdr`.
-///
-/// # Errors
-/// Returns [`FeedError::Store`] when the watermark file of the AQL source
-/// cannot be opened.
+/// Returns the source `settings` names, reached through `cdr`, keeping the
+/// cursors the bridge keeps in `store`.
+#[must_use]
 pub fn open(
     settings: &Settings,
     cdr: crate::cdr::CdrClient,
-) -> Result<std::sync::Arc<dyn ChangeFeed>, FeedError> {
-    Ok(match &settings.source {
-        Source::Aql { watermarks, start } => std::sync::Arc::new(aql::AqlFeed::new(
+    store: &crate::store::Store,
+) -> std::sync::Arc<dyn ChangeFeed> {
+    match &settings.source {
+        Source::Aql { start } => std::sync::Arc::new(aql::AqlFeed::new(
             cdr,
-            std::sync::Arc::new(watermark::WatermarkStore::open(watermarks)?),
+            watermark::Watermarks::new(store.pool().clone()),
             start.clone(),
         )),
         Source::FerroEhr { root } => {
             std::sync::Arc::new(ferroehr::FerroEhrFeed::new(cdr, root.clone()))
         }
-    })
+    }
 }

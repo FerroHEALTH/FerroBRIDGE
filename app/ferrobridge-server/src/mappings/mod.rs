@@ -14,6 +14,8 @@
 
 pub mod compile;
 pub mod files;
+pub mod revisions;
+pub mod tree;
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -28,6 +30,7 @@ use crate::config::MappingSettings;
 use crate::config::Settings;
 use crate::mappings::compile::Refusal;
 use crate::mappings::compile::TemplateCause;
+use crate::mappings::tree::Tree;
 
 /// Why a mapping set did not load.
 #[derive(Debug, thiserror::Error)]
@@ -189,22 +192,18 @@ pub async fn load_configured(
 /// template does not build, when the mapping files do not validate, and when a
 /// context does not compile against its template.
 pub fn load(settings: &MappingSettings) -> Result<ProgramSet, Error> {
-    let files = mapping_files(&settings.directory)?;
-    load_files(&settings.directory, &files, &settings.templates)
+    let tree = mapping_tree(&settings.directory)?;
+    load_tree(&settings.directory, &tree, &settings.templates)
 }
 
-/// Loads the mapping files `files`, named after `directory` in a refusal,
+/// Loads the mapping files of `tree`, named after `directory` in a refusal,
 /// compiled against every `.opt` file under `templates`.
 ///
 /// # Errors
 ///
 /// Returns what [`load`] returns, apart from an empty mapping tree.
-pub fn load_files(
-    directory: &Path,
-    files: &[PathBuf],
-    templates: &Path,
-) -> Result<ProgramSet, Error> {
-    let set = read(directory, files)?;
+pub fn load_tree(directory: &Path, tree: &Tree, templates: &Path) -> Result<ProgramSet, Error> {
+    let set = read(directory, tree)?;
     let resolved = compile::directory_templates(templates)?;
     if !resolved.diagnostics.is_empty() {
         return Err(Error::Mappings {
@@ -241,22 +240,22 @@ pub async fn load_from_cdr(
     directory: &Path,
     client: &crate::cdr::CdrClient,
 ) -> Result<ProgramSet, Error> {
-    let files = mapping_files(directory)?;
-    load_files_from_cdr(directory, &files, client).await
+    let tree = mapping_tree(directory)?;
+    load_tree_from_cdr(directory, &tree, client).await
 }
 
-/// Loads the mapping files `files`, named after `directory` in a refusal,
+/// Loads the mapping files of `tree`, named after `directory` in a refusal,
 /// compiled against the templates the CDR `client` reaches serves.
 ///
 /// # Errors
 ///
 /// Returns what [`load_from_cdr`] returns, apart from an empty mapping tree.
-pub async fn load_files_from_cdr(
+pub async fn load_tree_from_cdr(
     directory: &Path,
-    files: &[PathBuf],
+    tree: &Tree,
     client: &crate::cdr::CdrClient,
 ) -> Result<ProgramSet, Error> {
-    let set = read(directory, files)?;
+    let set = read(directory, tree)?;
     let templates = compile::cdr_templates(&set, client).await?;
     if let Some(refusal) = templates.refusals.into_iter().next() {
         return Err(refused(refusal, ""));
@@ -264,30 +263,27 @@ pub async fn load_files_from_cdr(
     program_set(&set, templates.indexes, &[])
 }
 
-/// Returns the FHIRconnect files under `directory`, refusing an empty tree.
-fn mapping_files(directory: &Path) -> Result<Vec<PathBuf>, Error> {
-    let files = crate::walk::mapping_files(directory)
+/// Reads the FHIRconnect files under `directory`, refusing an empty tree.
+fn mapping_tree(directory: &Path) -> Result<Tree, Error> {
+    let tree = crate::walk::mapping_files(directory)
+        .and_then(Tree::read)
         .map_err(|crate::walk::Error { path, source }| Error::Read { path, source })?;
-    if files.is_empty() {
+    if tree.is_empty() {
         return Err(Error::Empty {
             path: directory.to_path_buf(),
             what: "mapping file",
         });
     }
-    Ok(files)
+    Ok(tree)
 }
 
-/// Reads and validates `files`, the mapping files under `directory`.
-fn read(
-    directory: &Path,
-    files: &[PathBuf],
-) -> Result<fhirconnect::model::load::MappingSet, Error> {
-    fhirconnect::model::load::load_set(files, &fhirconnect::engine::library::Library).map_err(
-        |diagnostics| Error::Mappings {
-            path: directory.to_path_buf(),
-            report: compile::render(&diagnostics),
-        },
-    )
+/// Validates the mapping files of `tree`, named after `directory` in a
+/// refusal.
+fn read(directory: &Path, tree: &Tree) -> Result<fhirconnect::model::load::MappingSet, Error> {
+    tree::fhirconnect_set(tree).map_err(|diagnostics| Error::Mappings {
+        path: directory.to_path_buf(),
+        report: compile::render(&diagnostics),
+    })
 }
 
 /// Compiles every context of `set` into the operations lane's program set.

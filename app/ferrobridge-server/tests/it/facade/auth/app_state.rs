@@ -48,16 +48,19 @@ struct Guarded {
 
 impl Guarded {
     /// Returns a guarded facade serving App State.
-    async fn new() -> Result<Self, Box<dyn Error>> {
+    async fn new() -> Result<Option<Self>, Box<dyn Error>> {
+        let Some(case) = Case::new().await? else {
+            return Ok(None);
+        };
         let key = ec_key("k1", Algorithm::ES256);
         let issuer = Issuer::start(&[&key]).await;
         let authority = authority(issuer.settings()).await;
-        Ok(Self {
+        Ok(Some(Self {
             issuer,
             key,
-            case: Case::new().await?,
+            case,
             authority,
-        })
+        }))
     }
 
     /// Returns a token granting `scope`, launched for `patient` when given.
@@ -85,7 +88,9 @@ impl Guarded {
 
 #[tokio::test]
 async fn a_granular_code_scope_reaches_its_own_state_code_only() -> Result<(), Box<dyn Error>> {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let token = guarded.token(MOBILE, Some("123"));
     let (status, created) = guarded
         .send(with_body("POST", "/fhir/Basic", &keys("a")), &token)
@@ -117,7 +122,9 @@ async fn a_granular_code_scope_reaches_its_own_state_code_only() -> Result<(), B
 #[tokio::test]
 async fn a_patient_grant_reaches_its_launch_patient_and_no_global_state()
 -> Result<(), Box<dyn Error>> {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let token = guarded.token("patient/Basic.cuds", Some("123"));
     let mut other = keys("a");
     other["subject"]["reference"] = serde_json::json!(at_base("Patient/456"));
@@ -144,7 +151,9 @@ async fn a_patient_grant_reaches_its_launch_patient_and_no_global_state()
 #[tokio::test]
 async fn a_search_without_a_subject_answers_only_what_the_token_reaches()
 -> Result<(), Box<dyn Error>> {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let admin = guarded.token("user/Basic.cuds", None);
     for patient in ["123", "456"] {
         let mut state = keys("a");
@@ -173,7 +182,9 @@ async fn a_search_without_a_subject_answers_only_what_the_token_reaches()
 
 #[tokio::test]
 async fn a_delete_needs_the_delete_permission_on_the_stored_state() -> Result<(), Box<dyn Error>> {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let (_, created) = guarded
         .send(
             with_body("POST", "/fhir/Basic", &keys("a")),
@@ -202,7 +213,9 @@ async fn a_delete_needs_the_delete_permission_on_the_stored_state() -> Result<()
 
 #[tokio::test]
 async fn an_app_state_request_without_a_token_is_refused() -> Result<(), Box<dyn Error>> {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let response = crate::facade::raw(
         secured(&guarded.case.harness, &guarded.authority),
         with_body("POST", "/fhir/Basic", &keys("a")),
@@ -215,7 +228,9 @@ async fn an_app_state_request_without_a_token_is_refused() -> Result<(), Box<dyn
 #[tokio::test]
 async fn discovery_lists_smart_app_state_only_when_the_endpoint_is_on() -> Result<(), Box<dyn Error>>
 {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let path = "/fhir/.well-known/smart-configuration";
     let (_, _, on) = read_open(secured(&guarded.case.harness, &guarded.authority), path).await?;
     let listed = |document: &serde_json::Value| {
@@ -233,7 +248,9 @@ async fn discovery_lists_smart_app_state_only_when_the_endpoint_is_on() -> Resul
 #[tokio::test]
 async fn every_app_state_route_reaches_its_handler_under_a_full_scope() -> Result<(), Box<dyn Error>>
 {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let token = guarded.token("system/*.cruds", None);
     for (method, template, _) in ferrobridge_server::facade::guard::APP_STATE {
         let path = format!("/fhir{template}").replace("{id}", "unknown-id");

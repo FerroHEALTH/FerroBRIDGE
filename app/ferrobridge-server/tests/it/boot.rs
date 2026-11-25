@@ -157,12 +157,12 @@ async fn a_template_the_cdr_refuses_still_fails_the_start() -> Result<(), Box<dy
     template(&cdr, ResponseTemplate::new(400)).await;
     let settings = settings(&cdr)?;
 
-    let outcome = serve_settings(
+    let outcome = Box::pin(serve_settings(
         &settings,
         || async { Ok(TcpListener::bind("127.0.0.1:0").await?) },
         BACKOFF,
         std::future::pending::<()>(),
-    )
+    ))
     .await;
     let error = outcome
         .err()
