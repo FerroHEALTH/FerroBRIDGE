@@ -250,7 +250,7 @@ pub(crate) fn settings() -> Settings {
         language: String::from("en"),
         territory: String::from("GB"),
         ehr_status_system: None,
-        custodian: crate::facade::custodian(),
+        custodian: custodian(),
     }
 }
 

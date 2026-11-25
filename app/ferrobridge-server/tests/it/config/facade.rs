@@ -101,7 +101,7 @@ fn an_enabled_facade_without_each_custodian_key_refuses_to_boot()
         let text: String = ENABLED
             .lines()
             .filter(|line| !line.starts_with(dropped))
-            .map(|line| format!("{line}\n"))
+            .flat_map(|line| [line, "\n"])
             .collect();
         let error = Config::from_sources(Some(&text), &BTreeMap::new())?
             .resolve(Process::Server)
