@@ -13,10 +13,10 @@ use std::time::Duration;
 use ferrobridge_operator_api::sources::{Kind, Write};
 use ferrobridge_server::inbound::event::{Change, EventMap, Reading};
 use ferrobridge_server::inbound::store::{
-    Accepted, Claimed, InboxStore, Outcome, Replay, Returned, Settlement, WorkKey,
+    Accepted, Claimed, InboxStore, Outcome, Replay, Returned, WorkKey,
 };
 use ferrobridge_server::inbound::worker::{Attempt, Failed, Handler, Pool, Settings};
-use ferrobridge_server::retry::{Backoff, Failure, Policy};
+use ferrobridge_server::retry::{Backoff, Decided, Decision, Failure, Policy};
 use ferrobridge_server::sources::{Source, Sources};
 use ferrobridge_server::store::Store;
 use ferrobridge_testkit::containers;
@@ -307,6 +307,15 @@ impl Handler for Recording {
     }
 }
 
+/// The settlement `decision` of the test operator, for `reason`.
+fn decided(decision: Decision, reason: &str) -> Decided {
+    Decided {
+        decision,
+        by: String::from("operator-test"),
+        reason: reason.to_owned(),
+    }
+}
+
 const POLICY: Policy = Policy {
     backoff: Backoff {
         initial: Duration::from_millis(10),
@@ -451,9 +460,7 @@ async fn a_failure_retries_parks_and_an_operator_settles_it() -> Result<(), Box<
         inbox
             .settle(
                 &retried,
-                Settlement::Retry,
-                "operator-test",
-                "the patient was corrected"
+                &decided(Decision::Retry, "the patient was corrected")
             )
             .await?
     );
@@ -463,17 +470,12 @@ async fn a_failure_retries_parks_and_an_operator_settles_it() -> Result<(), Box<
     };
     assert!(
         inbox
-            .settle(
-                &discarded,
-                Settlement::Discard,
-                "operator-test",
-                "a test record"
-            )
+            .settle(&discarded, &decided(Decision::Discard, "a test record"))
             .await?
     );
     assert!(
         !inbox
-            .settle(&discarded, Settlement::Retry, "operator-test", "again")
+            .settle(&discarded, &decided(Decision::Retry, "again"))
             .await?,
         "a settled item is no longer parked"
     );

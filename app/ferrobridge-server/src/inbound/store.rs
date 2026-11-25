@@ -19,6 +19,7 @@ use sqlx::postgres::PgPool;
 use uuid::Uuid;
 
 use super::event::{Change, Event};
+use crate::retry::{Decided, Decision};
 
 /// The channel an accepted event notifies, with its source id as payload.
 pub const CHANNEL: &str = "ferrobridge_inbound";
@@ -92,15 +93,6 @@ pub struct Parked {
     pub attempts: u32,
     /// When it parked, RFC 3339 UTC.
     pub since: String,
-}
-
-/// How an operator settles a parked item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Settlement {
-    /// Run it again.
-    Retry,
-    /// Leave it unapplied for good.
-    Discard,
 }
 
 /// What a replay runs again.
@@ -405,21 +397,15 @@ impl InboxStore {
             .collect())
     }
 
-    /// Settles the parked item `key` as `settlement` says, recording `by`
-    /// and `reason`; `false` when no parked item has the key.
+    /// Settles the parked item `key` as `decided` says, recording who
+    /// decided and why; `false` when no parked item has the key.
     ///
     /// # Errors
     /// Returns [`sqlx::Error`] when a statement fails.
-    pub async fn settle(
-        &self,
-        key: &WorkKey,
-        settlement: Settlement,
-        by: &str,
-        reason: &str,
-    ) -> Result<bool, sqlx::Error> {
-        let state = match settlement {
-            Settlement::Retry => "pending",
-            Settlement::Discard => "discarded",
+    pub async fn settle(&self, key: &WorkKey, decided: &Decided) -> Result<bool, sqlx::Error> {
+        let state = match decided.decision {
+            Decision::Retry => "pending",
+            Decision::Discard => "discarded",
         };
         let mut tx = self.pool.begin().await?;
         let settled = sqlx::query(
@@ -431,13 +417,13 @@ impl InboxStore {
         .bind(&key.tenant)
         .bind(&key.entity)
         .bind(state)
-        .bind(by)
-        .bind(reason)
+        .bind(&decided.by)
+        .bind(&decided.reason)
         .execute(&mut *tx)
         .await?
         .rows_affected()
             > 0;
-        if settled && settlement == Settlement::Retry {
+        if settled && decided.decision == Decision::Retry {
             notify(&mut tx, key.source_id).await?;
         }
         tx.commit().await?;
