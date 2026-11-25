@@ -40,6 +40,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::owned::Held;
 use crate::facade::owned::answer::Search;
+use crate::facade::owned::answer::SearchFuture;
 use crate::facade::owned::answer::Written;
 use crate::facade::owned::answer::answer;
 use crate::facade::owned::answer::encoded;
@@ -79,6 +80,7 @@ pub async fn create(
     )?;
     let created = store
         .create(TASK, task.resource)
+        .await
         .map_err(|error| store_refusal(&error))?;
     Ok(answer(
         &facade,
@@ -109,6 +111,7 @@ pub async fn read(
     guard(&headers, &uri, Body::Absent)?;
     let held = store
         .get(TASK, &id)
+        .await
         .map_err(|error| store_refusal(&error))?;
     let Some(Held::Live { version, resource }) = held else {
         return Err(reply::refusal(
@@ -151,31 +154,35 @@ struct Criteria {
 /// Returns `400` for a parameter the endpoint does not take or a value it
 /// cannot read, the `403` of a token with no `Task` search, and a `500` when
 /// the store fails.
-pub fn searched(search: &Search<'_>) -> Result<Response, Refusal> {
-    let Search {
-        facade,
-        access,
-        uri,
-        parameters,
-    } = *search;
-    let store = store(facade)?;
-    let criteria = criteria(facade, parameters)?;
-    let reach = access
-        .reach(Permission::Search, TASK)
-        .ok_or_else(crate::facade::guard::forbidden)?;
-    let mut matched = Vec::new();
-    for (resource, task) in scanned(store, TASK, |_resource, bytes| profile::read(bytes))? {
-        let reached = match &reach {
-            Compartment::Any => true,
-            Compartment::Patient(_) => {
-                admit(facade, access, Permission::Search, task.patient.as_deref()).is_ok()
+pub fn searched<'a>(search: &'a Search<'a>) -> SearchFuture<'a> {
+    Box::pin(async move {
+        let Search {
+            facade,
+            access,
+            uri,
+            parameters,
+        } = *search;
+        let store = store(facade)?;
+        let criteria = criteria(facade, parameters)?;
+        let reach = access
+            .reach(Permission::Search, TASK)
+            .ok_or_else(crate::facade::guard::forbidden)?;
+        let mut matched = Vec::new();
+        for (resource, task) in
+            scanned(store, TASK, |_resource, bytes| profile::read(bytes)).await?
+        {
+            let reached = match &reach {
+                Compartment::Any => true,
+                Compartment::Patient(_) => {
+                    admit(facade, access, Permission::Search, task.patient.as_deref()).is_ok()
+                }
+            };
+            if reached && criteria.match_task(facade, &task) {
+                matched.push(resource);
             }
-        };
-        if reached && criteria.match_task(facade, &task) {
-            matched.push(resource);
         }
-    }
-    searchset(facade, TASK, uri, matched)
+        searchset(facade, TASK, uri, matched)
+    })
 }
 
 /// Returns what `parameters` ask for.

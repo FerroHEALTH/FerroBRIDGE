@@ -904,11 +904,11 @@ maps `Basic` is then a boot error, and a reload that adds one is refused.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Basic` is the SMART App State endpoint |
-| `store` | `app-state.redb` | The file the App State resources are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. App State can
-hold an app's keys, so keep the file on storage you protect as you protect the
-CDR's. The store and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. The resources
+live in the state store, so the endpoint needs `[state]`. App State can hold an
+app's keys, so protect the state database as you protect the CDR's. The store
+is FerroBRIDGE's own design.
 
 ### `[facade.launch_task]`
 
@@ -922,10 +922,10 @@ SMART launch), served as `Task` at the facade's base (the Integrate page,
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Task` is the launch endpoint |
-| `store` | `launch-tasks.redb` | The file the launch `Task`s are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
-and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The `Task`s
+live in the state store, so the endpoint needs `[state]`. The store is
+FerroBRIDGE's own design.
 
 ### `[facade.summary]`
 
@@ -1396,14 +1396,17 @@ concept resolver cannot reach refuse the start. Over `[change_feed] source =
 The person's SMART Health Links, the one-time share of their patient
 summary (SMART Health Cards and Links 1.0.0; the Integrate page,
 [The Yellow Button API](../integrate/yellow-button.md)). On, the server needs
-`[facade.summary]` and `[auth]`, and opens the store at boot; a store that
-cannot be opened refuses the start. The store is one `redb` file, so the lane
-runs on one replica.
+`[facade.summary]`, `[auth]`, `[state]` and `[state.seal]`. The links live in
+the state store, so every replica serves and revokes the same ones: each
+change of a link holds its row, so a file location is served once and the
+passcode attempts and the answers are counted across replicas. A link's
+manifest id, its handle and each location token are stored as their SHA-256,
+the handle also sealed so its owner can list it, and the sweep of expired
+links runs on one replica at a time.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the `/shl` routes are served |
-| `store` | none | The `redb` file the links are kept in. Required when on |
 | `base_url` | none | The public origin a receiver reaches the bridge at, such as `https://bridge.example.org`. A link's URL is this origin, `/shl/m/` and 43 characters, and the start is refused when that passes 128 characters. Required when on |
 | `default_expiry` | `"24h"` | How long a link lives when its creator names no `exp` |
 | `max_expiry` | `"7d"` | The longest a link may live |

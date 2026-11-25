@@ -692,8 +692,8 @@ async fn build_facade(
     facade::programs::check_party_search(&programs, lane.party_search.as_ref())
         .context("checking [facade.party_search] against the party contexts")?;
     let owned: Vec<&str> = [
-        (lane.app_state.is_some(), facade::app_state::BASIC),
-        (lane.launch_task.is_some(), facade::launch_task::TASK),
+        (lane.app_state, facade::app_state::BASIC),
+        (lane.launch_task, facade::launch_task::TASK),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
@@ -722,16 +722,9 @@ async fn build_facade(
     let store = facade::identity::state::StateStore::open(state)
         .await
         .context("opening the identity map in the state store")?;
-    let owned_store = |path: Option<&std::path::PathBuf>| {
-        path.map(|path| {
-            facade::owned::OwnedStore::open(path)
-                .map(Arc::new)
-                .with_context(|| format!("opening {}", path.display()))
-        })
-        .transpose()
-    };
-    let app_state = owned_store(lane.app_state.as_ref())?;
-    let launch_tasks = owned_store(lane.launch_task.as_ref())?;
+    let owned = |on: bool| on.then(|| Arc::new(facade::owned::OwnedStore::open(state)));
+    let app_state = owned(lane.app_state);
+    let launch_tasks = owned(lane.launch_task);
     let summary = match lane.summary.as_ref() {
         Some(summary) => Some(
             build_summary(summary, &programs, &client)
@@ -813,12 +806,16 @@ fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState>
     let (Some(shl), Some(mounted)) = (settings.shl.as_ref(), state.facade()) else {
         return Ok(state);
     };
+    let store = state.store().context(
+        "the links need a [state] section: every replica serves them from the state store",
+    )?;
     let links = crate::shl::Links::open(
+        store,
         shl.clone(),
         Arc::clone(mounted),
         state.access_log().cloned(),
     )
-    .with_context(|| format!("opening the link store {}", shl.store.display()))?;
+    .context("opening the links in the state store")?;
     let links = Arc::new(links);
     drop(links.spawn_sweeper());
     tracing::info!(

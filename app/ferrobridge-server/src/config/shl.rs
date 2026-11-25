@@ -18,7 +18,7 @@ const ID_LENGTH: usize = 43;
 const LOCATION_MAX_SECONDS: u64 = 3600;
 
 /// Returns the lane `config` turns on, refused without the patient summary
-/// and inbound authentication, without a store or a public origin, with an
+/// and inbound authentication, without a public origin, with an
 /// origin that leaves no room for a manifest id, or with limits outside
 /// their range; `None` while it is off.
 pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
@@ -37,9 +37,6 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             });
         }
     }
-    let store = section.store.clone().ok_or(Error::Missing {
-        key: String::from("shl.store"),
-    })?;
     let base = url::Url::parse(&section.base_url).map_err(|source| Error::Url {
         key: String::from("shl.base_url"),
         source,
@@ -92,7 +89,6 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
         });
     }
     Ok(Some(Settings {
-        store,
         base_url: origin,
         default_expiry,
         max_expiry,

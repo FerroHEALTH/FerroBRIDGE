@@ -74,10 +74,11 @@ therefore changes nothing in CI; the lanes activate by themselves.
 A pull request runs a Rust lane only when the change reaches what that lane
 reads. The `detect` job computes the reach with
 `scripts/checks/affected.sh`, from GitHub's merge commit (`HEAD^1..HEAD`), and
-publishes it as job outputs. A push to `main`, a merge-group run and a
-dispatch pass `--all` and run every lane over every package, so `main` is
-always verified in full; to run everything on a pull request, dispatch the
-workflow on its branch.
+publishes it as job outputs. A merge-group run measures the reach from the
+queue base to the group head. A push to `main` and a dispatch pass `--all`
+and run every lane over every package, so `main` is always verified in
+full; to run everything on a pull request, dispatch the workflow on its
+branch.
 
 A changed path reaches packages in one of these ways:
 
@@ -110,8 +111,8 @@ maps it. Each lane then reads one output:
 | `codegen-drift`, `codegen-emit-tests` | `fhir-codegen` is reached (its sources, its vendored packages, `fhir-types` or `hl7v2-types`) |
 | `omop-cdm-codegen-drift` | `omop-cdm-codegen` is reached (its sources or `omop-cdm`) |
 | `sqlx-offline` | `omop-cdm` is reached |
-| `journeys (browser)` | `ferrobridge-console` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console, with FerroUI's script modules loaded and refused; in a merge group it passes without starting a browser (§ Triggers and concurrency) |
-| `perf` | `ferrobridge-server` is reached: the performance gate of `perf.yml`, `ferrohealth-perf`'s A/B mode judging the release build of the head against its base on the same runner, each over its own pinned FerroEHR CDR, both arms built once in its build job and measured by each attempt on a fresh runner, retried after a run that could not be judged on any CPU model, and after a breach only on a CPU model listed as stall-prone, on which only the last attempt measures; in a merge group it passes without building or measuring (§ Triggers and concurrency; the book's Contribute page "The performance gate") |
+| `journeys (browser)` | `ferrobridge-console` or `ferrobridge-server` is reached: the console's browser journeys in headless Chrome at the pinned Chrome for Testing release, against a running bridge and console, with FerroUI's script modules loaded and refused |
+| `perf` | `ferrobridge-server` is reached: the performance gate of `perf.yml`, `ferrohealth-perf`'s A/B mode judging the release build of the head against its base on the same runner, each over its own pinned FerroEHR CDR, both arms built once in its build job and measured by each attempt on a fresh runner, retried after a run that could not be judged on any CPU model, and after a breach only on a CPU model listed as stall-prone, on which only the last attempt measures (the book's Contribute page "The performance gate") |
 | `conformance` | a package `conformance.sh` runs is reached |
 | `e2e (containers)` | one of `omop-cdm`, `ferrobridge-server`, `ferrobridge-term`, `ferrobridge-testkit` is reached; it runs those of them that are |
 | `rustfmt`, `cargo-deny`, `dependency-review` and every tier-1 job | always (`cargo-deny` because the advisory database moves without a change) |
@@ -500,25 +501,18 @@ specification governs this: our own design.
 ## The advisory analyzers beside this one
 
 `sonar.yml` (SonarQube Cloud) and `codeql.yml` (CodeQL) gate no merge
-(`.claude/rules/ai-code-review.md`), so neither is a `conclusion` input. Both
-narrow their work on a pull request and keep the full run on `main`, for the
-same reason the Rust lanes do: a pull-request analysis that is cancelled at
-its limit reports nothing, and both held runners the gating lanes need.
+(`.claude/rules/ai-code-review.md`), so neither is a `conclusion` input, and
+neither runs on a merge group. The organisation shares 20 concurrent jobs,
+and on 2026-11-25 eight of them were held by analyses of pull requests
+while the gates waited.
 
-**SonarQube Cloud.** The `analyze` job runs `affected.sh` the way `detect`
-does: `--base HEAD^1 --head HEAD` on a pull request, `--all` on a push to
-`main`. It instruments the reached packages one at a time with
-`cargo llvm-cov nextest`, leaving out `fhir-types` and `hl7v2-types`, whose
-sources the scan excludes, and fetches only the build-time corpora those
-packages read (the same rule `fast.sh` applies). A pull request that reaches
-no package skips the toolchain, the corpora and the coverage step, and the
-scan runs without `lcov.info`, which the scanner reports as a warning. The
-coverage of a pull request is therefore partial. That is acceptable for an
-advisory analyzer: a pull-request analysis applies only the quality gate's
-conditions on new code, and every file the change touches belongs to a
-reached package, so its new lines carry coverage. SonarQube Cloud's
-documentation describes no import of the target branch's coverage for
-unchanged files, and none is attempted.
+**SonarQube Cloud.** By the owner decision of 2026-11-25 it runs on a push
+to `main` and on a Monday schedule, never on a pull request, and a newer
+push to `main` cancels a running analysis. The `analyze` job instruments
+every package one at a time with `cargo llvm-cov nextest`, leaving out
+`fhir-types` and `hl7v2-types`, whose sources the scan excludes, and fetches
+the build-time corpora those packages read (the same rule `fast.sh`
+applies).
 
 `sonar-project.properties` excludes every generated tree, the same rule it
 already applied to `crates/omop-cdm/src/generated`. Before that, the
@@ -528,9 +522,12 @@ It also excludes every `.sql` file: they are PostgreSQL, and the analyzer
 reads `.sql` as Oracle PL/SQL. `sonar.coverage.exclusions` keeps the test
 code, `fuzz/` and the shell, CSS and JavaScript trees out of the coverage
 denominator; they stay analyzed for findings (#1572).
-A newer push to a pull request cancels its running analysis.
 
-**CodeQL.** The Rust analysis runs on a pull request only when the change
+**CodeQL.** It keeps its pull-request run (owner decision, 2026-11-25),
+triggered only by a change under `.github/workflows/`, `.github/actions/`, a `.rs`
+file, a `Cargo.toml`, `Cargo.lock` or `rust-toolchain.toml`, and a newer
+push to a pull request cancels its running analysis. It runs on no merge
+group. The Rust analysis runs on a pull request only when the change
 touches a `.rs` file, a `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` or
 `codeql.yml`, and then over the hand-written tree: a `paths-ignore` list
 leaves out the three generated trees, which held the job at 24 to 32
@@ -637,15 +634,24 @@ push to `main` and a merge-group run each verify a commit that must keep its
 own result, while a superseded pull-request run verifies a commit nobody will
 merge.
 
-The merge queue proves the merged tree. The non-functional gates, `perf`
-and `journeys (browser)`, run on the pull request and on every push to
-`main`, and in a merge group each ends in success without building,
-measuring or starting a browser, with a job summary that says why (#1790).
-Their thresholds, plans, journeys and retry rules are the same on every
-event; only the event they run on changed. Every functional gate (build,
-clippy, tests, guards, codegen drift, the conformance pass lists) still runs
-in the merge group. The rule is the owner's family CI target of 2026-11-09:
-pull-request and merge-group runs under 20 minutes each (#1754).
+The merge queue proves that the merged tree builds and its guards hold. The
+pull request already ran the full suite on the same change, so a merge-group
+run is light (the owner's ruling of 2026-11-25, #2128): every tier-1 job,
+`rustfmt`, `cargo-deny`, the crate-version guard, and the `test` shards over
+the packages the group reaches, each compiling every test target of them in
+the dev profile (with every feature too where a package has more) and
+running only their unit tests (`--lib`, or `--bins` for a binary-only
+package), with no integration suite or doctest run. Compiling every test
+target stays in the queue: two pull requests that each passed alone can
+break a test binary together. Every other Rust
+lane (clippy, msrv, rustdoc, public dependencies, the codegen drift and
+full-emit tests, the conformance pass lists, e2e, sqlx-offline, the FHIR
+Validator, the browser journeys, perf and the publish dry run) is skipped in
+the merge group and runs on the pull request and on every push to `main`.
+`conclusion` reads the skipped lanes as passes, so it judges the merge group
+on the light set and the pull request on the full one under the same name.
+Queues of about ten entries ran into the 60-minute check timeout when every
+group repeated the full suite.
 
 The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
 a commit gets one run. An `edited`, `labeled` or `unlabeled` event would start a
@@ -701,8 +707,6 @@ instead, which keeps the ruleset stable as the pipeline grows.
   <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository>
   and
   <https://github.com/licensee/licensee/blob/main/docs/what-we-look-at.md>
-- SonarQube Cloud pull request analysis:
-  <https://docs.sonarsource.com/sonarqube-cloud/improving/pull-request-analysis/>
 - CodeQL configuration, `paths-ignore`:
   <https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning>
 - Scorecard checks:

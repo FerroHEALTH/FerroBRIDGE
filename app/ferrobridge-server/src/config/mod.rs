@@ -431,12 +431,10 @@ pub struct FacadeSettings {
     pub binding_issuers: Vec<String>,
     /// The access directive exchange, when `Consent` is served.
     pub consent: Option<crate::consent::exchange::Settings>,
-    /// The file SMART App State is kept in, when `Basic` is the App State
-    /// endpoint.
-    pub app_state: Option<PathBuf>,
-    /// The file the SMART launch `Task`s are kept in, when `Task` is the launch
-    /// endpoint.
-    pub launch_task: Option<PathBuf>,
+    /// Whether `Basic` is the SMART App State endpoint.
+    pub app_state: bool,
+    /// Whether `Task` is the SMART launch endpoint.
+    pub launch_task: bool,
     /// The CORS policy of the FHIR base.
     pub cors: crate::facade::cors::Cors,
     /// The patient summary, when `Patient/[id]/$summary` is served.
