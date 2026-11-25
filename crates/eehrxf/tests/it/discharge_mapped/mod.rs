@@ -417,6 +417,59 @@ fn discharge_document(identifier: &str) -> Result<(Document, String, String), Bo
     Ok((document, subject, device))
 }
 
+// NOTE: draft EEHRxF Art 3(1)(b): narrative by data group, one HDR section per Annex IX data group a
+// section narrates, measured by the draft corpus.
+#[test]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "a test asserts, and returns its setup errors"
+)]
+fn a_narrative_only_discharge_report_is_written_for_the_corpus() -> Result<(), Box<dyn Error>> {
+    let (mut document, subject, _) =
+        discharge_document("urn:uuid:5b0c3f7e-0000-4000-8000-00000000d0a1")?;
+    document.with_encounter(fhir_types::r4::encounter::Encounter {
+        id: Some(String::from("stay-1")),
+        status: "finished".into(),
+        class: fhir_types::r4::coding::Coding {
+            system: Some("http://terminology.hl7.org/CodeSystem/v3-ActCode".into()),
+            code: Some("IMP".into()),
+            ..fhir_types::r4::coding::Coding::default()
+        },
+        subject: Some(reference(&subject)),
+        ..fhir_types::r4::encounter::Encounter::default()
+    })?;
+    for slice in [
+        "sectionAlert",
+        "sectionAdmissionEvaluation",
+        "sectionPatientHx",
+        "sectionHospitalCourse",
+        "sectionDischargeDetails",
+        "sectionDischargeMedications",
+        "sectionPlanOfCare",
+    ] {
+        let slot = HDR_SLOTS
+            .iter()
+            .find(|slot| slot.slice == slice)
+            .ok_or(slice)?;
+        document.with_section(Section::new(
+            slot,
+            vec![format!("A synthetic {} narrative.", slot.title)],
+        ))?;
+    }
+    document.with_metadata(annex_iii("18842-5"));
+    document.narrative_only();
+    let bundle = serde_json::to_value(document.into_bundle()?)?;
+    assert!(
+        bundle["entry"][0]["resource"]["section"]
+            .as_array()
+            .ok_or("sections")?
+            .iter()
+            .all(|section| section["text"]["div"].is_string() && section.get("entry").is_none()),
+        "every section is narrative alone"
+    );
+    crate::support::emit("eehrxf-narrative-discharge", &bundle.to_string())
+}
+
 /// The document of the run of `mapping` over `composition`, named
 /// `identifier`, in the text it is sent as.
 fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String, Box<dyn Error>> {

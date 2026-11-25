@@ -458,6 +458,21 @@ fn a_received_imaging_report_maps_into_one_composition_that_keeps_it() -> Result
     Ok(())
 }
 
+// NOTE: draft EEHRxF Annex VII EHDSImagingStudy header.author[x] is the reporting clinician, the RM
+// COMPOSITION.composer of the imaging report.
+#[test]
+fn the_study_mapped_out_names_the_composer_as_its_interpreter() -> Result<(), Box<dyn Error>> {
+    let (_, written) = round_trip()?;
+    let output: Value = serde_json::from_str(&written)?;
+    let study = only(&output, "ImagingStudy")?;
+    assert_eq!(
+        study.pointer("/interpreter/0/display"),
+        Some(&serde_json::json!(COMPOSER)),
+        "{study}"
+    );
+    Ok(())
+}
+
 #[test]
 fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(), Box<dyn Error>> {
     let (received, written) = round_trip()?;
@@ -511,13 +526,6 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
             "{pointer}: {study_after}"
         );
     }
-    // NOTE: draft EEHRxF Annex VII EHDSImagingStudy header.author[x] is the reporting clinician,
-    // the RM COMPOSITION.composer of the imaging report.
-    assert_eq!(
-        study_after.pointer("/interpreter/0/display"),
-        Some(&serde_json::json!(COMPOSER)),
-        "{study_after}"
-    );
     // NOTE: HL7 Europe Imaging Report 1.0.0-ballot, ImagingStudyEuImaging im-imagingstudy-01:
     // a DICOM study UID identifier carries a value in the urn:oid: form.
     assert!(

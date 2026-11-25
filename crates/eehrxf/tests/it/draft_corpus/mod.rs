@@ -11,8 +11,12 @@
 //! element is unmapped and counted apart. A mapped element is one case per
 //! document: it fails as missing when the annex requires it under required
 //! parents and the document holds none, and as wrong in cardinality when the
-//! annex allows one under single parents and the document holds more. The
-//! suite runs over the directory `EEHRXF_DRAFT_CORPUS_DIR` names, after the
+//! annex allows one under single parents and the document holds more. A
+//! narrative-only document (Art 3(1)(b)) is one case per data group, held
+//! when the section slice of [`groups::GROUPS`] carries its narrative, and a
+//! PDF document (Art 3(1)(a)) is one case for the embedded PDF and one per
+//! Annex III Table 1 element on the `DocumentReference` element of
+//! [`described::DESCRIBED`]. The suite runs over the directory `EEHRXF_DRAFT_CORPUS_DIR` names, after the
 //! other suites wrote it, and writes one result per category for
 //! `scripts/checks/conformance.sh`; HL7's FHIR Validator result for the same
 //! documents is the `fhir-validator` job's. No specification governs how the
@@ -27,6 +31,8 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use eehrxf::crosswalk::Crosswalk;
 use eehrxf::crosswalk::discharge::DISCHARGE;
 use eehrxf::crosswalk::dispensation::DISPENSATION;
@@ -39,27 +45,34 @@ use eehrxf::document::discharge::HDR_SLOTS;
 use eehrxf::document::form::{SLOTS, Slot};
 use eehrxf::document::imaging::IMAGING_SLOTS;
 use eehrxf::document::laboratory::LAB_SLOTS;
-use eehrxf::document::metadata::COMPOSITION_VERSION;
+use eehrxf::document::metadata::{COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, PDF};
 use eehrxf::draft::{Annex, AnnexCrosswalk, Row, SHIPPED};
 use serde_json::{Value, json};
 
+use described::DESCRIBED;
+use groups::GROUPS;
 use paths::{PATHS, Path as Tabled};
 
+mod described;
+mod groups;
 mod paths;
 
 /// The variable naming the directory of the documents the suites emitted.
 const CORPUS_DIR: &str = "EEHRXF_DRAFT_CORPUS_DIR";
 
 /// One category of the corpus: its corpus name, its annex, the crosswalks
-/// that carry its elements, the prefixes of its documents' names, and the
+/// that carry its elements, the prefixes of its documents' names, the
 /// Xt-EHR models a document of its own carries, with that document's
-/// prefixes.
+/// prefixes, and the prefixes of its narrative-only and PDF documents
+/// (draft `EEHRxF` Art 3(1)(b) and (a)).
 struct Category {
     corpus: &'static str,
     annex: Annex,
     crosswalks: &'static [&'static Crosswalk<'static>],
     prefixes: &'static [&'static str],
     models: &'static [(&'static str, &'static [&'static str])],
+    narrative: &'static [&'static str],
+    pdf: &'static [&'static str],
 }
 
 impl Category {
@@ -77,6 +90,8 @@ impl Category {
         self.prefixes
             .iter()
             .chain(self.models.iter().flat_map(|(_, prefixes)| prefixes.iter()))
+            .chain(self.narrative.iter())
+            .chain(self.pdf.iter())
             .copied()
     }
 }
@@ -89,6 +104,8 @@ const CATEGORIES: [Category; 6] = [
         crosswalks: &[&PATIENT_SUMMARY],
         prefixes: &["eehrxf-summary-", "eehrxf-eps-summary-"],
         models: &[],
+        narrative: &[],
+        pdf: &[],
     },
     Category {
         corpus: "eehrxf-draft-eprescription",
@@ -96,6 +113,8 @@ const CATEGORIES: [Category; 6] = [
         crosswalks: &[&PRESCRIPTION],
         prefixes: &["eehrxf-mpd-prescription"],
         models: &[],
+        narrative: &[],
+        pdf: &[],
     },
     Category {
         corpus: "eehrxf-draft-edispensation",
@@ -103,6 +122,8 @@ const CATEGORIES: [Category; 6] = [
         crosswalks: &[&DISPENSATION],
         prefixes: &["eehrxf-mpd-dispense"],
         models: &[],
+        narrative: &[],
+        pdf: &[],
     },
     Category {
         corpus: "eehrxf-draft-imaging",
@@ -112,6 +133,8 @@ const CATEGORIES: [Category; 6] = [
         // NOTE: draft EEHRxF Annex II(d) and Annex VII Table 2: the study is the manifest
         // beside the report.
         models: &[("EHDSImagingStudy", &["eehrxf-manifest-"])],
+        narrative: &[],
+        pdf: &[],
     },
     Category {
         corpus: "eehrxf-draft-medical-test-report",
@@ -119,6 +142,8 @@ const CATEGORIES: [Category; 6] = [
         crosswalks: &[&LABORATORY],
         prefixes: &["eehrxf-laboratory-", "eehrxf-test-report-"],
         models: &[],
+        narrative: &[],
+        pdf: &["eehrxf-pdf-laboratory"],
     },
     Category {
         corpus: "eehrxf-draft-discharge",
@@ -126,6 +151,8 @@ const CATEGORIES: [Category; 6] = [
         crosswalks: &[&DISCHARGE],
         prefixes: &["eehrxf-discharge-"],
         models: &[],
+        narrative: &["eehrxf-narrative-discharge"],
+        pdf: &[],
     },
 ];
 
@@ -249,6 +276,108 @@ fn parents(rows: &[&Row], element: &str, test: impl Fn(&Row) -> bool) -> bool {
     true
 }
 
+/// The cases of a narrative-only document `bundle` named `name`: one per data
+/// group of the category, held when the section slice [`GROUPS`] names for
+/// it is in the document with its narrative.
+fn narrated(
+    category: &Category,
+    rows: &[&Row],
+    name: &str,
+    bundle: &Value,
+    cases: &mut Vec<Value>,
+    unmapped: &mut usize,
+) {
+    for group in GROUPS.iter().filter(|group| group.annex == category.annex) {
+        let declared = rows.iter().any(|row| {
+            row.xtehr_model() == group.model && row.draft_element() == Some(group.element)
+        });
+        if !declared {
+            continue;
+        }
+        let Some(slice) = group.slice else {
+            *unmapped += 1;
+            continue;
+        };
+        let id = format!("{name}:{}", group.element);
+        let narrated = values(bundle, &format!("Composition.section:{slice}"))
+            .into_iter()
+            .any(|section| section["text"]["div"].is_string());
+        cases.push(if narrated {
+            json!({"id": id, "passed": true})
+        } else {
+            json!({"id": id, "passed": false, "failure": format!("missing: no {slice} section with its narrative")})
+        });
+    }
+}
+
+/// The cases of a PDF document `document`, a `DocumentReference` named
+/// `name`: the embedded PDF, and each Annex III Table 1 element on the
+/// element [`DESCRIBED`] names for it.
+fn described_pdf(
+    crosswalk: &AnnexCrosswalk,
+    name: &str,
+    document: &Value,
+    cases: &mut Vec<Value>,
+    unmapped: &mut usize,
+) {
+    let attachment = &document["content"][0]["attachment"];
+    let embedded = attachment["contentType"] == PDF
+        && attachment["data"].as_str().is_some_and(|data| {
+            STANDARD
+                .decode(data)
+                .is_ok_and(|bytes| bytes.starts_with(b"%PDF-"))
+        });
+    let id = format!("{name}:attachment");
+    cases.push(if embedded {
+        json!({"id": id, "passed": true})
+    } else {
+        json!({"id": id, "passed": false, "failure": "missing: no embedded application/pdf data"})
+    });
+    let wrapped = json!({"entry": [{"resource": document}]});
+    let rows: Vec<&Row> = crosswalk
+        .annex(Annex::Iii)
+        .filter(|row| row.draft_model() == "Document metadata" && row.draft_element().is_some())
+        .collect();
+    for row in &rows {
+        let (Some(element), Some(cardinality)) = (row.draft_element(), row.draft_cardinality())
+        else {
+            continue;
+        };
+        let Some(path) = DESCRIBED
+            .iter()
+            .find(|(held, _)| *held == element)
+            .and_then(|(_, path)| *path)
+        else {
+            *unmapped += 1;
+            continue;
+        };
+        let found = values(&wrapped, path)
+            .into_iter()
+            .filter(|value| element != "version" || value["url"] == DOCUMENT_REFERENCE_VERSION)
+            .count();
+        let required = cardinality.is_required()
+            && parents(&rows, element, |parent| {
+                parent
+                    .draft_cardinality()
+                    .is_some_and(|held| held.is_required())
+            });
+        let single = cardinality.upper() == Max::Bounded(1)
+            && parents(&rows, element, |parent| {
+                parent
+                    .draft_cardinality()
+                    .is_some_and(|held| held.upper() == Max::Bounded(1))
+            });
+        let id = format!("{name}:{element}");
+        cases.push(if required && found == 0 {
+            json!({"id": id, "passed": false, "failure": format!("missing: {path} holds nothing")})
+        } else if single && found > 1 {
+            json!({"id": id, "passed": false, "failure": format!("wrong cardinality: {path} holds {found}")})
+        } else {
+            json!({"id": id, "passed": true})
+        });
+    }
+}
+
 /// The result of one category over the documents under `dir`.
 fn measure(category: &Category, dir: &Path) -> Result<Value, Box<dyn Error>> {
     let crosswalk: AnnexCrosswalk = SHIPPED.parse()?;
@@ -280,6 +409,18 @@ fn measure(category: &Category, dir: &Path) -> Result<Value, Box<dyn Error>> {
             .and_then(|stem| stem.to_str())
             .ok_or("a document name")?;
         let bundle: Value = serde_json::from_str(&std::fs::read_to_string(document)?)?;
+        if category
+            .narrative
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+        {
+            narrated(category, &rows, name, &bundle, &mut cases, &mut unmapped);
+            continue;
+        }
+        if category.pdf.iter().any(|prefix| name.starts_with(prefix)) {
+            described_pdf(&crosswalk, name, &bundle, &mut cases, &mut unmapped);
+            continue;
+        }
         for row in &rows {
             if !category
                 .prefixes_of(row.xtehr_model())
@@ -477,6 +618,83 @@ fn every_path_is_an_element_of_its_profile() -> Result<(), Box<dyn Error>> {
         assert!(held, "{}: {eps} is no element of {url}", path.element);
     }
     Ok(())
+}
+
+#[test]
+fn every_group_slice_is_a_section_slice_of_its_profile() -> Result<(), Box<dyn Error>> {
+    if std::env::var("FERROBRIDGE_SKIP_PROFILE_PACKAGES").is_ok_and(|value| value == "1") {
+        return Ok(());
+    }
+    let mut definitions: BTreeMap<&str, Value> = BTreeMap::new();
+    for group in GROUPS {
+        let Some(slice) = group.slice else { continue };
+        let url = profile_of(group.annex, "Composition")
+            .ok_or_else(|| format!("{}: no Composition profile in its annex", group.element))?;
+        if !definitions.contains_key(url) {
+            definitions.insert(url, snapshot(url)?);
+        }
+        let definition = definitions.get(url).ok_or("a read definition")?;
+        let id = format!("Composition.section:{slice}");
+        let held = definition["snapshot"]["element"]
+            .as_array()
+            .ok_or("a snapshot")?
+            .iter()
+            .any(|element| element["id"] == id.as_str());
+        assert!(held, "{}: {id} is no element of {url}", group.element);
+        assert!(
+            section_code(slice).is_some(),
+            "{}: the document forms code no {slice} section",
+            group.element
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn every_data_group_has_a_slice_row() -> Result<(), Box<dyn Error>> {
+    let crosswalk: AnnexCrosswalk = SHIPPED.parse()?;
+    let mut missing = Vec::new();
+    for (annex, model) in [
+        (Annex::Iv, "EHDSPatientSummary"),
+        (Annex::Vii, "EHDSImagingReport"),
+        (Annex::Viii, "EHDSLaboratoryReport"),
+        (Annex::Ix, "EHDSDischargeReport"),
+    ] {
+        let elements: Vec<&str> = crosswalk
+            .annex(annex)
+            .filter(|row| row.xtehr_model() == model)
+            .filter_map(Row::draft_element)
+            .collect();
+        for element in &elements {
+            let top = element.strip_prefix("body.").unwrap_or(element);
+            let grouping = !top.contains('.')
+                && *element != "body"
+                && !element.starts_with("header")
+                && *element != "presentedForm"
+                && elements
+                    .iter()
+                    .any(|other| other.starts_with(&format!("{element}.")));
+            let tabled = GROUPS.iter().any(|group| {
+                group.annex == annex && group.model == model && group.element == *element
+            });
+            if grouping && !tabled {
+                missing.push(format!("{} {model} {element}", annex.numeral()));
+            }
+        }
+    }
+    assert!(missing.is_empty(), "data groups with no row: {missing:?}");
+    Ok(())
+}
+
+#[test]
+fn every_described_path_is_a_document_reference_element() {
+    for (element, path) in DESCRIBED {
+        let Some(path) = path else { continue };
+        assert!(
+            fhir_types::r4::schema::SCHEMAS.element(path).is_some(),
+            "{element}: {path} is no element of the R4 DocumentReference"
+        );
+    }
 }
 
 #[test]
