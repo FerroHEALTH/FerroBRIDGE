@@ -210,8 +210,8 @@ impl StartedFeed {
     }
 }
 
-/// Spawns every change-feed follower and the inbound recovery of `state`,
-/// each on its own task until `stop` reads `true`.
+/// Spawns every change-feed follower, the inbound recovery and the link
+/// sweeper of `state`, each on its own task until `stop` reads `true`.
 pub(crate) fn spawn_followers(
     feeds: Vec<StartedFeed>,
     state: &AppState,
@@ -224,6 +224,9 @@ pub(crate) fn spawn_followers(
         settings.inbound,
     ) {
         followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    if let Some(links) = state.links() {
+        followers.push(links.spawn_sweeper(&stop.subscribe()));
     }
     followers
 }
@@ -770,12 +773,14 @@ async fn build_facade(
         (lane.app_state, facade::app_state::BASIC),
         (lane.launch_task, facade::launch_task::TASK),
         (lane.endpoints.is_some(), facade::endpoint::ENDPOINT),
+        (lane.mhd, facade::mhd::DOCUMENT_REFERENCE),
+        (lane.mhd, facade::mhd::LIST),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
     .collect();
     facade::programs::check_owned(&programs, &owned)
-        .context("checking the contexts against [facade.app_state], [facade.launch_task] and [facade.endpoint]")?;
+        .context("checking the contexts against [facade.app_state], [facade.launch_task], [facade.endpoint] and [facade.mhd]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -825,6 +830,7 @@ async fn build_facade(
             .with_launch_tasks(launch_tasks)
             .with_summary(summary)
             .with_endpoints(lane.endpoints.clone())
+            .with_mhd(lane.mhd)
             .with_cors(lane.cors.clone()),
         counts,
     ))
@@ -894,7 +900,6 @@ fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState>
     )
     .context("opening the links in the state store")?;
     let links = Arc::new(links);
-    drop(links.spawn_sweeper());
     tracing::info!(
         lane = "shl",
         "the person's SMART Health Links are served under /shl"

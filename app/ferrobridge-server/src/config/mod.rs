@@ -468,6 +468,8 @@ pub struct FacadeSettings {
     /// The endpoints served as `Endpoint` beside the FHIR base, when
     /// `Endpoint` serves them.
     pub endpoints: Option<crate::facade::endpoint::Endpoints>,
+    /// Whether the IHE MHD Document Responder is served.
+    pub mhd: bool,
 }
 
 /// The patient summary, resolved.

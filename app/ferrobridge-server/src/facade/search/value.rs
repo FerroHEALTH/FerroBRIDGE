@@ -9,7 +9,21 @@ use fhir_search::date::{DateError, DateValue};
 use fhir_search::escape::EscapeError;
 use fhir_search::prefix::Prefix;
 use fhir_search::string::StringMatch;
+use fhir_search::token::System;
+use fhir_search::token::Token;
 use fhir_search::token::TokenError;
+
+/// Whether `token` matches the code `code` of `system` (§3.1.1.4.10): a
+/// token with no `|` matches any system, `|code` only a code with none.
+#[must_use]
+pub fn coded(token: &Token, system: Option<&str>, code: Option<&str>) -> bool {
+    let system_matches = match token.system() {
+        System::Any => true,
+        System::Absent => system.is_none(),
+        System::Is(named) => system == Some(named),
+    };
+    system_matches && token.code().is_none_or(|named| code == Some(named))
+}
 
 /// Why one value is refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

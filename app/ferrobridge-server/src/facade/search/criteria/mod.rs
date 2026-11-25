@@ -58,19 +58,13 @@ impl Handling {
     /// asks for neither is strict.
     #[must_use]
     pub fn of(headers: &HeaderMap) -> Self {
-        for value in headers.get_all("prefer") {
-            let Ok(text) = value.to_str() else {
-                continue;
-            };
-            for part in text.split(',') {
-                match part.trim().to_ascii_lowercase().as_str() {
-                    "handling=lenient" => return Self::Lenient,
-                    "handling=strict" => return Self::Strict,
-                    _ => {}
-                }
-            }
-        }
-        Self::Strict
+        media::preferences(headers)
+            .find_map(|part| match part.as_str() {
+                "handling=lenient" => Some(Self::Lenient),
+                "handling=strict" => Some(Self::Strict),
+                _ => None,
+            })
+            .unwrap_or(Self::Strict)
     }
 }
 
