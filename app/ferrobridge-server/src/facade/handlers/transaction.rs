@@ -72,7 +72,13 @@ pub(crate) async fn transaction(
         .and_then(Value::as_str)
         .unwrap_or_default();
     if kind == BATCH {
-        return super::batch::batch(facade, access, headers, bundle.document()).await;
+        return Box::pin(super::batch::batch(
+            facade,
+            access,
+            headers,
+            bundle.document(),
+        ))
+        .await;
     }
     if kind != TRANSACTION {
         return Err(reply::refusal(

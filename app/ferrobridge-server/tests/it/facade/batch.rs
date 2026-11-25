@@ -105,10 +105,13 @@ async fn created(harness: &Harness) -> Result<String, Box<dyn Error>> {
 /// bound to [`EHR_ID`].
 async fn searching() -> Result<Harness, Box<dyn Error>> {
     let harness = super::search_harness(Limits::default()).await;
-    harness.store.record_ehr(
-        &PersonId::new("http://example.org/fhir", "Patient/p-1")?,
-        &EhrId::new(EHR_ID)?,
-    )?;
+    harness
+        .store
+        .record_ehr(
+            &PersonId::new("http://example.org/fhir", "Patient/p-1")?,
+            &EhrId::new(EHR_ID)?,
+        )
+        .await?;
     Ok(harness)
 }
 
