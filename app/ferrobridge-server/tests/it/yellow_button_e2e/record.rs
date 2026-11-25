@@ -3,8 +3,9 @@
 
 //! The patient record the journey reads, written into the reference CDR
 //! through its own routes: the archetypes and templates on the Definition API
-//! (ITS-REST 1.1.0, `definition.html`, and the CDR's ADL 1.4 archetype
-//! route), the patients on the Demographic API, the EHR and the patient
+//! (ITS-REST 1.1.0, `definition.html`; each ADL 1.4 archetype stored on the
+//! CDR's own archetype route and its ADL 2 conversion stored beside the
+//! templates), the patients on the Demographic API, the EHR and the patient
 //! summary composition on the EHR API.
 
 use std::error::Error;
@@ -37,17 +38,40 @@ pub(super) struct Patients {
 }
 
 /// Uploads the definitions, then writes the two patients and the first
-/// one's EHR and patient summary into the CDR at `base`.
-pub(super) async fn seed(base: &str) -> Result<Patients, Box<dyn Error>> {
+/// one's EHR and patient summary into the CDR at `base`, whose extension
+/// routes answer at `extensions`.
+pub(super) async fn seed(base: &str, extensions: &str) -> Result<Patients, Box<dyn Error>> {
     let client = reqwest::Client::new();
     for (file, source) in CKM_MEDICATION_ARCHETYPES
         .iter()
         .chain(CKM_PATIENT_SUMMARY_ARCHETYPES.iter())
     {
         let response = client
-            .post(format!("{base}/definition/archetype/adl1.4"))
+            .post(format!("{extensions}/definition/archetype/adl1.4"))
             .header(header::CONTENT_TYPE, "text/plain")
             .body(*source)
+            .send()
+            .await?;
+        expect(response, &[StatusCode::CREATED], file).await?;
+        let id = file.trim_end_matches(".adl");
+        let response = client
+            .get(format!(
+                "{extensions}/definition/archetype/adl1.4/{id}/adl2"
+            ))
+            .send()
+            .await?;
+        let converted: serde_json::Value = expect(response, &[StatusCode::OK], file)
+            .await?
+            .json()
+            .await?;
+        let adl2 = converted["roots"][0]["adl2"]
+            .as_str()
+            .ok_or_else(|| format!("no ADL 2 conversion of {file}: {converted}"))?
+            .to_owned();
+        let response = client
+            .post(format!("{base}/definition/template/adl2"))
+            .header(header::CONTENT_TYPE, "text/plain")
+            .body(adl2)
             .send()
             .await?;
         expect(response, &[StatusCode::CREATED], file).await?;
@@ -67,6 +91,7 @@ pub(super) async fn seed(base: &str) -> Result<Patients, Box<dyn Error>> {
         let response = client
             .post(format!("{base}/definition/template/adl2"))
             .header(header::CONTENT_TYPE, "text/plain")
+            .header("Prefer", "return=representation")
             .body(source)
             .send()
             .await?;

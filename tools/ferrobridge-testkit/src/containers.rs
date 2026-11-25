@@ -612,7 +612,7 @@ pub async fn postgres_tls(material: &TlsMaterial) -> Result<Postgres, HarnessErr
 /// [`HarnessError::NotReady`] when the CDR does not answer it in time.
 pub async fn cdr() -> Result<Cdr, HarnessError> {
     let (database, placement) = crate::facility_cdr::database(CDR_POSTGRES).await?;
-    let request = cdr_request(CDR, placement.dsn.clone(), placement.network.clone());
+    let request = cdr_request(placement.dsn.clone(), placement.network.clone());
     crate::facility_cdr::serve(database, request).await
 }
 
@@ -624,7 +624,7 @@ pub async fn cdr() -> Result<Cdr, HarnessError> {
 /// As [`cdr`].
 pub async fn cdr_main() -> Result<Cdr, HarnessError> {
     let (database, placement) = crate::facility_cdr::database(CDR_MAIN_POSTGRES).await?;
-    let request = cdr_request(CDR_MAIN, placement.dsn.clone(), placement.network.clone());
+    let request = cdr_of(CDR_MAIN, placement.dsn.clone(), placement.network.clone());
     crate::facility_cdr::serve(database, request).await
 }
 
@@ -655,18 +655,23 @@ fn terminology_request(directories: &[(&str, &str)]) -> ContainerRequest<Generic
     request
 }
 
-/// Returns the request that starts the reference CDR of `image` against `dsn` on
-/// `network`.
+/// Returns the request that starts the released reference CDR against `dsn`
+/// on `network`, serving its outbox feed to [`CDR_READERS`].
+pub(crate) fn cdr_request(dsn: String, network: String) -> ContainerRequest<GenericImage> {
+    cdr_of(CDR, dsn, network).with_env_var(
+        "FERROEHR__RECORD__CHANGE_FEED__READERS",
+        CDR_READERS.join(","),
+    )
+}
+
+/// Returns the request that starts the reference CDR of `image` against
+/// `dsn` on `network`.
 ///
 /// The usage report is switched off: a container does not inherit the CI
 /// runner's environment, so the CDR's own CI detection cannot see that it runs
 /// in a test, and every run would report itself as an installation. The EHR
 /// index is the CDR's own, since the harness runs no patient identity source.
-pub(crate) fn cdr_request(
-    image: PinnedImage,
-    dsn: String,
-    network: String,
-) -> ContainerRequest<GenericImage> {
+fn cdr_of(image: PinnedImage, dsn: String, network: String) -> ContainerRequest<GenericImage> {
     image
         .image()
         .with_exposed_port(CDR_PORT.tcp())
@@ -675,10 +680,6 @@ pub(crate) fn cdr_request(
         .with_env_var("FERROEHR__AUTH__ENABLED", "false")
         .with_env_var("FERROEHR__RECORD__SUBJECT_INDEX", "local")
         .with_env_var("FERROEHR__USAGE_REPORT__ENABLED", "false")
-        .with_env_var(
-            "FERROEHR__RECORD__CHANGE_FEED__READERS",
-            CDR_READERS.join(","),
-        )
 }
 
 /// Returns the health check that answers when PostgreSQL accepts TCP
@@ -834,7 +835,7 @@ mod tests {
 
     #[test]
     fn the_cdr_starts_with_its_usage_report_off() {
-        let request = cdr_request(CDR, "postgres://cdr".to_owned(), "net".to_owned());
+        let request = cdr_request("postgres://cdr".to_owned(), "net".to_owned());
         let usage_report = request
             .env_vars()
             .find(|(name, _)| name == "FERROEHR__USAGE_REPORT__ENABLED")

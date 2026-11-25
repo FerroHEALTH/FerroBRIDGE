@@ -305,7 +305,7 @@ pub async fn relay(client: &RelayClient) -> Result<Cdr, RelayError> {
     let (database, placement) = database(CDR_POSTGRES).await?;
     let first = serve(
         database,
-        cdr_request(CDR, placement.dsn.clone(), placement.network.clone()),
+        cdr_request(placement.dsn.clone(), placement.network.clone()),
     )
     .await?;
     upload(first.base_url(), &client.templates).await?;
@@ -313,7 +313,7 @@ pub async fn relay(client: &RelayClient) -> Result<Cdr, RelayError> {
         server, database, ..
     } = first;
     server.rm().await.map_err(RelayError::Remove)?;
-    let request = cdr_request(CDR, placement.dsn, placement.network)
+    let request = cdr_request(placement.dsn, placement.network)
         .with_env_var("FERROEHR__AUTH__ENABLED", "true")
         .with_env_var("FERROEHR_CONFIG", CONFIG_PATH)
         .with_copy_to(CONFIG_PATH, configuration.into_bytes())

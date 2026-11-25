@@ -77,7 +77,7 @@ impl Stack {
     /// Starts the platform.
     pub(super) async fn start() -> Result<Self, Box<dyn Error>> {
         let cdr = containers::cdr_main().await?;
-        let patients = super::record::seed(cdr.base_url()).await?;
+        let patients = super::record::seed(cdr.base_url(), cdr.extensions_url()).await?;
         let smart_database = containers::postgres().await?;
         let state = containers::postgres().await?;
         let upstream = Provider::start().await?;
