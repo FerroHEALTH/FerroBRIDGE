@@ -28,6 +28,8 @@ pub mod patient_summary;
 pub mod prescription;
 #[cfg(feature = "laboratory")]
 pub mod test_report;
+#[cfg(feature = "vaccination")]
+pub mod vaccination;
 
 use std::collections::BTreeSet;
 

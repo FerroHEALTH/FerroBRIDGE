@@ -577,6 +577,13 @@ impl Document {
         self.metadata = Some(metadata);
     }
 
+    /// Whether the metadata set names a legal authentication.
+    pub(super) fn legally_authenticated(&self) -> bool {
+        self.metadata
+            .as_ref()
+            .is_some_and(|metadata| !metadata.legal.is_empty())
+    }
+
     /// Fills the Annex III Table 2 metadata of every data group the document
     /// holds, once metadata is set.
     pub(super) fn fill_data_groups(&mut self) -> Result<(), DocumentError> {
