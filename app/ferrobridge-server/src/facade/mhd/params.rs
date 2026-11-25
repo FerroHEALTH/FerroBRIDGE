@@ -10,12 +10,12 @@
 //! (§3.1.1.3); a modifier the set does not support is refused, which R4
 //! states as a SHALL (§3.1.1.4.4).
 
+use crate::facade::search::value::coded;
 use fhir_search::date::DateValue;
 use fhir_search::date::Instants;
 use fhir_search::date::SearchDate;
 use fhir_search::prefix::Prefix;
 use fhir_search::string::StringMatch;
-use fhir_search::token::System;
 use fhir_search::token::Token;
 use http::HeaderMap;
 use http::StatusCode;
@@ -112,20 +112,9 @@ impl Read {
 /// Whether the client asked for `Prefer: handling=strict`; lenient handling
 /// is the default MHD asks for (ITI TF-2: 3.67.4.1.2).
 pub(super) fn strict(headers: &HeaderMap) -> bool {
-    let mut strict = false;
-    for value in headers.get_all("prefer") {
-        let Ok(text) = value.to_str() else {
-            continue;
-        };
-        for part in text.split(',') {
-            match part.trim().to_ascii_lowercase().as_str() {
-                "handling=strict" => strict = true,
-                "handling=lenient" => strict = false,
-                _ => {}
-            }
-        }
-    }
-    strict
+    crate::facade::media::preferences(headers)
+        .find(|part| matches!(part.as_str(), "handling=strict" | "handling=lenient"))
+        .is_some_and(|part| part == "handling=strict")
 }
 
 /// Reads `pairs` against `declared`.
@@ -236,14 +225,7 @@ fn values(key: &str, kind: Kind, modifier: Option<&str>, value: &str) -> Result<
         }
         Kind::Reference => {
             unmodified()?;
-            parts
-                .iter()
-                .map(|part| {
-                    fhir_search::escape::unescape(part)
-                        .map_err(|error| invalid(key, &error.to_string()))
-                })
-                .collect::<Result<_, _>>()
-                .map(Values::References)
+            unescaped(key, &parts).map(Values::References)
         }
         Kind::Text => {
             let matching = StringMatch::from_modifier(modifier).ok_or_else(|| {
@@ -257,16 +239,19 @@ fn values(key: &str, kind: Kind, modifier: Option<&str>, value: &str) -> Result<
                         .at(key.to_owned()),
                 )
             })?;
-            parts
-                .iter()
-                .map(|part| {
-                    fhir_search::escape::unescape(part)
-                        .map_err(|error| invalid(key, &error.to_string()))
-                })
-                .collect::<Result<_, _>>()
-                .map(|texts| Values::Texts(matching, texts))
+            unescaped(key, &parts).map(|texts| Values::Texts(matching, texts))
         }
     }
+}
+
+/// Returns `parts`, the values of `key`, unescaped.
+fn unescaped(key: &str, parts: &[String]) -> Result<Vec<String>, Refusal> {
+    parts
+        .iter()
+        .map(|part| {
+            fhir_search::escape::unescape(part).map_err(|error| invalid(key, &error.to_string()))
+        })
+        .collect()
 }
 
 /// Returns the `400` of a malformed value of `key`.
@@ -279,14 +264,26 @@ fn invalid(key: &str, text: &str) -> Refusal {
     )
 }
 
-/// Whether `token` matches the code `code` of `system` (§3.1.1.4.10).
-pub(super) fn coded(token: &Token, system: Option<&str>, code: Option<&str>) -> bool {
-    let system_matches = match token.system() {
-        System::Any => true,
-        System::Absent => system.is_none(),
-        System::Is(named) => system == Some(named),
-    };
-    system_matches && token.code().is_none_or(|named| code == Some(named))
+/// Whether `json`, a served resource, matches one occurrence of a parameter
+/// every MHD type takes, `None` for any other: `_id` and `_lastUpdated`
+/// match the resource's own elements, and `patient` and `patient.identifier`
+/// have already scoped the EHRs the search lists.
+pub(super) fn resource_matches(name: &str, values: &Values, json: &Value) -> Option<bool> {
+    match (name, values) {
+        ("_id", Values::Tokens(tokens)) => Some(
+            tokens
+                .iter()
+                .any(|token| token.code() == json.get("id").and_then(Value::as_str)),
+        ),
+        ("_lastUpdated", Values::Dates(dates)) => Some(self::dates(
+            dates,
+            json.pointer("/meta/lastUpdated")
+                .and_then(Value::as_str)
+                .and_then(Span::of_date),
+        )),
+        ("patient" | "patient.identifier", _) => Some(true),
+        _ => None,
+    }
 }
 
 /// Whether any of `tokens` matches a coding of the `CodeableConcept`s or

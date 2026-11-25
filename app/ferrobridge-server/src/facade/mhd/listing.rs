@@ -7,7 +7,6 @@
 
 use std::collections::BTreeMap;
 
-use futures_util::TryStreamExt as _;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::AdhocQueryExecute;
 use openehr_its::rest::generated::query::ResultSetRow;
@@ -17,7 +16,6 @@ use openehr_rm::v1_2::composition::composition::Composition;
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::cdr::query::PageSize;
-use crate::cdr::query::QueryPageError;
 use crate::facade::Facade;
 use crate::facade::handlers::read::COMPOSITION;
 use crate::facade::handlers::write::refuse;
@@ -128,14 +126,7 @@ pub(super) async fn listed(
             additional_properties: BTreeMap::new(),
         };
         let page = PageSize::new(PAGE).map_err(|error| super::internal(error.to_string()))?;
-        let rows: Vec<ResultSetRow> = client
-            .query_aql_rows(request, page)
-            .try_collect()
-            .await
-            .map_err(|error| match error {
-                QueryPageError::Refused(upstream) => refuse(&status::of_query_refusal(&upstream)),
-                QueryPageError::Call(error) => refuse(&status::of_client_error(&error)),
-            })?;
+        let rows = crate::facade::handlers::search::every_row(client, request, page).await?;
         for (position, row) in rows.iter().enumerate() {
             listed.push(read_row(facade, client, &program, row, position).await?);
         }

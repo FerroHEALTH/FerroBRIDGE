@@ -180,9 +180,14 @@ pub(super) async fn search(
     pairs: &[(String, String)],
     strict: bool,
 ) -> Result<Found, Refusal> {
-    let request = params::read(pairs, DECLARED, strict)?;
-    let named = super::list::patients(facade, client, &request).await?;
-    let ehrs = super::reach(facade, access, DOCUMENT_REFERENCE, named).await?;
+    let (request, ehrs) = super::scoped(
+        facade,
+        access,
+        client,
+        (DOCUMENT_REFERENCE, DECLARED),
+        (pairs, strict),
+    )
+    .await?;
     let mut found = Vec::new();
     for ehr_id in &ehrs {
         for listed in listing::listed(facade, client, listing::Scope::Ehr(ehr_id)).await? {
@@ -284,16 +289,10 @@ fn matches(name: &str, values: &Values, json: &Value, document: &Value) -> bool 
             None => Vec::new(),
         }
     };
+    if let Some(matched) = params::resource_matches(name, values, json) {
+        return matched;
+    }
     match (name, values) {
-        ("_id", Values::Tokens(tokens)) => tokens
-            .iter()
-            .any(|token| token.code() == at("/id").and_then(Value::as_str)),
-        ("_lastUpdated", Values::Dates(dates)) => params::dates(
-            dates,
-            at("/meta/lastUpdated")
-                .and_then(Value::as_str)
-                .and_then(Span::of_date),
-        ),
         ("author.given" | "author.family", Values::Texts(matching, texts)) => {
             let part = if name == "author.given" {
                 "given"
@@ -351,7 +350,6 @@ fn matches(name: &str, values: &Values, json: &Value, document: &Value) -> bool 
             params::tokens_plain(tokens, STATUS, at("/status").and_then(Value::as_str))
         }
         ("type", Values::Tokens(tokens)) => params::tokens_code(tokens, each("/type").into_iter()),
-        ("patient" | "patient.identifier", _) => true,
         _ => false,
     }
 }

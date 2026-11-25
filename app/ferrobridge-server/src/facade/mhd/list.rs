@@ -27,7 +27,6 @@ use super::params;
 use super::params::Span;
 use super::params::Values;
 use crate::cdr::CdrClient;
-use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
 use crate::facade::reply::Refusal;
 
@@ -149,9 +148,8 @@ pub(super) async fn search(
     pairs: &[(String, String)],
     strict: bool,
 ) -> Result<Found, Refusal> {
-    let request = params::read(pairs, DECLARED, strict)?;
-    let named = patients(facade, client, &request).await?;
-    let ehrs = super::reach(facade, access, LIST, named).await?;
+    let (request, ehrs) =
+        super::scoped(facade, access, client, (LIST, DECLARED), (pairs, strict)).await?;
     let mut found = Vec::new();
     for ehr_id in &ehrs {
         let listed = listing::listed(facade, client, listing::Scope::Ehr(ehr_id)).await?;
@@ -175,74 +173,6 @@ pub(super) async fn search(
         }
     }
     Ok(Found::paged(found, request))
-}
-
-/// Returns the EHRs the `patient` and `patient.identifier` occurrences of
-/// `request` name together, `None` when it names neither.
-///
-/// A `patient` value is a `Patient` reference, relative, absolute under
-/// this server's base or a bare id (R4 `search.html` §3.1.1.4.11); a
-/// reference to another server names no patient of this one.
-pub(super) async fn patients(
-    facade: &Facade,
-    client: &CdrClient,
-    request: &params::Read,
-) -> Result<Option<Vec<EhrId>>, Refusal> {
-    let mut named: Option<Vec<EhrId>> = None;
-    for occurrence in &request.applied {
-        let mut found = Vec::new();
-        match (occurrence.name, &occurrence.values) {
-            ("patient", Values::References(references)) => {
-                for reference in references {
-                    if let Some(id) = patient_id(facade, reference)
-                        && let Some(ehr) =
-                            crate::facade::handlers::search::identifier::ehr_of_party(
-                                facade, client, &id,
-                            )
-                            .await?
-                    {
-                        found.push(ehr);
-                    }
-                }
-            }
-            ("patient.identifier", Values::Tokens(tokens)) => {
-                for token in tokens {
-                    found.extend(
-                        crate::facade::handlers::search::identifier::ehrs_of(
-                            facade,
-                            client,
-                            "patient.identifier",
-                            token,
-                        )
-                        .await?,
-                    );
-                }
-            }
-            _ => continue,
-        }
-        named = Some(match named {
-            None => found,
-            Some(earlier) => earlier
-                .into_iter()
-                .filter(|ehr| found.contains(ehr))
-                .collect(),
-        });
-    }
-    Ok(named)
-}
-
-/// Returns the logical id a `patient` value names on this server.
-fn patient_id(facade: &Facade, reference: &str) -> Option<String> {
-    let base = facade.settings().base_url.trim_end_matches('/');
-    let relative = reference
-        .strip_prefix(base)
-        .and_then(|rest| rest.strip_prefix('/'))
-        .unwrap_or(reference);
-    match relative.split_once('/') {
-        Some(("Patient", id)) if !id.contains('/') => Some(id.to_owned()),
-        Some(_) => None,
-        None => Some(relative.to_owned()),
-    }
 }
 
 /// Returns the submission set of `held`, the documents one CONTRIBUTION
@@ -301,16 +231,10 @@ fn matches(name: &str, values: &Values, json: &Value) -> bool {
                     .find(|extension| extension.get("url").and_then(Value::as_str) == Some(url))
             })
     };
+    if let Some(matched) = params::resource_matches(name, values, json) {
+        return matched;
+    }
     match (name, values) {
-        ("_id", Values::Tokens(tokens)) => tokens
-            .iter()
-            .any(|token| token.code() == at("/id").and_then(Value::as_str)),
-        ("_lastUpdated", Values::Dates(dates)) => params::dates(
-            dates,
-            at("/meta/lastUpdated")
-                .and_then(Value::as_str)
-                .and_then(Span::of_date),
-        ),
         ("code", Values::Tokens(tokens)) => params::tokens_code(tokens, at("/code").into_iter()),
         ("date", Values::Dates(dates)) => params::dates(
             dates,
@@ -338,7 +262,6 @@ fn matches(name: &str, values: &Values, json: &Value) -> bool {
         ("status", Values::Tokens(tokens)) => {
             params::tokens_plain(tokens, STATUS, at("/status").and_then(Value::as_str))
         }
-        ("patient" | "patient.identifier", _) => true,
         _ => false,
     }
 }

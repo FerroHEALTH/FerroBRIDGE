@@ -39,6 +39,7 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 
+use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
 use crate::facade::handlers::format_of;
@@ -47,6 +48,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
+use params::Values;
 
 /// The resource type of a document's description.
 pub const DOCUMENT_REFERENCE: &str = "DocumentReference";
@@ -224,6 +226,90 @@ impl Found {
     }
 }
 
+/// Reads a search of `resource_type` over `declared` from `pairs`, refusing
+/// an unsupported parameter when `strict`, and returns it with the EHRs it
+/// reaches.
+async fn scoped(
+    facade: &Facade,
+    access: &Access,
+    client: &CdrClient,
+    (resource_type, declared): (&str, &[params::Declared]),
+    (pairs, strict): (&[(String, String)], bool),
+) -> Result<(params::Read, Vec<EhrId>), Refusal> {
+    let request = params::read(pairs, declared, strict)?;
+    let named = patients(facade, client, &request).await?;
+    let ehrs = reach(facade, access, resource_type, named).await?;
+    Ok((request, ehrs))
+}
+
+/// Returns the EHRs the `patient` and `patient.identifier` occurrences of
+/// `request` name together, `None` when it names neither.
+///
+/// A `patient` value is a `Patient` reference, relative, absolute under
+/// this server's base or a bare id (R4 `search.html` §3.1.1.4.11); a
+/// reference to another server names no patient of this one.
+async fn patients(
+    facade: &Facade,
+    client: &CdrClient,
+    request: &params::Read,
+) -> Result<Option<Vec<EhrId>>, Refusal> {
+    let mut named: Option<Vec<EhrId>> = None;
+    for occurrence in &request.applied {
+        let mut found = Vec::new();
+        match (occurrence.name, &occurrence.values) {
+            ("patient", Values::References(references)) => {
+                for reference in references {
+                    if let Some(id) = patient_id(facade, reference)
+                        && let Some(ehr) =
+                            crate::facade::handlers::search::identifier::ehr_of_party(
+                                facade, client, &id,
+                            )
+                            .await?
+                    {
+                        found.push(ehr);
+                    }
+                }
+            }
+            ("patient.identifier", Values::Tokens(tokens)) => {
+                for token in tokens {
+                    found.extend(
+                        crate::facade::handlers::search::identifier::ehrs_of(
+                            facade,
+                            client,
+                            "patient.identifier",
+                            token,
+                        )
+                        .await?,
+                    );
+                }
+            }
+            _ => continue,
+        }
+        named = Some(match named {
+            None => found,
+            Some(earlier) => earlier
+                .into_iter()
+                .filter(|ehr| found.contains(ehr))
+                .collect(),
+        });
+    }
+    Ok(named)
+}
+
+/// Returns the logical id a `patient` value names on this server.
+fn patient_id(facade: &Facade, reference: &str) -> Option<String> {
+    let base = facade.settings().base_url.trim_end_matches('/');
+    let relative = reference
+        .strip_prefix(base)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .unwrap_or(reference);
+    match relative.split_once('/') {
+        Some(("Patient", id)) if !id.contains('/') => Some(id.to_owned()),
+        Some(_) => None,
+        None => Some(relative.to_owned()),
+    }
+}
+
 /// Returns the EHRs a search may reach: the ones its patient parameters
 /// name, held to the patient compartment of a `patient/` token.
 ///
@@ -248,7 +334,7 @@ async fn reach(
             )
         }),
         Some(Compartment::Patient(patient)) => {
-            let own = compartment_ehr(facade, &patient).await?;
+            let own = crate::facade::handlers::search::compartment_ehrs(facade, &patient).await?;
             Ok(match named {
                 Some(named) => own.into_iter().filter(|ehr| named.contains(ehr)).collect(),
                 None => own,
@@ -256,23 +342,6 @@ async fn reach(
         }
         None => Err(crate::facade::guard::forbidden()),
     }
-}
-
-/// Returns the EHR the identity map binds to `Patient/<patient>`, the
-/// compartment of a `patient/` token.
-async fn compartment_ehr(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
-    // NOTE: no specification governs this: our own design, a patient id no
-    // person key can hold names no EHR the map binds, so the token reaches none.
-    let Ok(person) = facade.settings().subject.person_of_patient(patient) else {
-        return Ok(Vec::new());
-    };
-    Ok(facade
-        .store()
-        .ehr_of(&person)
-        .await
-        .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?
-        .into_iter()
-        .collect())
 }
 
 /// Returns the `404` of an id that names nothing served as `resource_type`.

@@ -269,12 +269,7 @@ fn coded(concept: Option<&CodeableConcept>, token: &Token) -> bool {
         concept.coding.iter().any(|coding| {
             let system = coding.system.as_ref().and_then(|uri| uri.value.as_deref());
             let code = coding.code.as_ref().and_then(|code| code.value.as_deref());
-            let system_matches = match token.system() {
-                System::Any => true,
-                System::Absent => system.is_none(),
-                System::Is(named) => system == Some(named),
-            };
-            system_matches && token.code().is_none_or(|named| code == Some(named))
+            crate::facade::search::value::coded(token, system, code)
         })
     })
 }

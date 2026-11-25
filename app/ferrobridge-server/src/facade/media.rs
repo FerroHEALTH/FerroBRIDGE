@@ -43,21 +43,27 @@ impl Prefer {
     /// refusing the request (<https://hl7.org/fhir/R4/http.html#return>).
     #[must_use]
     pub fn of(headers: &HeaderMap) -> Self {
-        for value in headers.get_all("prefer") {
-            let Ok(text) = value.to_str() else {
-                continue;
-            };
-            for part in text.split(',') {
-                match part.trim().to_ascii_lowercase().as_str() {
-                    "return=minimal" => return Self::Minimal,
-                    "return=representation" => return Self::Representation,
-                    "return=operationoutcome" => return Self::Outcome,
-                    _ => {}
-                }
-            }
-        }
-        Self::Representation
+        preferences(headers)
+            .find_map(|part| match part.as_str() {
+                "return=minimal" => Some(Self::Minimal),
+                "return=representation" => Some(Self::Representation),
+                "return=operationoutcome" => Some(Self::Outcome),
+                _ => None,
+            })
+            .unwrap_or(Self::Representation)
     }
+}
+
+/// Returns every preference the `Prefer` headers of `headers` carry, in
+/// order, trimmed and lowercased (RFC 7240 §2); a header value that is not
+/// text carries none.
+pub fn preferences(headers: &HeaderMap) -> impl Iterator<Item = String> + '_ {
+    headers
+        .get_all("prefer")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|text| text.split(','))
+        .map(|part| part.trim().to_ascii_lowercase())
 }
 
 /// Why a request's media types are not ones the facade speaks.
