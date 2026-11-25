@@ -12,10 +12,14 @@
 
 use std::error::Error;
 
+#[cfg(feature = "laboratory")]
+use eehrxf::document::metadata::Header;
 use eehrxf::document::metadata::{
     Attestation, COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, DocumentMetadata, FHIR_JSON,
 };
 use eehrxf::document::{Document, DocumentError, LOINC};
+#[cfg(feature = "laboratory")]
+use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
@@ -197,6 +201,35 @@ fn the_discharge_report_carries_the_annex_iii_document_metadata() -> Result<(), 
             .iter()
             .any(|category| category["coding"][0]["code"] == "34105-7")
     );
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "laboratory")]
+fn a_header_describes_the_document_before_it_is_written() -> Result<(), Box<dyn Error>> {
+    let (bundle, metadata) = written(super::lab_document::document()?, "11502-2")?;
+    let described = serde_json::to_value(metadata.describe(&bundle, "description")?)?;
+    let header = Header::of_document(&bundle)?;
+    let attachment = Attachment {
+        content_type: Some(FHIR_JSON.into()),
+        url: Some("Binary/synthetic-token".into()),
+        title: Some("Synthetic laboratory report".into()),
+        ..Attachment::default()
+    };
+    let mut listed =
+        serde_json::to_value(metadata.describe_at(&header, "description", attachment)?)?;
+    assert_eq!(
+        listed["content"][0]["attachment"],
+        json!({
+            "contentType": FHIR_JSON,
+            "language": "en",
+            "title": "Synthetic laboratory report",
+            "url": "Binary/synthetic-token"
+        })
+    );
+    // DocumentReference-minimal: everything but the attachment is what describe writes.
+    listed["content"] = described["content"].clone();
+    assert_eq!(listed, described);
     Ok(())
 }
 
