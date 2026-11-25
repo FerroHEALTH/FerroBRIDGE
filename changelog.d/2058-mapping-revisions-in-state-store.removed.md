@@ -1,1 +1,1 @@
-- `[operator] mapping_dir`, the `..revisions` directory beside it, and the `baseline` and `reload` origins of a revision; the console's files and their history move to the state store with no migration of the files on disk (#2058).
+- `[operator] mapping_dir`, the `..revisions` directory beside it, and the `reload` origin of a revision; the console's files and their history move to the state store with no migration of the files on disk (#2058).
