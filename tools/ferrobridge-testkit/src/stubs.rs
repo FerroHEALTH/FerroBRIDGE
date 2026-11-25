@@ -517,6 +517,44 @@ pub mod terminology {
         }))
     }
 
+    /// Returns the `searchset` `Bundle` of a `NamingSystem` search.
+    ///
+    /// It holds one active identifier `NamingSystem` per `(unique id, uri)`
+    /// pair: the `other` unique id and the preferred `uri` unique id
+    /// (<https://hl7.org/fhir/R4/namingsystem.html>).
+    #[must_use]
+    pub fn naming_systems(registered: &[(&str, &str)]) -> ResponseTemplate {
+        let entries: Vec<serde_json::Value> = registered
+            .iter()
+            .enumerate()
+            .map(|(index, (unique, uri))| {
+                serde_json::json!({
+                    "fullUrl": format!("urn:uuid:00000000-0000-4000-8000-{index:012}"),
+                    "resource": {
+                        "resourceType": "NamingSystem",
+                        "name": format!("Registered{index}"),
+                        "status": "active",
+                        "kind": "identifier",
+                        "date": "2026-01-01",
+                        "uniqueId": [
+                            {"type": "other", "value": unique},
+                            {"type": "uri", "value": uri, "preferred": true}
+                        ]
+                    },
+                    "search": {"mode": "match"}
+                })
+            })
+            .collect();
+        let mut bundle = serde_json::Map::new();
+        bundle.insert("resourceType".into(), "Bundle".into());
+        bundle.insert("type".into(), "searchset".into());
+        bundle.insert("total".into(), entries.len().into());
+        if !entries.is_empty() {
+            bundle.insert("entry".into(), serde_json::Value::Array(entries));
+        }
+        fhir_resource(&serde_json::Value::Object(bundle))
+    }
+
     /// Returns the `OperationOutcome` body of a refused operation.
     ///
     /// A failed operation answers "an `OperationOutcome` resource with error

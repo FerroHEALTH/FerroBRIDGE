@@ -46,15 +46,12 @@ pub async fn admit_person(
     match access.reach(permission, resource_type) {
         Some(Compartment::Any) => Ok(()),
         Some(Compartment::Patient(patient)) => {
-            // NOTE: no specification governs this: our own design, a launch patient the
-            // identity map records no person for admits nothing.
-            let launched = crate::facade::subject::recorded_person(
-                &facade.settings().subject,
-                facade.store(),
-                &facade.programs(),
-                &patient,
-            )
-            .await?;
+            // NOTE: no specification governs this: our own design, a launch patient that
+            // names no person admits nothing.
+            let launched = facade
+                .patients(facade.client(), access)
+                .known_person(&patient)
+                .await?;
             let admitted = person.is_some_and(|person| launched.as_ref() == Some(person));
             if admitted {
                 Ok(())

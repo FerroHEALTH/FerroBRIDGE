@@ -416,6 +416,9 @@ impl Run<'_> {
                     _ => Value::String(text),
                 })
             }
+            Pending::Registry { lookup } => {
+                self.lookups.get(*lookup)?.answer.clone().map(Value::String)
+            }
             Pending::Sibling { .. } => None,
         }
     }

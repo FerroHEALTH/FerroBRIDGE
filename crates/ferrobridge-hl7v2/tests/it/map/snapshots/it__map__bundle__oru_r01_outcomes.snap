@@ -14,7 +14,6 @@ expression: summary(&mapped)
     "unmapped-field: MSH[1]-12",
     "unmapped-field: MSH[1]-18",
     "narrative-condition: PID[1]-3(1) datatype-cx-to-identifier CX.4 -> assigner(Organization) []",
-    "unsupported-condition: PID[1]-3(1) datatype-cx-to-identifier CX.4 -> system [IF CX.4 IN http://hl7.org/implement/standards/fhir/identifier-registry.html]",
     "unsupported-target: PID[1]-11(1) datatype-xad-to-address XAD.1 -> line[1-3] [a label spreads one value over several instances]",
     "narrative-condition: PID[1] message-oru-r01-to-bundle ORU_R01.PATIENT_RESULT.PATIENT.PID -> Provenance[4] []",
     "unmapped-field: PID[1]-1",
@@ -52,5 +51,6 @@ expression: summary(&mapped)
     "unknown-element: OBX[2]-6(1) datatype-cwe-to-quantity CWE.3 -> Quantity.system [the element table does not resolve the target path]",
     "unmapped-field: OBX[2]-1",
     "unmapped-field: OBX[2]-2",
+    "unregistered: Unregistered { at: Location { segment: \"PID\", sequence: 1, field: Some(3), repetition: Some(1), component: None, subcomponent: None }, row: RowRef { map: \"datatype-cx-to-identifier\", source: \"CX.4\", target: \"system\" }, authority: \"NORTHLAB\" }",
     "missing-required: DiagnosticReport lacks DiagnosticReport.status",
 ]

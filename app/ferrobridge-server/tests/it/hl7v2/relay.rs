@@ -61,9 +61,10 @@ const SCOPES: &str = "system/composition-*.cruds system/template-*.r system/aql-
 /// The DNS name the sending facility SOUTHLAB's client certificate carries.
 const SOUTHLAB_SUBJECT: &str = "southlab.example.org";
 
-/// A result from `sender` for its patient `subject`, at the visit location
-/// whose facility is `facility`, ordered by `clinician`, whose assigning
-/// authority is the sender.
+/// A result from `sender` for its patient `subject`, identified in the
+/// universal id [`FACILITIES`], at the visit location whose facility is
+/// `facility`, ordered by `clinician`, whose assigning authority is the
+/// sender.
 fn result(
     sender: &str,
     control_id: &str,
@@ -75,7 +76,7 @@ fn result(
         format!(
             "MSH|^~\\&|LAB|{sender}|EHR|SOUTHCLINIC|20260925143000+0200||ORU^R01^ORU_R01|{control_id}|P|2.5.1"
         ),
-        format!("PID|1||{subject}^^^{sender}^MR||Synthetic^Sam^^^^^L||19800101|M"),
+        format!("PID|1||{subject}^^^&2.999.1&ISO^MR||Synthetic^Sam^^^^^L||19800101|M"),
         format!("PV1|1|O|ROOM-1^^^{facility}"),
         String::from("ORC|RE|PLC-1|FIL-1"),
         format!(
@@ -193,12 +194,12 @@ async fn node(provider: &Provider, origins: &[&str]) -> Result<Cdr, Box<dyn Erro
 /// Starts the face over `cdr`, reached with the client credentials grant at
 /// `provider`, accepting NORTHLAB and SOUTHLAB on their own certificates,
 /// each sender of `devices` a device source issuing in the namespace it maps
-/// to.
+/// to, with the stub identity source it asks, held while the face runs.
 async fn face(
     cdr: &Cdr,
     provider: &Provider,
     devices: std::collections::BTreeMap<&str, &str>,
-) -> Result<Serving, Box<dyn Error>> {
+) -> Result<(Serving, wiremock::MockServer), Box<dyn Error>> {
     let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?).with_oauth(
         ClientCredentials::new(
             Endpoint::Token(provider.token_endpoint().parse()?),
@@ -209,7 +210,8 @@ async fn face(
     let set = programs::read_set(Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let compiled = programs::compile_set(&set, &templates)?;
-    let mut facade_settings = settings();
+    let pix = wiremock::MockServer::start().await;
+    let mut facade_settings = crate::support::served_identity(&pix, settings()).await;
     facade_settings.ehr_policy = Policy::CreateOnFirstWrite;
     let facade = Arc::new(Facade::new(
         compiled,
@@ -242,7 +244,7 @@ async fn face(
         source
     })
     .collect();
-    Serving::start(facade, lane, None).await
+    Ok((Serving::start(facade, lane, None).await?, pix))
 }
 
 /// Starts the test issuer, answering the bridge's client credentials grant
@@ -270,7 +272,7 @@ async fn two_senders_commit_each_its_facility_under_the_one_bridge_client()
     }
     let (provider, access) = issuing().await?;
     let cdr = node(&provider, &["relay"]).await?;
-    let serving = face(&cdr, &provider, std::collections::BTreeMap::new()).await?;
+    let (serving, _pix) = face(&cdr, &provider, std::collections::BTreeMap::new()).await?;
     let southlab = PKI.client(SOUTHLAB_SUBJECT)?;
 
     let north = send_as(
@@ -376,7 +378,7 @@ async fn a_device_sender_s_result_commits_as_a_device_act_named_by_its_system_id
     }
     let (provider, access) = issuing().await?;
     let cdr = node(&provider, &["device"]).await?;
-    let serving = face(
+    let (serving, _pix) = face(
         &cdr,
         &provider,
         std::collections::BTreeMap::from([("NORTHLAB", DEVICES)]),

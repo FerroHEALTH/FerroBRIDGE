@@ -145,9 +145,10 @@ async fn search(
     let fingerprint = cursor::fingerprint(resource_type, &criteria.used);
     let start = start_of(&criteria, &fingerprint, declarations.len())?;
     let client = facade.client_for(headers, access).await?;
-    let mut resolved = resolve(facade, &client, resource_type, &criteria).await?;
+    let patients = facade.patients(&client, access);
+    let mut resolved = resolve(facade, (&client, &patients), resource_type, &criteria).await?;
     if let Compartment::Patient(patient) = compartment {
-        let ehrs = compartment_ehrs(facade, &patient).await?;
+        let ehrs = compartment_ehrs(facade, &patients, &patient).await?;
         resolved.ehrs.push(ehrs);
     }
     let session = facade.translator().session();
@@ -291,22 +292,19 @@ fn start_of(
 }
 
 /// Returns the EHRs of the patient a `patient/` token is launched for: the
-/// EHR the identity map binds to `Patient/<patient>`, or none.
+/// EHR of the person `Patient/<patient>` is, or none.
 ///
 /// "Patient-specific scopes allow access to specific data about a single
 /// patient" (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>),
 /// so the search is held to that patient's EHR as one more `AND`ed subject,
-/// and a patient the map does not know reaches no data (no specification
+/// and a patient that names no person reaches no data (no specification
 /// governs the mapping from a compartment to an EHR: our own design).
-async fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
-    let Some(person) = crate::facade::subject::recorded_person(
-        &facade.settings().subject,
-        facade.store(),
-        &facade.programs(),
-        patient,
-    )
-    .await?
-    else {
+async fn compartment_ehrs(
+    facade: &Facade,
+    patients: &crate::facade::subject::Patients<'_>,
+    patient: &str,
+) -> Result<Vec<EhrId>, Refusal> {
+    let Some(person) = patients.known_person(patient).await? else {
         return Ok(Vec::new());
     };
     let found = facade
@@ -317,40 +315,31 @@ async fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, 
     Ok(found.into_iter().collect())
 }
 
-/// Resolves the subject parameters and `_id` through the identity map, and a
-/// chained identifier through the CDR as well.
+/// Resolves the subject parameters and `_id` to their persons through
+/// `patients`, and a chained identifier through the CDR as well.
 ///
-/// A subject or an id the map does not know resolves to nothing, which the
+/// A subject or an id that names no person resolves to nothing, which the
 /// plan reads as a declaration that matches nothing.
 async fn resolve(
     facade: &Facade,
-    client: &CdrClient,
+    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
     resource_type: &str,
     criteria: &Criteria,
 ) -> Result<Resolved, Refusal> {
-    let link = &facade.settings().subject;
-    let programs = facade.programs();
     let mut resolved = Resolved::default();
     for subjects in &criteria.subjects {
         let mut ehrs: Vec<EhrId> = Vec::new();
         for subject in subjects {
             let found: Vec<EhrId> = match *subject {
                 Subject::Literal(ref reference) => {
-                    // NOTE: no specification governs this: our own design, a reference the
-                    // identity map records no person for matches none.
+                    // NOTE: no specification governs this: our own design, a reference that
+                    // names no person matches none.
                     let Ok(crate::facade::subject::Subject::Patient(id)) =
                         crate::facade::subject::patient_of_reference(reference)
                     else {
                         continue;
                     };
-                    let Some(person) = crate::facade::subject::recorded_person(
-                        link,
-                        facade.store(),
-                        &programs,
-                        &id,
-                    )
-                    .await?
-                    else {
+                    let Some(person) = patients.known_person(&id).await? else {
                         continue;
                     };
                     facade
@@ -364,7 +353,7 @@ async fn resolve(
                 Subject::Identifier {
                     ref parameter,
                     ref token,
-                } => identifier::ehrs_of(facade, client, parameter, token).await?,
+                } => identifier::ehrs_of(facade, (client, patients), parameter, token).await?,
                 Subject::ReferenceIdentifier {
                     ref system,
                     ref value,
@@ -376,9 +365,9 @@ async fn resolve(
                         continue;
                     };
                     if crate::facade::subject::reference_of(
-                        link,
+                        &facade.settings().subject,
                         facade.store(),
-                        &programs,
+                        &facade.programs(),
                         &person,
                     )
                     .await?

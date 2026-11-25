@@ -1135,10 +1135,11 @@ key that is unique per composition.
 | `_include` | `[type]:[parameter]` or `[type]:[parameter]:[target type]` for a declared include; `:iterate` and any other include are a `400`, or ignored under `Prefer: handling=lenient` |
 
 A comma inside a value is an OR and a repeated parameter an AND. An empty
-parameter is ignored. A subject or an id the identity map does not know
-matches nothing, so the answer is an empty `searchset`, never a `404`, and no
-query reaches the CDR. A subject is read from the map and never echoed from
-the request.
+parameter is ignored. A subject or an id resolves to its person through the
+identity map and, on a miss, the party read and ITI-83. One that names no
+person matches nothing, so the answer is an empty `searchset`, never a `404`,
+and no query reaches the CDR. A subject is read from the map and never echoed
+from the request.
 
 A parameter the type does not declare is a `400` with `not-supported` naming
 it. Send `Prefer: handling=lenient` and the facade ignores it instead, leaves it

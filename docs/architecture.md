@@ -2748,8 +2748,9 @@ draft upstream change.
   pseudonym, `503` on a timeout, a transport failure, a `429` or a `5xx`, and
   `502` otherwise (R4 http.html leaves an upstream failure to the server: our
   own design). A patient-scoped token's launch patient and every search
-  subject are matched through the identity map alone, so a `Patient` the map
-  has not recorded reaches no data (our own design). `person_id` maps one
+  subject resolve the same way, the identity map first and on a miss the
+  party read and ITI-83, so a `Patient` with no party the CDR holds reaches
+  no data (our own design). `person_id` maps one
   `ehr_id` to one person on the OMOP side; reconciling one person across
   several EHRs is a deployment decision the CDM leaves to the ETL, and the
   bridge does not guess it.

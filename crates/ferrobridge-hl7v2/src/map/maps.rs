@@ -76,6 +76,15 @@ pub enum Condition {
         /// The condition as written.
         text: String,
     },
+    /// `IF CX.4 IN` the FHIR identifier registry ([`condition::registry`]):
+    /// whether the assigning authority the operand names is a registered
+    /// identifier system.
+    Registry {
+        /// The operand, the row's own `HD`.
+        operand: condition::Operand,
+        /// The condition as written.
+        text: String,
+    },
     /// A condition in a form the interpreter does not evaluate.
     Unsupported {
         /// The property the form came under.
@@ -540,6 +549,12 @@ fn condition(source: &str, depends_on: &[(&str, &str)]) -> Condition {
         return Condition::Narrative;
     }
     if let Some(text) = property("Computable-ANTLR") {
+        if let Some(operand) = condition::registry(text) {
+            return Condition::Registry {
+                operand,
+                text: String::from(text),
+            };
+        }
         let own = condition::source_operand(source);
         return match condition::parse(text, own.as_ref()) {
             Ok(expr) => Condition::Computable(expr),

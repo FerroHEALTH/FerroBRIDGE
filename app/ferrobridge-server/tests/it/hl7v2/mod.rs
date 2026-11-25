@@ -74,7 +74,7 @@ pub(crate) fn oru_r01(control_id: &str) -> Vec<u8> {
             "MSH|^~\\&|LAB|NORTHLAB|EHR|SOUTHCLINIC|20260925143000+0200||ORU^R01^ORU_R01|{control_id}|P|2.5.1"
         ),
         String::from(
-            "PID|1||synthetic-subject-0001^^^NORTHLAB&2.999.1&ISO^MR||Synthetic^Sam^^^^^L||19800101|M",
+            "PID|1||synthetic-subject-0001^^^&2.999.1&ISO^MR||Synthetic^Sam^^^^^L||19800101|M",
         ),
         String::from("ORC|RE|PLC-1|FIL-1"),
         String::from(
@@ -102,7 +102,7 @@ fn adt_a01(control_id: &str) -> Vec<u8> {
         ),
         String::from("EVN||20260925143000+0200|||OP-1^Operator^Olive^^^^^^NORTHLAB"),
         String::from(
-            "PID|1||synthetic-subject-0001^^^NORTHLAB&2.999.1&ISO^MR||Synthetic^Sam^^^^^L||19800101|M",
+            "PID|1||synthetic-subject-0001^^^&2.999.1&ISO^MR||Synthetic^Sam^^^^^L||19800101|M",
         ),
         String::from("PV1|1|I|WARD-1^ROOM-1^BED-1"),
         String::from(
@@ -194,7 +194,11 @@ impl Respond for Tables {
     }
 }
 
-/// Returns a terminology client over a started stub.
+/// The assigning authority the stub's identifier registry holds.
+pub(crate) const REGISTERED: &str = "NORTHHOSP";
+
+/// Returns a terminology client over a started stub, whose identifier
+/// registry holds [`REGISTERED`] under the testkit's patient system.
 async fn terminology_stub() -> (MockServer, ferrobridge_term::client::Client) {
     let server = MockServer::start().await;
     for route in ["/r4/ConceptMap/$translate", "/r4"] {
@@ -204,6 +208,22 @@ async fn terminology_stub() -> (MockServer, ferrobridge_term::client::Client) {
             .mount(&server)
             .await;
     }
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/r4/NamingSystem"))
+        .and(matchers::query_param("value", REGISTERED))
+        .respond_with(terminology::naming_systems(&[(
+            REGISTERED,
+            crate::support::PATIENT_SYSTEM,
+        )]))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/r4/NamingSystem"))
+        .respond_with(terminology::naming_systems(&[]))
+        .with_priority(2)
+        .mount(&server)
+        .await;
     let base = format!("{}/r4", server.uri()).parse().expect("a base url");
     let config =
         ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::R4)
@@ -513,11 +533,12 @@ impl Running {
         let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
         let compiled = programs::compile_set(&set, &templates)?;
         let store = Arc::new(MemoryStore::default());
+        let facade_settings = crate::support::served_identity(&cdr, settings()).await;
         let facade = Arc::new(Facade::new(
             compiled,
             handle(&store),
             client(&cdr),
-            settings(),
+            facade_settings,
         ));
         let serving = Serving::start_routed(facade, listeners, routes, log).await?;
         Ok(Self { cdr, serving })
@@ -580,5 +601,6 @@ mod clinician;
 mod facility;
 mod feeder_audit;
 mod plain;
+mod registry;
 mod relay;
 mod routes;

@@ -34,7 +34,7 @@ use fhir_search::token::Token;
 /// parameter `name` names, in the order the identifier query returns them.
 pub(super) async fn ehrs_of(
     facade: &Facade,
-    client: &CdrClient,
+    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
     name: &str,
     token: &Token,
 ) -> Result<Vec<EhrId>, Refusal> {
@@ -63,7 +63,7 @@ pub(super) async fn ehrs_of(
     })?;
     let mut ehrs = Vec::new();
     for party in &parties {
-        if let Some(found) = ehr_of_party(facade, client, party).await?
+        if let Some(found) = ehr_of_party(facade, (client, patients), party).await?
             && !ehrs.contains(&found)
         {
             ehrs.push(found);
@@ -76,19 +76,12 @@ pub(super) async fn ehrs_of(
 /// the CDR holds none.
 async fn ehr_of_party(
     facade: &Facade,
-    client: &CdrClient,
+    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
     party: &str,
 ) -> Result<Option<EhrId>, Refusal> {
-    // NOTE: no specification governs this: our own design, a party the identity
-    // map records no person for matches nothing.
-    let Some(person) = crate::facade::subject::recorded_person(
-        &facade.settings().subject,
-        facade.store(),
-        &facade.programs(),
-        party,
-    )
-    .await?
-    else {
+    // NOTE: no specification governs this: our own design, a party that names no
+    // person matches nothing.
+    let Some(person) = patients.known_person(party).await? else {
         return Ok(None);
     };
     match ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing).await {

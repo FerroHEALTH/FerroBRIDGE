@@ -187,10 +187,32 @@ impl Patients<'_> {
     /// holds, the refusals of the party read and of a failed pseudonym
     /// query, and a `500` when the identity map cannot be used.
     pub async fn person_of_patient(&self, id: &str) -> Result<PersonId, Refused> {
-        let Some(loaded) = self.programs.party(PATIENT) else {
+        if self.programs.party(PATIENT).is_none() {
             return self.link.person_of_pseudonym(id).map_err(|error| {
                 unprocessable(IssueType::Value, ferrohealth_server::run::chain(&error))
             });
+        }
+        self.known_person(id).await?.ok_or_else(|| {
+            unprocessable(
+                IssueType::NotFound,
+                format!("{PATIENT}/{id} names no {PATIENT} party the CDR holds"),
+            )
+        })
+    }
+
+    /// Returns the person the `Patient` with logical id `id` is, as
+    /// [`Patients::person_of_patient`] resolves it, `None` for an id that
+    /// names no person or no party the CDR holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusals of the party read and of a failed pseudonym
+    /// query, a `422` for a party with no identifier in an accepted domain,
+    /// and a `500` when the identity map cannot be used.
+    pub async fn known_person(&self, id: &str) -> Result<Option<PersonId>, Refused> {
+        let Some(loaded) = self.programs.party(PATIENT) else {
+            // NOTE: an id that cannot be a pseudonym legitimately names no person.
+            return Ok(self.link.person_of_pseudonym(id).ok());
         };
         if let Some(person) = self
             .store
@@ -198,15 +220,12 @@ impl Patients<'_> {
             .await
             .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))?
         {
-            return Ok(person);
+            return Ok(Some(person));
         }
-        let unknown = || {
-            unprocessable(
-                IssueType::NotFound,
-                format!("{PATIENT}/{id} names no {PATIENT} party the CDR holds"),
-            )
+        // NOTE: an id that cannot be a party uid legitimately names no party.
+        let Ok(uid) = HierObjectId::new(id) else {
+            return Ok(None);
         };
-        let uid = HierObjectId::new(id).map_err(|_not_a_uid| unknown())?;
         let class = loaded.program().party().ok_or_else(|| {
             Refused::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -216,13 +235,15 @@ impl Patients<'_> {
                 )),
             )
         })?;
-        let held = crate::facade::party::find(
+        let Some(held) = crate::facade::party::find(
             crate::facade::party::demographic(self.client)?,
             class,
             uid.value(),
         )
         .await?
-        .ok_or_else(unknown)?;
+        else {
+            return Ok(None);
+        };
         let accepted = crate::facade::party::accept(loaded, PATIENT, id, &held)?;
         let resource =
             crate::facade::party::render(self.renders, loaded, &accepted, &held.version).await?;
@@ -238,14 +259,14 @@ impl Patients<'_> {
                 )
             })?;
         let Subject::Identified(source) = subject else {
-            return Err(unknown());
+            return Ok(None);
         };
         let person = self.pseudonym(&source).await?;
         self.store
             .record_party(id, &person)
             .await
             .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))?;
-        Ok(person)
+        Ok(Some(person))
     }
 
     /// Asks the identity source for the pseudonym of `source`.
@@ -279,28 +300,6 @@ pub async fn reference_of(
         .await
         .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))?
         .map(|party| format!("{PATIENT}/{party}")))
-}
-
-/// Returns the person the `Patient` with logical id `patient` is as far as
-/// the identity map knows, `None` for an id that names none.
-///
-/// # Errors
-///
-/// Returns a `500` when the identity map cannot be read.
-pub async fn recorded_person(
-    link: &SubjectLink,
-    store: &dyn Store,
-    programs: &Programs,
-    patient: &str,
-) -> Result<Option<PersonId>, Refused> {
-    if programs.party(PATIENT).is_none() {
-        // NOTE: an id that cannot be a pseudonym legitimately names no person.
-        return Ok(link.person_of_pseudonym(patient).ok());
-    }
-    store
-        .person_of_party(patient)
-        .await
-        .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))
 }
 
 /// Returns a `422` of `kind` diagnosing `text`.
