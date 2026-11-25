@@ -399,6 +399,7 @@ fn diagnostic_report() -> Group {
             "patient=Patient/p-1&category=LAB",
             "patient=Patient/p-1&category=LAB&date=ge2026-03-01",
             "patient=Patient/p-1&category=http://terminology.hl7.org/CodeSystem/v2-0074|LAB&date=lt2026-04-01",
+            "patient=Patient/p-1&category=LAB&code=http://loinc.org|24331-1",
         ],
     }
 }
@@ -871,7 +872,10 @@ async fn the_statement_lists_each_group_s_searches() -> Result<(), Box<dyn Error
         ("MedicationStatement", &["patient"][..]),
         ("Immunization", &["patient", "date"][..]),
         ("Observation", &["patient", "category", "code", "date"][..]),
-        ("DiagnosticReport", &["patient", "category", "date"][..]),
+        (
+            "DiagnosticReport",
+            &["patient", "category", "code", "date"][..],
+        ),
         ("DeviceUseStatement", &["patient"][..]),
         ("Specimen", &["patient"][..]),
     ] {
@@ -989,6 +993,42 @@ async fn a_laboratory_report_answers_its_qedm_searches_and_includes_its_results(
     assert_eq!(
         Some("Observation"),
         included[0]["resource"]["resourceType"].as_str()
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_report_code_matches_the_test_name_under_any_event() -> Result<(), Box<dyn Error>> {
+    // PCC-44 2:3.44.4.1.2.1.4 patient+category+code: KDS_Laborbericht holds
+    // the test name under its repeating event, so the query binds the event
+    // inside the result and a report matches when any of its events does.
+    let report = diagnostic_report();
+    let harness = annex_x().await?;
+    let composition = composition_of(&harness, &report);
+    mount_rows(&harness.cdr, &[entry_row(&composition, report.archetype)?]).await;
+    let (status, body) = get(
+        &harness,
+        &format!("DiagnosticReport?patient={SUBJECT}&category=LAB&code=http://loinc.org|24331-1"),
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    assert_eq!(1, matches(&body).len(), "{body}");
+    let sent = queries(&harness).await;
+    let text = sent
+        .iter()
+        .find_map(|query| query["q"].as_str())
+        .ok_or("the search queried the CDR")?;
+    assert!(
+        text.contains(
+            "OBSERVATION[openEHR-EHR-OBSERVATION.laboratory_test_result.v1] CONTAINS EVENT n0[at0002]"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "n0/data[at0003]/items[at0005,'Labortest-Bezeichnung']/value/defining_code/code_string"
+        ),
+        "{text}"
     );
     Ok(())
 }

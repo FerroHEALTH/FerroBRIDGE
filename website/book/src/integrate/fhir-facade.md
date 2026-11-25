@@ -901,16 +901,17 @@ the published `KDS_Laborbericht`.
 | EHDSDeviceUse | `DeviceUseStatement` | `deviceUseStatement-eu-eps` | `patient` with `_include=DeviceUseStatement:device` |
 | EHDSDevice | `Device` | `device-eu-eps` | read, and included by the statement that names it |
 | EHDSDosage | the `dosage` of a `MedicationStatement` | | as its statement |
-| (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
+| (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category`, `code` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
 
 The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device
 profiles HL7 Europe Patient Summary 1.0.0-ballot, and the others but
 `bodyweight` HL7 Europe Base and Core 2.0.1. A group QEDm names no search
 for answers the FHIR R4 base `patient` parameter and `_id`. A laboratory report
 carries the v2-0074 category `LAB` and each analyte the category
-`laboratory`, both `fixed`. The report's code sits under the repeating event
-of `KDS_Laborbericht`, so QEDm's `patient+category+code` is not offered for
-a `DiagnosticReport`.
+`laboratory`, both `fixed`. The report's code is the test name under the
+repeating event of `KDS_Laborbericht`, so its `code` binds the event inside
+the result with `contains`, and a report matches when any of its events
+carries the code.
 A body weight observation carries the category `vital-signs` and the LOINC
 code `29463-7` the profile fixes, so both are `fixed` tokens. The
 `conformance/eehrxf-annex-x` pass list records the groups served, and its
@@ -1061,6 +1062,24 @@ code of another. A `string` or a `date` names a data value, with any
 attribute below it. A `date` may also name `time/value` under an `ACTION`
 and `data[atNNNN]/origin/value` under an `OBSERVATION`: the RM defines both
 instants, each once, and the Web Template leaves them out.
+
+A value under a node that repeats inside its archetype, such as the data of
+an `OBSERVATION`'s events, binds that node with `contains`, its RM class and
+at-code, and gives the path relative to it:
+
+```yaml
+    node:
+      class: OBSERVATION
+      archetype: openEHR-EHR-OBSERVATION.laboratory_test_result.v1
+      contains: { class: EVENT, node: at0002 }
+    path: data[at0003]/items[at0005,'Labortest-Bezeichnung']/value
+```
+
+The query reads `CONTAINS OBSERVATION[<archetype>] CONTAINS EVENT n0[at0002]`
+(QUERY AQL 1.1.0 §3.13.2.2), so the entry matches when any of its events
+does, and the bound node is never one inside an archetype slotted below the
+root. A path names the Web Template's name predicate where the template
+gives the node a name.
 
 A `token` whose value the mapping writes as a constant, such as the category
 of every observation a context maps, has no openEHR path to compare. Declare

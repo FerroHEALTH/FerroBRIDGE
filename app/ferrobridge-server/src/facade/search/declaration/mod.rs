@@ -109,6 +109,21 @@ pub struct Node {
     pub class: String,
     /// The archetype id of the root.
     pub archetype: String,
+    /// The node inside the archetype the parameter is read under, when it is
+    /// not the root itself.
+    pub step: Option<Step>,
+}
+
+/// A node inside an archetype, bound below its root as
+/// `CONTAINS <class> <alias>[<node id>]` (QUERY AQL 1.1.0 §3.13.2.2), so a
+/// parameter read under a repeated node matches when any instance of it
+/// matches.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Step {
+    /// The RM class of the node, `EVENT` for any event.
+    pub class: String,
+    /// The node's at-code in its archetype.
+    pub node_id: String,
 }
 
 /// The RM type a token's coded value carries, which places its code and its
