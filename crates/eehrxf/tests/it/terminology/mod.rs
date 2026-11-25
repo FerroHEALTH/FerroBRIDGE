@@ -53,7 +53,10 @@ pub(crate) enum Script {
     /// `$translate` answers each entry whose source system, source code and
     /// target system are asked as an `equivalent` match to its code, and no
     /// match to anything else.
-    #[cfg(all(feature = "openehr", feature = "patient-summary"))]
+    #[cfg_attr(
+        not(all(feature = "openehr", feature = "patient-summary")),
+        expect(dead_code, reason = "only the EPS sections suite scripts a map")
+    )]
     Map(Vec<Mapped>),
     /// `$lookup` answers this display.
     Display(&'static str),
@@ -68,7 +71,6 @@ pub(crate) enum Script {
 
 /// One entry of [`Script::Map`]: the source system, the source code, the
 /// target system and the target code.
-#[cfg(all(feature = "openehr", feature = "patient-summary"))]
 pub(crate) type Mapped = (&'static str, &'static str, &'static str, &'static str);
 
 /// A terminology server that answers from a script.
@@ -98,7 +100,6 @@ impl TerminologyServer for Scripted {
         if matches!(self.0, Script::Unmapped(_)) {
             return Ok(Vec::new());
         }
-        #[cfg(all(feature = "openehr", feature = "patient-summary"))]
         if let Script::Map(entries) = &self.0 {
             return Ok(entries
                 .iter()
