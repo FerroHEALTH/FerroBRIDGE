@@ -639,6 +639,28 @@ id = "2026-05"
 key_file = "/run/secrets/state_seal_2026_05"
 ```
 
+### `[secrets]`
+
+The directory the secrets an inbound source names are read from: one file
+per secret, named by the secret's name, read at start and read again every
+`poll_seconds`, so a secret added or rotated reaches every replica without a
+restart. A source names a secret (`{"secret": "nedap-ons-prod-hmac"}`) and
+never holds its value; a write that names a secret the directory does not
+hold is refused, and a secret missing at runtime fails the source closed with
+`503`. On Kubernetes, mount one Secret as a volume without `subPath`, since a
+`subPath` mount never updates; in compose, write a new file beside the old one
+and rename it over it.
+
+| Key | Default | Secret | Meaning |
+|---|---|---|---|
+| `dir` | none, required when the section is present | no | The directory |
+| `poll_seconds` | `10` | no | Seconds between two reads of the directory, at least 1 |
+
+```toml
+[secrets]
+dir = "/run/secrets/ferrobridge-sources"
+```
+
 ### `[etl]`
 
 The OMOP ETL jobs `ferrobridge etl run` and `ferrobridge etl fhir` run. Both queries are parsed and

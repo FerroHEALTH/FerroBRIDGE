@@ -41,6 +41,9 @@ pub const ROUTES: &[&str] = &[
     "/omop/:tab",
     "/omop/runs/:id",
     "/events",
+    "/sources",
+    "/sources/new",
+    "/sources/:id",
     "/connections",
     "/connections/:name",
     "/connections/:name/:tab",
@@ -85,6 +88,12 @@ pub enum Page {
     OmopRun,
     /// `/events`.
     Events,
+    /// `/sources`.
+    Sources,
+    /// `/sources/new`.
+    NewSource,
+    /// `/sources/:id`.
+    Source,
     /// `/connections`.
     Connections,
     /// `/connections/:name` and its tabs.
@@ -120,6 +129,9 @@ impl Page {
             ["omop", "runs", _] => Self::OmopRun,
             ["omop"] | ["omop", _] => Self::Omop,
             ["events"] => Self::Events,
+            ["sources"] => Self::Sources,
+            ["sources", "new"] => Self::NewSource,
+            ["sources", _] => Self::Source,
             ["connections"] => Self::Connections,
             ["connections", _] | ["connections", _, _] => Self::Connection,
             ["configuration"] | ["configuration", _] => Self::Configuration,
@@ -169,6 +181,9 @@ pub async fn draw(visit: &Visit) -> Drawn {
         Page::Omop => pages::omop::page(visit).await,
         Page::OmopRun => pages::omop::run::page(visit).await,
         Page::Events => pages::events::page(visit, None).await,
+        Page::Sources => pages::sources::list_page(visit).await,
+        Page::NewSource => pages::sources::new_page(visit, None),
+        Page::Source => pages::sources::source_page(visit, None).await,
         Page::Connections => pages::connections::page(visit).await,
         Page::Connection => pages::connections::connection_page(visit).await,
         Page::Configuration => pages::configuration::page(visit).await,
@@ -194,6 +209,8 @@ pub async fn posted(visit: &Visit, raw: &[u8], content_type: Option<&str>) -> Op
         Page::Revision => Some(pages::mappings::revisions::posted(visit, body).await),
         Page::Playground => Some(pages::playground::posted(visit, body).await),
         Page::Events => Some(pages::events::posted(visit, body).await),
+        Page::NewSource => Some(pages::sources::posted_new(visit, body).await),
+        Page::Source => Some(pages::sources::posted_source(visit, body).await),
         _ => None,
     }
 }

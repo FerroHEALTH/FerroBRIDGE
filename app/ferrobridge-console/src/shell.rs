@@ -29,7 +29,7 @@ use openehr_mapping_core::diagnostic::Severity;
 
 use crate::app::{
     ABOUT, CONFIGURATION, CONNECTIONS, DASHBOARD, EVENTS, FACADE, HL7V2, MAPPINGS, MARK_DARK,
-    MARK_LIGHT, OMOP, PLAYGROUND, PREFERENCES, PRODUCT, SIGN_OUT, VERSION,
+    MARK_LIGHT, OMOP, PLAYGROUND, PREFERENCES, PRODUCT, SIGN_OUT, SOURCES, VERSION,
 };
 use crate::locale::messages::Msg;
 use crate::locale::{tr, tr_with};
@@ -241,6 +241,7 @@ fn navigation(locale: &Locale, path: &str, rail: bool, state: &Loaded<EngineStat
                 entry(HL7V2, Msg::Hl7v2, Glyph::MESSAGE_SQUARE, false),
                 entry(OMOP, Msg::OmopEtl, Glyph::TABLE_2, false),
                 entry(EVENTS, Msg::Events, Glyph::ACTIVITY, false),
+                entry(SOURCES, Msg::Sources, Glyph::INBOX, false),
                 entry(CONNECTIONS, Msg::Connections, Glyph::PLUG, false),
             ],
         },

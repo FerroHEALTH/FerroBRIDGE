@@ -122,6 +122,9 @@ pub struct Config {
     pub cdm: Option<Cdm>,
     /// The PostgreSQL state store, when one is configured.
     pub state: Option<State>,
+    /// The directory the secrets an inbound source names are read from,
+    /// one file per secret, when one is configured.
+    pub secrets: Option<ferrohealth_secret::dir::SecretDirConfig>,
     /// The OMOP ETL job, when one is configured.
     pub etl: Option<Etl>,
     /// Where the mapping files are read from.
@@ -340,6 +343,7 @@ impl Config {
                 .as_ref()
                 .map(|state| state::resolve(state).map(Box::new))
                 .transpose()?,
+            secrets: self.secrets.clone(),
             etl: self.etl.as_ref().map(resolve_etl).transpose()?,
             mapping_directory: self.mappings.directory.clone(),
             omocl_directory: self.mappings.omocl.clone(),
@@ -506,6 +510,9 @@ pub struct Settings {
     /// The PostgreSQL state store, when one is configured, boxed so the
     /// settings stay small enough to move through a job's future.
     pub state: Option<Box<crate::store::Settings>>,
+    /// The directory of the secrets the inbound sources name, when one is
+    /// configured.
+    pub secrets: Option<ferrohealth_secret::dir::SecretDirConfig>,
     /// The OMOP ETL job, when it is configured.
     pub etl: Option<EtlSettings>,
     /// The directory the mapping files are read from, when one is configured.
