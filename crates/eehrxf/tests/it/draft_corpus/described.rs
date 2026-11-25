@@ -6,12 +6,14 @@
 //!
 //! Draft `EEHRxF` Art 3(1)(a) (initiative 17512, 2026-11-23) exchanges a
 //! document as a PDF/A attachment embedded in a FHIR resource with its
-//! metadata. Each row names a Table 1 element and the R4 `DocumentReference`
-//! element `eehrxf::document::metadata` writes it to, or why the profiles it
-//! claims leave it no place, which the corpus counts unmapped. No
-//! specification publishes this map: our own design,
-//! the table of the `eehrxf::document::metadata` module, held to the R4
-//! resource by [`super::every_described_path_is_a_document_reference_element`].
+//! metadata, in a `DocumentReference` that claims no HL7 Europe
+//! `EehrxfMhdDocumentReference`, whose `attachment.data` 0..0 has no place
+//! for the embedded PDF (upstream report #2235). Each row names a Table 1
+//! element and the R4 `DocumentReference` element
+//! `eehrxf::document::metadata` writes it to, or why R4 leaves it no place,
+//! which the corpus counts unmapped. No specification publishes this map:
+//! our own design, the table of the `eehrxf::document::metadata` module, held
+//! to the R4 resource by [`super::every_described_path_is_a_document_reference_element`].
 
 /// Why R4 `DocumentReference` carries no attestation.
 const NO_ATTESTER: &str = "R4 DocumentReference has no attester";
@@ -27,12 +29,7 @@ pub(super) const DESCRIBED: &[(&str, Result<&str, &str>)] = &[
     ("attestation", Err(NO_ATTESTER)),
     ("attestation.attester[x]", Err(NO_ATTESTER)),
     ("attestation.dateTime", Err(NO_ATTESTER)),
-    (
-        "status",
-        Err(
-            "EehrxfMhdDocumentReference holds docStatus to 0..0 (IHE MHD Minimal), and status is the reference's own availability (upstream report #2231)",
-        ),
-    ),
+    ("status", Ok("DocumentReference.docStatus")),
     (
         "language",
         Ok("DocumentReference.content.attachment.language"),

@@ -52,6 +52,7 @@ eehrxf-pdf-laboratory:legalAuthentication
 eehrxf-pdf-laboratory:legalAuthentication.legalAuthenticator[x]
 eehrxf-pdf-laboratory:period
 eehrxf-pdf-laboratory:serviceSpecialty
+eehrxf-pdf-laboratory:status
 eehrxf-pdf-laboratory:subject
 eehrxf-pdf-laboratory:version
 eehrxf-test-report-ecg:attachment
@@ -134,5 +135,5 @@ eehrxf-test-report-spirometry:header.subject
 eehrxf-test-report-spirometry:header.version
 eehrxf-test-report-spirometry:intendedRecipient[x]
 eehrxf-test-report-spirometry:presentedForm
-total 136
-unmapped 8
+total 137
+unmapped 7
