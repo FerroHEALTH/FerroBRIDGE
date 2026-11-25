@@ -13,7 +13,7 @@ use openehr_rm::v1_2::typing::base_name;
 
 use super::tail_walk;
 use super::tail_walk::concrete_forms;
-use super::{ENTRY_TIMES, FAMILIES, FAMILY_TEXTS, IDENTITIES, PARTY_ROOTS};
+use super::{ENTRY_TIMES, FAMILIES, FAMILY_TEXTS, IDENTITIES, PARTY_REFS};
 
 /// What the attribute a tail ends on holds.
 ///
@@ -61,7 +61,7 @@ pub enum Carried {
 /// class, and a bound below it is its parameter
 /// ([`derive::attribute_class`]). A tail may step through a `List` attribute,
 /// and then names one element of the list ([`list_steps`]). A tail below a
-/// structural node other than a [`FAMILIES`], [`PARTY_ROOTS`] or [`IDENTITIES`]
+/// structural node other than a [`FAMILIES`], [`PARTY_REFS`] or [`IDENTITIES`]
 /// entry, one
 /// that steps through a `Set` or `Hash`, whose members have no position, and
 /// one that ends on a container attribute, which holds no single value, is
@@ -88,7 +88,7 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
     {
         return Some((owner, Carried::FamilyText));
     }
-    if let Some(&(owner, _)) = PARTY_ROOTS
+    if let Some(&(owner, _)) = PARTY_REFS
         .iter()
         .find(|&&(owner, path)| path == wanted && class == owner)
     {

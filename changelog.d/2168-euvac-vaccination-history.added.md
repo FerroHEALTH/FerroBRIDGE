@@ -1,4 +1,4 @@
-- `eehrxf` 0.34.0 writes the MyHealth@EU vaccination history
+- `eehrxf` 0.36.0 writes the MyHealth@EU vaccination history
   (`myhealth.eu.fhir.euvac` 10.0.0-preview, a preview) behind the new
   `vaccination` feature: the shipped `euvac` FHIRconnect project maps the
   immunisations of the patient summary template to

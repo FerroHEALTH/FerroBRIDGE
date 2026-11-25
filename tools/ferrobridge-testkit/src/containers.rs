@@ -184,12 +184,13 @@ pub const CDR_POSTGRES: PinnedImage = PinnedImage {
     digest: "sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a",
 };
 
-/// The reference CDR as its `main` branch publishes it, which the Yellow
-/// Button journey runs against until `FerroEHR` 6.0.0 is released (#2018).
+/// The reference CDR as `FerroEHR`'s `main` commit `f79725f` builds it
+/// (Containers run 45642706571), which the Yellow Button journey runs
+/// against until `FerroEHR` 6.0.0 is released (#2018).
 pub const CDR_MAIN: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferroehr",
     tag: "main",
-    digest: "sha256:482c3f3cbcef8dfc213330e1bc50d33a83cec5cfe246f79e0a1cdd8553ec7a22",
+    digest: "sha256:90d3e18d22da2e055edc0880bcf32cdc38668d3af0a37c1786d4ecc16fd05159",
 };
 
 /// The PostgreSQL image published with [`CDR_MAIN`].
