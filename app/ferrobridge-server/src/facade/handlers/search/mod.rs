@@ -833,7 +833,7 @@ async fn render_entry(
         program.program(),
         program.index(),
         &entry.isolate(composition),
-        render::Origin::of(facade, &id, version, &source, subject.as_ref()),
+        render::Origin::new(facade, &id, version, &source, subject.as_ref()),
         plan.session,
     )
     .await?;

@@ -737,11 +737,11 @@ pub fn routes(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}"),
             get(handlers::read_route)
                 .put(handlers::update_route)
-                .delete(handlers::delete_route),
+                .delete(handlers::party_only_route),
         )
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history"),
-            get(handlers::history_route),
+            get(handlers::party_only_route),
         )
         .layer(axum::Extension(operator));
     let router = if facade.app_state().is_some() {

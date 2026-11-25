@@ -5,8 +5,8 @@
 //! the operator API, and each replica's snapshot of them.
 //!
 //! An operator adds, changes, disables or deletes a source without a restart
-//! and without a new port ([`store`]). Each write notifies
-//! `ferrobridge_sources` when it commits; each replica's `LISTEN` session
+//! and without a new port ([`store`]). Each write notifies [`SOURCES`]
+//! when it commits; each replica's `LISTEN` session
 //! reloads the source a notification names into its snapshot behind one
 //! pointer swap, and reloads every source when it connects again, and while
 //! it is disconnected every lookup reads its row. A document names its
@@ -28,9 +28,9 @@ use ferrohealth_secret::dir::SecretDir;
 use secrecy::SecretString;
 use uuid::Uuid;
 
-use crate::store::listen::{Dropping, Listened, Subscriber};
+use crate::store::listen::{Dropping, Listened, SOURCES, Subscriber};
 use document::{Document, Invalid, SecretRef};
-use store::{CHANNEL, SourceStore};
+use store::SourceStore;
 
 /// One source at its head version.
 #[derive(Debug, Clone)]
@@ -305,7 +305,7 @@ impl Routes for Fixed {
 pub struct Sources {
     /// The snapshot and its store.
     held: Arc<Held>,
-    /// The listener state of `ferrobridge_sources`.
+    /// The listener state of [`SOURCES`].
     listened: Arc<Listened>,
     /// The `[secrets]` directory, when configured.
     secrets: Option<SecretDir>,
@@ -347,7 +347,7 @@ impl Sources {
             whole: AtomicBool::new(false),
         });
         let listened = Arc::new(Listened::with_subscriber(
-            CHANNEL,
+            SOURCES.name(),
             Arc::<Held>::clone(&held),
         ));
         Self {

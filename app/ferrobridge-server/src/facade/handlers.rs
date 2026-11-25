@@ -57,6 +57,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
+use crate::facade::request::Inbound;
 
 /// `GET [base]/metadata`: the `CapabilityStatement` of the loaded programs.
 ///
@@ -90,12 +91,8 @@ pub async fn create_route(
     }
     if let Some(loaded) = facade.programs().party(&resource_type) {
         return crate::facade::party::write::create(
-            &facade,
-            &access,
-            loaded,
+            crate::facade::party::Call::new(&facade, &access, loaded, (&headers, &uri)),
             &resource_type,
-            &headers,
-            &uri,
             &body,
         )
         .await
@@ -414,16 +411,18 @@ pub async fn update_route(
     .unwrap_or_else(Refusal::into_response)
 }
 
-/// `DELETE [base]/{type}/{id}`: delete a party resource, ITS-REST 1.1.0
-/// Demographic API, DEVELOPMENT.
+/// `DELETE [base]/{type}/{id}` and `GET [base]/{type}/{id}/_history`, the
+/// two interactions only a party type serves, ITS-REST 1.1.0 Demographic API,
+/// DEVELOPMENT; the method tells them apart.
 ///
 /// A type no party program serves is `not-supported`, and a party program
 /// loads only with `[cdr] demographic` on (no specification governs this: our
 /// own design).
-pub async fn delete_route(
+pub async fn party_only_route(
     State(facade): State<Arc<Facade>>,
     access: Access,
     Path((resource_type, id)): Path<(String, String)>,
+    method: http::Method,
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
@@ -431,42 +430,13 @@ pub async fn delete_route(
     let Some(loaded) = programs.party(&resource_type) else {
         return not_supported(&resource_type).into_response();
     };
-    crate::facade::party::write::delete(
-        &facade,
-        &access,
-        loaded,
-        (&resource_type, &id),
-        &headers,
-        &uri,
-    )
-    .await
-    .unwrap_or_else(Refusal::into_response)
-}
-
-/// `GET [base]/{type}/{id}/_history`: the history of a party resource,
-/// ITS-REST 1.1.0 Demographic API, DEVELOPMENT.
-///
-/// A type no party program serves is `not-supported`, as for [`delete_route`].
-pub async fn history_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    Path((resource_type, id)): Path<(String, String)>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
-    let programs = facade.programs();
-    let Some(loaded) = programs.party(&resource_type) else {
-        return not_supported(&resource_type).into_response();
-    };
-    crate::facade::party::read::history(
-        &facade,
-        &access,
-        loaded,
-        (&resource_type, &id),
-        &headers,
-        &uri,
-    )
-    .await
+    let call = crate::facade::party::Call::new(&facade, &access, loaded, (&headers, &uri));
+    let instance = (resource_type.as_str(), id.as_str());
+    if method == http::Method::DELETE {
+        crate::facade::party::write::delete(call, instance).await
+    } else {
+        crate::facade::party::read::history(call, instance).await
+    }
     .unwrap_or_else(Refusal::into_response)
 }
 
@@ -516,12 +486,8 @@ pub(crate) async fn read(
 ) -> Result<Response, Refusal> {
     if let Some(loaded) = facade.programs().party(resource_type) {
         return crate::facade::party::read::read(
-            facade,
-            access,
-            loaded,
+            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
             (resource_type, id),
-            headers,
-            uri,
         )
         .await;
     }
@@ -547,12 +513,8 @@ pub(crate) async fn vread(
 ) -> Result<Response, Refusal> {
     if let Some(loaded) = facade.programs().party(resource_type) {
         return crate::facade::party::read::vread(
-            facade,
-            access,
-            loaded,
+            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
             (resource_type, id, vid),
-            headers,
-            uri,
         )
         .await;
     }
@@ -578,12 +540,8 @@ pub(crate) async fn update(
 ) -> Result<Response, Refusal> {
     if let Some(loaded) = facade.programs().party(resource_type) {
         return crate::facade::party::write::update(
-            facade,
-            access,
-            loaded,
+            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
             (resource_type, id),
-            headers,
-            uri,
             body,
         )
         .await;
@@ -819,6 +777,24 @@ pub(crate) fn supported(facade: &Facade, resource_type: &str) -> Result<(), Refu
         return Ok(());
     }
     Err(not_supported(resource_type))
+}
+
+/// Admits a request whose body is a resource of `resource_type`: the
+/// request's media types, a type some program maps, and the body read as
+/// that type.
+///
+/// # Errors
+///
+/// Returns the [`Refusal`] of the first check that fails.
+pub(crate) fn inbound(
+    facade: &Facade,
+    resource_type: &str,
+    (headers, uri): (&HeaderMap, &Uri),
+    body: &[u8],
+) -> Result<Inbound, Refusal> {
+    guard(headers, uri, Body::Present)?;
+    supported(facade, resource_type)?;
+    read::parse(body, resource_type)
 }
 
 /// Checks that some loaded program maps or creates `resource_type`, as read

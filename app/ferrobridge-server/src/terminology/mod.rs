@@ -47,7 +47,7 @@ use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::Boolean;
 use fhirconnect::engine::terminology::{NoTerminology, Terminology, TerminologyError};
 
-use crate::terminology::fetch::{Answer, Displayed, Lookup, fetch};
+use crate::terminology::fetch::{Answer, Displayed, Lookup, Stored, fetch};
 
 /// The direction of one engine run, which decides `reverse`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -247,53 +247,33 @@ pub struct Resolved<'s> {
     direction: Direction,
 }
 
+impl Resolved<'_> {
+    /// Refuses a run with no terminology server to have asked.
+    fn configured(&self) -> Result<(), TerminologyError> {
+        if self.session.client.is_none() {
+            return Err(TerminologyError::NotConfigured);
+        }
+        Ok(())
+    }
+}
+
 impl Terminology for Resolved<'_> {
     fn translate(
         &self,
         request: &ConceptMapTranslateRequest,
     ) -> Result<ConceptMapTranslateResponse, TerminologyError> {
-        if self.session.client.is_none() {
-            return Err(TerminologyError::NotConfigured);
-        }
+        self.configured()?;
         let translation = translation(self.direction, request)?;
-        let answers = self
-            .session
-            .answers
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        match answers.get(&translation) {
-            Some(Ok(response)) => Ok(response.clone()),
-            Some(Err(error)) => Err(TerminologyError::Upstream {
-                source: Box::new(Arc::clone(error)),
-            }),
-            None => Err(TerminologyError::Upstream {
-                source: Box::new(Unresolved),
-            }),
-        }
+        resolved(&self.session.answers, &translation)
     }
 
     fn lookup(
         &self,
         request: &CodeSystemLookupRequest,
     ) -> Result<Option<CodeSystemLookupResponse>, TerminologyError> {
-        if self.session.client.is_none() {
-            return Err(TerminologyError::NotConfigured);
-        }
+        self.configured()?;
         let lookup = lookup(request)?;
-        let displays = self
-            .session
-            .displays
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        match displays.get(&lookup) {
-            Some(Ok(response)) => Ok(response.clone()),
-            Some(Err(error)) => Err(TerminologyError::Upstream {
-                source: Box::new(Arc::clone(error)),
-            }),
-            None => Err(TerminologyError::Upstream {
-                source: Box::new(Unresolved),
-            }),
-        }
+        resolved(&self.session.displays, &lookup)
     }
 
     fn display_fallback(&self) -> bool {
@@ -344,21 +324,16 @@ impl Terminology for Prepared<'_> {
         request: &ConceptMapTranslateRequest,
     ) -> Result<ConceptMapTranslateResponse, TerminologyError> {
         let translation = translation(self.direction, request)?;
-        match self.answers.get(&translation) {
-            Some(Ok(response)) => Ok(response.clone()),
-            Some(Err(error)) => Err(TerminologyError::Upstream {
-                source: Box::new(Arc::clone(error)),
-            }),
-            None => {
-                self.missing
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .insert(translation);
-                // NOTE: no specification governs this: our own design; this run
-                // is discarded, and a false `result` lets it reach further codes.
-                Ok(unresolved())
-            }
+        if let Some(answer) = answered(self.answers.get(&translation)) {
+            return answer;
         }
+        self.missing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(translation);
+        // NOTE: no specification governs this: our own design; this run
+        // is discarded, and a false `result` lets it reach further codes.
+        Ok(unresolved())
     }
 
     fn lookup(
@@ -366,21 +341,16 @@ impl Terminology for Prepared<'_> {
         request: &CodeSystemLookupRequest,
     ) -> Result<Option<CodeSystemLookupResponse>, TerminologyError> {
         let lookup = lookup(request)?;
-        match self.displays.get(&lookup) {
-            Some(Ok(response)) => Ok(response.clone()),
-            Some(Err(error)) => Err(TerminologyError::Upstream {
-                source: Box::new(Arc::clone(error)),
-            }),
-            None => {
-                self.missing_lookups
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .insert(lookup);
-                // NOTE: no specification governs this: our own design; this run
-                // is discarded, and a found display lets it reach further codes.
-                Ok(Some(undisplayed()))
-            }
+        if let Some(answer) = answered(self.displays.get(&lookup)) {
+            return answer;
         }
+        self.missing_lookups
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(lookup);
+        // NOTE: no specification governs this: our own design; this run
+        // is discarded, and a found display lets it reach further codes.
+        Ok(Some(undisplayed()))
     }
 
     fn display_fallback(&self) -> bool {
@@ -399,16 +369,11 @@ fn translation(
     direction: Direction,
     request: &ConceptMapTranslateRequest,
 ) -> Result<Translation, TerminologyError> {
-    if let Some(parameter) = uncarried(request) {
-        return Err(TerminologyError::Upstream {
-            source: Box::new(Uncarried { parameter }),
-        });
-    }
-    let system = request.system.as_ref().and_then(|uri| uri.value.as_deref());
-    let code = request.code.as_ref().and_then(|code| code.value.as_deref());
-    let (Some(system), Some(code)) = (system, code) else {
-        return Err(TerminologyError::Uncoded);
-    };
+    let (system, code) = coded(
+        uncarried(request),
+        request.system.as_ref(),
+        request.code.as_ref(),
+    )?;
     let mut translation = Translation::new(system, code);
     if let Some(version) = request
         .version
@@ -471,21 +436,57 @@ fn lookup(request: &CodeSystemLookupRequest) -> Result<Lookup, TerminologyError>
     ]
     .into_iter()
     .find_map(|(parameter, set)| set.then_some(parameter));
-    if let Some(parameter) = parameter {
-        return Err(TerminologyError::Upstream {
-            source: Box::new(Uncarried { parameter }),
-        });
-    }
-    let system = request.system.as_ref().and_then(|uri| uri.value.as_deref());
-    let code = request.code.as_ref().and_then(|code| code.value.as_deref());
-    let (Some(system), Some(code)) = (system, code) else {
-        return Err(TerminologyError::Uncoded);
-    };
+    let (system, code) = coded(parameter, request.system.as_ref(), request.code.as_ref())?;
     Ok(Lookup {
         system: String::from(system),
         code: String::from(code),
         version: request.version.as_ref().and_then(|text| text.value.clone()),
     })
+}
+
+/// Returns the answer the session holds for `question`, a question no probe
+/// run met refused as [`Unresolved`].
+fn resolved<Q: Ord, R: Clone>(
+    held: &Mutex<BTreeMap<Q, Stored<R>>>,
+    question: &Q,
+) -> Result<R, TerminologyError> {
+    let held = held.lock().unwrap_or_else(PoisonError::into_inner);
+    answered(held.get(question)).unwrap_or_else(|| {
+        Err(TerminologyError::Upstream {
+            source: Box::new(Unresolved),
+        })
+    })
+}
+
+/// Returns the answer held for a question, its upstream failure carried as
+/// one, and `None` when no answer is held.
+fn answered<R: Clone>(held: Option<&Stored<R>>) -> Option<Result<R, TerminologyError>> {
+    held.map(|answer| match *answer {
+        Ok(ref response) => Ok(response.clone()),
+        Err(ref error) => Err(TerminologyError::Upstream {
+            source: Box::new(Arc::clone(error)),
+        }),
+    })
+}
+
+/// Returns the system and code a question names, refusing a parameter this
+/// client does not send and a question with no system or no code.
+fn coded<'request>(
+    uncarried: Option<&'static str>,
+    system: Option<&'request primitives::Uri>,
+    code: Option<&'request primitives::Code>,
+) -> Result<(&'request str, &'request str), TerminologyError> {
+    if let Some(parameter) = uncarried {
+        return Err(TerminologyError::Upstream {
+            source: Box::new(Uncarried { parameter }),
+        });
+    }
+    let system = system.and_then(|uri| uri.value.as_deref());
+    let code = code.and_then(|code| code.value.as_deref());
+    let (Some(system), Some(code)) = (system, code) else {
+        return Err(TerminologyError::Uncoded);
+    };
+    Ok((system, code))
 }
 
 /// A parameter the engine set that this client does not send.

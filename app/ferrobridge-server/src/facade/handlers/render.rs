@@ -124,28 +124,6 @@ impl<'a> Origin<'a> {
     }
 }
 
-impl<'a> Origin<'a> {
-    /// Returns the origin of the resource `id` rendered from `version`, read at
-    /// `source`, of the subject `subject`, bound in `facade`'s identity map.
-    pub(crate) fn of(
-        facade: &'a Facade,
-        id: &'a FhirResourceId,
-        version: &'a ObjectVersionId,
-        source: &'a Url,
-        subject: Option<&'a Value>,
-    ) -> Self {
-        Self {
-            id,
-            version,
-            source,
-            subject,
-            store: facade.store(),
-            usage: facade.usage(),
-            demographics: facade.demographics(),
-        }
-    }
-}
-
 /// Returns the resource `composition` maps to, decorated with its identity
 /// and checked against the required elements R4 gives its type.
 ///
@@ -251,16 +229,7 @@ pub(crate) async fn render_units(
     session: &Session<'_>,
 ) -> Result<Units, Refusal> {
     let resource_type = program.resource().as_str();
-    let (value, created, warnings) = produce(program, index, composition, &origin, session).await?;
-    let body = resource_object(value, resource_type)?;
-    let own = decorate(
-        body,
-        resource_type,
-        origin.id,
-        &origin,
-        Some(program.profile().url().as_str()),
-        warnings,
-    )?;
+    let (own, created) = produce_own(program, index, composition, &origin, session).await?;
     let mut units = Units {
         own: vec![(origin.id.clone(), own)],
         others: Vec::new(),
@@ -277,14 +246,7 @@ pub(crate) async fn render_units(
             continue;
         };
         let text = body.get("id").and_then(Value::as_str).unwrap_or_default();
-        let id = FhirResourceId::new(text).map_err(|error| {
-            reply::refusal(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Issue::error(IssueType::Exception).diagnosing(format!(
-                    "a {created_type} the mapping created carries an id outside the R4 grammar: {error}"
-                )),
-            )
-        })?;
+        let id = created_id(text, &created_type)?;
         let rendered = decorate(body, &created_type, &id, &origin, None, Vec::new())?;
         if created_type == resource_type {
             units.own.push((id, rendered));
@@ -293,6 +255,42 @@ pub(crate) async fn render_units(
         }
     }
     Ok(units)
+}
+
+/// Runs the outbound mapping of `composition` and returns its own resource,
+/// decorated with its identity and profile, and the resources it created.
+async fn produce_own(
+    program: &Program,
+    index: &WebTemplateIndex,
+    composition: &CanonicalComposition,
+    origin: &Origin<'_>,
+    session: &Session<'_>,
+) -> Result<(Rendered, Vec<Value>), Refusal> {
+    let resource_type = program.resource().as_str();
+    let (value, created, warnings) = produce(program, index, composition, origin, session).await?;
+    let body = resource_object(value, resource_type)?;
+    let own = decorate(
+        body,
+        resource_type,
+        origin.id,
+        origin,
+        Some(program.profile().url().as_str()),
+        warnings,
+    )?;
+    Ok((own, created))
+}
+
+/// Reads the id of a resource the run created as a `kind`, a `500` when it
+/// is outside the R4 grammar.
+fn created_id(text: &str, kind: &str) -> Result<FhirResourceId, Refusal> {
+    FhirResourceId::new(text).map_err(|error| {
+        reply::refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception).diagnosing(format!(
+                "a {kind} the mapping created carries an id outside the R4 grammar: {error}"
+            )),
+        )
+    })
 }
 
 /// Returns the resource `composition` maps to and every resource the
@@ -311,17 +309,7 @@ pub(crate) async fn render_document(
     origin: Origin<'_>,
     session: &Session<'_>,
 ) -> Result<(Rendered, Vec<Rendered>), Refusal> {
-    let resource_type = program.resource().as_str();
-    let (value, created, warnings) = produce(program, index, composition, &origin, session).await?;
-    let body = resource_object(value, resource_type)?;
-    let own = decorate(
-        body,
-        resource_type,
-        origin.id,
-        &origin,
-        Some(program.profile().url().as_str()),
-        warnings,
-    )?;
+    let (own, created) = produce_own(program, index, composition, &origin, session).await?;
     let mut parts = Vec::with_capacity(created.len());
     for resource in created {
         let Value::Object(body) = resource else {
@@ -333,14 +321,7 @@ pub(crate) async fn render_document(
             .unwrap_or_default()
             .to_owned();
         let text = body.get("id").and_then(Value::as_str).unwrap_or_default();
-        let id = FhirResourceId::new(text).map_err(|error| {
-            reply::refusal(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Issue::error(IssueType::Exception).diagnosing(format!(
-                    "a {kind} the mapping created carries an id outside the R4 grammar: {error}"
-                )),
-            )
-        })?;
+        let id = created_id(text, &kind)?;
         parts.push(decorate(body, &kind, &id, &origin, None, Vec::new())?);
     }
     Ok((own, parts))

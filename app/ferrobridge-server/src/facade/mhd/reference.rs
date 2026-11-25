@@ -21,6 +21,7 @@ use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use serde_json::Value;
 
+use eehrxf::category::Category;
 use eehrxf::document::metadata::DocumentMetadata;
 
 use super::DOCUMENT_REFERENCE;
@@ -250,7 +251,18 @@ fn describe(
         .map_err(|error| undescribed(error.to_string()))?;
     let typed = Bundle::from_json(bundle, &mut Path::root("Bundle"))
         .map_err(|error| undescribed(error.to_string()))?;
-    let metadata = DocumentMetadata::from_composition(composition.value(), category)
+    // NOTE: draft EEHRxF Art 14(1): the priority category is the one whose Bundle profile the
+    // document claims; a document of none is described without one.
+    let priority = typed.meta.as_ref().and_then(|meta| {
+        Category::ENABLED.iter().copied().find(|category| {
+            category.profiles().is_some_and(|profiles| {
+                meta.profile
+                    .iter()
+                    .any(|claimed| claimed.value.as_deref() == Some(profiles.bundle))
+            })
+        })
+    });
+    let metadata = DocumentMetadata::from_composition(composition.value(), category, priority)
         .map_err(|error| undescribed(ferrohealth_server::run::chain(&error)))?;
     let mut described = metadata
         .describe(&typed, id)

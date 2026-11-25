@@ -7,7 +7,7 @@
 //! Every write appends one version naming the version it replaces, under a
 //! transaction-level advisory lock on the register, so a writer that read an
 //! older version is refused (RFC 9110 §13.1.1). The write notifies
-//! [`CHANNEL`] before it commits; each replica keeps the newest version of
+//! [`SETTINGS`] before it commits; each replica keeps the newest version of
 //! each register in memory, drops a register its listener hears of, and
 //! reads the store on every request while the listener is down. A register
 //! with no version holds its default. No specification governs the register
@@ -20,11 +20,7 @@ use std::sync::{Arc, PoisonError, RwLock};
 use sqlx::Row as _;
 use sqlx::postgres::{PgPool, PgRow};
 
-use crate::store::listen::{Dropping, Listened, Subscriber};
-
-/// The channel a register write is notified on, its payload the register's
-/// name.
-pub const CHANNEL: &str = "ferrobridge_settings";
+use crate::store::listen::{Dropping, Listened, SETTINGS, Subscriber};
 
 /// A runtime settings register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -224,7 +220,7 @@ impl From<sqlx::Error> for RegisterError {
 pub struct Registers {
     /// The store's pool.
     pool: PgPool,
-    /// The listener state of [`CHANNEL`].
+    /// The listener state of [`SETTINGS`].
     listened: Arc<Listened>,
     /// The copy of the newest version of each register.
     copy: Arc<Copy>,
@@ -277,12 +273,12 @@ impl Registers {
         let copy = Arc::new(Copy::default());
         Self {
             pool: store.pool().clone(),
-            listened: Arc::new(Listened::with_subscriber(CHANNEL, copy.clone())),
+            listened: Arc::new(Listened::with_subscriber(SETTINGS.name(), copy.clone())),
             copy,
         }
     }
 
-    /// Returns the listener state of [`CHANNEL`], for the replica's `LISTEN`
+    /// Returns the listener state of [`SETTINGS`], for the replica's `LISTEN`
     /// session.
     #[must_use]
     pub fn listened(&self) -> Arc<Listened> {
@@ -402,11 +398,7 @@ impl Registers {
         .fetch_one(&mut *transaction)
         .await
         ?;
-        sqlx::query("SELECT pg_notify($1, $2)")
-            .bind(CHANNEL)
-            .bind(register.name())
-            .execute(&mut *transaction)
-            .await?;
+        SETTINGS.notify(&mut transaction, register.name()).await?;
         transaction.commit().await?;
         let recorded = version(register, &row)?;
         self.copy.drop_register(Some(register));

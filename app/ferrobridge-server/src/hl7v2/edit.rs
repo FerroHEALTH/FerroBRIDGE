@@ -18,17 +18,11 @@ pub fn claim_profiles(bundle: &mut Value, profiles: &BTreeMap<String, String>) {
     if profiles.is_empty() {
         return;
     }
-    let Value::Object(document) = bundle else {
-        return;
-    };
-    let Some(Value::Array(entries)) = document.get_mut("entry") else {
+    let Some(entries) = entries_of(bundle) else {
         return;
     };
     for entry in entries {
-        let Value::Object(entry) = entry else {
-            continue;
-        };
-        let Some(Value::Object(resource)) = entry.get_mut("resource") else {
+        let Some(resource) = resource_of(entry) else {
             continue;
         };
         let Some(profile) = resource
@@ -55,6 +49,28 @@ pub fn claim_profiles(bundle: &mut Value, profiles: &BTreeMap<String, String>) {
     }
 }
 
+/// Returns the entries of a Bundle, `None` when it carries none.
+fn entries_of(bundle: &mut Value) -> Option<&mut Vec<Value>> {
+    match bundle {
+        Value::Object(document) => match document.get_mut("entry") {
+            Some(Value::Array(entries)) => Some(entries),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Returns the resource of a Bundle entry, `None` when it carries none.
+fn resource_of(entry: &mut Value) -> Option<&mut BTreeMap<String, Value>> {
+    match entry {
+        Value::Object(entry) => match entry.get_mut("resource") {
+            Some(Value::Object(resource)) => Some(resource),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 /// Points every entry that names no subject at the message's one `Patient`.
 ///
 /// The guide's maps write no `subject`, and its guidelines leave the
@@ -68,10 +84,7 @@ pub fn claim_profiles(bundle: &mut Value, profiles: &BTreeMap<String, String>) {
 /// its entries are refused for naming no subject (no specification governs
 /// this: our own design).
 pub fn link_subjects(bundle: &mut Value) {
-    let Value::Object(document) = bundle else {
-        return;
-    };
-    let Some(Value::Array(entries)) = document.get_mut("entry") else {
+    let Some(entries) = entries_of(bundle) else {
         return;
     };
     let patients: Vec<String> = entries
@@ -90,10 +103,7 @@ pub fn link_subjects(bundle: &mut Value) {
         return;
     };
     for entry in entries {
-        let Value::Object(entry) = entry else {
-            continue;
-        };
-        let Some(Value::Object(resource)) = entry.get_mut("resource") else {
+        let Some(resource) = resource_of(entry) else {
             continue;
         };
         if resource.contains_key("subject") || resource.contains_key("patient") {

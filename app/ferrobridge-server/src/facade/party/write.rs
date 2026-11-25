@@ -15,13 +15,11 @@
 //! ITS-REST 1.1.0 Demographic API, DEVELOPMENT. No specification governs the
 //! missing-`If-Match` rule: our own design.
 
-use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhirconnect::engine::lens::party_ref::NAMESPACE;
 use fhirconnect::engine::traverse::error::EngineError;
 use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 use http::header;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_base::v1_3::base_types::identification::version_tree_id::VersionTreeId;
@@ -45,7 +43,7 @@ use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
-use crate::facade::party::read::class_of;
+use crate::facade::party::Call;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
 use crate::facade::reply::Header;
@@ -54,46 +52,38 @@ use crate::terminology::Direction;
 
 /// `POST [base]/{type}` of a party type.
 pub(crate) async fn create(
-    facade: &Facade,
-    access: &Access,
-    loaded: &Loaded,
+    call: Call<'_>,
     resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Present)?;
-    party::admit(access, Permission::Create, resource_type, None)?;
-    let Prepared {
-        built,
-        client,
-        person,
-    } = prepared(
-        facade,
-        (access, headers),
-        loaded,
-        (resource_type, None),
-        body,
-    )
-    .await?;
-    let demographic = party::demographic(&client)?;
-    let class = class_of(loaded)?;
-    let creation = commit(facade, loaded, Change::Creation)?;
-    let modification = commit(facade, loaded, Change::Modification)?;
-    let deletion = commit(facade, loaded, Change::Deleted)?;
+    crate::facade::handlers::guard(call.headers, call.uri, Body::Present)?;
+    party::admit(call.access, Permission::Create, resource_type, None)?;
+    let client = call.facade.client_for(call.headers, call.access).await?;
+    let (built, person) = prepared(call, &client, (resource_type, None), body).await?;
+    let (demographic, class) = party::reach(&client, call.loaded)?;
+    let creation = commit(call.facade, call.loaded, Change::Creation)?;
+    let modification = commit(call.facade, call.loaded, Change::Modification)?;
+    let deletion = commit(call.facade, call.loaded, Change::Deleted)?;
     let first = commit_party(demographic, class, &built, &creation, None).await?;
-    let (built, version) =
-        match relate(loaded, (demographic, class), &built, &modification, &first).await {
-            Ok(related) => related,
-            Err(relating) => {
-                let unrelated = withdraw((demographic, class), &first, &deletion, relating).await;
-                return Err(unrelated.into_refusal(resource_type));
-            }
-        };
+    let (built, version) = match relate(
+        call.loaded,
+        (demographic, class),
+        &built,
+        &modification,
+        &first,
+    )
+    .await
+    {
+        Ok(related) => related,
+        Err(relating) => {
+            let unrelated = withdraw((demographic, class), &first, &deletion, relating).await;
+            return Err(unrelated.into_refusal(resource_type));
+        }
+    };
     let written = (&built, &version);
     respond(
-        facade,
-        loaded,
+        call.facade,
+        call.loaded,
         resource_type,
         written,
         (&client, person),
@@ -107,37 +97,19 @@ pub(crate) async fn create(
 /// R4 update requires the body's id to be the URL's
 /// (<https://hl7.org/fhir/R4/http.html#update>).
 pub(crate) async fn update(
-    facade: &Facade,
-    access: &Access,
-    loaded: &Loaded,
+    call: Call<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Present)?;
-    party::admit(access, Permission::Update, resource_type, Some(id))?;
-    let uid = party::party_id(resource_type, id)?;
-    let Prepared {
-        built,
-        client,
-        person,
-    } = prepared(
-        facade,
-        (access, headers),
-        loaded,
-        (resource_type, Some(id)),
-        body,
-    )
-    .await?;
-    let demographic = party::demographic(&client)?;
-    let class = class_of(loaded)?;
-    let latest = party::get(demographic, class, resource_type, uid.value()).await?;
-    party::accept(loaded, resource_type, id, &latest)?;
-    party::unbound(facade, resource_type, &latest.value)?;
-    let built = sourced(loaded, &built, uid.value())?;
-    let preceding = preceding(headers, &latest.version)?;
-    let commit = commit(facade, loaded, Change::Modification)?;
+    let uid = call.admit(Permission::Update, (resource_type, id), Body::Present)?;
+    let opened = call.connect(uid).await?;
+    let (built, person) = prepared(call, opened.client(), (resource_type, Some(id)), body).await?;
+    let latest = accepted(call, (resource_type, id), &opened).await?;
+    let (demographic, class) = opened.party()?;
+    let uid = &opened.uid;
+    let built = sourced(call.loaded, &built, uid.value())?;
+    let preceding = preceding(call.headers, &latest.version)?;
+    let commit = commit(call.facade, call.loaded, Change::Modification)?;
     let version = commit_party(
         demographic,
         class,
@@ -148,11 +120,11 @@ pub(crate) async fn update(
     .await?;
     let written = (&built, &version);
     respond(
-        facade,
-        loaded,
+        call.facade,
+        call.loaded,
         resource_type,
         written,
-        (&client, person),
+        (opened.client(), person),
         StatusCode::OK,
     )
     .await
@@ -161,25 +133,34 @@ pub(crate) async fn update(
 /// `DELETE [base]/{type}/{id}` of a party type: the latest version is
 /// deleted, and the answer is `204`.
 pub(crate) async fn delete(
-    facade: &Facade,
-    access: &Access,
-    loaded: &Loaded,
+    call: Call<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    party::admit(access, Permission::Delete, resource_type, Some(id))?;
-    let uid = party::party_id(resource_type, id)?;
-    let client = facade.client_for(headers, access).await?;
-    let demographic = party::demographic(&client)?;
-    let class = class_of(loaded)?;
-    let latest = party::get(demographic, class, resource_type, uid.value()).await?;
-    party::accept(loaded, resource_type, id, &latest)?;
-    party::unbound(facade, resource_type, &latest.value)?;
-    let commit = commit(facade, loaded, Change::Deleted)?;
+    let opened = call
+        .open(Permission::Delete, (resource_type, id), Body::Absent)
+        .await?;
+    let latest = accepted(call, (resource_type, id), &opened).await?;
+    let (demographic, class) = opened.party()?;
+    let commit = commit(call.facade, call.loaded, Change::Deleted)?;
     delete_version((demographic, class), &latest.version, &commit).await?;
     Ok(reply::minimal(StatusCode::NO_CONTENT, &[]))
+}
+
+/// Reads the latest version of the opened party and refuses one that is no
+/// party of the program or that a patient record binds.
+///
+/// # Errors
+///
+/// Returns the [`Refusal`] of the read or of either check.
+async fn accepted(
+    call: Call<'_>,
+    (resource_type, id): (&str, &str),
+    opened: &party::Opened,
+) -> Result<party::Held, Refusal> {
+    let latest = opened.latest(resource_type).await?;
+    party::accept(call.loaded, resource_type, id, &latest)?;
+    party::unbound(call.facade, resource_type, &latest.value)?;
+    Ok(latest)
 }
 
 /// Deletes the party version `version` names, which must be its latest
@@ -212,44 +193,32 @@ async fn delete_version(
     }
 }
 
-/// Maps one inbound resource to its party.
-/// The party a create or an update writes, the caller's CDR client and, for
-/// a `Patient`, the person its ITI-83 pseudonym names.
-struct Prepared {
-    /// The party built from the body.
-    built: CanonicalParty,
-    /// The caller's CDR client.
-    client: crate::cdr::CdrClient,
-    /// The person, for a `Patient`.
-    person: Option<PersonId>,
-}
-
 /// Reads `body` as a `resource_type`, the id `id` names for an update, and
-/// builds the party it describes, refused while it names a bound party.
+/// builds the party it describes, refused while it names a bound party,
+/// with the pseudonym of a `Patient` asked through `client`.
 async fn prepared(
-    facade: &Facade,
-    (access, headers): (&Access, &HeaderMap),
-    loaded: &Loaded,
+    call: Call<'_>,
+    client: &crate::cdr::CdrClient,
     (resource_type, id): (&str, Option<&str>),
     body: &[u8],
-) -> Result<Prepared, Refusal> {
+) -> Result<(CanonicalParty, Option<PersonId>), Refusal> {
     let inbound = parse(body, resource_type)?;
     if let Some(id) = id {
         same_id(&inbound, id)?;
     }
-    let built = build(facade, loaded, inbound.document()).await?;
-    party::unbound(facade, resource_type, built.value())?;
-    let client = facade.client_for(headers, access).await?;
-    let person =
-        party::provision::pseudonym(facade, (access, &client), resource_type, inbound.document())
-            .await?;
-    Ok(Prepared {
-        built,
-        client,
-        person,
-    })
+    let built = build(call.facade, call.loaded, inbound.document()).await?;
+    party::unbound(call.facade, resource_type, built.value())?;
+    let person = party::provision::pseudonym(
+        call.facade,
+        (call.access, client),
+        resource_type,
+        inbound.document(),
+    )
+    .await?;
+    Ok((built, person))
 }
 
+/// Maps one inbound resource to its party.
 async fn build(
     facade: &Facade,
     loaded: &Loaded,

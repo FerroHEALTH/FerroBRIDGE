@@ -33,6 +33,7 @@ use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::library::Library;
 use fhirconnect::engine::seam::Seams;
+use fhirconnect::engine::terminology::Terminology;
 use fhirconnect::operations::TO_FHIR;
 use fhirconnect::operations::TO_OPENEHR;
 use fhirconnect::operations::contract::CompositionPayload;
@@ -57,6 +58,9 @@ pub mod lane;
 /// The FHIR JSON media type, the one both operations exchange.
 pub const FHIR_JSON: &str = "application/fhir+json";
 
+/// The media types a FHIR body may carry.
+const FHIR_BODIES: &[&str] = &[FHIR_JSON, "application/json"];
+
 /// The media type the chapter defines for an unwrapped openEHR payload.
 pub const OPENEHR_JSON: &str = fhirconnect::operations::OPENEHR_JSON;
 
@@ -79,6 +83,18 @@ pub struct OperationQuery {
     pub format: Option<String>,
     /// The openEHR EHR identifier associated with the composition.
     pub ehr_id: Option<String>,
+}
+
+impl OperationQuery {
+    /// Returns the template the query pins for a request whose body pins
+    /// `carried`: the body takes precedence (`engine/rest-api.adoc` §Query
+    /// parameters), so only a request that pins none takes the query's.
+    fn template_for(&self, carried: Option<&TemplateId>) -> Option<TemplateId> {
+        match (carried, self.template_id.as_deref()) {
+            (None, Some(template)) => Some(TemplateId::new(template)),
+            _ => None,
+        }
+    }
 }
 
 /// What the routes of the two operations read: the lane when it runs, why
@@ -111,116 +127,129 @@ impl Served {
 /// FHIRconnect FHIR implementation guide.
 pub fn router(served: Served) -> Router {
     Router::new()
-        .route("/fhir/$tofhir", post(to_fhir))
-        .route("/fhir/$toopenehr", post(to_openehr))
-        .route("/fhir/tofhir", post(to_fhir_direct))
-        .route("/fhir/toopenehr", post(to_openehr_direct))
+        .route("/fhir/$tofhir", post(route(Target::Fhir)))
+        .route("/fhir/$toopenehr", post(route(Target::Openehr)))
+        .route("/fhir/tofhir", post(route(Target::FhirDirect)))
+        .route("/fhir/toopenehr", post(route(Target::OpenehrDirect)))
         .with_state(served)
 }
 
-/// `POST /fhir/$tofhir`: a `Parameters` in, a `Bundle` out.
-async fn to_fhir(
-    State(served): State<Served>,
-    Query(query): Query<OperationQuery>,
-    headers: http::HeaderMap,
-    body: String,
-) -> Response {
-    let Some(lane) = served.lane.as_deref() else {
-        return unavailable(served.off);
-    };
-    let settings = lane.settings();
-    if let Some(refusal) = fhir_media_type(&headers) {
-        return refusal;
-    }
-    match tofhir_answer(lane, &settings, &query, &body).await {
-        Ok(response) => response,
-        Err(error) => refused(&served.usage, &error),
+/// What one of the four routes produces.
+#[derive(Debug, Clone, Copy)]
+enum Target {
+    /// `POST /fhir/$tofhir`: a `Parameters` in, a `Bundle` out.
+    Fhir,
+    /// `POST /fhir/$toopenehr`: a `Bundle` or a `Parameters` in, a
+    /// `Parameters` out.
+    Openehr,
+    /// `POST /fhir/tofhir`: the composition as the body, a `Bundle` out, the
+    /// direct form of the chapter's §Direct payload invocation.
+    FhirDirect,
+    /// `POST /fhir/toopenehr`: a FHIR body, the composition itself out, the
+    /// direct form of the chapter's §Direct payload invocation.
+    OpenehrDirect,
+}
+
+/// The future a route's handler answers with.
+type Answering = core::pin::Pin<Box<dyn Future<Output = Response> + Send>>;
+
+impl Target {
+    /// Returns the media types the route's body may carry.
+    const fn accepted(self) -> &'static [&'static str] {
+        match self {
+            Self::FhirDirect => &[OPENEHR_JSON],
+            Self::Fhir | Self::Openehr | Self::OpenehrDirect => FHIR_BODIES,
+        }
     }
 }
 
-/// `POST /fhir/$toopenehr`: a `Bundle` or a `Parameters` in, a `Parameters`
-/// out.
-async fn to_openehr(
-    State(served): State<Served>,
-    Query(query): Query<OperationQuery>,
-    headers: http::HeaderMap,
-    body: String,
-) -> Response {
-    let Some(lane) = served.lane.as_deref() else {
-        return unavailable(served.off);
-    };
-    let settings = lane.settings();
-    if let Some(refusal) = fhir_media_type(&headers) {
-        return refusal;
-    }
-    match toopenehr_answer(lane, &settings, &query, &body).await {
-        Ok(response) => response,
-        Err(error) => refused(&served.usage, &error),
+/// Returns the handler of the route that produces `target`.
+fn route(
+    target: Target,
+) -> impl Fn(State<Served>, Query<OperationQuery>, http::HeaderMap, String) -> Answering
++ Clone
++ Send
++ Sync
++ 'static {
+    move |State(served), Query(query), headers, body| {
+        Box::pin(async move { serve(&served, target, &query, &headers, &body).await })
     }
 }
 
-/// `POST /fhir/tofhir`: the composition as the body, a `Bundle` out.
-///
-/// The direct form of the chapter's §Direct payload invocation, outside the
-/// FHIR implementation guide.
-async fn to_fhir_direct(
-    State(served): State<Served>,
-    Query(query): Query<OperationQuery>,
-    headers: http::HeaderMap,
-    body: String,
+/// Serves one call of the route that produces `target`: the lane must be on and the body in a media
+/// type the route reads, and every refusal answers an `OperationOutcome`.
+async fn serve(
+    served: &Served,
+    target: Target,
+    query: &OperationQuery,
+    headers: &http::HeaderMap,
+    body: &str,
 ) -> Response {
     let Some(lane) = served.lane.as_deref() else {
         return unavailable(served.off);
     };
     let settings = lane.settings();
-    if let Some(refusal) = media_type(&headers, &[OPENEHR_JSON]) {
+    if let Some(refusal) = media_type(headers, target.accepted()) {
         return refusal;
     }
-    let answer = match CompositionPayload::parse(&body)
-        .map(ToFhirRequest::new)
-        .map(|request| with_query(request, &query))
-    {
-        Ok(request) => run_to_fhir(lane, &settings, &request).await,
-        Err(error) => Err(error),
+    let answer = match target {
+        Target::Fhir => tofhir_answer(lane, &settings, query, body).await,
+        Target::Openehr => toopenehr_answer(lane, &settings, query, body).await,
+        Target::FhirDirect => tofhir_direct_answer(lane, &settings, query, body).await,
+        Target::OpenehrDirect => toopenehr_direct_answer(lane, &settings, query, body).await,
     };
-    match answer {
-        Ok(response) => fhir_resource(
-            StatusCode::OK,
-            &Resource::Bundle(Box::new(response.into_bundle())),
-        ),
-        Err(error) => refused(&served.usage, &error),
-    }
+    answer.unwrap_or_else(|error| refused(&served.usage, &error))
 }
 
-/// `POST /fhir/toopenehr`: a FHIR body, the composition itself out.
-///
-/// The direct form of the chapter's §Direct payload invocation, outside the
-/// FHIR implementation guide.
-async fn to_openehr_direct(
-    State(served): State<Served>,
-    Query(query): Query<OperationQuery>,
-    headers: http::HeaderMap,
-    body: String,
-) -> Response {
-    let Some(lane) = served.lane.as_deref() else {
-        return unavailable(served.off);
-    };
-    let settings = lane.settings();
-    if let Some(refusal) = media_type(&headers, &[FHIR_JSON, "application/json"]) {
-        return refusal;
-    }
-    let answer = match toopenehr_request(&body, &query) {
-        Ok(request) => run_to_openehr(lane, &settings, &request).await,
-        Err(error) => Err(error),
-    };
-    match answer {
-        Ok(response) => (
-            StatusCode::OK,
-            [(CONTENT_TYPE, OPENEHR_JSON)],
-            String::from(response.composition()),
-        )
-            .into_response(),
-        Err(error) => refused(&served.usage, &error),
+/// Runs the direct `$tofhir` form over the composition `body`.
+async fn tofhir_direct_answer(
+    lane: &OperationsLane,
+    settings: &run::Settings,
+    query: &OperationQuery,
+    body: &str,
+) -> Result<Response, OperationError> {
+    let request = with_query(ToFhirRequest::new(CompositionPayload::parse(body)?), query);
+    let response = run_to_fhir(lane, settings, &request).await?;
+    Ok(fhir_resource(
+        StatusCode::OK,
+        &Resource::Bundle(Box::new(response.into_bundle())),
+    ))
+}
+
+/// Runs the direct `$toopenehr` form, answering the composition itself.
+async fn toopenehr_direct_answer(
+    lane: &OperationsLane,
+    settings: &run::Settings,
+    query: &OperationQuery,
+    body: &str,
+) -> Result<Response, OperationError> {
+    let request = toopenehr_request(body, query)?;
+    let response = run_to_openehr(lane, settings, &request).await?;
+    Ok((
+        StatusCode::OK,
+        [(CONTENT_TYPE, OPENEHR_JSON)],
+        String::from(response.composition()),
+    )
+        .into_response())
+}
+
+/// Returns the seams a run maps through: the mapping library, `terminology`
+/// and the lane's demographics.
+fn seams<'run>(lane: &'run OperationsLane, terminology: &'run dyn Terminology) -> Seams<'run> {
+    Seams::default()
+        .with_functions(&Library)
+        .with_terminology(terminology)
+        .with_demographics(lane.demographics())
+}
+
+/// Records the read of `template` on the request's reach, when one is known.
+fn reached(template: Option<TemplateId>) {
+    if let Some(template) = template {
+        crate::cdr::reach::touched(
+            crate::cdr::reach::Touch::Read,
+            None,
+            crate::cdr::reach::template(template.as_str()),
+        );
     }
 }
 
@@ -235,22 +264,18 @@ async fn run_to_fhir(
         .template_id()
         .cloned()
         .or_else(|| request.composition().template_id());
-    if let Some(template) = template {
-        crate::cdr::reach::touched(
-            crate::cdr::reach::Touch::Read,
-            None,
-            crate::cdr::reach::template(template.as_str()),
-        );
-    }
+    reached(template);
     // One snapshot for every attempt, so a reload mid-request cannot mix sets.
     let programs = lane.programs();
     lane.translator()
         .run(Direction::ToFhir, |terminology| {
-            let seams = Seams::default()
-                .with_functions(&Library)
-                .with_terminology(terminology)
-                .with_demographics(lane.demographics());
-            run::to_fhir(&programs, &SCHEMAS, &seams, settings, request)
+            run::to_fhir(
+                &programs,
+                &SCHEMAS,
+                &seams(lane, terminology),
+                settings,
+                request,
+            )
         })
         .await
 }
@@ -266,28 +291,23 @@ async fn run_to_openehr(
     let programs = lane.programs();
     lane.translator()
         .run(Direction::ToOpenehr, |terminology| {
-            let seams = Seams::default()
-                .with_functions(&Library)
-                .with_terminology(terminology)
-                .with_demographics(lane.demographics());
-            run::to_openehr(&programs, &SCHEMAS, &seams, settings, request)
+            run::to_openehr(
+                &programs,
+                &SCHEMAS,
+                &seams(lane, terminology),
+                settings,
+                request,
+            )
         })
         .await
         .inspect(|answer| {
             // NOTE: no specification governs this: our own design; a flat composition names
             // no template inline, so the template the call pinned classifies it instead.
-            let template = request.template_id().cloned().or_else(|| {
+            reached(request.template_id().cloned().or_else(|| {
                 CompositionPayload::parse(answer.composition())
                     .ok()
                     .and_then(|payload| payload.template_id())
-            });
-            if let Some(template) = template {
-                crate::cdr::reach::touched(
-                    crate::cdr::reach::Touch::Read,
-                    None,
-                    crate::cdr::reach::template(template.as_str()),
-                );
-            }
+            }));
         })
 }
 
@@ -365,10 +385,8 @@ fn toopenehr_request(
         ToOpenehrRequest::new(bundle)
     };
     let mut request = request;
-    if request.template_id().is_none()
-        && let Some(ref template) = query.template_id
-    {
-        request = request.with_template_id(TemplateId::new(template.as_str()));
+    if let Some(template) = query.template_for(request.template_id()) {
+        request = request.with_template_id(template);
     }
     if let Some(ref code) = query.format {
         let asked = Format::parse(code)?;
@@ -441,10 +459,8 @@ fn merge_query(parameters: &mut Parameters, query: &OperationQuery) {
 /// only place a template or an EHR identifier can travel.
 fn with_query(request: ToFhirRequest, query: &OperationQuery) -> ToFhirRequest {
     let mut request = request;
-    if request.template_id().is_none()
-        && let Some(ref template) = query.template_id
-    {
-        request = request.with_template_id(TemplateId::new(template.as_str()));
+    if let Some(template) = query.template_for(request.template_id()) {
+        request = request.with_template_id(template);
     }
     if let Some(ref id) = query.ehr_id {
         let carried = request.context().cloned().unwrap_or_default();
@@ -563,16 +579,6 @@ fn media_type(headers: &http::HeaderMap, accepted: &[&str]) -> Option<Response> 
             Some(outcome(StatusCode::UNSUPPORTED_MEDIA_TYPE, &reported))
         }
     }
-}
-
-/// Refuses a body that is not FHIR JSON.
-///
-/// "The request and response bodies of both operations are FHIR resources ...
-/// and are exchanged as `application/fhir+json`" (`engine/rest-api.adoc`
-/// §Media types); `application/json` is accepted beside it because FHIR itself
-/// names both (<https://hl7.org/fhir/R4/http.html#mime-type>).
-fn fhir_media_type(headers: &http::HeaderMap) -> Option<Response> {
-    media_type(headers, &[FHIR_JSON, "application/json"])
 }
 
 /// Renders an `OperationOutcome` as the body of `status`.

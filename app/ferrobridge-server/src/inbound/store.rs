@@ -4,7 +4,7 @@
 //! The inbox, the work items and the slot pool in the state store.
 //!
 //! An event is stored, its entity's work item moved to a new generation and
-//! `ferrobridge_inbound` notified in one transaction, before the source is
+//! [`INBOUND`] notified in one transaction, before the source is
 //! answered. Workers on every replica claim due items with `FOR UPDATE SKIP
 //! LOCKED` under a lease through [`crate::store::claim`], make their
 //! remote calls outside any transaction, and finish at the generation they
@@ -22,9 +22,7 @@ use uuid::Uuid;
 use super::event::{Change, Event};
 use crate::retry::{Decided, Decision};
 use crate::store::claim::{Claim, millis};
-
-/// The channel an accepted event notifies, with its source id as payload.
-pub const CHANNEL: &str = "ferrobridge_inbound";
+use crate::store::listen::INBOUND;
 
 /// The entity one work item is about.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -196,7 +194,7 @@ impl InboxStore {
     }
 
     /// Stores `event` of `source_id` for `tenant`, moves its entity's work item to a new
-    /// generation and notifies [`CHANNEL`], in one transaction.
+    /// generation and notifies [`INBOUND`], in one transaction.
     ///
     /// # Errors
     /// Returns [`sqlx::Error`] when a statement or the commit fails; nothing
@@ -431,7 +429,7 @@ impl InboxStore {
         .rows_affected()
             > 0;
         if settled && decided.decision == Decision::Retry {
-            notify(&mut tx, key.source_id).await?;
+            INBOUND.notify(&mut tx, &key.source_id.to_string()).await?;
         }
         tx.commit().await?;
         Ok(settled)
@@ -474,7 +472,7 @@ impl InboxStore {
         .await?
         .rows_affected();
         if replayed > 0 {
-            notify(&mut tx, source_id).await?;
+            INBOUND.notify(&mut tx, &source_id.to_string()).await?;
         }
         tx.commit().await?;
         Ok(replayed)
@@ -590,7 +588,7 @@ impl InboxStore {
 }
 
 /// Stores `event` of `source_id` for `tenant` in `tx` and moves its entity's
-/// work item to a new generation, notifying [`CHANNEL`] when `tx` commits;
+/// work item to a new generation, notifying [`INBOUND`] when `tx` commits;
 /// a stored repeat changes nothing.
 ///
 /// # Errors
@@ -630,7 +628,7 @@ pub async fn store_event(
 
 /// Moves the work items of `entities` of `source_id` and `tenant` to a new
 /// generation due with `change`, inserting the missing ones, and notifies
-/// [`CHANNEL`] when `tx` commits; a running item keeps running and reruns
+/// [`INBOUND`] when `tx` commits; a running item keeps running and reruns
 /// when its worker gives it back.
 async fn bump(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -657,19 +655,6 @@ async fn bump(
     .execute(&mut **tx)
     .await?
     .rows_affected();
-    notify(tx, source_id).await?;
+    INBOUND.notify(tx, &source_id.to_string()).await?;
     Ok(bumped)
-}
-
-/// Notifies [`CHANNEL`] that `source_id` has due work when `tx` commits.
-async fn notify(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    source_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT pg_notify($1, $2)")
-        .bind(CHANNEL)
-        .bind(source_id.to_string())
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
 }

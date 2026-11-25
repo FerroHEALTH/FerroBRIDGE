@@ -5,7 +5,7 @@
 //!
 //! A worker claims a due item, takes a slot of the item's source and tenant,
 //! hands the item to the [`Handler`] with no transaction open, and gives the
-//! item and the slot back. A notification on `ferrobridge_inbound` wakes an
+//! item and the slot back. A notification on [`INBOUND`] wakes an
 //! idle worker; without one it looks again after the idle interval. No
 //! specification governs an intake's workers: our own design.
 
@@ -14,13 +14,13 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{Notify, watch};
+use tokio::sync::watch;
 use uuid::Uuid;
 
-use super::store::{CHANNEL, Claimed, InboxStore, Outcome, Returned};
+use super::store::{Claimed, InboxStore, Outcome, Returned};
 use crate::retry::{Failure, Next, Policy};
 use crate::sources::{Source, Sources};
-use crate::store::listen::{Dropping, Listened, Subscriber};
+use crate::store::listen::{INBOUND, Listened, Wake};
 
 /// Why an attempt at a work item failed, in words that name no value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,20 +53,6 @@ pub struct Settings {
     pub idle: Duration,
 }
 
-/// The wake-up a notification on [`CHANNEL`] gives the idle workers.
-#[derive(Debug, Default)]
-struct Wake(Notify);
-
-impl Subscriber for Wake {
-    fn notified<'a>(&'a self, _payload: &'a str) -> Dropping<'a> {
-        Box::pin(async move { self.0.notify_waiters() })
-    }
-
-    fn reset(&self) -> Dropping<'_> {
-        Box::pin(async move { self.0.notify_waiters() })
-    }
-}
-
 /// The workers of one replica.
 #[derive(Debug)]
 pub struct Pool {
@@ -82,7 +68,7 @@ pub struct Pool {
     holder: Uuid,
     /// The wake-up.
     wake: Arc<Wake>,
-    /// The listener state of [`CHANNEL`].
+    /// The listener state of [`INBOUND`].
     listened: Arc<Listened>,
 }
 
@@ -95,9 +81,9 @@ impl Pool {
         handler: Arc<dyn Handler>,
         settings: Settings,
     ) -> Self {
-        let wake = Arc::new(Wake::default());
+        let wake = Arc::new(Wake::all());
         let listened = Arc::new(Listened::with_subscriber(
-            CHANNEL,
+            INBOUND.name(),
             Arc::<Wake>::clone(&wake),
         ));
         Self {
@@ -199,7 +185,7 @@ impl Pool {
                 let mut stop = stop.clone();
                 tokio::spawn(async move {
                     while !*stop.borrow() {
-                        let woken = pool.wake.0.notified();
+                        let woken = pool.wake.armed();
                         match pool.step().await {
                             Ok(true) => continue,
                             Ok(false) => {}

@@ -11,7 +11,7 @@
 //! One replica runs a source's recovery under the lane lease
 //! `inbound-recover:<source id>`, and a cursor moves only under the lease
 //! generation that read it. Every call goes through the source's client in
-//! [`super::clients`]. No specification governs the recovery schedule: our
+//! `inbound::clients`. No specification governs the recovery schedule: our
 //! own design.
 
 use std::collections::BTreeMap;
