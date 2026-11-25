@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM INSTRUCTION.care_plan_request.v0
+# (revision 0.0.1-alpha) to a FHIR R4 CarePlan, the draft EEHRxF Annex X data
+# group EHDSCarePlan: the plan's name, description and date of onset. A
+# requested plan is an `active` plan of the intent `plan`.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: INSTRUCTION.care_plan_request.v0.CarePlan
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-INSTRUCTION.care_plan_request.v0
+    revision: 0.0.1-alpha
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/CarePlan
+
+mappings:
+  - name: "statusIntent"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "activePlan"
+        fhir:
+          - path: "status"
+            value: "active"
+          - path: "intent"
+            value: "plan"
+
+  - name: "activity"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/activities[at0001]/description[at0004]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "title"
+          with:
+            fhir: "title"
+            openehr: "items[at0017]"
+        - name: "description"
+          with:
+            fhir: "description"
+            openehr: "items[at0007]"
+        - name: "periodStart"
+          with:
+            fhir: "period.start"
+            openehr: "items[at0018]"

@@ -689,6 +689,7 @@ async fn build_operator(
             omocl: settings.omocl_directory.is_some(),
             facade,
             operations,
+            structuremaps: Some(Arc::default()),
         };
         let revisions = crate::mappings::revisions::Revisions::new(store);
         revisions
@@ -772,12 +773,13 @@ async fn build_facade(
     let owned: Vec<&str> = [
         (lane.app_state, facade::app_state::BASIC),
         (lane.launch_task, facade::launch_task::TASK),
+        (lane.endpoints.is_some(), facade::endpoint::ENDPOINT),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
     .collect();
     facade::programs::check_owned(&programs, &owned)
-        .context("checking the contexts against [facade.app_state] and [facade.launch_task]")?;
+        .context("checking the contexts against [facade.app_state], [facade.launch_task] and [facade.endpoint]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -826,6 +828,7 @@ async fn build_facade(
             .with_app_state(app_state)
             .with_launch_tasks(launch_tasks)
             .with_summary(summary)
+            .with_endpoints(lane.endpoints.clone())
             .with_cors(lane.cors.clone()),
         counts,
     ))

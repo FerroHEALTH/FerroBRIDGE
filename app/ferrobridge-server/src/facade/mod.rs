@@ -27,6 +27,7 @@ pub mod cors;
 pub mod document;
 pub mod edge;
 pub mod ehr;
+pub mod endpoint;
 pub mod engine;
 pub mod guard;
 pub mod handlers;
@@ -168,6 +169,9 @@ pub struct Facade {
     cors: cors::Cors,
     /// The patient summary, when `Patient/$summary` is served.
     summary: Option<Arc<summary::Summary>>,
+    /// The endpoints served as `Endpoint` beside the FHIR base, when
+    /// `Endpoint` serves them.
+    endpoints: Option<endpoint::Endpoints>,
 }
 
 /// Returns the demographics endpoint of a facade at `settings.base_url`: the
@@ -213,6 +217,7 @@ impl Facade {
             launch_tasks: None,
             cors: cors::Cors::default(),
             summary: None,
+            endpoints: None,
         }
     }
 
@@ -253,6 +258,21 @@ impl Facade {
         self.launch_tasks.as_deref()
     }
 
+    /// Returns this facade serving its FHIR base and `endpoints` as
+    /// `Endpoint`, `None` serving none.
+    #[must_use]
+    pub fn with_endpoints(mut self, endpoints: Option<endpoint::Endpoints>) -> Self {
+        self.endpoints = endpoints;
+        self
+    }
+
+    /// Returns the endpoints served as `Endpoint` beside the FHIR base, when
+    /// `Endpoint` serves them.
+    #[must_use]
+    pub const fn endpoints(&self) -> Option<&endpoint::Endpoints> {
+        self.endpoints.as_ref()
+    }
+
     /// Returns the resource types the facade serves itself rather than
     /// through a program.
     #[must_use]
@@ -260,6 +280,7 @@ impl Facade {
         [
             (self.app_state.is_some(), app_state::BASIC),
             (self.launch_tasks.is_some(), launch_task::TASK),
+            (self.endpoints.is_some(), endpoint::ENDPOINT),
         ]
         .into_iter()
         .filter_map(|(on, resource_type)| on.then_some(resource_type))

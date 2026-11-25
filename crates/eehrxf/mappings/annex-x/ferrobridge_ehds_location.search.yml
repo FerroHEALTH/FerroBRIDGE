@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The search of the EHDSLocation resources: the R4 Location `name`, the
+# location of the encounter. No patient compartment holds a Location.
+context: ferrobridge_ehds_location.context
+parameters:
+  name:
+    type: string
+    path: context/location

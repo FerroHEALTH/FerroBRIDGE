@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSMedicationAdministration (Table 21), served by the facade as an
+# individual MedicationAdministration (draft act Art 7(2), #2087): each
+# ACTION.medication.v1 of FerroBRIDGE's EHDS medication administration
+# template becomes one MedicationAdministration with the HL7 Europe Hospital Discharge Report
+# 1.0.0 medicationAdministration-eu-hdr profile, its dosage the
+# EHDSAdministeredDosage (Table 2) and its category the encounter's setting.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_medication_administration.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/hdr/StructureDefinition/medicationAdministration-eu-hdr"
+    version: "1.0.0"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_administration.v1.0.0"
+  archetypes:
+    - "ACTION.medication.v1.MedicationAdministration"
+    - "CLUSTER.dosage.v2.AdministeredDosage"
+    - "COMPOSITION.encounter.v1.MedicationAdministration"
+  start: "ACTION.medication.v1.MedicationAdministration"

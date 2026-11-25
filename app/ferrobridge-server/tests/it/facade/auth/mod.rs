@@ -9,6 +9,7 @@
 
 mod access_record;
 mod app_state;
+mod assurance;
 mod audit;
 mod basic;
 mod batch;

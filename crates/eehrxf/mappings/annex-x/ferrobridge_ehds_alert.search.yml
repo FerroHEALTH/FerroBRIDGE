@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The search of the EHDSAlert Flags: the R4 Flag `patient` parameter and
+# the period of the precaution as the R4 `date`.
+context: ferrobridge_ehds_alert.context
+patient:
+  parameters: [patient]
+parameters:
+  date:
+    type: date
+    node: { class: EVALUATION, archetype: openEHR-EHR-EVALUATION.precaution.v1 }
+    path: protocol[at0006]/items[at0022]/value/value

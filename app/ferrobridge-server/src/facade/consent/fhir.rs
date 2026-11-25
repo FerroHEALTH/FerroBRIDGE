@@ -21,6 +21,8 @@ use http::Uri;
 use http::header;
 use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
 
+use crate::cdr::CdrClient;
+use crate::cdr::ids::EhrId;
 use crate::consent::exchange;
 use crate::consent::fhir::Release;
 use crate::consent::fhir::import::ImportContext;
@@ -28,23 +30,30 @@ use crate::consent::fhir::model::Code;
 use crate::facade::Facade;
 use crate::facade::consent::CONSENT;
 use crate::facade::consent::Committed;
+use crate::facade::consent::Lanes;
 use crate::facade::consent::PATIENT;
+use crate::facade::consent::PATIENT_PRIVACY;
+use crate::facade::consent::SCOPE;
 use crate::facade::consent::State;
 use crate::facade::consent::admit;
 use crate::facade::consent::answer;
 use crate::facade::consent::commit;
 use crate::facade::consent::export_context;
 use crate::facade::consent::logical_id;
+use crate::facade::consent::names_scope;
 use crate::facade::consent::parse_id;
+use crate::facade::consent::scope_values;
 use crate::facade::consent::state;
 use crate::facade::consent::subject;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::write::refuse;
+use crate::facade::identity::FhirResourceId;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
+use crate::facade::search::bundle::Match;
 use crate::facade::status::consent::of_document_refusal;
 use crate::facade::status::consent::of_exchange_error;
 use crate::facade::status::consent::of_unstatable;
@@ -172,34 +181,163 @@ pub async fn read(
     Ok(answer(StatusCode::OK, release, &body, &[]))
 }
 
-/// Searches the `Consent`s of the patient the `patient` parameter names.
+/// Searches the `Consent`s of the patient the `patient` parameter names in
+/// the `lanes` it reaches ([`crate::facade::consent::lanes`]).
 ///
-/// The one parameter is `patient` (R4 `consent.html#search`); any other is
-/// refused, so a search never answers more than it was asked for.
+/// The access directives take `patient` and, in R4, `scope` (R4
+/// `consent.html#search`); any other parameter is refused, so a search never
+/// answers more than it was asked for. Every directive is of scope
+/// `patient-privacy`, so a `scope` that names no such value matches none.
+///
+/// A search of both lanes answers the access directives first, then the
+/// mapped search's matches, paged as one searchset (R4 `search.html`
+/// §3.1.1.5.3); it also takes the paging parameters, and another parameter
+/// is refused naming `scope=adr`, which searches the advance directives by
+/// it. The mapped lane writes R4 alone, so an R5 search of both is refused.
+/// No specification governs the order of the lanes: our own design.
 ///
 /// # Errors
-/// Returns `400` for a search without `patient` or with another parameter,
-/// the refusals of [`subject`], and the exchange failures.
+/// Returns `406` for an R5 search of both lanes, `400` for a search without
+/// one `patient`, with another parameter or with a `scope` in R5, the
+/// refusals of [`subject`], the exchange failures and every refusal of the
+/// mapped search.
 pub async fn search(
     facade: &Facade,
     access: &Access,
     headers: &HeaderMap,
     uri: &Uri,
+    pairs: &[(String, String)],
+    lanes: Lanes,
 ) -> Result<axum::response::Response, Refusal> {
+    let both = lanes == Lanes::Both;
     let settings = admit(facade, headers, uri, Body::Absent)?;
     let release =
         crate::facade::consent::release_of(headers, &header::ACCEPT, StatusCode::NOT_ACCEPTABLE)?;
-    let pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    if let Some((name, _)) = pairs.iter().find(|(name, _)| name != PATIENT) {
+    if both && release == Release::R5 {
         return Err(reply::refusal(
-            StatusCode::BAD_REQUEST,
-            Issue::error(IssueType::NotSupported)
-                .diagnosing(format!("a {CONSENT} search takes only {PATIENT}"))
-                .at(name.clone()),
+            StatusCode::NOT_ACCEPTABLE,
+            Issue::error(IssueType::NotSupported).diagnosing(format!(
+                "a {CONSENT} search that reaches the advance directives answers FHIR R4; search {SCOPE}=patient-privacy for the access directives in R5"
+            )),
         ));
     }
-    let patient = match pairs.as_slice() {
-        [(_, patient)] => patient.clone(),
+    let asked = asked(pairs, release, if both { &PAGING } else { &[] })?;
+    let client = facade.client_for(headers, access).await?;
+    let reached = subject(
+        facade,
+        &client,
+        access,
+        Permission::Search,
+        Some(&asked.patient),
+    )
+    .await?;
+    let entries = if asked.matches {
+        directives(facade, &client, &reached.ehr, settings, release).await?
+    } else {
+        Vec::new()
+    };
+    if both {
+        let mut lead = Vec::with_capacity(entries.len());
+        for (id, resource) in entries {
+            let id = id
+                .as_deref()
+                .and_then(|id| FhirResourceId::new(id).ok())
+                .ok_or_else(|| {
+                    reply::refusal(
+                        StatusCode::BAD_GATEWAY,
+                        Issue::error(IssueType::Exception).diagnosing(format!(
+                            "the EHR {} has no UUID id, so its access directives have no {CONSENT} id",
+                            reached.ehr.as_str()
+                        )),
+                    )
+                })?;
+            lead.push(Match {
+                id,
+                resource,
+                included: Vec::new(),
+            });
+        }
+        return crate::facade::handlers::search::search(
+            facade,
+            access,
+            CONSENT,
+            headers,
+            pairs,
+            Some(lead),
+        )
+        .await;
+    }
+    let base = facade.settings().base_url.trim_end_matches('/');
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    query.append_pair(PATIENT, &asked.patient);
+    for scope in &asked.scopes {
+        query.append_pair(SCOPE, scope);
+    }
+    let self_link = format!("{base}/{CONSENT}?{}", query.finish());
+    Ok(answer(
+        StatusCode::OK,
+        release,
+        &searchset(base, &self_link, entries)?,
+        &[],
+    ))
+}
+
+/// The paging parameters of a mapped search, which a search of both lanes
+/// takes beside `patient` and `scope`.
+const PAGING: [&str; 4] = ["_count", "_cursor", "_total", "_summary"];
+
+/// What a search of the access directives asks.
+struct Asked {
+    /// The one `patient` value.
+    patient: String,
+    /// The `scope` values, as received.
+    scopes: Vec<String>,
+    /// Whether every `scope` names `patient-privacy`.
+    matches: bool,
+}
+
+/// Reads `pairs` as a search of the access directives in `release`, which
+/// also passes over the parameters `also` names.
+fn asked(pairs: &[(String, String)], release: Release, also: &[&str]) -> Result<Asked, Refusal> {
+    let mut patients = Vec::new();
+    let mut scopes = Vec::new();
+    let mut matches = true;
+    for (name, value) in pairs {
+        // NOTE: R4 search.html §3.1.1.3: an empty parameter is ignored.
+        if value.is_empty() || also.contains(&name.as_str()) {
+            continue;
+        }
+        if name == PATIENT {
+            patients.push(value.clone());
+        } else if name == SCOPE && release == Release::R4 {
+            let tokens = scope_values(value).ok_or_else(|| {
+                reply::refusal(
+                    StatusCode::BAD_REQUEST,
+                    Issue::error(IssueType::Invalid)
+                        .diagnosing(format!("`{value}` is no token value"))
+                        .at(SCOPE),
+                )
+            })?;
+            matches &= names_scope(&tokens, PATIENT_PRIVACY);
+            scopes.push(value.clone());
+        } else {
+            let diagnosis = if also.is_empty() {
+                format!("a {CONSENT} search takes only {PATIENT} and, in R4, {SCOPE}")
+            } else {
+                format!(
+                    "the access directives are searched by {PATIENT} and {SCOPE} alone; search {SCOPE}=adr for the advance directives by {name}"
+                )
+            };
+            return Err(reply::refusal(
+                StatusCode::BAD_REQUEST,
+                Issue::error(IssueType::NotSupported)
+                    .diagnosing(diagnosis)
+                    .at(name.clone()),
+            ));
+        }
+    }
+    let patient = match patients.as_slice() {
+        [patient] => patient.clone(),
         _ => {
             return Err(reply::refusal(
                 StatusCode::BAD_REQUEST,
@@ -209,31 +347,33 @@ pub async fn search(
             ));
         }
     };
-    let client = facade.client_for(headers, access).await?;
-    let reached = subject(facade, &client, access, Permission::Search, Some(&patient)).await?;
-    let State { current, policy } = state(facade, &client, &reached.ehr, settings).await?;
-    let context = export_context(facade, &reached.ehr, policy.as_ref(), now()).await?;
+    Ok(Asked {
+        patient,
+        scopes,
+        matches,
+    })
+}
+
+/// Returns the directives in force of `ehr`, each rendered in `release`
+/// with its logical id.
+async fn directives(
+    facade: &Facade,
+    client: &CdrClient,
+    ehr: &EhrId,
+    settings: &exchange::Settings,
+    release: Release,
+) -> Result<Vec<(Option<String>, Object)>, Refusal> {
+    let State { current, policy } = state(facade, client, ehr, settings).await?;
+    let context = export_context(facade, ehr, policy.as_ref(), now()).await?;
     let mut entries = Vec::with_capacity(current.directives().len());
     for directive in current.directives() {
-        let id = logical_id(&reached.ehr, exchange::key(directive));
+        let id = logical_id(ehr, exchange::key(directive));
         entries.push((
             id.clone(),
             render(release, directive, &context, id.as_deref())?,
         ));
     }
-    let base = facade.settings().base_url.trim_end_matches('/');
-    let self_link = format!(
-        "{base}/{CONSENT}?{}",
-        url::form_urlencoded::Serializer::new(String::new())
-            .append_pair(PATIENT, &patient)
-            .finish()
-    );
-    Ok(answer(
-        StatusCode::OK,
-        release,
-        &searchset(base, &self_link, entries)?,
-        &[],
-    ))
+    Ok(entries)
 }
 
 /// Writes `directive` as one `Consent` of `release` with `id`.

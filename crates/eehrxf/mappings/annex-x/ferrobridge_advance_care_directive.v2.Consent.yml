@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM EVALUATION.advance_care_directive.v2
+# (revision 2.0.4) to a FHIR R4 Consent, the draft EEHRxF Annex X data group
+# EHDSAdvanceDirective. A directive recorded as present is an `active`
+# Consent of the scope `adr` consent-eu-eps fixes and the LOINC category
+# 42348-3 (Advance directives); a directive recorded absent or unknown is no
+# Consent. The digital representation slot carries the directive's document.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: EVALUATION.advance_care_directive.v2.Consent
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.advance_care_directive.v2
+    revision: 2.0.4
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Consent
+
+preprocessor:
+  openehrCondition:
+    targetRoot: "$archetype"
+    targetAttribute: "data[at0001]/items[at0004]/value/defining_code/code_string"
+    operator: "one of"
+    criteria:
+      - "at0044"
+
+mappings:
+  - name: "status"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/items[at0004]/value"
+    manual:
+      - name: "active"
+        fhir:
+          - path: "status"
+            value: "active"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "active"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at0044"
+          - path: "value"
+            value: "Present"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0044"
+
+  - name: "scope"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource.scope.coding"
+    manual:
+      - name: "adr"
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/consentscope"
+          - path: "code"
+            value: "adr"
+
+  - name: "category"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource.category.coding"
+    manual:
+      - name: "advanceDirectives"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "42348-3"
+
+  - name: "dateTime"
+    with:
+      fhir: "$resource.dateTime"
+      openehr: "$archetype/protocol[at0010]/items[at0055]"
+
+  - name: "provisionPeriod"
+    with:
+      fhir: "$resource.provision.period"
+      openehr: "$archetype/protocol[at0010]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "start"
+          with:
+            fhir: "start"
+            openehr: "items[at0053]"
+        - name: "end"
+          with:
+            fhir: "end"
+            openehr: "items[at0054]"
+
+  - name: "sourceAttachment"
+    with:
+      fhir: "$resource.source.as(Attachment)"
+      openehr: "$archetype/protocol[at0010]/items[openEHR-EHR-CLUSTER.media_file.v1]"
+    slotArchetype: "CLUSTER.media_file.v1.Attachment"

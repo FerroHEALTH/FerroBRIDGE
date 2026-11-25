@@ -3,12 +3,12 @@
 -- FerroBRIDGE's EHDS record template over published CKM archetypes: an
 -- encounter COMPOSITION (fixtures/ckm/medication) whose content holds each
 -- entry the draft EEHRxF Annex X data groups take from no other template,
--- once per archetype so a context starting at one places it unambiguously:
--- the ACTION.medication.v1 of an immunisation (fixtures/ckm/medication) and
--- the OBSERVATION.body_weight.v2 of a simple observation (fixtures/ckm/ehds).
--- No specification governs this template: our own design for the Annex X
--- facade resources. Node identifiers are at-coded, the ADL 1.4 codes of the
--- CKM sources.
+-- once per archetype so a context starting at one places it unambiguously.
+-- The advance care directive fills its digital representation slot with the
+-- media file cluster, and the problem its structured body site slot with the
+-- anatomical location cluster (fixtures/ckm/ehds, discharge and library). No specification governs this template: our own design for the
+-- Annex X facade resources. Node identifiers are at-coded, the ADL 1.4 codes
+-- of the CKM sources.
 
 template (adl_version=2.4.0; rm_release=1.1.0)
     openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0
@@ -36,6 +36,13 @@ definition
         content matches {
             use_archetype ACTION[at0000.2, openEHR-EHR-ACTION.medication.v1] occurrences matches {0..*}
             use_archetype OBSERVATION[at0000.3, openEHR-EHR-OBSERVATION.body_weight.v2] occurrences matches {0..*}
+            use_archetype EVALUATION[at0000.5, openEHR-EHR-EVALUATION.precaution.v1] occurrences matches {0..*}
+            use_archetype EVALUATION[at0000.6, openEHR-EHR-EVALUATION.advance_care_directive-ferrobridge.v2] occurrences matches {0..*}
+            use_archetype EVALUATION[at0000.7, openEHR-EHR-EVALUATION.problem_diagnosis-ferrobridge_body_site.v1] occurrences matches {0..*}
+            use_archetype INSTRUCTION[at0000.8, openEHR-EHR-INSTRUCTION.care_plan_request.v0] occurrences matches {0..*}
+            use_archetype OBSERVATION[at0000.9, openEHR-EHR-OBSERVATION.pregnancy_assertion.v0] occurrences matches {0..*}
+            use_archetype EVALUATION[at0000.10, openEHR-EHR-EVALUATION.obstetric_summary.v1] occurrences matches {0..*}
+            use_archetype ADMIN_ENTRY[at0000.11, openEHR-EHR-ADMIN_ENTRY.travel_event.v0] occurrences matches {0..*}
         }
     }
 
@@ -53,6 +60,120 @@ terminology
             ["at0000.3"] = <
                 text = <"Body weight">
                 description = <"The body weight a vital-signs Observation carries.">
+            >
+            ["at0000.5"] = <
+                text = <"Alert">
+                description = <"The precaution a Flag carries.">
+            >
+            ["at0000.6"] = <
+                text = <"Advance directive">
+                description = <"The advance care directive a Consent carries, with its digital representation.">
+            >
+            ["at0000.7"] = <
+                text = <"Body site">
+                description = <"The problem whose structured body site a BodyStructure carries.">
+            >
+            ["at0000.8"] = <
+                text = <"Care plan">
+                description = <"The care plan request a CarePlan carries.">
+            >
+            ["at0000.9"] = <
+                text = <"Pregnancy status">
+                description = <"The pregnancy assertion a pregnancy status Observation carries.">
+            >
+            ["at0000.10"] = <
+                text = <"Pregnancy history">
+                description = <"The obstetric summary a pregnancy outcome Observation carries.">
+            >
+            ["at0000.11"] = <
+                text = <"Travel">
+                description = <"The trip a travel Observation carries.">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-EVALUATION.advance_care_directive-ferrobridge.v2.0.0
+
+specialize
+    openEHR-EHR-EVALUATION.advance_care_directive.v2
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The draft EEHRxF Annex X data groups served as individual resources by FerroBRIDGE.">
+        >
+    >
+
+definition
+    EVALUATION[at0000.1] matches {
+        /protocol[at0010]/items matches {
+            use_archetype CLUSTER[at0060.1, openEHR-EHR-CLUSTER.media_file.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Advance directive">
+                description = <"Advance directive">
+            >
+            ["at0060.1"] = <
+                text = <"Digital representation">
+                description = <"Digital representation">
+            >
+        >
+    >
+
+------------------------------------------------------------------------
+template_overlay
+    openEHR-EHR-EVALUATION.problem_diagnosis-ferrobridge_body_site.v1.0.0
+
+specialize
+    openEHR-EHR-EVALUATION.problem_diagnosis.v1
+
+language
+    original_language = <[ISO_639-1::en]>
+
+description
+    lifecycle_state = <"unmanaged">
+    original_author = <
+        ["name"] = <"FerroBRIDGE">
+    >
+    details = <
+        ["en"] = <
+            language = <[ISO_639-1::en]>
+            purpose = <"The draft EEHRxF Annex X data groups served as individual resources by FerroBRIDGE.">
+        >
+    >
+
+definition
+    EVALUATION[at0000.1] matches {
+        /data[at0001]/items matches {
+            use_archetype CLUSTER[at0039.1, openEHR-EHR-CLUSTER.anatomical_location.v1]
+        }
+    }
+
+terminology
+    term_definitions = <
+        ["en"] = <
+            ["at0000.1"] = <
+                text = <"Body site">
+                description = <"Body site">
+            >
+            ["at0039.1"] = <
+                text = <"Structured body site">
+                description = <"Structured body site">
             >
         >
     >

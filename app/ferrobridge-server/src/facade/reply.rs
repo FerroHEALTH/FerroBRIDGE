@@ -179,6 +179,16 @@ pub fn refusal(status: StatusCode, one: Issue) -> Refusal {
     Refusal::new(issue(status, one))
 }
 
+/// Returns the `500` refusal of a failure inside the bridge, naming its
+/// cause chain.
+#[must_use]
+pub fn exception(error: &dyn std::error::Error) -> Refusal {
+    refusal(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(error)),
+    )
+}
+
 /// Returns the refusal carrying `issues` under `status`.
 #[must_use]
 pub fn refusals(status: StatusCode, issues: &[Issue], headers: &[Header]) -> Refusal {

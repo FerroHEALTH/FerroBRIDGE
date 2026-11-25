@@ -217,12 +217,17 @@ impl Place<'_> {
 }
 
 /// Returns the lane's routes: the person's, behind `smart`'s gate with a
-/// read permission on `Patient`, and the receiver's, public with any origin.
+/// read permission on `Patient` and the level `[assurance] shl` names, and
+/// the receiver's, public with any origin.
 pub fn routes(links: Arc<Links>, smart: &crate::smart::Smart) -> Router {
     let person = Router::new()
         .route(BASE, post(handlers::create).get(handlers::list))
         .route(&format!("{BASE}/{{handle}}"), delete(handlers::revoke))
         .with_state(Arc::clone(&links))
+        .route_layer(axum::middleware::from_fn_with_state(
+            smart.assurance(crate::assurance::RouteClass::Shl),
+            crate::assurance::require,
+        ))
         .route_layer(handlers::guard(smart));
     let receiver = Router::new()
         .route(
