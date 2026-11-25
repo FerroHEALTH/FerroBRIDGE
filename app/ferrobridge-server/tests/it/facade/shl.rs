@@ -590,15 +590,16 @@ async fn neither_the_store_nor_the_log_holds_the_key_the_document_or_the_passcod
 
 #[tokio::test]
 async fn each_event_of_a_link_is_recorded_with_its_recipient() -> Result<(), Box<dyn Error>> {
+    let Some((_postgres, store)) = crate::audit::state().await? else {
+        return Ok(());
+    };
     let arr = crate::audit::repository().await;
-    let spool = tempfile::tempdir()?;
     let cdr: url::Url = "http://cdr.invalid/".parse()?;
     let log = crate::audit::access_log(
         &arr,
-        spool.path(),
+        &store,
         &cdr,
         ehds_logging::map::CategoryMap::default(),
-        64 << 20,
     )?;
     let Some(case) = case(Some(log)).await? else {
         return Ok(());

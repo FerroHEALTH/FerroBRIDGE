@@ -93,8 +93,10 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
         let base = url::Url::parse(&mounted.settings().base_url)
             .context("reading [facade] base_url as the address the access records name")?;
-        let log = crate::audit::AccessLog::open(audit, &base, mounted.client().base_url())
-            .context("opening the access-record spool")?;
+        let store = state.store().context(
+            "the access-record lane keeps its outbox in the state store, and [state] is not set",
+        )?;
+        let log = crate::audit::AccessLog::open(audit, &base, mounted.client().base_url(), store);
         tracing::info!(
             lane = "audit",
             repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
@@ -384,8 +386,10 @@ fn start_outbound(
         .facade()
         .cloned()
         .context("the outbound FHIR lane maps through the facade, and the facade is off")?;
-    let consumer = crate::outbound::Outbound::start(lane, facade, client)
-        .with_context(|| format!("opening {}", lane.emitted.display()))?
+    let store = state.store().context(
+        "the outbound FHIR lane keeps its delivery record in the state store, and [state] is not set",
+    )?;
+    let consumer = crate::outbound::Outbound::start(lane, facade, client, store)
         .with_following(follower_lane.following.clone());
     tracing::warn!(
         lane = name,

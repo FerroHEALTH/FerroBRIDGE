@@ -2378,12 +2378,21 @@ area on the store (`0006`): the watermarks of the AQL source, the dead
 letters with the operator's settlement (who decided, retry or discard, and
 why) and the poisoned-pass counts, every follower write fenced by its
 reader's lease; the reference CDR's feed keeps its cursor in the CDR and
-takes only the lease. The inbound sources (`0008`)
+takes only the lease. The outbound lane (`0007`) stages what each accepted
+delivery stands at and writes `outbound_delivered` in the transaction that
+moves its watermark, so with idempotent `PUT` and `DELETE` entries
+(<https://hl7.org/fhir/R4/http.html#transaction>) and one leader per lane
+each effect lands once at the endpoint. The inbound sources (`0008`)
 are versioned rows: one write validates the kind's document, appends the
 version with its committer, derives the tenants and MLLP routes and
 notifies `ferrobridge_sources`, and each replica reloads the named source
 into a snapshot behind one pointer swap; a source names its secrets, which
-resolve through the `[secrets]` directory of `ferrohealth-secret`. Session advisory locks are not
+resolve through the `[secrets]` directory of `ferrohealth-secret`. The audit outbox (`0010`)
+holds each BALP `AuditEvent` until the Audit Record Repository takes it:
+the recorder commits the row before the answer, and each replica's
+`ihe-atna` forwarder claims the oldest unclaimed row for a lease with
+`FOR UPDATE SKIP LOCKED`, deletes it on a `2xx` and moves a refused one to
+`audit_quarantine`, so a replica that stops loses no access record. Session advisory locks are not
 used for leadership: they carry no fencing token and end with their
 connection while the task may run on
 (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
@@ -2514,6 +2523,20 @@ The profile validator (#437), verified against crates.io on 2026-10-15,
 takes `flate2` 1.1.10 on its pure-Rust `rust_backend` and `tar` 0.4.46
 without its default `xattr` feature for the `.tgz` form of a FHIR package,
 the pair FerroFED reads its packages with.
+
+The FHIR Mapping Language engine (#2051, `src/structuremap/`) renders a
+source's own JSON as FHIR R4: a map in the R4 language
+(<https://hl7.org/fhir/R4/mapping-language.html>, grammar `mapping.g4`)
+runs over an instance of a logical model, a `StructureDefinition` of `kind =
+logical`, which `structuremap::openapi` generates from the schema a
+source's `OpenAPI` document publishes. FHIRconnect maps openEHR to FHIR and
+cannot describe another source, so this second language serves the inbound
+sources. The grammar leaves `fhirPath` a placeholder, so an embedded
+expression is parenthesized or runs to the next clause, as the tutorial
+writes it, and `ferrobridge-fhirpath` evaluates it with the map's variables
+bound by name over untyped logical-model nodes. `translate` waits on the
+terminology client (#2118); `dateOp` and `escape`, which R4 leaves
+undocumented, are refused.
 
 ## 8. What each seam carries
 
