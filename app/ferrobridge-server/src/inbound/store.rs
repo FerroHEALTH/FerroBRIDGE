@@ -22,6 +22,7 @@ use uuid::Uuid;
 use super::event::{Change, Event};
 use crate::retry::{Decided, Decision};
 use crate::store::claim::{Claim, millis};
+use crate::store::seal::{KeyId, SealKeys};
 
 /// The channel an accepted event notifies, with its source id as payload.
 pub const CHANNEL: &str = "ferrobridge_inbound";
@@ -44,6 +45,52 @@ pub enum Accepted {
     Stored,
     /// The same event was stored before; nothing changed.
     Repeated,
+    /// The event is stored as superseded: its stamp is older than the one
+    /// its entity applied or waits on, so it moves no work item.
+    Superseded,
+}
+
+/// The record an event carries, which the store seals before it is written
+/// and its worker applies.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Body(Vec<u8>);
+
+impl Body {
+    /// Returns `bytes` as an event's body.
+    #[must_use]
+    pub const fn new(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
+    /// Returns the body's bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for Body {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Body(..)")
+    }
+}
+
+/// Why an event's body could not be stored or read.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum BodyError {
+    /// A statement failed.
+    #[error("the inbox statement failed")]
+    Database(#[from] sqlx::Error),
+    /// The store has no `[state.seal]` keys to seal a body under.
+    #[error("the inbox has no [state.seal] keys to seal an event body under")]
+    Unsealed,
+    /// The body could not be sealed or did not open.
+    #[error("an event body could not be sealed or did not open")]
+    Seal(#[from] crate::store::seal::SealError),
+    /// The stored key id does not read.
+    #[error("an event body names a key id that does not read")]
+    KeyId,
 }
 
 /// A work item a worker holds.
@@ -121,6 +168,8 @@ pub enum Replay {
 pub struct InboxStore {
     /// The state store's pool.
     pool: PgPool,
+    /// The keys an event's body is sealed under.
+    seal: Option<SealKeys>,
 }
 
 /// The claim of due work items: pending items whose time has come, and
@@ -171,7 +220,13 @@ impl InboxStore {
     /// Returns the intake's rows in the store behind `pool`.
     #[must_use]
     pub const fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self { pool, seal: None }
+    }
+
+    /// Returns these rows sealing each event's body under `seal`.
+    #[must_use]
+    pub fn with_seal(self, seal: Option<SealKeys>) -> Self {
+        Self { seal, ..self }
     }
 
     /// Returns the pool the rows are read and written through.
@@ -208,9 +263,92 @@ impl InboxStore {
         event: &Event,
     ) -> Result<Accepted, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
-        let accepted = store_event(&mut tx, source_id, tenant, event).await?;
+        let accepted = store_event(&mut tx, source_id, tenant, event, None).await?;
         tx.commit().await?;
         Ok(accepted)
+    }
+
+    /// Stores `event` with its record `body` sealed under `[state.seal]`, as
+    /// [`Self::accept`] does.
+    ///
+    /// # Errors
+    /// Returns [`BodyError::Unsealed`] without `[state.seal]` keys,
+    /// [`BodyError::Seal`] when the body does not seal, and
+    /// [`BodyError::Database`] when a statement or the commit fails; nothing
+    /// is stored then.
+    pub async fn accept_with_body(
+        &self,
+        source_id: Uuid,
+        tenant: &str,
+        event: &Event,
+        body: &Body,
+    ) -> Result<Accepted, BodyError> {
+        let keys = self.seal.as_ref().ok_or(BodyError::Unsealed)?;
+        let (key_id, sealed) =
+            keys.seal(&body_context(source_id, tenant, &event.entity), &body.0)?;
+        let mut tx = self.pool.begin().await?;
+        let accepted = store_event(
+            &mut tx,
+            source_id,
+            tenant,
+            event,
+            Some((key_id.as_str(), sealed.as_slice())),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(accepted)
+    }
+
+    /// Returns the opened body of the event that moved `key` to
+    /// `generation`, `None` when the item moved on or the event has none.
+    ///
+    /// # Errors
+    /// Returns [`BodyError`] when a statement fails, the store has no keys
+    /// or the body does not open.
+    pub async fn body(&self, key: &WorkKey, generation: i64) -> Result<Option<Body>, BodyError> {
+        let row: Option<(Vec<u8>, String)> = sqlx::query_as(
+            "SELECT e.body, e.body_key_id FROM inbound_work w \
+             JOIN inbound_event e ON e.id = w.event_id \
+             WHERE w.source_id = $1 AND w.tenant = $2 AND w.entity_key = $3 \
+               AND w.generation = $4 AND e.body IS NOT NULL",
+        )
+        .bind(key.source_id)
+        .bind(&key.tenant)
+        .bind(&key.entity)
+        .bind(generation)
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some((sealed, key_id)) = row else {
+            return Ok(None);
+        };
+        let keys = self.seal.as_ref().ok_or(BodyError::Unsealed)?;
+        let key_id = KeyId::new(&key_id).map_err(|_invalid| BodyError::KeyId)?;
+        let opened = keys.open(
+            &key_id,
+            &body_context(key.source_id, &key.tenant, &key.entity),
+            &sealed,
+        )?;
+        Ok(Some(Body(opened)))
+    }
+
+    /// Clears the bodies of the events of items parked longer than `kept`,
+    /// returning how many (GDPR Art 5(1)(e)).
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the statement fails.
+    pub async fn expire_parked_bodies(&self, kept: Duration) -> Result<u64, sqlx::Error> {
+        Ok(sqlx::query(
+            "UPDATE inbound_event e SET body = NULL, body_key_id = NULL \
+             FROM inbound_work w \
+             WHERE e.body IS NOT NULL AND w.state = 'parked' \
+               AND w.updated_at < now() - $1 * interval '1 millisecond' \
+               AND e.source_id = w.source_id AND e.tenant = w.tenant \
+               AND e.entity_key = w.entity_key",
+        )
+        .bind(millis(kept))
+        .execute(&self.pool)
+        .await?
+        .rows_affected())
     }
 
     /// Begins a transaction on the store.
@@ -279,6 +417,7 @@ impl InboxStore {
             Returned::Park(reason) => ("park", Duration::ZERO, Some(reason)),
             Returned::Defer(delay) => ("defer", delay, None),
         };
+        let mut tx = self.pool.begin().await?;
         let same: Option<bool> = sqlx::query_scalar(
             "UPDATE inbound_work SET \
                state = CASE \
@@ -307,8 +446,12 @@ impl InboxStore {
         .bind(millis(delay))
         .bind(reason)
         .bind(holder)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?;
+        if same == Some(true) && how == "done" {
+            applied(&mut tx, &item.key).await?;
+        }
+        tx.commit().await?;
         Ok(match same {
             None => Outcome::Lost,
             Some(true) => Outcome::Settled,
@@ -432,6 +575,9 @@ impl InboxStore {
             > 0;
         if settled && decided.decision == Decision::Retry {
             notify(&mut tx, key.source_id).await?;
+        }
+        if settled && decided.decision == Decision::Discard {
+            clear_bodies(&mut tx, key, None).await?;
         }
         tx.commit().await?;
         Ok(settled)
@@ -583,15 +729,22 @@ impl InboxStore {
             return Ok(0);
         }
         let mut tx = self.pool.begin().await?;
-        let marked = bump(&mut tx, source_id, tenant, entities, change).await?;
+        let marked = bump(&mut tx, source_id, tenant, entities, change, None).await?;
         tx.commit().await?;
         Ok(marked)
     }
 }
 
-/// Stores `event` of `source_id` for `tenant` in `tx` and moves its entity's
-/// work item to a new generation, notifying [`CHANNEL`] when `tx` commits;
-/// a stored repeat changes nothing.
+/// Stores `event` of `source_id` for `tenant` in `tx`, with the sealed
+/// `body` and the id of the key it is sealed under, and moves its entity's
+/// work item to a new generation, notifying [`CHANNEL`] when `tx` commits.
+///
+/// A stored repeat changes nothing. An event that carries its record and
+/// whose stamp is older than the stamp its entity applied or waits on is
+/// stored as superseded, without its body, and moves no work item; stamps
+/// that are not both RFC 3339 instants are not compared. An event without a
+/// body always moves its item, since its worker reads the source's current
+/// state.
 ///
 /// # Errors
 /// Returns [`sqlx::Error`] when a statement fails.
@@ -600,10 +753,17 @@ pub async fn store_event(
     source_id: Uuid,
     tenant: &str,
     event: &Event,
+    body: Option<(&str, &[u8])>,
 ) -> Result<Accepted, sqlx::Error> {
+    let superseded = match (event.stamp.as_deref(), body) {
+        (Some(stamp), Some(_)) => older(tx, source_id, tenant, &event.entity, stamp).await?,
+        _ => false,
+    };
+    let body = body.filter(|_| !superseded);
     let inserted: Option<Uuid> = sqlx::query_scalar(
-        "INSERT INTO inbound_event (source_id, dedupe_key, tenant, entity_key, change, stamp) \
-         VALUES ($1, $2, $3, $4, $5, $6) \
+        "INSERT INTO inbound_event (source_id, dedupe_key, tenant, entity_key, change, stamp, \
+           body, body_key_id, superseded) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
          ON CONFLICT (source_id, dedupe_key) DO NOTHING RETURNING id",
     )
     .bind(source_id)
@@ -612,10 +772,16 @@ pub async fn store_event(
     .bind(&event.entity)
     .bind(change_text(event.change))
     .bind(event.stamp.as_deref())
+    .bind(body.map(|(_, sealed)| sealed))
+    .bind(body.map(|(key_id, _)| key_id))
+    .bind(superseded)
     .fetch_optional(&mut **tx)
     .await?;
-    if inserted.is_none() {
+    let Some(id) = inserted else {
         return Ok(Accepted::Repeated);
+    };
+    if superseded {
+        return Ok(Accepted::Superseded);
     }
     bump(
         tx,
@@ -623,28 +789,140 @@ pub async fn store_event(
         tenant,
         std::slice::from_ref(&event.entity),
         event.change,
+        Some(id),
     )
     .await?;
     Ok(Accepted::Stored)
 }
 
+/// Returns whether `stamp` is older than the stamp the entity applied or
+/// the one its item waits on, locking the item for the rest of `tx`.
+async fn older(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    source_id: Uuid,
+    tenant: &str,
+    entity: &str,
+    stamp: &str,
+) -> Result<bool, sqlx::Error> {
+    // NOTE: our own design; a stamp that is no RFC 3339 instant orders nothing, so it is never older.
+    let Ok(stamp) = stamp.parse::<jiff::Timestamp>() else {
+        return Ok(false);
+    };
+    let held: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT w.applied_stamp, e.stamp FROM inbound_work w \
+         LEFT JOIN inbound_event e ON e.id = w.event_id \
+         WHERE w.source_id = $1 AND w.tenant = $2 AND w.entity_key = $3 \
+         FOR UPDATE OF w",
+    )
+    .bind(source_id)
+    .bind(tenant)
+    .bind(entity)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some((applied, waiting)) = held else {
+        return Ok(false);
+    };
+    Ok([applied, waiting]
+        .into_iter()
+        .flatten()
+        .filter_map(|held| held.parse::<jiff::Timestamp>().ok())
+        .any(|held| stamp < held))
+}
+
+/// Records that the item `key` applied the event of its generation: its
+/// stamp becomes the applied one, and the bodies of that event and every
+/// older one of the entity are cleared (GDPR Art 5(1)(e)).
+async fn applied(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    key: &WorkKey,
+) -> Result<(), sqlx::Error> {
+    let event: Option<Option<Uuid>> = sqlx::query_scalar(
+        "UPDATE inbound_work w SET applied_stamp = COALESCE( \
+           (SELECT e.stamp FROM inbound_event e WHERE e.id = w.event_id), w.applied_stamp) \
+         WHERE w.source_id = $1 AND w.tenant = $2 AND w.entity_key = $3 \
+         RETURNING w.event_id",
+    )
+    .bind(key.source_id)
+    .bind(&key.tenant)
+    .bind(&key.entity)
+    .fetch_optional(&mut **tx)
+    .await?;
+    match event.flatten() {
+        Some(event) => clear_bodies(tx, key, Some(event)).await,
+        None => Ok(()),
+    }
+}
+
+/// Clears the bodies of the events of `key`, every one or those up to and
+/// including `through`.
+async fn clear_bodies(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    key: &WorkKey,
+    through: Option<Uuid>,
+) -> Result<(), sqlx::Error> {
+    // NOTE: our own design; event ids are UUIDv7 (RFC 9562 §5.7), so an id at or below another was stored no later.
+    sqlx::query(
+        "UPDATE inbound_event SET body = NULL, body_key_id = NULL \
+         WHERE source_id = $1 AND tenant = $2 AND entity_key = $3 AND body IS NOT NULL \
+           AND ($4::uuid IS NULL OR id <= $4)",
+    )
+    .bind(key.source_id)
+    .bind(&key.tenant)
+    .bind(&key.entity)
+    .bind(through)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// Clears the bodies of items parked longer than `retention` every `tick`,
+/// on its own task until `stop` reads `true`.
+#[must_use]
+pub fn spawn_body_expiry(
+    inbox: InboxStore,
+    tick: Duration,
+    retention: Duration,
+    stop: &tokio::sync::watch::Receiver<bool>,
+) -> tokio::task::JoinHandle<()> {
+    let mut stop = stop.clone();
+    tokio::spawn(async move {
+        while !*stop.borrow() {
+            if let Err(error) = inbox.expire_parked_bodies(retention).await {
+                tracing::warn!(%error, "the parked inbound bodies could not be cleared");
+            }
+            tokio::select! {
+                () = tokio::time::sleep(tick) => {}
+                _ = stop.changed() => {}
+            }
+        }
+    })
+}
+
+/// Returns the associated data an event body of `entity` is sealed with.
+fn body_context(source_id: Uuid, tenant: &str, entity: &str) -> Vec<u8> {
+    format!("inbound-event:{source_id}:{tenant}:{entity}").into_bytes()
+}
+
 /// Moves the work items of `entities` of `source_id` and `tenant` to a new
 /// generation due with `change`, inserting the missing ones, and notifies
 /// [`CHANNEL`] when `tx` commits; a running item keeps running and reruns
-/// when its worker gives it back.
+/// when its worker gives it back. An item moved by `event` applies that
+/// event's body; a mark or a replay keeps the event it had.
 async fn bump(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     source_id: Uuid,
     tenant: &str,
     entities: &[String],
     change: Change,
+    event: Option<Uuid>,
 ) -> Result<u64, sqlx::Error> {
     let bumped = sqlx::query(
-            "INSERT INTO inbound_work (source_id, tenant, entity_key, generation, change, state) \
-             SELECT $1, $2, entity, 1, $4, 'pending' FROM unnest($3::text[]) AS entity \
+            "INSERT INTO inbound_work (source_id, tenant, entity_key, generation, change, state, event_id) \
+             SELECT $1, $2, entity, 1, $4, 'pending', $5 FROM unnest($3::text[]) AS entity \
              ON CONFLICT (source_id, tenant, entity_key) DO UPDATE SET \
                generation = inbound_work.generation + 1, \
                change = EXCLUDED.change, \
+               event_id = COALESCE(EXCLUDED.event_id, inbound_work.event_id), \
                state = CASE WHEN inbound_work.state = 'running' THEN 'running' ELSE 'pending' END, \
                attempts = CASE WHEN inbound_work.state = 'running' THEN inbound_work.attempts ELSE 0 END, \
                next_at = CASE WHEN inbound_work.state = 'running' THEN inbound_work.next_at ELSE now() END, \
@@ -654,6 +932,7 @@ async fn bump(
     .bind(tenant)
     .bind(entities)
     .bind(change_text(change))
+    .bind(event)
     .execute(&mut **tx)
     .await?
     .rows_affected();

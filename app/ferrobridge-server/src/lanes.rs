@@ -167,15 +167,18 @@ fn inbound_workers(
     ) else {
         return None;
     };
+    let inbox = crate::inbound::store::InboxStore::new(store.pool().clone())
+        .with_seal(store.seal().cloned());
     let handler = crate::inbound::apply::Apply::new(
         Arc::new(crate::inbound::apply::Undeclared),
         facade.settings().subject.identity_handle(),
         facade.client().clone(),
         facade.store_handle(),
     )
-    .with_access_log(state.access_log().cloned());
+    .with_access_log(state.access_log().cloned())
+    .with_inbox(Some(inbox.clone()));
     Some(Arc::new(crate::inbound::worker::Pool::new(
-        crate::inbound::store::InboxStore::new(store.pool().clone()),
+        inbox,
         Arc::clone(sources),
         Arc::new(handler),
         inbound.workers,
@@ -266,6 +269,14 @@ pub(crate) fn spawn_followers(
         settings.inbound,
     ) {
         followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    if let (Some(store), Some(inbound)) = (state.store(), settings.inbound) {
+        followers.push(crate::inbound::store::spawn_body_expiry(
+            crate::inbound::store::InboxStore::new(store.pool().clone()),
+            inbound.recovery_tick,
+            inbound.parked_body_retention,
+            &stop.subscribe(),
+        ));
     }
     if let Some(links) = state.links() {
         followers.push(links.spawn_sweeper(&stop.subscribe()));
@@ -560,7 +571,11 @@ async fn start_hl7v2(
     )?;
     let face = hl7v2::Face::new(facade, terminology, routes)
         .with_usage(Arc::clone(state.usage_window()))
-        .with_access_log(state.access_log().cloned(), lane.listen);
+        .with_access_log(state.access_log().cloned(), lane.listen)
+        .with_inbox(settings.inbound.and(state.store()).map(|store| {
+            crate::inbound::store::InboxStore::new(store.pool().clone())
+                .with_seal(store.seal().cloned())
+        }));
     let plain = match lane.plain {
         Some(bind) => Some(hl7v2::plain::bind(bind, &face).await?),
         None => None,

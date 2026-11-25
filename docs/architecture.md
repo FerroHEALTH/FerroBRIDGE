@@ -2574,6 +2574,22 @@ no resolution parks its items as `resolution-undeclared`. Under `[audit]`
 each feed is recorded as the system's PHI import and each EHR the handler
 creates as a create on the CDR, beside the BALP ITI-104 Source and ITI-83
 Consumer records, each place taken in the audit outbox before its step.
+An HL7 v2 sender cannot be asked for its patient again, so the face stores
+the ADT patient triggers (A01, A04, A05 and A08 of IHE ITI-8, A28 and A31
+of ITI-30) with the minimised `Patient` the v2-to-FHIR maps wrote as the
+event's body, and A40 and A47 with the source's merge statement, MRG-1
+`replaced-by` PID-3. The body is sealed under `[state.seal]`, keyed by
+MSH-10 and stamped by EVN-2 or MSH-7, and the work item names the event
+that moved it to its generation, so the handler applies the body of that
+event and never another in flight for the same patient. The body is
+cleared in the transaction that marks the item done, when an operator
+discards its park, and once it has been parked past
+`[inbound] parked_body_retention` (GDPR Art 5(1)(c) and (e)); an event
+carrying a body whose stamp is older than the one its patient applied or
+waits on is stored as superseded, with no body, and moves no item. The face
+answers `AA` only after the store commits and `AE` when it cannot, so the
+sender sends the message again. The trigger set and the storage rule are
+our own design.
 Recovery is the receiver's job for a webhook source that retries nothing on
 its own: a source declares a `redeliver` call, made when a replica first
 leads the source and after a run of `503` answers, and `reconcile` polls

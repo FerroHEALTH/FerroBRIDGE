@@ -32,6 +32,10 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             "inbound.recovery_tick",
             section.recovery_tick.get().is_zero(),
         ),
+        (
+            "inbound.parked_body_retention",
+            section.parked_body_retention.get().is_zero(),
+        ),
     ];
     if let Some((key, _)) = zero.into_iter().find(|(_, zero)| *zero) {
         return Err(Error::Zero {
@@ -47,6 +51,7 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
     Ok(Some(Settings {
         body_limit: section.body_limit,
         recovery_tick: section.recovery_tick.get(),
+        parked_body_retention: section.parked_body_retention.get(),
         workers: crate::inbound::worker::Settings {
             workers: section.workers,
             lease: section.lease.get(),

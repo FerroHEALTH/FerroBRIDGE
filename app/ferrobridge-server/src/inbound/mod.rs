@@ -42,4 +42,6 @@ pub struct Settings {
     pub workers: worker::Settings,
     /// How often each replica looks for a source whose recovery is due.
     pub recovery_tick: std::time::Duration,
+    /// How long a parked item's event bodies are kept.
+    pub parked_body_retention: std::time::Duration,
 }

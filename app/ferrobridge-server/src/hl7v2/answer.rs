@@ -57,6 +57,11 @@ pub enum Settled {
     /// terminology server's registry does not settle, so the patient carries
     /// an identifier with no system.
     Unregistered(Vec<Unsettled>),
+    /// The patient event could not be stored in the inbound intake, so the
+    /// message may be sent again.
+    Unstored,
+    /// A patient trigger names no identifier its event can be keyed by.
+    Unidentified(crate::hl7v2::intake::Unidentified),
 }
 
 /// A PID-3 assigning authority the identifier registry did not settle.
@@ -198,6 +203,20 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
                     text: authority.text(),
                 })
                 .collect(),
+        ),
+        Settled::Unstored => one(
+            Code::Error,
+            None,
+            ErrorCode::Application,
+            String::from(
+                "the patient event could not be stored in the inbound intake; send the message again",
+            ),
+        ),
+        Settled::Unidentified(unidentified) => one(
+            Code::Error,
+            Some((unidentified.segment, unidentified.field)),
+            ErrorCode::RequiredFieldMissing,
+            unidentified.to_string(),
         ),
         Settled::Unkeyed => one(
             Code::Error,

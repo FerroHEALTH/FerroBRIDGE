@@ -120,3 +120,21 @@ fn an_unknown_key_is_refused() {
         Err(Error::Parse { .. })
     ));
 }
+
+#[test]
+fn a_parked_body_is_kept_a_week_unless_the_section_says_otherwise()
+-> Result<(), Box<dyn std::error::Error>> {
+    let default = resolve(&with_inbound(""))?
+        .inbound
+        .ok_or("the intake is on")?;
+    assert_eq!(Duration::from_hours(7 * 24), default.parked_body_retention);
+    let set = resolve(&with_inbound("parked_body_retention = \"1d\"\n"))?
+        .inbound
+        .ok_or("the intake is on")?;
+    assert_eq!(Duration::from_hours(24), set.parked_body_retention);
+    assert!(matches!(
+        resolve(&with_inbound("parked_body_retention = \"0s\"\n")),
+        Err(Error::Zero { key }) if key == "inbound.parked_body_retention"
+    ));
+    Ok(())
+}

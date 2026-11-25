@@ -263,6 +263,9 @@ pub(crate) struct Lane {
     pub(crate) listeners: Hl7v2Settings,
     /// The MLLP documents.
     pub(crate) sources: Vec<serde_json::Value>,
+    /// The inbound intake an ADT patient trigger is stored in, when one is
+    /// given.
+    pub(crate) inbox: Option<ferrobridge_server::inbound::store::InboxStore>,
 }
 
 impl Lane {
@@ -343,8 +346,17 @@ pub(crate) fn face_settings(claim: bool) -> Lane {
             "profiles": profiles,
             "log_outcomes": true,
         })],
+        inbox: None,
     }
 }
+
+/// The listeners a face answers on, the routes it takes its sources from
+/// and the inbound intake it stores patient triggers in.
+pub(crate) type Wiring = (
+    Hl7v2Settings,
+    Arc<dyn Routes>,
+    Option<ferrobridge_server::inbound::store::InboxStore>,
+);
 
 /// A face serving on an ephemeral port, with its terminology stub.
 struct Serving {
@@ -373,7 +385,7 @@ impl Serving {
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, Box<dyn Error>> {
         let routes = lane.routes()?;
-        Self::start_routed(facade, lane.listeners, routes, log).await
+        Self::start_routed(facade, (lane.listeners, routes, lane.inbox), log).await
     }
 
     /// Starts the face over `facade` on `listeners`, routing each message
@@ -381,15 +393,15 @@ impl Serving {
     /// given.
     async fn start_routed(
         facade: Arc<Facade>,
-        listeners: Hl7v2Settings,
-        routes: Arc<dyn Routes>,
+        (listeners, routes, inbox): Wiring,
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, Box<dyn Error>> {
         let (terminology_server, terminology) = terminology_stub().await;
         let usage = Arc::new(ferrobridge_server::usage_report::window());
         let face = Face::new(facade, Some(terminology), routes)
             .with_usage(Arc::clone(&usage))
-            .with_access_log(log, listeners.listen);
+            .with_access_log(log, listeners.listen)
+            .with_inbox(inbox);
         // A configured plain listener is the one the case drives.
         let face = Arc::new(match listeners.plain {
             Some(bind) => face.on_plain(bind),
@@ -500,7 +512,13 @@ impl Running {
         opt: &str,
     ) -> Result<Self, Box<dyn Error>> {
         let routes = lane.routes()?;
-        Self::start_over((lane.listeners, routes), lookup, log, opt).await
+        Box::pin(Self::start_wired(
+            (lane.listeners, routes, lane.inbox),
+            lookup,
+            log,
+            opt,
+        ))
+        .await
     }
 
     /// Starts the face on `listeners`, routing through `routes`, over a CDR
@@ -508,6 +526,23 @@ impl Running {
     /// `ferrobridge.diagnose.v1` is `opt`.
     pub(crate) async fn start_over(
         (listeners, routes): (Hl7v2Settings, Arc<dyn Routes>),
+        lookup: ResponseTemplate,
+        log: Option<Arc<AccessLog>>,
+        opt: &str,
+    ) -> Result<Self, Box<dyn Error>> {
+        Box::pin(Self::start_wired(
+            (listeners, routes, None),
+            lookup,
+            log,
+            opt,
+        ))
+        .await
+    }
+
+    /// Starts the face wired by `wiring` over a CDR whose EHR lookup answers
+    /// `lookup` and whose `ferrobridge.diagnose.v1` is `opt`.
+    async fn start_wired(
+        wiring: Wiring,
         lookup: ResponseTemplate,
         log: Option<Arc<AccessLog>>,
         opt: &str,
@@ -541,7 +576,7 @@ impl Running {
             client(&cdr),
             facade_settings,
         ));
-        let serving = Serving::start_routed(facade, listeners, routes, log).await?;
+        let serving = Serving::start_routed(facade, wiring, log).await?;
         Ok(Self { cdr, serving })
     }
 
@@ -601,6 +636,7 @@ mod certificate;
 mod clinician;
 mod facility;
 mod feeder_audit;
+mod intake;
 mod plain;
 mod registry;
 mod relay;
