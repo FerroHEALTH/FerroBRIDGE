@@ -887,6 +887,22 @@ jobs:
             cargo nextest run -p "$package" --all-features --locked --no-tests=pass
             cargo test --doc -p "$package" --all-features --locked
           done
+      # The EEHRxF draft corpora (#2084) measure the documents the eehrxf suites
+      # wrote above against the draft annexes, so they run after those suites.
+      - name: The EEHRxF draft corpora hold their pass lists
+        if: ${{ contains(matrix.packages, 'eehrxf') }}
+        env:
+          EEHRXF_DRAFT_CORPUS_DIR: ${{ runner.temp }}/eehrxf-documents
+        run: |
+          set -euo pipefail
+          cargo nextest run -p eehrxf --all-features --locked \
+            -E 'test(=draft_corpus::conformance_the_eehrxf_draft_corpus_measures_the_emitted_documents)'
+          status=0
+          for corpus in eehrxf-draft-patient-summary eehrxf-draft-eprescription eehrxf-draft-edispensation \
+            eehrxf-draft-medical-test-report eehrxf-draft-imaging eehrxf-draft-discharge; do
+            bash scripts/checks/conformance.sh --check "$corpus" || status=1
+          done
+          exit "$status"
       # fhir-search keeps jiff behind its default feature, so a token reader
       # compiles no time library (#1730): its suites also run with none.
       - name: Test fhir-search with no default feature

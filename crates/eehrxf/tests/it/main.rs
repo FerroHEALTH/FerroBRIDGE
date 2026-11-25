@@ -42,6 +42,17 @@ mod document;
 #[cfg(test)]
 mod draft;
 #[cfg(test)]
+#[cfg(all(
+    feature = "fhir-r4",
+    feature = "patient-summary",
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "imaging",
+    feature = "laboratory",
+    feature = "discharge"
+))]
+mod draft_corpus;
+#[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod eps_mapped;
 #[cfg(test)]

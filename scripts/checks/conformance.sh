@@ -72,9 +72,14 @@ readonly CORPUS_TESTS=(
   'validator-agreement ferrobridge-validator conformance_the_validator_agrees_with_the_hl7_validator_on_its_corpus'
   'xtehr-crosswalk eehrxf conformance_the_xtehr_crosswalk_holds_its_pass_list'
 )
-# The corpora HL7's FHIR Validator measures (scripts/checks/fhir-validator.sh
-# --myhealth-eu), whose results this script reads and never produces.
-readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc)
+# The corpora measured outside this script, whose results it reads and never
+# produces: the MyHealth@EU corpora HL7's FHIR Validator measures
+# (scripts/checks/fhir-validator.sh --myhealth-eu) and the EEHRxF draft
+# corpora the eehrxf draft corpus suite measures over the documents the other
+# eehrxf suites emitted (EEHRXF_DRAFT_CORPUS_DIR), each after those suites run.
+readonly DRAFT_CORPORA=(eehrxf-draft-patient-summary eehrxf-draft-eprescription eehrxf-draft-edispensation
+  eehrxf-draft-medical-test-report eehrxf-draft-imaging eehrxf-draft-discharge)
+readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc "${DRAFT_CORPORA[@]}")
 
 # Whether $1 equals one of the remaining arguments.
 contains() {
@@ -190,6 +195,12 @@ label_of() {
     fhirpath-r4-stu3) echo "FHIRPath R4 test suite, 3.0.0 STU functions" ;;
     validator-agreement) echo "R4 profile validator, agreement with the HL7 FHIR Validator" ;;
     xtehr-crosswalk) echo "Xt-EHR models 1.0.0 crosswalk, $(draft_label)" ;;
+    eehrxf-draft-patient-summary) echo "$(draft_label), Patient Summary" ;;
+    eehrxf-draft-eprescription) echo "$(draft_label), ePrescription" ;;
+    eehrxf-draft-edispensation) echo "$(draft_label), eDispensation" ;;
+    eehrxf-draft-medical-test-report) echo "$(draft_label), Medical test report" ;;
+    eehrxf-draft-imaging) echo "$(draft_label), Imaging report and study" ;;
+    eehrxf-draft-discharge) echo "$(draft_label), Discharge report" ;;
     myhealth-eu-core) echo "MyHealth@EU Core $(ci_build_version myhealth.eu.fhir.core) (CI)" ;;
     myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
     myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
@@ -205,6 +216,7 @@ unit_of() {
     myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr) echo " valid" ;;
     myhealth-eu-mvc) echo " codes in bound value sets" ;;
     xtehr-crosswalk) echo " elements aligned" ;;
+    eehrxf-draft-*) echo " annex elements held" ;;
     *) echo "" ;;
   esac
 }
@@ -248,13 +260,17 @@ fraction_badge() {
     '{schemaVersion: 1, label: $label, message: $message, color: $color}'
 }
 
-# The badge JSON a pass list implies.
+# The badge JSON a pass list implies; a list that records unmapped elements
+# names their count after the fraction, so the badge never hides them.
 badge_of() {
-  local corpus="$1" list="conformance/$1/pass-list.txt" passed total
-  passed="$(grep -vc '^total ' "$list" || true)"
+  local corpus="$1" list="conformance/$1/pass-list.txt" passed total unmapped unit
+  passed="$(grep -vEc '^(total|unmapped) ' "$list" || true)"
   total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   [[ -n "$total" ]] || { echo "conformance: $list has no total line" >&2; return 2; }
-  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(unit_of "$corpus")"
+  unmapped="$(sed -n 's/^unmapped \([0-9][0-9]*\)$/\1/p' "$list")"
+  unit="$(unit_of "$corpus")"
+  [[ -z "$unmapped" ]] || unit="$unit, $unmapped unmapped"
+  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$unit"
 }
 
 failed=0
@@ -350,7 +366,7 @@ for corpus in "${selected[@]}"; do
   result="$OUT/$corpus.json"
   list="conformance/$corpus/pass-list.txt"
   if [[ ! -f "$result" ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}" && [[ -z "$only" ]]; then
-    echo "conformance: $corpus is measured by scripts/checks/fhir-validator.sh --myhealth-eu, not in this run"
+    echo "conformance: $corpus is measured outside this script, not in this run"
     emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
     continue
   fi
@@ -364,11 +380,12 @@ for corpus in "${selected[@]}"; do
     {
       jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort
       echo "total $(jq -r '.total' "$result")"
+      jq -r 'select(.unmapped != null) | "unmapped \(.unmapped)"' "$result"
     } >"$list"
   fi
   passing="$(jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort)"
   measured_total="$(jq -r '.total' "$result")"
-  listed="$(grep -v '^total ' "$list" | LC_ALL=C sort || true)"
+  listed="$(grep -vE '^(total|unmapped) ' "$list" | LC_ALL=C sort || true)"
   listed_total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   regressed="$(LC_ALL=C comm -23 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
   new="$(LC_ALL=C comm -13 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
@@ -384,6 +401,12 @@ for corpus in "${selected[@]}"; do
   if [[ -n "$new" ]]; then
     echo "conformance: $corpus passes cases its list does not record; run $0 --update:"
     printf '  %s\n' "$new"
+    if [[ "$mode" = check ]]; then failed=1; fi
+  fi
+  measured_unmapped="$(jq -r '.unmapped // empty' "$result")"
+  listed_unmapped="$(sed -n 's/^unmapped \([0-9][0-9]*\)$/\1/p' "$list")"
+  if [[ "$measured_unmapped" != "$listed_unmapped" ]]; then
+    echo "conformance: $corpus leaves $measured_unmapped elements unmapped and its list records ${listed_unmapped:-none}; run $0 --update"
     if [[ "$mode" = check ]]; then failed=1; fi
   fi
   if [[ "$measured_total" != "$listed_total" ]]; then
@@ -483,7 +506,7 @@ render_block() {
   printf '%s\n' "${COMPLIANCE_BADGES[@]}"
   echo
   echo '**EHDS and EEHRxF**: self-tests against the named build, never a certification<br>'
-  for name in xtehr-crosswalk "${EXTERNAL_CORPORA[@]}"; do
+  for name in "${DRAFT_CORPORA[@]}" xtehr-crosswalk myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
   # The per-family and per-version badges fold into a collapsed block, so the

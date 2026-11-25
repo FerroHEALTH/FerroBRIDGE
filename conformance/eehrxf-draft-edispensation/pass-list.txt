@@ -1,0 +1,14 @@
+eehrxf-mpd-dispense:dispenseLocation
+eehrxf-mpd-dispense:dispensedQuantity
+eehrxf-mpd-dispense:dosageInstructions
+eehrxf-mpd-dispense:header.author[x]
+eehrxf-mpd-dispense:header.date
+eehrxf-mpd-dispense:header.language
+eehrxf-mpd-dispense:header.status
+eehrxf-mpd-dispense:header.subject
+eehrxf-mpd-dispense:medication
+eehrxf-mpd-dispense:note
+eehrxf-mpd-dispense:receiver[x]
+eehrxf-mpd-dispense:substitutionOccurred
+total 14
+unmapped 1
