@@ -15,6 +15,7 @@
 
 use std::error::Error;
 
+use super::support::annex_iii;
 use eehrxf::document::Document;
 use eehrxf::document::discharge::{DISCHARGE_REPORT_FORM, HDR_SLOTS};
 use eehrxf::document::section::Section;
@@ -441,6 +442,7 @@ fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String
         let paragraph = format!("{}.", section.slot.title);
         document.with_section(section.into_section(vec![paragraph]))?;
     }
+    document.with_metadata(annex_iii("18842-5"));
     Ok(serde_json::to_string(&document.into_bundle()?)?)
 }
 

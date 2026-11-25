@@ -47,6 +47,7 @@ eehrxf-discharge-full:header.attestation.dateTime
 eehrxf-discharge-full:header.author[x]
 eehrxf-discharge-full:header.custodian
 eehrxf-discharge-full:header.date
+eehrxf-discharge-full:header.documentCategory
 eehrxf-discharge-full:header.documentTitle
 eehrxf-discharge-full:header.documentType
 eehrxf-discharge-full:header.eventCategory
@@ -59,6 +60,7 @@ eehrxf-discharge-full:header.period
 eehrxf-discharge-full:header.serviceSpecialty
 eehrxf-discharge-full:header.status
 eehrxf-discharge-full:header.subject
+eehrxf-discharge-full:header.version
 eehrxf-discharge-full:presentedForm
 eehrxf-discharge-mapped:attachment
 eehrxf-discharge-mapped:body
@@ -109,6 +111,7 @@ eehrxf-discharge-mapped:header.attestation.dateTime
 eehrxf-discharge-mapped:header.author[x]
 eehrxf-discharge-mapped:header.custodian
 eehrxf-discharge-mapped:header.date
+eehrxf-discharge-mapped:header.documentCategory
 eehrxf-discharge-mapped:header.documentTitle
 eehrxf-discharge-mapped:header.documentType
 eehrxf-discharge-mapped:header.eventCategory
@@ -121,6 +124,7 @@ eehrxf-discharge-mapped:header.period
 eehrxf-discharge-mapped:header.serviceSpecialty
 eehrxf-discharge-mapped:header.status
 eehrxf-discharge-mapped:header.subject
+eehrxf-discharge-mapped:header.version
 eehrxf-discharge-mapped:presentedForm
 total 128
 unmapped 4
