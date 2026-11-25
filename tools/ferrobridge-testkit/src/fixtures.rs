@@ -752,8 +752,9 @@ pub const CKM_TEST_REPORT_ARCHETYPES: [(&str, &str); 2] = [
 ///
 /// An encounter `COMPOSITION` whose content holds, once per archetype, each
 /// entry a draft `EEHRxF` Annex X data group takes from no other template:
-/// `ACTION.medication.v1` for an immunisation and
-/// `OBSERVATION.body_weight.v2` for a simple observation. A suite builds the
+/// `ACTION.medication.v1` for an immunisation, `OBSERVATION.body_weight.v2`
+/// for a simple observation, and the alert, advance directive, body site,
+/// care plan, pregnancy and travel entries. A suite builds the
 /// ADL 2 operational template from it, [`CKM_MEDICATION_ARCHETYPES`] and
 /// [`CKM_EHDS_ARCHETYPES`] at test time. The template identifier is
 /// [`FERROBRIDGE_EHDS_RECORD_TEMPLATE_ID`].
@@ -764,14 +765,41 @@ pub const FERROBRIDGE_EHDS_RECORD_TEMPLATE: &str =
 pub const FERROBRIDGE_EHDS_RECORD_TEMPLATE_ID: &str =
     "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0";
 
+/// FerroBRIDGE's ADL 2 EHDS medication administration template.
+///
+/// An encounter `COMPOSITION` holding the `ACTION.medication.v1` of a
+/// medication administration, its amount slot filled with
+/// `CLUSTER.dosage.v2` by a template overlay. A suite builds the ADL 2
+/// operational template from it and [`CKM_MEDICATION_ARCHETYPES`] at test
+/// time. The template identifier is
+/// [`FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE_ID`].
+pub const FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE: &str =
+    include_str!("../fixtures/adl2/ferrobridge_ehds_administration.adlt");
+
+/// The template identifier [`FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE`]
+/// declares.
+pub const FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE_ID: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_ehds_administration.v1.0.0";
+
 /// The published CKM archetypes [`FERROBRIDGE_EHDS_RECORD_TEMPLATE`] adds to
 /// [`CKM_MEDICATION_ARCHETYPES`], as `(file name, ADL 1.4 source)`.
 ///
 /// `scripts/vendor/ckm-ehds.sh` fetches them at the CKM mirror commit
 /// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
-/// source and licence.
-pub const CKM_EHDS_ARCHETYPES: [(&str, &str); 1] =
-    [ckm_ehds!("openEHR-EHR-OBSERVATION.body_weight.v2.adl")];
+/// source and licence. The problem diagnosis and the anatomical location
+/// the template's body site places come from the discharge and library sets.
+pub const CKM_EHDS_ARCHETYPES: [(&str, &str); 10] = [
+    ckm_ehds!("openEHR-EHR-OBSERVATION.body_weight.v2.adl"),
+    ckm_ehds!("openEHR-EHR-EVALUATION.precaution.v1.adl"),
+    ckm_ehds!("openEHR-EHR-EVALUATION.advance_care_directive.v2.adl"),
+    ckm_ehds!("openEHR-EHR-CLUSTER.media_file.v1.adl"),
+    ckm_ehds!("openEHR-EHR-INSTRUCTION.care_plan_request.v0.adl"),
+    ckm_ehds!("openEHR-EHR-OBSERVATION.pregnancy_assertion.v0.adl"),
+    ckm_ehds!("openEHR-EHR-EVALUATION.obstetric_summary.v1.adl"),
+    ckm_ehds!("openEHR-EHR-ADMIN_ENTRY.travel_event.v0.adl"),
+    ckm_discharge!("openEHR-EHR-EVALUATION.problem_diagnosis.v1.adl"),
+    ckm_library!("openEHR-EHR-CLUSTER.anatomical_location.v1.adl"),
+];
 
 #[cfg(test)]
 mod tests {

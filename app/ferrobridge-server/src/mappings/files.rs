@@ -7,8 +7,8 @@
 //! confined to one of them, and the console's files of the running revision
 //! sit beside them.
 //!
-//! A path on the wire is `<root>/<relative path>`, the root `fhirconnect` or
-//! `omocl`. A relative path is plain names only, never `..`, `.`, a
+//! A path on the wire is `<root>/<relative path>`, the root `fhirconnect`,
+//! `omocl` or `structuremap`. A relative path is plain names only, never `..`, `.`, a
 //! `..`-prefixed name or an absolute form, and the file it names must resolve
 //! inside its root once every symlink is followed, so a link that points out
 //! of the tree serves nothing. A console file is keyed by its wire path in a
@@ -30,6 +30,8 @@ pub enum Language {
     Fhirconnect,
     /// OMOCL files.
     Omocl,
+    /// FHIR Mapping Language maps (FHIR R4 §7.7), one map per file.
+    Structuremap,
 }
 
 impl Language {
@@ -39,14 +41,29 @@ impl Language {
         match self {
             Self::Fhirconnect => "fhirconnect",
             Self::Omocl => "omocl",
+            Self::Structuremap => "structuremap",
         }
+    }
+
+    /// Returns whether `path` carries an extension of this language's files,
+    /// compared without case.
+    #[must_use]
+    pub fn holds(self, path: &Path) -> bool {
+        let extensions: &[&str] = match self {
+            Self::Fhirconnect | Self::Omocl => &EXTENSIONS,
+            Self::Structuremap => &[STRUCTUREMAP_EXTENSION],
+        };
+        path.extension()
+            .and_then(std::ffi::OsStr::to_str)
+            .map(str::to_ascii_lowercase)
+            .is_some_and(|found| extensions.contains(&found.as_str()))
     }
 
     /// Returns the language whose files a wire path opening with `root`
     /// names, or `None` for a root that names neither.
     #[must_use]
     pub fn of_root(root: &str) -> Option<Self> {
-        [Self::Fhirconnect, Self::Omocl]
+        [Self::Fhirconnect, Self::Omocl, Self::Structuremap]
             .into_iter()
             .find(|language| language.root() == root)
     }
@@ -66,6 +83,7 @@ impl From<Language> for ferrobridge_operator_api::operator::Language {
         match language {
             Language::Fhirconnect => Self::Fhirconnect,
             Language::Omocl => Self::Omocl,
+            Language::Structuremap => Self::Structuremap,
         }
     }
 }
@@ -156,7 +174,7 @@ impl Located {
     pub fn console(wire: &str) -> Option<Self> {
         let (root, relative) = relative(wire).ok()?;
         let language = Language::of_root(root)?;
-        is_mapping(&relative).then(|| Self {
+        language.holds(&relative).then(|| Self {
             language,
             owner: Owner::Console,
             wire: wire.to_owned(),
@@ -190,17 +208,17 @@ impl Located {
     }
 }
 
-/// The extensions a mapping file carries under either root, compared without
-/// case.
+/// The extensions a FHIRconnect or OMOCL file carries.
 const EXTENSIONS: [&str; 2] = ["yml", "yaml"];
 
-/// Returns whether `path` carries a mapping file extension.
+/// The extension a FHIR Mapping Language map carries.
+const STRUCTUREMAP_EXTENSION: &str = "map";
+
+/// Returns whether `wire` names a mapping file of the language its root
+/// names.
 #[must_use]
-pub fn is_mapping(path: &Path) -> bool {
-    path.extension()
-        .and_then(std::ffi::OsStr::to_str)
-        .map(str::to_ascii_lowercase)
-        .is_some_and(|found| EXTENSIONS.contains(&found.as_str()))
+pub fn is_mapping(wire: &str) -> bool {
+    Located::console(wire).is_some()
 }
 
 /// Returns every mapping file under `roots`, in root order and sorted within
@@ -212,7 +230,7 @@ pub fn is_mapping(path: &Path) -> bool {
 pub fn list(roots: &[Root]) -> Result<Vec<Located>, crate::walk::Error> {
     let mut found: Vec<Located> = Vec::new();
     for root in roots {
-        for path in crate::walk::files(&root.directory, is_mapping)? {
+        for path in crate::walk::files(&root.directory, |path| root.language.holds(path))? {
             let Some(wire) = wire_path(root, &path) else {
                 continue;
             };
@@ -241,6 +259,8 @@ pub struct Sources {
     pub declarations: Tree,
     /// The OMOCL files.
     pub omocl: Tree,
+    /// The FHIR Mapping Language maps.
+    pub structuremap: Tree,
 }
 
 /// A file standing in for the one at its wire path.
@@ -316,6 +336,7 @@ impl Sources {
     fn tree(&mut self, located: &Located) -> &mut Tree {
         match located.language {
             Language::Omocl => &mut self.omocl,
+            Language::Structuremap => &mut self.structuremap,
             Language::Fhirconnect if crate::walk::is_declaration(Path::new(&located.wire)) => {
                 &mut self.declarations
             }
@@ -361,7 +382,7 @@ pub fn resolve(roots: &[Root], wire: &str) -> Result<Located, PathError> {
     for root in roots.iter().filter(|root| root.language.root() == first) {
         matched = true;
         let path = root.directory.join(&relative);
-        if !is_mapping(&path) {
+        if !root.language.holds(&path) {
             return Err(PathError::Absent);
         }
         match confined(&root.directory, &path) {

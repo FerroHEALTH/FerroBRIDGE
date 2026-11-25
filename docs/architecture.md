@@ -1119,7 +1119,18 @@ expression is a load error: the reference CDR's connector let `where()` and
   the profile HL7 Europe Base and Core 2.0.1 gives the group and the IHE
   QEDm 3.0.0 PCC-44 searches of its option as a search declaration beside
   it (#2087). A date search may read `ACTION.time` and `HISTORY.origin`,
-  which the RM defines and the Web Template leaves out.
+  which the RM defines and the Web Template leaves out, and a string search
+  `EVENT_CONTEXT.location`. Two contexts of one type may share a template
+  when each starts at an archetype of its own. A context whose mappings all
+  run openEHR to FHIR, such as the Location derived from an encounter's
+  context, is read-only: a write answers `405`. A `Consent` search without
+  `scope` answers the access directives and then the mapped advance
+  directives (scope `adr`) as one paged searchset, a `scope` picks the
+  lane its code names, and a read reaches the access directives for their
+  64-hex-digit id and the mapped lane for any other. A `patient-eu-core` party
+  write refuses an identifier without a type, as draft Annex X gives
+  `EHDSPatient.identifier.type` 1..1. Each of these is FerroBRIDGE's own
+  design.
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a
@@ -1545,7 +1556,8 @@ server keeps its read-only root file system. Without `[state]`, the operator
 API checks and saves nothing.
 
 **The load path compiles a tree in memory.** Every FHIRconnect, search
-declaration and OMOCL load reads a tree of file bytes by path, keeping each
+declaration, OMOCL and FHIR Mapping Language load reads a tree of file bytes
+by path, keeping each
 file's path for the source positions its diagnostics carry. A provisioned
 directory is one producer of that tree, keyed by path on disk; the running
 revision is the other, keyed by wire path. No file is staged on disk to be
@@ -2574,13 +2586,23 @@ source's own JSON as FHIR R4: a map in the R4 language
 (<https://hl7.org/fhir/R4/mapping-language.html>, grammar `mapping.g4`)
 runs over an instance of a logical model, a `StructureDefinition` of `kind =
 logical`, which `structuremap::openapi` generates from the schema a
-source's `OpenAPI` document publishes. FHIRconnect maps openEHR to FHIR and
+source's `OpenAPI` document publishes. The maps are console files of the
+mapping revision under the `structuremap` root, one `.map` file per map: a
+save or an apply parses every one, refuses a map outside the grammar or a
+URL two maps carry, and a reload on any replica swaps the parsed maps in
+with the rest of the set. FHIRconnect maps openEHR to FHIR and
 cannot describe another source, so this second language serves the inbound
 sources. The grammar leaves `fhirPath` a placeholder, so an embedded
 expression is parenthesized or runs to the next clause, as the tutorial
 writes it, and `ferrobridge-fhirpath` evaluates it with the map's variables
-bound by name over untyped logical-model nodes. `translate` waits on the
-terminology client (#2118); `dateOp` and `escape`, which R4 leaves
+bound by name over untyped logical-model nodes. `translate` (#2118) sends
+a `Coding`, or each coding of a `CodeableConcept` in order, with the map URL
+to `ConceptMap/$translate` through `ferrobridge-term`, since R4 takes a code
+only with its system; the first coding with exactly one accepted concept
+answers, and a refusal, no translation or two concepts stop the map. The
+engine stays synchronous behind a `Translate` seam: the lane runs it with
+`Engine::transform_blocking` on a blocking thread, where the terminology
+call waits with `Handle::block_on`. `dateOp` and `escape`, which R4 leaves
 undocumented, are refused.
 
 ## 8. What each seam carries

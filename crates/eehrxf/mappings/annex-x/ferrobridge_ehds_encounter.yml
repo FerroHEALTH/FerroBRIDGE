@@ -1,0 +1,127 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of COMPOSITION.encounter.v1.Encounter for the
+# encounter-eu-hdr profile: the status R4 requires, `finished` for a
+# committed encounter composition, and the class from the composition's
+# setting, each openEHR setting paired with the v3 ActCode class of the
+# same care (no specification governs the pairing: our own design).
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_ehds_encounter
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: COMPOSITION.encounter.v1.Encounter
+
+mappings:
+  - name: "status"
+    extension: "add"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "finished"
+        fhir:
+          - path: "status"
+            value: "finished"
+
+  - name: "class"
+    extension: "add"
+    with:
+      fhir: "$resource.class"
+      openehr: "$composition/context/setting"
+    manual:
+      - name: "ambulatory"
+        fhir:
+          - path: "code"
+            value: "AMB"
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "code"
+          operator: "one of"
+          criteria: "AMB"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "defining_code/code_string"
+            value: "228"
+          - path: "value"
+            value: "primary medical care"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "228"
+      - name: "inpatient"
+        fhir:
+          - path: "code"
+            value: "IMP"
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "code"
+          operator: "one of"
+          criteria: "IMP"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "defining_code/code_string"
+            value: "232"
+          - path: "value"
+            value: "secondary medical care"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "232"
+      - name: "emergency"
+        fhir:
+          - path: "code"
+            value: "EMER"
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "code"
+          operator: "one of"
+          criteria: "EMER"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "defining_code/code_string"
+            value: "227"
+          - path: "value"
+            value: "emergency care"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "227"
+      - name: "home"
+        fhir:
+          - path: "code"
+            value: "HH"
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "code"
+          operator: "one of"
+          criteria: "HH"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "openehr"
+          - path: "defining_code/code_string"
+            value: "225"
+          - path: "value"
+            value: "home"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "225"

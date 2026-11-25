@@ -19,7 +19,7 @@ use crate::facade::reply::Refusal;
 const FORM: &str = "application/x-www-form-urlencoded";
 
 /// Checks that a `POST _search` body is a form.
-pub(super) fn check_form(headers: &HeaderMap) -> Result<(), Refusal> {
+pub(crate) fn check_form(headers: &HeaderMap) -> Result<(), Refusal> {
     let found = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())

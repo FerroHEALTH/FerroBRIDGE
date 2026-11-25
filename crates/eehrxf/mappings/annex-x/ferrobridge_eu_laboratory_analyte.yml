@@ -1,0 +1,124 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's extension of CLUSTER.laboratory_test_analyte.v1 for the
+# Laboratory Report 2.0.0 Observation-resultslab-eu-lab profile: the
+# canonical, the `laboratory` category slice the profile fixes by pattern
+# (min 1, max 1), written out of openEHR, where a laboratory analyte is a
+# laboratory result by its archetype, and the effective time and performer
+# the profile requires.
+grammar: FHIRConnect/v1.0.0
+type: extension
+metadata:
+  name: ferrobridge_eu_laboratory_analyte
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  extends: CLUSTER.laboratory_test_analyte.v1
+
+mappings:
+  - name: "metaURL"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.meta"
+    manual:
+      - name: "profileUrl"
+        fhir:
+          - path: "profile"
+            value: "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab"
+
+  - name: "categoryLaboratory"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.category.coding"
+    manual:
+      - name: "laboratory"
+        fhir:
+          - path: "system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "code"
+            value: "laboratory"
+          # FHIR R4 CodeSystem observation-category: the display of `laboratory`.
+          - path: "display"
+            value: "Laboratory"
+
+  # Observation-resultslab-eu-lab requires effective[x] (min 1); an analyte is
+  # observed at the time of the laboratory test result's event, which the
+  # report's effective time carries too, so it is written out of openEHR only.
+  - name: "resultTime"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.effective.as(DateTime)"
+      openehr: "$archetype/../../time"
+
+
+  # NOTE: FHIR R4 extension-data-absent-reason.html: KDS_Laborbericht holds no party for the
+  # performing laboratory, so the performer Observation-resultslab-eu-lab requires is written absent.
+  - name: "performerAbsent"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.performer.extension"
+    manual:
+      - name: "unknown"
+        fhir:
+          - path: "url"
+            value: "http://hl7.org/fhir/StructureDefinition/data-absent-reason"
+          - path: "valueCode"
+            value: "unknown"
+
+  # NOTE: openEHR RM data_types §DV_ORDERED: `normal_range` is the one normal range of the
+  # quantity, and R4 Observation.referenceRange.type assumes the normal range when absent.
+  # NOTE: KDS_Laborbericht OPT, the analyte cluster 0..* with `items[at0001]` 1..1: the bounds
+  # merge into the DV_QUANTITY `analyteMeasurement` writes, where a mapping of their own onto
+  # `items[at0001]` writes a second value with no `magnitude`, which the RM refuses.
+  - name: "referenceRange"
+    extension: "append"
+    appendTo: "analyteMeasurement"
+    followedBy:
+      mappings:
+        - name: "referenceRange"
+          with:
+            fhir: "$resource.referenceRange"
+            openehr: "$openehrRoot"
+          fhirCondition:
+            targetRoot: "$resource.referenceRange"
+            targetAttribute: "type"
+            operator: "empty"
+          followedBy:
+            mappings:
+              - name: "low"
+                with:
+                  fhir: "low"
+                  openehr: "value/normal_range/lower"
+              - name: "high"
+                with:
+                  fhir: "high"
+                  openehr: "value/normal_range/upper"
+        # NOTE: FHIRconnect DV_QUANTITY.adoc §Range: a range other than the normal range maps to
+        # `other_reference_ranges`, each element's `meaning` the R4 referenceRange.type.
+        - name: "otherReferenceRange"
+          with:
+            fhir: "$resource.referenceRange"
+            openehr: "value/other_reference_ranges"
+          fhirCondition:
+            targetRoot: "$resource.referenceRange"
+            targetAttribute: "type"
+            operator: "not empty"
+          followedBy:
+            mappings:
+              - name: "meaning"
+                with:
+                  fhir: "type"
+                  openehr: "meaning"
+              - name: "low"
+                with:
+                  fhir: "low"
+                  openehr: "range/lower"
+              - name: "high"
+                with:
+                  fhir: "high"
+                  openehr: "range/upper"

@@ -851,3 +851,57 @@ fn the_environment_alone_declares_a_named_issuer() -> Result<(), Box<dyn std::er
     );
     Ok(())
 }
+
+/// The `acr` mapping of the issuer, eIDAS URIs as `FerroSMART` writes them.
+const LEVELS: &str = "\n[auth.issuer.ferro.assurance]\nlevels = { \"http://eidas.europa.eu/LoA/low\" = \"low\", \"http://eidas.europa.eu/LoA/substantial\" = \"substantial\" }\n";
+
+#[test]
+fn an_assurance_minimum_reaches_the_settings_over_the_issuer_mapping()
+-> Result<(), Box<dyn std::error::Error>> {
+    let resolved = settings(&format!(
+        "[assurance]\nfhir = \"substantial\"\nshl = \"low\"\n\n{MINIMAL}{LEVELS}"
+    ))?
+    .ok_or("[auth] is on")?;
+    assert_eq!(
+        Some(ferrohealth_smart::assurance::AssuranceLevel::Substantial),
+        resolved.assurance.fhir
+    );
+    let mapped = resolved.issuers[0]
+        .assurance
+        .as_ref()
+        .ok_or("the mapping")?;
+    assert_eq!(2, mapped.levels.len());
+    Ok(())
+}
+
+#[test]
+fn an_assurance_minimum_no_issuer_reaches_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal(&format!("[assurance]\nshl = \"high\"\n\n{MINIMAL}{LEVELS}"))?;
+    assert!(
+        matches!(
+            &error,
+            Error::Assurance {
+                source: ferrobridge_server::assurance::AssuranceError::Unreachable {
+                    key: "assurance.shl",
+                    minimum: "high"
+                }
+            }
+        ),
+        "{error:?}"
+    );
+    let unmapped = refusal(&format!("[assurance]\nfhir = \"low\"\n\n{MINIMAL}"))?;
+    assert!(matches!(unmapped, Error::Assurance { .. }), "{unmapped:?}");
+    Ok(())
+}
+
+#[test]
+fn an_assurance_minimum_without_auth_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    let error = refusal("[assurance]\nfhir = \"substantial\"\n\n[auth]\nenabled = false\n")?;
+    assert!(
+        matches!(&error, Error::Needs { key, needs } if key == "assurance" && needs == "auth.enabled"),
+        "{error:?}"
+    );
+    let unknown = refusal("[assurance]\noperator = \"high\"\n")?;
+    assert!(matches!(unknown, Error::Parse { .. }), "{unknown:?}");
+    Ok(())
+}

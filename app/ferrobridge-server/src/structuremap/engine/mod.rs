@@ -12,11 +12,14 @@
 //! type pair for a complex value (§7.7.0.8, §7.7.0.9).
 
 mod transform;
+pub mod translate;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use fhir_types::codec::{Object, Value};
 
+use self::translate::{Translate, Upstream};
 use super::expression::{ExpressionError, evaluate, holds};
 use super::model::{Known, Structures};
 use super::syntax::{
@@ -86,6 +89,30 @@ pub enum MapError {
     /// Groups or rules nest deeper than the engine follows.
     #[error("the map nests deeper than {DEPTH} levels")]
     Depth,
+    /// The terminology server refused a `translate`, or the call reached no
+    /// answer.
+    #[error("the translate through {map} failed")]
+    Translate {
+        /// The concept map URL.
+        map: String,
+        /// The terminology client's failure.
+        #[source]
+        source: Upstream,
+    },
+    /// The terminology server found no translation.
+    #[error("the translate through {map} found no translation")]
+    NoTranslation {
+        /// The concept map URL.
+        map: String,
+        /// The server's `message`, when it sent one.
+        message: Option<String>,
+    },
+    /// The accepted matches of a `translate` name more than one concept.
+    #[error("the translate through {0} found more than one translation")]
+    AmbiguousTranslation(String),
+    /// The runtime shut down before a blocking run finished.
+    #[error("the runtime shut down before the map finished")]
+    Interrupted,
 }
 
 /// The tree a place lies in.
@@ -159,13 +186,52 @@ pub struct Output {
 pub struct Engine {
     maps: Vec<StructureMap>,
     structures: Known,
+    translator: Option<Arc<dyn Translate>>,
 }
 
 impl Engine {
     /// Returns the engine over `maps`, reading types from `structures`.
     #[must_use]
     pub const fn new(maps: Vec<StructureMap>, structures: Known) -> Self {
-        Self { maps, structures }
+        Self {
+            maps,
+            structures,
+            translator: None,
+        }
+    }
+
+    /// Returns the engine running `translate` through `translator`; without
+    /// one, `translate` is refused.
+    #[must_use]
+    pub fn with_translator(mut self, translator: Arc<dyn Translate>) -> Self {
+        self.translator = Some(translator);
+        self
+    }
+
+    /// Runs [`Engine::transform`] on a blocking thread, where the translator
+    /// may wait on the terminology server.
+    ///
+    /// # Errors
+    /// Returns [`MapError`] as [`Engine::transform`] does, and
+    /// [`MapError::Interrupted`] when the runtime shuts down first.
+    ///
+    /// # Panics
+    /// Resumes a panic of the run on the calling task.
+    pub async fn transform_blocking(
+        self: Arc<Self>,
+        url: String,
+        sources: Vec<Value>,
+        target_type: String,
+    ) -> Result<Output, MapError> {
+        match tokio::task::spawn_blocking(move || self.transform(&url, &sources, &target_type))
+            .await
+        {
+            Ok(result) => result,
+            Err(error) => match error.try_into_panic() {
+                Ok(payload) => std::panic::resume_unwind(payload),
+                Err(_cancelled) => Err(MapError::Interrupted),
+            },
+        }
     }
 
     /// Runs the first group of the map `url` with `sources` bound to its

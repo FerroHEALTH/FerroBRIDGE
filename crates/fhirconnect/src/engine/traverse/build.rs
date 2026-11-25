@@ -357,6 +357,13 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
                 );
                 continue;
             }
+            if let Held::Partial(ref object) = written.value
+                && object.contains_key(rm::carried::NAME)
+                && openehr_rm::v1_2::model::is_a(node.rm_type(), crate::resolve::derive::STRUCTURAL)
+            {
+                values.push(family::name(node, &written.positions, object).map_err(refuse)?);
+                continue;
+            }
             let value = match written.value {
                 Held::Canonical(ref value) => {
                     values.push(
