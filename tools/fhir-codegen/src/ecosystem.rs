@@ -7,7 +7,7 @@
 //! The HL7 terminology ecosystem requires servers to accept and answer
 //! parameters the earlier FHIR versions never declared
 //! (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>). Where the
-//! R6 ballot declares one, its definition is pre-adopted verbatim from the
+//! R6 package declares one, its definition is pre-adopted verbatim from the
 //! vendored R6 package; the rest the ecosystem alone defines, and this module
 //! declares them. The overlay is applied to a version's definition before
 //! lowering, so the generated contract, its descriptor, and its documentation
@@ -26,7 +26,7 @@ pub enum ParameterSource {
     /// The version's own `OperationDefinition`.
     #[default]
     Version,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem.
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem.
     PreAdopted,
     /// Defined by the terminology ecosystem alone.
     Ecosystem,
@@ -153,7 +153,7 @@ const PRE_ADOPTED: &[(&str, ParameterUse, &str)] = &[
 /// The declared parameters whose type the overlay takes from R6, by operation
 /// URL, direction, and (dotted) name: R5 types `targetCode`, `targetCoding`,
 /// and `targetCodeableConcept` as `uri` and `match.originMap` as `uri`, which
-/// R6 corrects (<https://hl7.org/fhir/6.0.0-ballot5/conceptmap-operation-translate.html>).
+/// R6 corrects (<https://hl7.org/fhir/6.0.0-snapshot1/conceptmap-operation-translate.html>).
 const PRE_ADOPTED_TYPES: &[(&str, ParameterUse, &str)] = &[
     (CONCEPT_MAP_TRANSLATE, ParameterUse::In, "targetCode"),
     (CONCEPT_MAP_TRANSLATE, ParameterUse::In, "targetCoding"),
@@ -194,7 +194,7 @@ fn overlay_type(
     {
         parameter.type_name.clone_from(&r6.type_name);
         parameter.documentation = Some(format!(
-            "Typed as the FHIR R6 ballot declares it, for the terminology ecosystem (<{IG_REQUIREMENTS}>). {}",
+            "Typed as FHIR R6 declares it, for the terminology ecosystem (<{IG_REQUIREMENTS}>). {}",
             parameter.documentation.as_deref().unwrap_or_default()
         ));
         added.push(Added {
@@ -444,7 +444,7 @@ fn overlay_parts(
             }
             let mut part = part.clone();
             part.documentation = Some(format!(
-                "Pre-adopted from the FHIR R6 ballot for the terminology ecosystem (<{IG_REQUIREMENTS}>). {}",
+                "Pre-adopted from FHIR R6 for the terminology ecosystem (<{IG_REQUIREMENTS}>). {}",
                 part.documentation.as_deref().unwrap_or_default()
             ));
             added.push(Added {
@@ -497,7 +497,7 @@ pub fn overlay(
             }
             let mut parameter = parameter.clone();
             parameter.documentation = Some(format!(
-                "Pre-adopted from the FHIR R6 ballot for the terminology ecosystem (<{IG_REQUIREMENTS}>). {}",
+                "Pre-adopted from FHIR R6 for the terminology ecosystem (<{IG_REQUIREMENTS}>). {}",
                 parameter.documentation.as_deref().unwrap_or_default()
             ));
             added.push(Added {

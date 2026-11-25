@@ -240,7 +240,11 @@ async fn rendered(
             format!("the party uid {uid} is no FHIR id: {error}"),
         ))
     })?;
-    Ok(Match { id, resource })
+    Ok(Match {
+        id,
+        resource,
+        included: Vec::new(),
+    })
 }
 
 /// Returns the searchset of what one search found.

@@ -300,7 +300,10 @@ the testkit tool crate. Beside it:
   chapter, the FHIRconnect mapping library, OMOCL, the OMOP CDM v5.4
   definitions and PostgreSQL DDL, the ITS-REST OpenAPI documents, and the
   corpora the `eehrxf` tests read (the Xt-EHR models, the HL7 Europe guides,
-  the MyHealth@EU catalogue, FR Core and four FHIR R4 pages), each pinned
+  the MyHealth@EU catalogue, FR Core and four FHIR R4 pages), the draft
+  EEHRxF and testing-environment implementing acts with their extracted
+  text, and the Xt-EHR deliverables D5.2 and D8.2 read from the ignored
+  cache (`scripts/vendor/ehds-drafts.sh`), each pinned
   file by file by URL and sha256 (`scripts/vendor/lib/pinned.sh`). Beside
   them, `fhir-packages/` holds the R4 profile validator's package set (#435),
   one `<package>#<version>` tree per pin, fetched at build time by
@@ -345,9 +348,10 @@ the testkit tool crate. Beside it:
   that fail a rise, pass a fall and only tighten (#1359); `forwarders.sh`,
   the ratchet of the same kind over the functions that only forward to
   another, which `tools/forwarders` lists (#1414); and `conformance.sh`, the pass-list gate over the six
-  corpora under `conformance/` (fifteen: the two mapping libraries, the
+  corpora under `conformance/` (sixteen: the two mapping libraries, the
   round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
-  FHIR examples packages per version, STU3 to R6, the R4 facade, the HL7
+  FHIR examples packages per version, STU3 to R6, the R4 facade, the draft
+  EEHRxF Annex X groups the facade serves, the HL7
   FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, and
   the R4 profile validator's agreement with the HL7 FHIR Validator) (a regression fails, a new pass asks for the
   list, `--update` rewrites the lists and the shields.io badge JSON).

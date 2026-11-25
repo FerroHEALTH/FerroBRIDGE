@@ -3,7 +3,8 @@
 
 //! Captures the build facts the banner, the boot event and `GET /health/info`
 //! report: the git commit, the build instant, the `rustc` version, and the
-//! versions of the `openehr-*` crates and of `fhir-types` this build locked.
+//! versions of the `openehr-*` crates this build locked and of the workspace's
+//! own `fhir-types`, the model the bridge's code is written against.
 //!
 //! A build outside a git checkout reports the commit as `unknown`; a missing
 //! or unreadable `Cargo.lock` fails the build, because the pins it carries are
@@ -65,7 +66,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let openehr = locked_versions(&lock, |name, registry| {
         registry && name.starts_with("openehr-")
     });
-    let fhir_types = locked_versions(&lock, |name, _| name == "fhir-types");
+    // NOTE: a registry copy of `fhir-types` on an older line, which a crates.io
+    // dependency pulls in, is that crate's own model, never the bridge's.
+    let fhir_types = locked_versions(&lock, |name, registry| !registry && name == "fhir-types");
     for (key, versions) in [
         ("FERROBRIDGE_BUILD_OPENEHR_CRATES", openehr),
         ("FERROBRIDGE_BUILD_FHIR_TYPES", fhir_types),

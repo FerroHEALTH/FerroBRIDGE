@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSAllergyIntolerance (Table 5), served by the facade as an individual
+# resource (draft act Art 7(2), #2087): each
+# EVALUATION.adverse_reaction_risk.v2 entry of the template becomes one
+# AllergyIntolerance with the
+# http://hl7.eu/fhir/base/StructureDefinition/allergyIntolerance-eu-core
+# profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_allergy_intolerance.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/allergyIntolerance-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "EVALUATION.adverse_reaction_risk.v2"
+  start: "EVALUATION.adverse_reaction_risk.v2"

@@ -312,7 +312,7 @@ pub mod primitives;
 pub mod procedure;
 #[cfg(any(feature = "resources", feature = "r5-resources"))]
 pub mod product_shelf_life;
-#[cfg(any(feature = "resources", feature = "r5-resources"))]
+#[cfg(feature = "terminology")]
 pub mod provenance;
 #[cfg(feature = "terminology")]
 pub mod quantity;
