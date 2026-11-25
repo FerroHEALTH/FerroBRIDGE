@@ -267,6 +267,7 @@ fn group_medication_use() -> Group {
             }],
             "medicationReference": { "reference": "#medicine" },
             "effectivePeriod": { "start": "2026-03-01" },
+            "dosage": [{ "text": "One tablet twice a day" }],
             "subject": subject()
         }),
         // PCC-44 2:3.44.4.1.2.1.5.
@@ -422,6 +423,49 @@ fn group_laboratory_observation() -> Group {
     }
 }
 
+/// Returns the `EHDSDeviceUse` group.
+fn group_device_use() -> Group {
+    Group {
+        name: "EHDSDeviceUse",
+        context: "ferrobridge_ehds_device_use.context",
+        resource_type: "DeviceUseStatement",
+        archetype: "openEHR-EHR-EVALUATION.device_summary.v0",
+        profile: String::from(
+            "http://hl7.eu/fhir/eps/StructureDefinition/deviceUseStatement-eu-eps",
+        ),
+        resource: serde_json::json!({
+            "resourceType": "DeviceUseStatement",
+            "status": "active",
+            "contained": [{
+                "resourceType": "Device",
+                "id": "pacemaker",
+                "type": { "coding": [{
+                    "system": "http://snomed.info/sct", "code": "14106009", "display": "Cardiac pacemaker"
+                }]}
+            }],
+            "device": { "reference": "#pacemaker" },
+            "timingPeriod": { "start": "2025-06-01" },
+            "subject": subject()
+        }),
+        // R4 DeviceUseStatement search parameter `patient`.
+        searches: &["patient=Patient/p-1"],
+    }
+}
+
+/// Returns the `EHDSSpecimen` group: each specimen of a laboratory report.
+fn group_specimen() -> Group {
+    Group {
+        name: "EHDSSpecimen",
+        context: "ferrobridge_ehds_diagnostic_report.context",
+        resource_type: "Specimen",
+        archetype: "openEHR-EHR-CLUSTER.specimen.v1",
+        profile: format!("{LAB}/Specimen-eu-lab"),
+        resource: laboratory_report(),
+        // R4 Specimen search parameter `patient`.
+        searches: &["patient=Patient/p-1"],
+    }
+}
+
 /// Returns the groups this suite serves.
 fn groups() -> Vec<Group> {
     vec![
@@ -432,6 +476,8 @@ fn groups() -> Vec<Group> {
         group_immunisation(),
         group_observation(),
         group_laboratory_observation(),
+        group_device_use(),
+        group_specimen(),
     ]
 }
 
@@ -529,9 +575,9 @@ fn ensure(holds: bool, reason: impl FnOnce() -> String) -> Result<(), Box<dyn Er
     if holds { Ok(()) } else { Err(reason().into()) }
 }
 
-/// Returns the one id every search of `group` answers, after holding each
-/// answer to the group's profile, and reads that resource back.
-async fn serve(group: &Group) -> Result<String, Box<dyn Error>> {
+/// Holds every search of `group` to one answer with the group's profile, and
+/// returns that resource as it reads back by its id.
+async fn serve(group: &Group) -> Result<serde_json::Value, Box<dyn Error>> {
     let harness = annex_x().await?;
     let composition = composition_of(&harness, group);
     mount_rows(&harness.cdr, &[entry_row(&composition, group.archetype)?]).await;
@@ -571,23 +617,87 @@ async fn serve(group: &Group) -> Result<String, Box<dyn Error>> {
         read["meta"]["profile"] == serde_json::json!([group.profile]),
         || format!("the read answered the profile {}", read["meta"]["profile"]),
     )?;
-    Ok(id)
+    Ok(read)
 }
 
-/// Serves `EHDSMedication`: the Medication a medication statement
-/// references, included by its search and read back by its id.
-async fn serve_medication() -> Result<(), Box<dyn Error>> {
-    let group = groups()
+/// A group served as the resource another group's resource references and
+/// its run creates: included by that group's search and read by its id.
+struct Included {
+    /// The group whose resource references it.
+    by: &'static str,
+    /// The `_include` value, `[type]:[parameter]`.
+    include: &'static str,
+    /// The resource type it is served as.
+    resource_type: &'static str,
+    /// The profile it answers with.
+    profile: String,
+}
+
+/// Returns the groups served as included resources, by name.
+fn included_groups() -> Vec<(&'static str, Included)> {
+    vec![
+        (
+            "EHDSMedication",
+            Included {
+                by: "EHDSMedicationUse",
+                include: "MedicationStatement:medication",
+                resource_type: "Medication",
+                profile: format!("{BASE}/medication-eu-core"),
+            },
+        ),
+        (
+            "EHDSDevice",
+            Included {
+                by: "EHDSDeviceUse",
+                include: "DeviceUseStatement:device",
+                resource_type: "Device",
+                profile: String::from("http://hl7.eu/fhir/eps/StructureDefinition/device-eu-eps"),
+            },
+        ),
+    ]
+}
+
+/// A data-type group, asserted in a served resource that carries it.
+struct Embedded {
+    /// The group whose resource carries it.
+    by: &'static str,
+    /// The JSON pointer of the element in that resource.
+    pointer: &'static str,
+}
+
+/// Returns the data-type groups the suite asserts, by name.
+const fn embedded_groups() -> [(&'static str, Embedded); 1] {
+    [(
+        "EHDSDosage",
+        Embedded {
+            by: "EHDSMedicationUse",
+            pointer: "/dosage/0/text",
+        },
+    )]
+}
+
+/// Returns the served group named `name`.
+fn group_named(name: &str) -> Result<Group, Box<dyn Error>> {
+    groups()
         .into_iter()
-        .find(|group| group.name == "EHDSMedicationUse")
-        .ok_or("the medication use group")?;
+        .find(|group| group.name == name)
+        .ok_or_else(|| format!("no served group {name}").into())
+}
+
+/// Serves an included group: the search of the group that references it
+/// includes it, and it reads back by its id with its profile.
+async fn serve_included(included: &Included) -> Result<(), Box<dyn Error>> {
+    let group = group_named(included.by)?;
     let harness = annex_x().await?;
     let composition = composition_of(&harness, &group);
     mount_rows(&harness.cdr, &[entry_row(&composition, group.archetype)?]).await;
     mount_read(&harness.cdr, VERSION_ONE, &composition).await;
     let (status, body) = get(
         &harness,
-        &format!("MedicationStatement?patient={SUBJECT}&_include=MedicationStatement:medication"),
+        &format!(
+            "{}?patient={SUBJECT}&_include={}",
+            group.resource_type, included.include
+        ),
     )
     .await?;
     ensure(status == StatusCode::OK, || {
@@ -601,16 +711,46 @@ async fn serve_medication() -> Result<(), Box<dyn Error>> {
                 .find(|entry| entry["search"]["mode"] == "include")
         })
         .and_then(|entry| entry["resource"]["id"].as_str())
-        .ok_or("the search includes no Medication")?
+        .ok_or_else(|| format!("the search includes no {}", included.resource_type))?
         .to_owned();
-    let (status, read) = get(&harness, &format!("Medication/{id}")).await?;
+    let (status, read) = get(&harness, &format!("{}/{id}", included.resource_type)).await?;
     ensure(status == StatusCode::OK, || {
         format!("the read answered {status}: {read}")
     })?;
-    let profile = serde_json::json!([format!("{BASE}/medication-eu-core")]);
-    ensure(read["meta"]["profile"] == profile, || {
-        format!("the read answered the profile {}", read["meta"]["profile"])
+    ensure(
+        read["meta"]["profile"] == serde_json::json!([included.profile]),
+        || format!("the read answered the profile {}", read["meta"]["profile"]),
+    )
+}
+
+/// Serves a data-type group: the served resource that carries it reads back
+/// with the element.
+async fn serve_embedded(embedded: &Embedded) -> Result<(), Box<dyn Error>> {
+    let group = group_named(embedded.by)?;
+    let read = serve(&group).await?;
+    ensure(read.pointer(embedded.pointer).is_some(), || {
+        format!("{} answered no {}: {read}", group.name, embedded.pointer)
     })
+}
+
+/// Returns the verdict on the Annex X group `name`.
+async fn verdict(name: &str) -> Result<(), Box<dyn Error>> {
+    if let Ok(group) = group_named(name) {
+        return serve(&group).await.map(drop);
+    }
+    if let Some((_, included)) = included_groups()
+        .into_iter()
+        .find(|(held, _)| *held == name)
+    {
+        return serve_included(&included).await;
+    }
+    if let Some((_, embedded)) = embedded_groups()
+        .into_iter()
+        .find(|(held, _)| *held == name)
+    {
+        return serve_embedded(&embedded).await;
+    }
+    Err("the facade serves no resource of this group yet".into())
 }
 
 #[tokio::test]
@@ -618,12 +758,7 @@ async fn conformance_the_annex_x_groups_hold_their_pass_list() -> Result<(), Box
     let served = groups();
     let mut cases = Vec::with_capacity(ANNEX_X_GROUPS.len());
     for name in ANNEX_X_GROUPS {
-        let verdict = match served.iter().find(|group| group.name == name) {
-            Some(group) => serve(group).await.map(drop),
-            None if name == "EHDSMedication" => serve_medication().await,
-            None => Err("the facade serves no resource of this group yet".into()),
-        };
-        cases.push(match verdict {
+        cases.push(match verdict(name).await {
             Ok(()) => Case::pass(name),
             Err(reason) => Case::fail(name, reason.to_string()),
         });
@@ -737,6 +872,8 @@ async fn the_statement_lists_each_group_s_searches() -> Result<(), Box<dyn Error
         ("Immunization", &["patient", "date"][..]),
         ("Observation", &["patient", "category", "code", "date"][..]),
         ("DiagnosticReport", &["patient", "category", "date"][..]),
+        ("DeviceUseStatement", &["patient"][..]),
+        ("Specimen", &["patient"][..]),
     ] {
         let resource = resources
             .iter()

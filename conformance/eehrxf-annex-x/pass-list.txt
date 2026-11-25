@@ -1,9 +1,13 @@
 EHDSAllergyIntolerance
 EHDSCondition
+EHDSDevice
+EHDSDeviceUse
+EHDSDosage
 EHDSImmunisation
 EHDSLaboratoryObservation
 EHDSMedication
 EHDSMedicationUse
 EHDSObservation
 EHDSProcedure
+EHDSSpecimen
 total 33

@@ -495,16 +495,19 @@ pub const ANNEX_X: Project = Project {
     contexts: &[
         "ferrobridge_ehds_allergy_intolerance.context",
         "ferrobridge_ehds_condition.context",
+        "ferrobridge_ehds_device_use.context",
         "ferrobridge_ehds_diagnostic_report.context",
         "ferrobridge_ehds_immunisation.context",
         "ferrobridge_ehds_laboratory_observation.context",
         "ferrobridge_ehds_medication_use.context",
         "ferrobridge_ehds_observation.context",
         "ferrobridge_ehds_procedure.context",
+        "ferrobridge_ehds_specimen.context",
     ],
     searches: &[
         shipped!("annex-x", "ferrobridge_ehds_allergy_intolerance.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_condition.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_device_use.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_diagnostic_report.search.yml"),
         shipped!(
             "annex-x",
@@ -514,6 +517,7 @@ pub const ANNEX_X: Project = Project {
         shipped!("annex-x", "ferrobridge_ehds_medication_use.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_observation.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_procedure.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_specimen.search.yml"),
     ],
     files: &[
         shipped!(
@@ -548,6 +552,12 @@ pub const ANNEX_X: Project = Project {
         shipped!("annex-x", "ferrobridge_body_weight.v2.Observation.yml"),
         shipped!("annex-x", "ferrobridge_ehds_procedure.context.yml"),
         shipped!("annex-x", "ferrobridge_procedure.v1.Procedure.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_device_use.context.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_device_summary.v0.DeviceUseStatement.yml"
+        ),
+        shipped!("annex-x", "ferrobridge_ehds_specimen.context.yml"),
     ],
     accounted: &[],
     followed: &[],

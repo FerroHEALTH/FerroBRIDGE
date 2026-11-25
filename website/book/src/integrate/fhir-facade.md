@@ -897,10 +897,16 @@ the published `KDS_Laborbericht`.
 | EHDSObservation | `Observation` | FHIR R4 `bodyweight` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
 | EHDSProcedure | `Procedure` | `procedure-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.7) |
 | EHDSLaboratoryObservation | `Observation` | `Observation-resultslab-eu-lab` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSSpecimen | `Specimen` | `Specimen-eu-lab` | `patient` |
+| EHDSDeviceUse | `DeviceUseStatement` | `deviceUseStatement-eu-eps` | `patient` with `_include=DeviceUseStatement:device` |
+| EHDSDevice | `Device` | `device-eu-eps` | read, and included by the statement that names it |
+| EHDSDosage | the `dosage` of a `MedicationStatement` | | as its statement |
 | (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
 
-The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, and the
-others but `bodyweight` HL7 Europe Base and Core 2.0.1. A laboratory report
+The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device
+profiles HL7 Europe Patient Summary 1.0.0-ballot, and the others but
+`bodyweight` HL7 Europe Base and Core 2.0.1. A group QEDm names no search
+for answers the FHIR R4 base `patient` parameter and `_id`. A laboratory report
 carries the v2-0074 category `LAB` and each analyte the category
 `laboratory`, both `fixed`. The report's code sits under the repeating event
 of `KDS_Laborbericht`, so QEDm's `patient+category+code` is not offered for
