@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The documents of the priority categories in their HL7 Europe forms
-//! (feature `fhir-r4` with `patient-summary`, `laboratory`, `discharge` or
-//! `imaging`).
+//! The documents of the priority categories in their HL7 Europe forms, and
+//! the MyHealth@EU vaccination history (feature `fhir-r4` with
+//! `patient-summary`, `laboratory`, `discharge`, `imaging` or
+//! `vaccination`).
 //!
 //! A FHIR document is a `Bundle` of type `document` whose first entry is a
 //! `Composition` and whose other entries are every resource the composition
@@ -18,9 +19,11 @@
 //! ([`PATIENT_SUMMARY_FORM`]) or to HL7 International Patient Summary 2.0.1
 //! ([`form::IPS_PATIENT_SUMMARY_FORM`]), the laboratory report to HL7 Europe
 //! Laboratory Report 2.0.0 (`laboratory`), the discharge report to HL7
-//! Europe Hospital Discharge Report 1.0.0 (`discharge`) and the imaging report
-//! to HL7 Europe Imaging Report 1.0.0-ballot (`imaging`). What feeds each
-//! section is the caller's: this module decides no clinical content.
+//! Europe Hospital Discharge Report 1.0.0 (`discharge`), the imaging report
+//! to HL7 Europe Imaging Report 1.0.0-ballot (`imaging`) and the vaccination
+//! history to MyHealth@EU Vaccination 10.0.0-preview (`vaccination`). What
+//! feeds each section is the caller's: this module decides no clinical
+//! content.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -58,6 +61,8 @@ pub mod representation;
 pub mod section;
 #[cfg(feature = "laboratory")]
 pub mod test_report;
+#[cfg(feature = "vaccination")]
+pub mod vaccination;
 
 #[cfg(feature = "patient-summary")]
 use form::PATIENT_SUMMARY_FORM;
@@ -190,6 +195,17 @@ pub enum DocumentError {
     /// profile requires ([`form::SectionRule::Required`]).
     #[error("the document holds no section {slice}, which its composition profile requires")]
     Lacking {
+        /// The section slice.
+        slice: &'static str,
+    },
+    /// The section whose entries a required entry slice of the form's
+    /// `Bundle` profile holds has no entry ([`form::SectionRule::Entered`]).
+    #[error(
+        "the section {slice} holds no entry, and the bundle's entry slice {entry} requires one"
+    )]
+    Unentered {
+        /// The entry slice of the `Bundle` profile.
+        entry: &'static str,
         /// The section slice.
         slice: &'static str,
     },
@@ -588,12 +604,14 @@ impl Document {
     ///
     /// [`DocumentError::Dangling`] when a section names a `fullUrl` the
     /// document does not hold, or no patient was added,
-    /// [`DocumentError::Unreasoned`], [`DocumentError::Lacking`] and
-    /// [`DocumentError::Absent`] when the
+    /// [`DocumentError::Unreasoned`], [`DocumentError::Lacking`],
+    /// [`DocumentError::Absent`] and [`DocumentError::Unentered`] when the
     /// sections break a rule of the form ([`form::SectionRule`]),
     /// [`DocumentError::Missing`] when the form requires an encounter or a
-    /// language that was not given, and [`DocumentError::Report`] when the
-    /// form holds a report and none was given. With metadata set
+    /// language that was not given, [`DocumentError::MissingMetadata`] when
+    /// it requires a legal authentication the metadata does not name, and
+    /// [`DocumentError::Report`] when the form holds a report and none was
+    /// given. With metadata set
     /// ([`Document::with_metadata`]), [`DocumentError::DataGroup`] for a data
     /// group with no subject and [`DocumentError::TooMany`] for a second
     /// language. For a narrative-only document ([`Document::narrative_only`]),
@@ -628,12 +646,7 @@ impl Document {
             .unwrap_or("composition")
             .to_owned();
         let composition_url = self.full_url("Composition", &id);
-        if self.form.encounter.is_some() && self.encounter.is_none() {
-            return Err(DocumentError::Missing { part: "encounter" });
-        }
-        if self.form.language && self.language.is_none() {
-            return Err(DocumentError::Missing { part: "language" });
-        }
+        self.hold_parts()?;
         let report = self.report_written(&subject, &composition_url)?;
         let mut composition = Composition {
             id: Some(id),

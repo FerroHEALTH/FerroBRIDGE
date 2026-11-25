@@ -12,7 +12,8 @@
 # Prescription and Dispense, Laboratory Report, Imaging Report, Hospital
 # Discharge Report), each at the one version the component reads, with the
 # MyHealth@EU Master Value Sets Catalogue and HL7 France FR Core, whose value
-# sets the terminology tests read. One corpus per package, each under
+# sets the terminology tests read, and the MyHealth@EU Vaccination guide, whose
+# profiles the vaccination history is written to. One corpus per package, each under
 # docs/specs/.
 #
 # Each package is the FHIR package registry's tarball (Simplifier's for FR
@@ -22,8 +23,9 @@
 # docs/VERSIONS.md carries its pin-set digest. The component reads a package
 # as the archive the registry serves, so these are kept as tarballs beside
 # the unpacked trees scripts/vendor/profile-packages.sh fetches for the
-# profile validator. Every package declares CC0-1.0 in its manifest, and
-# FHIR R4 licenses its pages under CC0-1.0.
+# profile validator. Every package but the MyHealth@EU Vaccination guide
+# (CC-BY-4.0) declares CC0-1.0 in its manifest, and FHIR R4 licenses its pages
+# under CC0-1.0.
 #
 # The corpora came from FerroFED with the crate (#1314), at the same pins
 # and the same bytes.
@@ -136,6 +138,18 @@ pinned_corpus ehdsi-mvc "MyHealth@EU Master Value Sets Catalogue" \
   "the MyHealth@EU Master Value Sets Catalogue myhealth.eu.fhir.mvc-package" \
   "The value sets MyHealth@EU exchanges are coded with, canonical
 \`http://fhir.ehdsi.eu/mvc-package\`, committed under CC0-1.0." "" "$read_by"
+
+pin commit myhealth.eu.fhir.euvac-10.0.0-preview.tgz "10.0.0-preview, a preview (FHIR 4.0.1, built 2026-07-16)" \
+  "$registry/myhealth.eu.fhir.euvac/10.0.0-preview" \
+  96bf16bc13cf01b1c9a7642aef20704cb210c4900d83ae4ec6511081535fe3f6 \
+  'CC-BY-4.0: the license of the package manifest and of the ImplementationGuide resource, whose copyright reads "Copyright European Union, represented by the European Commission - DG SANTE. Licenced under CC-BY-4.0."' \
+  "$whole A preview, not a release, and the only version on the registry; https://fhir.ehdsi.eu/euvac/package.tgz serves a rebuild with other bytes."
+pinned_corpus ehdsi-euvac "MyHealth@EU Vaccination" \
+  "the MyHealth@EU Vaccination FHIR IG myhealth.eu.fhir.euvac" \
+  "The MyHealth@EU vaccination history on FHIR in its 10.0.0-preview, a
+preview and not a release, canonical \`http://fhir.ehdsi.eu/euvac\`, committed
+under CC-BY-4.0 with the copyright its ImplementationGuide resource carries." "" \
+  $'#2168 (the eehrxf vaccination crosswalk and document tests,\n  crates/eehrxf/tests/it/, which read the EuVAC profiles)'
 
 pin commit hl7.fhir.fr.core-2.2.0.tgz "2.2.0" \
   https://packages.simplifier.net/hl7.fhir.fr.core/2.2.0 \
