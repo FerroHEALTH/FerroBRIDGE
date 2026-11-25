@@ -226,7 +226,17 @@ async fn annex_x_over(
     let compiled = programs::compile_set(&set, &templates)?;
     let store = Arc::new(MemoryStore::default());
     programs::check_parties(&compiled, true)?;
-    let built = Facade::new(compiled, handle(&store), client, settings());
+    let served = crate::support::served_identity_accepting(
+        &cdr,
+        settings(),
+        &[
+            crate::support::SOURCE_DOMAIN,
+            NATIONAL_ID,
+            "http://example.org/fhir",
+        ],
+    )
+    .await;
+    let built = Facade::new(compiled, handle(&store), client, served);
     let catalog = ferrobridge_server::facade::search::load(directory, &built.programs())?;
     let facade = Arc::new(
         built
@@ -236,8 +246,14 @@ async fn annex_x_over(
     );
     let person = PersonId::new("http://example.org/fhir", super::PSEUDONYM)?;
     store.record_ehr(&person, &EhrId::new(EHR_ID)?).await?;
+    let party = SUBJECT.trim_start_matches("Patient/");
+    store.record_party(party, &person).await?;
     Ok(Harness { cdr, store, facade })
 }
+
+/// The identifier system the synthetic patients' national ids are in, an
+/// accepted source domain of the stub identity source.
+const NATIONAL_ID: &str = "http://example.org/fhir/sid/synthetic-national-id";
 
 /// One Annex X group served as a resource: its context, a resource it maps,
 /// the `QEDm` searches its option asks for, and the profile it answers with.
