@@ -84,6 +84,9 @@ pub const OMOP: &str = "/omop";
 /// The change-feed consumers and the AMQP topology.
 pub const EVENTS: &str = "/events";
 
+/// The inbound sources.
+pub const SOURCES: &str = "/sources";
+
 /// The connections.
 pub const CONNECTIONS: &str = "/connections";
 

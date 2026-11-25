@@ -33,6 +33,7 @@ pub mod reload;
 pub mod revisions;
 pub mod save;
 pub mod snapshot;
+pub mod sources;
 pub mod templates;
 
 use std::path::PathBuf;

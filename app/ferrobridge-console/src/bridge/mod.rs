@@ -31,6 +31,7 @@ use crate::config::settings::BridgeSettings;
 pub mod editing;
 pub mod operations;
 pub mod revisions;
+pub mod sources;
 
 /// The FHIR JSON media type (FHIR R4 REST API, `http.html`, content types
 /// and encodings).
@@ -650,6 +651,25 @@ impl Bridge {
         self.base
             .join(route)
             .map_err(|source| BridgeError::Route { route, source })
+    }
+
+    /// The URL of the item `id` of the collection at `route`, with `tail`
+    /// after it when given.
+    fn item_url(
+        &self,
+        route: &'static str,
+        id: &str,
+        tail: Option<&str>,
+    ) -> Result<Url, BridgeError> {
+        let mut url = self.url(route)?;
+        {
+            let mut segments = url.path_segments_mut().map_err(|()| BridgeError::Path)?;
+            segments.push(id);
+            if let Some(tail) = tail {
+                segments.push(tail);
+            }
+        }
+        Ok(url)
     }
 }
 

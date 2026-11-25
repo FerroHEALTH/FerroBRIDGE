@@ -94,6 +94,8 @@ pub struct AppState {
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
     /// The state store, when `[state]` is configured.
     store: Option<crate::store::Store>,
+    /// The inbound sources, when `[state]` is configured.
+    sources: Option<Arc<crate::sources::Sources>>,
 }
 
 impl AppState {
@@ -201,6 +203,7 @@ impl AppState {
             access_log: None,
             links: None,
             store,
+            sources: None,
         })
     }
 
@@ -227,6 +230,7 @@ impl AppState {
             access_log: None,
             links: None,
             store: None,
+            sources: None,
         }
     }
 
@@ -242,6 +246,19 @@ impl AppState {
     #[must_use]
     pub const fn store(&self) -> Option<&crate::store::Store> {
         self.store.as_ref()
+    }
+
+    /// Returns this state serving the inbound sources `sources`.
+    #[must_use]
+    pub fn with_sources(mut self, sources: Arc<crate::sources::Sources>) -> Self {
+        self.sources = Some(sources);
+        self
+    }
+
+    /// Returns the inbound sources, when `[state]` is configured.
+    #[must_use]
+    pub const fn sources(&self) -> Option<&Arc<crate::sources::Sources>> {
+        self.sources.as_ref()
     }
 
     /// Returns the links lane, when it is on.

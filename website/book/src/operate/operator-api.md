@@ -384,6 +384,77 @@ until an apply.
 | `422` | The set does not compile with the archive's files; the body names every diagnostic, and nothing is recorded |
 | `503` | The CDR did not serve a template, so the set could not be checked |
 
+## Inbound sources
+
+The systems that send patient events to the bridge are inbound sources, each
+a versioned row of the state store ([`[state]`](configuration.md#state)), so
+an operator adds, changes, disables or deletes one without a restart and
+without a new port. A bridge without `[state]` answers `404` to every route
+below. Every version is kept with its committer, the subject of the
+operator's token, a deletion included, which is the record of who configured
+each flow (GDPR Art 30).
+
+A source carries a `name` (`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, at most
+128 characters, unique), a `kind` (`webhook`, `fhir-subscription` or
+`mllp`), `enabled`, and the kind's `document`:
+
+| Kind | Document |
+|---|---|
+| `webhook` | `verify`: `scheme` (`hmac-sha256`), `header` and `keys`, a list of secrets any of which verifies, newest first; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled` |
+| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; `tenants` as above |
+| `mllp` | `routes`: each `sending_application` (MSH-3) and `sending_facility` (MSH-4), bound to a `certificate_subject`, to `source_cidrs`, or to both |
+
+A secret is named, never written: `{"secret": "<name>"}` resolves through
+[`[secrets]`](configuration.md#secrets) when the source uses it.
+
+One write is one transaction: it validates the document, appends the
+version, updates the head row with its tenants and routes, and notifies
+every replica. Each replica's `LISTEN` session reloads the source into its
+snapshot; while the session is down, every lookup reads the row.
+
+```mermaid
+sequenceDiagram
+    participant O as Operator
+    participant A as Replica A
+    participant S as State store
+    participant B as Replica B
+    O->>A: PUT /operator/sources/{id} (If-Match)
+    A->>S: one transaction: validate, append the version, update the head, pg_notify
+    S-->>B: NOTIFY ferrobridge_sources '<id>:<version>'
+    B->>S: reload the source into the snapshot
+```
+
+### `GET /operator/sources`
+
+Every source at its head version, by name.
+
+### `GET /operator/sources/{id}`
+
+One source, with its version as its `ETag` (`"<version>"`).
+
+### `GET /operator/sources/{id}/versions`
+
+Every version of one source, oldest first, a deleted source included.
+
+### `POST /operator/sources`
+
+Creates a source from `{"name", "kind", "enabled", "document"}` as version 1;
+`201` with its `Location` and `ETag`. A document that breaks a rule of its
+kind or names a secret the directory does not hold answers `422`
+[`invalid-source`](problems.md#invalid-source); a name or an MLLP route
+another source holds answers `409` [`source-conflict`](problems.md#source-conflict).
+
+### `PUT /operator/sources/{id}`
+
+Changes a source to its next version; the body is that of a create and keeps
+the kind. `If-Match` names the `ETag` it replaces: a stale one answers `412`
+and a missing one `428`. Disabling is a `PUT` with `"enabled": false`.
+
+### `DELETE /operator/sources/{id}`
+
+Deletes a source under `If-Match`, recording the deletion as its last
+version; `204`.
+
 ## What the log records
 
 Every operator request leaves one audit line on the
