@@ -70,8 +70,8 @@ impl Register {
     ///
     /// # Errors
     ///
-    /// Returns [`RegisterError::Refused`] naming why the document does not
-    /// hold.
+    /// Returns [`RegisterError::Shape`] for a document of another shape and
+    /// [`RegisterError::Categories`] for a category map that does not hold.
     pub fn check(self, document: &serde_json::Value) -> Result<(), RegisterError> {
         match self {
             Self::AuditCategories => {
