@@ -17,9 +17,10 @@ use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
 
-use ferrobridge_server::boot::{Backoff, serve_settings};
+use ferrobridge_server::boot::serve_settings;
 use ferrobridge_server::change_feed::{ChangedVersion, Domain, Event, Position, ReaderName, Seq};
 use ferrobridge_server::config::Process;
+use ferrobridge_server::retry::Backoff;
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
@@ -505,7 +506,7 @@ async fn bridge(
          [state]\nurl = \"{state}\"\n\n[state.seal]\nlookup_key = \"{LOOKUP_KEY}\"\n\n\
          [[state.seal.keys]]\nid = \"journey\"\nkey = \"{SEAL_KEY}\"\n\n\
          [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\n\
-         composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
+         composition_language = \"en\"\ncomposition_territory = \"NL\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
          [operator]\nenabled = true\n\n\
          [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n{mllp_tls}\n\

@@ -1,17 +1,92 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The resolution of `[change_feed]` into the source the consumers follow.
+//! The resolution of `[change_feed]` into the source the consumers follow,
+//! and the list of the consumer sections that follow it, which owns the
+//! checks of every consumer's reader.
 //!
 //! No specification governs the change feed: our own design.
 
+use super::Config;
 use super::error::Error;
 use super::section::change_feed::ChangeFeed;
 use crate::change_feed::PageSize;
+use crate::change_feed::ReaderName;
 use crate::change_feed::Settings;
 use crate::change_feed::Source;
 use crate::change_feed::aql::Start;
 use crate::change_feed::follow::Polling;
+
+/// A change-feed consumer section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Consumer {
+    /// `[events]`, the AMQP publisher.
+    Events,
+    /// `[omop_incremental]`, the incremental OMOP load.
+    OmopIncremental,
+    /// `[fhir_outbound]`, the outbound FHIR lane.
+    FhirOutbound,
+}
+
+impl Consumer {
+    /// Every consumer section, in the order the sections resolve.
+    const ALL: [Self; 3] = [Self::Events, Self::OmopIncremental, Self::FhirOutbound];
+
+    /// Returns the key of the section.
+    const fn section(self) -> &'static str {
+        match self {
+            Self::Events => "events",
+            Self::OmopIncremental => "omop_incremental",
+            Self::FhirOutbound => "fhir_outbound",
+        }
+    }
+
+    /// Returns whether the section is on in `config` and the reader it names.
+    fn of(self, config: &Config) -> (bool, &str) {
+        match self {
+            Self::Events => (config.events.enabled, &config.events.reader),
+            Self::OmopIncremental => (
+                config.omop_incremental.enabled,
+                &config.omop_incremental.reader,
+            ),
+            Self::FhirOutbound => (config.fhir_outbound.enabled, &config.fhir_outbound.reader),
+        }
+    }
+
+    /// Returns how many consumer sections are on in `config`.
+    pub(super) fn on(config: &Config) -> usize {
+        Self::ALL
+            .iter()
+            .filter(|consumer| consumer.of(config).0)
+            .count()
+    }
+
+    /// Returns the reader the section names in `config`, refused when it is
+    /// empty, outside the reader alphabet, or the reader of a section that is
+    /// on and resolves before it.
+    pub(super) fn reader(self, config: &Config) -> Result<ReaderName, Error> {
+        let key = format!("{}.reader", self.section());
+        let (_, named) = self.of(config);
+        if named.is_empty() {
+            return Err(Error::Missing { key });
+        }
+        let reader = ReaderName::new(named).map_err(|source| Error::ReaderName {
+            key: key.clone(),
+            source,
+        })?;
+        let taken = Self::ALL
+            .iter()
+            .take_while(|earlier| **earlier != self)
+            .any(|earlier| earlier.of(config) == (true, named));
+        if taken {
+            return Err(Error::Duplicate {
+                key,
+                value: named.to_owned(),
+            });
+        }
+        Ok(reader)
+    }
+}
 
 /// Returns the change feed `section` describes, refused when it has no CDR
 /// to read, no state store to keep its cursors and dead letters in, a key
@@ -92,8 +167,10 @@ pub(super) fn resolve_change_feed(
         polling: Polling {
             page_size,
             idle: section.poll_interval.get(),
-            backoff: section.backoff.get(),
-            max_backoff: section.max_backoff.get(),
+            backoff: crate::retry::Backoff {
+                initial: section.backoff.get(),
+                max: section.max_backoff.get(),
+            },
         },
     })
 }

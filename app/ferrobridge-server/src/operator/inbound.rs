@@ -17,18 +17,18 @@ use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use ferrobridge_operator_api::inbound::{
-    ParkedItem, ParkedItems, Replay, Replayed, Settle, Settlement,
-};
+use ferrobridge_operator_api::inbound::{ParkedItem, ParkedItems, Replay, Replayed, Settle};
 use ferrohealth_smart::resource::Access;
 use uuid::Uuid;
 
 use super::guard;
+use super::refused::Refused;
 use super::save::subject_of;
 use crate::inbound::intake::Intake;
 use crate::inbound::recover::Recoverer;
 use crate::inbound::store::{self, WorkKey};
-use crate::problem::{Kind, refuse};
+use crate::problem::Kind;
+use crate::retry::Decision;
 use crate::sources::Source;
 
 /// The intake a request reads and writes, `None` while `[inbound]` is off.
@@ -44,25 +44,6 @@ pub fn routes(intake: Option<Arc<Intake>>, smart: &crate::smart::Smart) -> Route
         .route("/operator/sources/{id}/redeliver", post(redeliver))
         .with_state(intake)
         .route_layer(guard::layer(smart))
-}
-
-/// A refusal: the problem kind and its fixed detail, or a status whose
-/// meaning says enough.
-#[derive(Debug, Clone, Copy)]
-enum Refused {
-    /// A problem of the registry.
-    Problem(Kind, &'static str),
-    /// An `about:blank` problem of the status.
-    Blank(StatusCode, &'static str),
-}
-
-impl IntoResponse for Refused {
-    fn into_response(self) -> Response {
-        match self {
-            Self::Problem(kind, detail) => refuse(kind, detail),
-            Self::Blank(status, detail) => crate::problem::blank(status, detail),
-        }
-    }
 }
 
 /// The `404` of a bridge with the intake off.
@@ -231,35 +212,40 @@ async fn settle(
     axum::Json(body): axum::Json<Settle>,
 ) -> Result<Response, Refused> {
     let (intake, source) = source(intake.as_ref(), &id).await?;
-    if body.reason.trim().is_empty() {
-        return Err(Refused::Problem(
-            Kind::ReasonRequired,
-            "a settlement names its reason",
-        ));
-    }
+    let reason = Some(body.reason.trim())
+        .filter(|reason| !reason.is_empty())
+        .map(str::to_owned);
     let key = WorkKey {
         source_id: source.id,
         tenant: body.tenant,
         entity: body.entity,
     };
-    let (settlement, action) = match body.settlement {
-        Settlement::Retry => (store::Settlement::Retry, "retry"),
-        Settlement::Discard => (store::Settlement::Discard, "discard"),
-    };
-    let settled = intake
-        .store()
-        .settle(&key, settlement, subject_of(&access), body.reason.trim())
-        .await
-        .map_err(unavailable("a parked inbound item could not be settled"))?;
-    if !settled {
-        return Err(Refused::Problem(
-            Kind::NotParked,
-            "no parked item has this entity",
-        ));
-    }
+    let decision = Decision::from(body.settlement);
+    super::settle::settle(
+        &access,
+        decision,
+        reason,
+        "a settlement names its reason",
+        async |decided| {
+            let settled = intake
+                .store()
+                .settle(&key, decided)
+                .await
+                .map_err(unavailable("a parked inbound item could not be settled"))?;
+            if settled {
+                Ok(())
+            } else {
+                Err(Refused::Problem(
+                    Kind::NotParked,
+                    "no parked item has this entity",
+                ))
+            }
+        },
+    )
+    .await?;
     guard::source_audited(
         subject_of(&access),
-        action,
+        decision.as_str(),
         source.id,
         StatusCode::NO_CONTENT,
     );

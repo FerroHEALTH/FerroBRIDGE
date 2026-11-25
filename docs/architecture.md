@@ -2511,8 +2511,8 @@ revision field are our own design. `[state.seal]`
 lists the keys stored bodies are sealed under, each named by the id a sealed
 row carries, the first one sealing, and the lookup key identifier values are
 stored as an HMAC under. The identity map (section 9), the SMART Health Links
-and the facade's own App State and launch `Task`s live there; the change-feed
-and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
+and the facade's own App State and launch `Task`s live there, with the
+change-feed and outbound records. No specification governs where the bridge keeps its state: our
 own design on family precedent.
 
 **The inbound intake.** No specification governs an inbound patient-event
@@ -2549,7 +2549,11 @@ in two short statements. Idempotence is the inbox key and the generation; the
 failure policy is ours: a network failure, `5xx`, `429` or `423` retries
 after `backoff·2^(n-1)`, capped at `max_backoff`, with jitter, until
 `max_attempts`, and every other refusal parks at once with a fixed reason
-that names no value. An operator settles a parked item (retry or discard,
+that names no value. One module, `retry`, owns the backoff, the
+transient-or-poisoned verdict and the status tables of every loop of the
+bridge's own (the start, the change-feed follower, the inbound workers and
+the outbound sink), each lane keeping its numbers and its park rule. An
+operator settles a parked item (retry or discard,
 recorded with the token's subject and the reason) and replays work by
 entity or by received range through `/operator/sources/{id}/…`.
 Recovery is the receiver's job for a webhook source that retries nothing on
@@ -2569,16 +2573,15 @@ event number, `fhir_subscription_state` keeps each subscription's status,
 highest event and gap, and the recovery leader recovers a gap through
 `$events` (errors.html).
 
-**Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
-`jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
+**Dependencies, verified against crates.io on 2026-09-12**, with `jiff`
+re-verified on 2026-09-15 when the facade added it, and recorded in
 `docs/VERSIONS.md`: `openehr-base`, `openehr-rm`, `openehr-its`,
 `openehr-sdt`, `openehr-query`, `openehr-term` 0.0.134 (re-verified on 2026-11-08); `serde-saphyr` 2.0.0 (the
 maintained serde YAML with anchors, aliases, merge keys and spans;
 `serde_yaml` is archived, `serde-yaml-ng` and `serde_yml` unmaintained);
 `jsonschema` 0.61.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
 0.7.1, `reqwest` 0.13.5 with rustls, `backon` 1.6.0; `sqlx` 0.9.0 for checked
-queries and the state store, `tokio-postgres` 0.7.18 for binary `COPY`; `redb` 4.3.0 for the
-stores that have not yet moved to the state store; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
+queries and the state store, `tokio-postgres` 0.7.18 for binary `COPY`; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
 dates stay in their lexical form in `openehr-base`; FHIR primitives keep theirs
 in `fhir-types`); `sha2` 0.11.0; `insta`, `proptest`, `wiremock`,
 `testcontainers` 0.28.0 for tests. Consuming `openehr-its` with
