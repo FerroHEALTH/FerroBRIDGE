@@ -373,10 +373,7 @@ async fn a_refused_feed_parks_before_any_pseudonym() -> Result<(), Box<dyn Error
         .await
         .expect_err("a refused feed fails");
     assert_eq!("feed-refused", failed.reason);
-    assert_eq!(
-        ferrobridge_server::inbound::retry::Failure::Refusal,
-        failed.failure
-    );
+    assert_eq!(ferrobridge_server::retry::Failure::Poisoned, failed.failure);
     assert_eq!(0, upstreams.count("POST", PIX_PATH).await);
     assert_eq!(0, upstreams.count("POST", "/ehr").await);
     Ok(())
@@ -392,7 +389,7 @@ async fn an_unavailable_identity_source_runs_the_feed_again() -> Result<(), Box<
         .expect_err("an unavailable identity source fails the attempt");
     assert_eq!("feed-unavailable", failed.reason);
     assert_eq!(
-        ferrobridge_server::inbound::retry::Failure::Transient,
+        ferrobridge_server::retry::Failure::Transient,
         failed.failure
     );
     Ok(())

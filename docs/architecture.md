@@ -2561,13 +2561,19 @@ is written inside it (our own design). An upsert reads the source's entity
 as an R4 `Patient` through the source's declared resolution, keeps only the
 identifiers, names, birth date, gender and deceased status with the
 tenant's local identifier (GDPR Art 5(1)(c)), feeds it to the identity
-source over ITI-104 (PIXm 3.1.0 §2:3.104), asks ITI-83 by the local
+source as an ITI-104 Add or Revise Patient through the `ihe-iti` Patient
+Identity Source (PIXm 3.1.0 §2:3.104.4.1), asks ITI-83 by the local
 identifier for the pseudonym and ensures exactly one EHR for it, a `409` on
-`POST /ehr` read again by subject (ITS-REST 1.1.0 EHR API). A remove only
-deactivates the patient at the identity source: an inbound event never
-deletes an EHR. A source that declares no resolution parks its items as
-`resolution-undeclared`, and until a published `ihe-iti` client speaks
-ITI-104 every upsert parks as `feed-client-unavailable` before ITI-83.
+`POST /ehr` read again by subject (ITS-REST 1.1.0 EHR API). A `Patient` the
+source links `replaced-by` to another of its identifiers is forwarded as a
+Resolve Duplicate Patient (§2:3.104.4.2) and ensures no EHR: the bridge
+decides no merge. A remove sends `Patient.active = false`: an inbound event
+never deletes an EHR (WGBO, BW 7:454 lid 3). A refused feed parks the item,
+and a `5xx`, `429`, `423` or no answer runs it again. A source that declares
+no resolution parks its items as `resolution-undeclared`. Under `[audit]`
+each feed is recorded as the system's PHI import and each EHR the handler
+creates as a create on the CDR, beside the BALP ITI-104 Source and ITI-83
+Consumer records, each place taken in the audit outbox before its step.
 Recovery is the receiver's job for a webhook source that retries nothing on
 its own: a source declares a `redeliver` call, made when a replica first
 leads the source and after a run of `503` answers, and `reconcile` polls

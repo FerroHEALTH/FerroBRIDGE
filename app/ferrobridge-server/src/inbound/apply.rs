@@ -25,7 +25,6 @@ use ihe_iti::pixm::source::error::SourceError as FeedError;
 use secrecy::SecretString;
 
 use super::event::Change;
-use super::retry::Failure;
 use super::store::Claimed;
 use super::worker::{Attempt, Failed, Handler};
 use crate::audit::AccessLog;
@@ -33,6 +32,7 @@ use crate::cdr::CdrClient;
 use crate::facade::ehr::{self, EhrError, Policy};
 use crate::facade::identity::store::Store;
 use crate::identity_source::IdentitySource;
+use crate::retry::Failure;
 use crate::sources::Source;
 use crate::sources::document::Tenant;
 
@@ -68,7 +68,7 @@ pub struct Undeclared;
 impl Resolve for Undeclared {
     fn patient<'a>(&'a self, _: &'a Source, _: &'a Tenant, _: &'a str) -> Step<'a, Value> {
         Box::pin(std::future::ready(Err(Failed {
-            failure: Failure::Refusal,
+            failure: Failure::Poisoned,
             reason: "resolution-undeclared",
         })))
     }
@@ -184,7 +184,7 @@ impl Apply {
                 failure: if error.transient() {
                     Failure::Transient
                 } else {
-                    Failure::Refusal
+                    Failure::Poisoned
                 },
                 reason: "pseudonym-refused",
             })?;
@@ -263,7 +263,7 @@ impl Handler for Apply {
 /// Returns the failure for good of `reason`.
 const fn refused(reason: &'static str) -> Failed {
     Failed {
-        failure: Failure::Refusal,
+        failure: Failure::Poisoned,
         reason,
     }
 }
@@ -345,19 +345,19 @@ fn survivor_of(patient: &Value, tenant: &Tenant) -> Result<Option<SourceIdentifi
 /// no answer or no credential run again, every other answer parks.
 fn fed_failed(error: &FeedError) -> Failed {
     let failure = match error {
-        FeedError::Rejected { status, .. } => Failure::of(*status),
+        FeedError::Rejected { status, .. } => super::STATUSES.failure(*status),
         FeedError::Timeout
         | FeedError::Transport(_)
         | FeedError::Unauthenticated(_)
         | FeedError::Audit(_) => Failure::Transient,
-        _ => Failure::Refusal,
+        _ => Failure::Poisoned,
     };
     match failure {
         Failure::Transient => Failed {
             failure,
             reason: "feed-unavailable",
         },
-        Failure::Refusal => refused("feed-refused"),
+        Failure::Poisoned => refused("feed-refused"),
     }
 }
 
@@ -366,15 +366,15 @@ fn ehr_failed(error: &EhrError) -> Failed {
     let failure = match error {
         EhrError::Client { source } => source
             .upstream_status()
-            .map_or(Failure::Transient, Failure::of),
-        _ => Failure::Refusal,
+            .map_or(Failure::Transient, |status| super::STATUSES.failure(status)),
+        _ => Failure::Poisoned,
     };
     match failure {
         Failure::Transient => Failed {
             failure,
             reason: "ehr-unavailable",
         },
-        Failure::Refusal => refused("ehr-refused"),
+        Failure::Poisoned => refused("ehr-refused"),
     }
 }
 
