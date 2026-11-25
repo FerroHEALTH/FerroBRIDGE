@@ -26,6 +26,8 @@ records why the value is what it is. The guard compares the first token of each
 | OMOP CDM | v5.4 | `docs/architecture.md`, `tools/omop-cdm-codegen` and the `omop-cdm` crate constant, and its embedded DDL |
 | openEHR ITS-REST | 1.1.0 | `docs/architecture.md`, the `ferrobridge-server` CDR module constant |
 | openEHR RM | 1.1.0 (compiled as `openehr_rm::v1_2`) | `docs/architecture.md`, every hand-written `openehr_rm::v1_N` path under `app/`, `crates/` and `tools/`, which names the generation this row records |
+| Standard Webhooks | v1.3.0 (the `v1` and `v1a` signature schemes) | `docs/architecture.md` §2, `app/ferrobridge-server/src/inbound/verify.rs` |
+| Standard Webhooks v2a | `standard-webhooks/standard-webhooks` commit `4a8ee40c5bcb6157f856905cc8871040d41a78ce` (the unreleased `v2a` scheme, whose text has not changed since `3d65b1824` introduced it) | `docs/architecture.md` §2, `app/ferrobridge-server/src/inbound/verify.rs` |
 
 ## Corpora and machine-readable inputs
 
