@@ -35,10 +35,11 @@
 //! | serviceSpecialty | none in R4 | `context.practiceSetting` |
 //! | custodian | `custodian` | `custodian` |
 //!
-//! R4 holds one `Composition.language` and one
-//! `DocumentReference.context.practiceSetting` where Table 1 allows many, so
-//! a second value is refused with [`DocumentError::TooMany`] rather than
-//! dropped.
+//! The language is the document's own ([`Document::with_language`]), one
+//! value written on the `Bundle`, the `Composition`, each data group and the
+//! description. R4 holds one `DocumentReference.context.practiceSetting`
+//! where Table 1 allows many, so a second value is refused with
+//! [`DocumentError::TooMany`] rather than dropped.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
@@ -61,6 +62,7 @@ use fhir_types::r4::resource::Resource;
 use sha1::{Digest as _, Sha1};
 
 use crate::category::{Category, PRIORITY_SYSTEM};
+use crate::document::language::DocumentLanguage;
 use crate::document::representation::PdfA;
 use crate::document::{Document, DocumentError, URN_SYSTEM, reference};
 
@@ -108,7 +110,6 @@ pub struct DocumentMetadata {
     category: CodeableConcept,
     priority: Option<Category>,
     status: String,
-    languages: Vec<String>,
     period: Option<Period>,
     attestations: Vec<Attestation>,
     legal: Vec<Attestation>,
@@ -134,7 +135,6 @@ impl DocumentMetadata {
             category,
             priority,
             status: String::new(),
-            languages: Vec::new(),
             period: None,
             attestations: Vec::new(),
             legal: Vec::new(),
@@ -150,10 +150,11 @@ impl DocumentMetadata {
     ///
     /// openEHR RM 1.1.0 (`COMPOSITION`, `EVENT_CONTEXT`): the version is the
     /// version tree id of `uid`, an `OBJECT_VERSION_ID`
-    /// (`object_id::creating_system_id::version_tree_id`), the language is
-    /// `language.code_string`, and the period runs from `context.start_time`
-    /// to `context.end_time`. Attestations live on the `VERSION`, not in the
-    /// composition, so the caller adds them.
+    /// (`object_id::creating_system_id::version_tree_id`), and the period
+    /// runs from `context.start_time` to `context.end_time`. Attestations
+    /// live on the `VERSION`, not in the composition, so the caller adds
+    /// them. The language is the document's
+    /// ([`super::language::DocumentLanguage::of_composition`]).
     ///
     /// # Errors
     ///
@@ -174,9 +175,6 @@ impl DocumentMetadata {
             .filter(|version| !version.is_empty())
             .ok_or(DocumentError::MissingMetadata { element: "version" })?;
         let mut metadata = Self::new(version.to_owned(), category, priority);
-        if let Some(language) = text("/language/code_string") {
-            metadata.languages.push(language.to_owned());
-        }
         let start = text("/context/start_time/value");
         let end = text("/context/end_time/value");
         if start.is_some() || end.is_some() {
@@ -193,13 +191,6 @@ impl DocumentMetadata {
     #[must_use]
     pub fn with_status(mut self, status: String) -> Self {
         self.status = status;
-        self
-    }
-
-    /// Adds a language the document is written in, a BCP 47 tag.
-    #[must_use]
-    pub fn with_language(mut self, language: String) -> Self {
-        self.languages.push(language);
         self
     }
 
@@ -267,7 +258,7 @@ impl DocumentMetadata {
     /// first, [`DocumentError::MissingMetadata`] when it carries no
     /// identifier, type, date, title or custodian, and
     /// [`DocumentError::TooMany`] for more than one service specialty or
-    /// language.
+    /// legal authentication.
     pub fn describe(&self, bundle: &Bundle, id: &str) -> Result<DocumentReference, DocumentError> {
         let header = Header::of_document(bundle)?;
         let title = header.title.clone();
@@ -288,8 +279,8 @@ impl DocumentMetadata {
     ///
     /// # Errors
     ///
-    /// [`DocumentError::TooMany`] for more than one service specialty,
-    /// language or legal authentication, [`DocumentError::TooLarge`] for a
+    /// [`DocumentError::TooMany`] for more than one service specialty or
+    /// legal authentication, [`DocumentError::TooLarge`] for a
     /// PDF whose size an R4 `unsignedInt` cannot hold, and
     /// [`DocumentError::MissingMetadata`] for a header with no custodian.
     pub fn describe_pdf(
@@ -320,7 +311,7 @@ impl DocumentMetadata {
     /// names with this metadata, with its `id` set to `id` and its one
     /// content `attachment` as the caller gives it: the URL the document is
     /// read at, its media type and its title; the attachment's language is
-    /// this metadata's.
+    /// the header's.
     ///
     /// It writes what [`DocumentMetadata::describe`] writes of a document,
     /// with no written `Bundle`, so a caller that lists documents describes
@@ -337,8 +328,8 @@ impl DocumentMetadata {
     ///
     /// # Errors
     ///
-    /// [`DocumentError::TooMany`] for more than one service specialty,
-    /// language or legal authentication, and
+    /// [`DocumentError::TooMany`] for more than one service specialty or
+    /// legal authentication, and
     /// [`DocumentError::MissingMetadata`] for a header with no custodian.
     pub fn describe_at(
         &self,
@@ -347,7 +338,6 @@ impl DocumentMetadata {
         mut attachment: Attachment,
     ) -> Result<DocumentReference, DocumentError> {
         let practice_setting = at_most_one("serviceSpecialty", &self.specialties)?.cloned();
-        let language = at_most_one("language", &self.languages)?;
         let legal = at_most_one("legalAuthentication", &self.legal)?;
         let custodian = header
             .custodian
@@ -355,7 +345,7 @@ impl DocumentMetadata {
             .ok_or(DocumentError::MissingMetadata {
                 element: "custodian",
             })?;
-        attachment.language = language.map(|language| language.as_str().into());
+        attachment.language = header.language.as_deref().map(Into::into);
         let mut category = self.category.clone();
         if let Some(priority) = self.priority {
             category.coding.push(Coding {
@@ -426,6 +416,7 @@ pub struct Header {
     kind: CodeableConcept,
     title: String,
     custodian: Option<Reference>,
+    language: Option<String>,
 }
 
 impl Header {
@@ -450,7 +441,15 @@ impl Header {
             kind,
             title,
             custodian: None,
+            language: None,
         }
+    }
+
+    /// Sets the language the document is written in.
+    #[must_use]
+    pub fn with_language(mut self, language: &DocumentLanguage) -> Self {
+        self.language = Some(language.tag().to_owned());
+        self
     }
 
     /// Adds an author.
@@ -517,6 +516,10 @@ impl Header {
                 .filter(|title| !title.is_empty())
                 .ok_or_else(|| missing("documentTitle"))?,
             custodian: composition.custodian.clone(),
+            language: composition
+                .language
+                .as_ref()
+                .and_then(|language| language.value.clone()),
         })
     }
 }
@@ -653,10 +656,10 @@ impl Document {
     /// Fills the Annex III Table 2 metadata of every data group the document
     /// holds, once metadata is set.
     pub(super) fn fill_data_groups(&mut self) -> Result<(), DocumentError> {
-        let Some(metadata) = &self.metadata else {
+        if self.metadata.is_none() {
             return Ok(());
-        };
-        let language = at_most_one("language", &metadata.languages)?.map(String::as_str);
+        }
+        let language = self.language.as_deref();
         for (_, resource) in &mut self.entries {
             data_group(resource, &self.timestamp, language)?;
         }
@@ -693,9 +696,6 @@ impl Document {
             .push(version_extension(COMPOSITION_VERSION, &metadata.version));
         if !metadata.status.is_empty() {
             composition.status = metadata.status.as_str().into();
-        }
-        if let Some(language) = at_most_one("language", &metadata.languages)? {
-            composition.language = Some(language.as_str().into());
         }
         // NOTE: Composition-eu-lab 2.0.0 slices category open; the imaging form fixes it (#2120).
         if self.form.categories.is_empty() && !composition.category.contains(&metadata.category) {

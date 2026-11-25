@@ -114,6 +114,9 @@ mod medication;
 ))]
 mod metadata;
 #[cfg(test)]
+#[cfg(all(feature = "discharge", feature = "fhir-r4"))]
+mod myhealtheu_discharge;
+#[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod own;
 #[cfg(test)]

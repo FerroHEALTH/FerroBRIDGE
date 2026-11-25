@@ -18,6 +18,7 @@ use eehrxf::document::discharge::{
     DISCHARGE_REPORT_FORM, DISCHARGE_SUMMARY, HDR_BUNDLE, HDR_ENCOUNTER, HDR_SLOTS,
 };
 use eehrxf::document::form::SectionRule;
+use eehrxf::document::language::DocumentLanguage;
 use eehrxf::document::section::Section;
 use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::coding::Coding;
@@ -151,7 +152,7 @@ fn bare(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
         })?;
     }
     if language {
-        document.with_language(String::from("en"));
+        document.with_language(DocumentLanguage::new("en", "GB")?)?;
     }
     Ok(document)
 }
@@ -162,7 +163,7 @@ fn the_document_is_a_bundle_the_discharge_report_profiles_constrain() -> Result<
     let bundle = serde_json::to_value(document(true, true)?.into_bundle()?)?;
     assert_eq!(bundle["type"], "document");
     assert_eq!(bundle["meta"]["profile"][0], HDR_BUNDLE);
-    assert_eq!(bundle["language"], "en");
+    assert_eq!(bundle["language"], "en-GB");
     assert_eq!(bundle["identifier"]["value"], IDENTIFIER);
     let entries = bundle["entry"].as_array().ok_or("entries")?;
     assert!(entries.len() >= 3, "Bundle.entry min 3");
@@ -179,7 +180,7 @@ fn the_document_is_a_bundle_the_discharge_report_profiles_constrain() -> Result<
     assert_eq!(composition["subject"]["reference"], "Patient/patient-1");
     assert_eq!(composition["encounter"]["reference"], "Encounter/stay-1");
     // NOTE: MyHealth@EU HDR 9.2.0 composition-hdr-myhealtheu: Composition.language is 1..1.
-    assert_eq!(composition["language"], "en");
+    assert_eq!(composition["language"], "en-GB");
     let encounter = entries
         .iter()
         .find(|entry| entry["resource"]["resourceType"] == "Encounter")
