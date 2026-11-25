@@ -465,7 +465,8 @@ impl Document {
         Ok(reference)
     }
 
-    /// Sets `language`, a BCP 47 tag, as the document's `Bundle.language`.
+    /// Sets `language`, a BCP 47 tag, as the document's `Bundle.language` and
+    /// `Composition.language`.
     pub fn with_language(&mut self, language: String) {
         self.language = Some(language);
     }
@@ -638,6 +639,8 @@ impl Document {
                 value: Some(self.identifier.as_str().into()),
                 ..Identifier::default()
             }),
+            // NOTE: FHIR R4 Resource.language: the composition states the language its content is in.
+            language: self.language.clone().map(Into::into),
             status: "final".into(),
             r#type: CodeableConcept::default(),
             subject: Some(reference(&subject)),
