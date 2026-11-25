@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's sub-context for the immunisations of the MyHealth@EU
+# vaccination history, entered from ferrobridge_myhealtheu_euvac.context at
+# the template's immunisations section, the CKM vaccination list: each
+# medication action the section holds becomes one
+# vaccination-myhealtheu-euvac, the profile the section's immunisation entry
+# slice admits.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_myhealtheu_euvac_immunisation.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  scope: sub
+  profile:
+    url: "http://fhir.ehdsi.eu/euvac/StructureDefinition/composition-euvac-myhealtheu"
+    version: "10.0.0-preview"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "SECTION.immunisation_list.v0"
+    - "ACTION.medication.v1.Vaccination"
+  extensions:
+    - "ferrobridge_myhealtheu_euvac_immunisation_section"
+  start: "SECTION.immunisation_list.v0"

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's root context for the MyHealth@EU vaccination history
+# (myhealth.eu.fhir.euvac 10.0.0-preview) over FerroBRIDGE's patient summary
+# template: the composition becomes one composition-euvac-myhealtheu, and its
+# immunisations section is entered through the sub-context the section path
+# names (FHIRconnect 1.0.0, types-of-mapping-files/sub-contexts.adoc).
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_myhealtheu_euvac.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://fhir.ehdsi.eu/euvac/StructureDefinition/composition-euvac-myhealtheu"
+    version: "10.0.0-preview"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "COMPOSITION.health_summary.v1.VaccinationHistory"
+  contexts:
+    - "ferrobridge_myhealtheu_euvac_immunisation.context"
+  start: "COMPOSITION.health_summary.v1.VaccinationHistory"

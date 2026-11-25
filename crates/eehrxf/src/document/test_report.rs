@@ -68,4 +68,5 @@ pub const TEST_REPORT_FORM: Form = Form {
     language: false,
     // NOTE: FHIR R4 Composition cmp-1 holds by the narrative every section carries.
     rules: &[],
+    legal_authentication: false,
 };

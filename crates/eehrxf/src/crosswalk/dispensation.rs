@@ -14,8 +14,10 @@
 use crate::category::Root;
 use crate::crosswalk::Crosswalk;
 use crate::crosswalk::EhnElement;
-use crate::crosswalk::Populate;
 use crate::crosswalk::Row;
+use crate::crosswalk::SHALL;
+use crate::crosswalk::SHOULD;
+use crate::crosswalk::uncontexted as row;
 
 /// The canonical URL of the HL7 Europe MPD `MedicationDispense` profile.
 pub const MPD_MEDICATION_DISPENSE: &str =
@@ -56,28 +58,6 @@ const EHN: &[EhnElement] = &[
 const fn ehn(id: &'static str, name: &'static str) -> EhnElement {
     EhnElement { id, name }
 }
-
-/// The row of `path`, its eHealth Network ids, its producer obligation and
-/// the `MedicationDispense-eu-mpd` element that carries it.
-const fn row(
-    path: &'static str,
-    ehn: &'static [&'static str],
-    producer: Option<Populate>,
-    eps: &'static str,
-) -> Row {
-    Row {
-        path,
-        ehn,
-        producer,
-        eps,
-        contexts: &[],
-    }
-}
-
-/// The shall obligation.
-const SHALL: Option<Populate> = Some(Populate::Shall);
-/// The should obligation.
-const SHOULD: Option<Populate> = Some(Populate::Should);
 
 /// The rows, in the model's order.
 const ROWS: &[Row] = &[

@@ -5,7 +5,7 @@ name = "eehrxf"
 description = "The European interoperability software component of an EHR system under Regulation (EU) 2025/327: the format-neutral dataset model of the priority categories read from the Xt-EHR EHDS logical models, and the European electronic health record exchange format in FHIR R4, mapped from openEHR by FHIRconnect"
 # On the crate line, the fhir-types line, since it moved here from FerroFED at
 # 0.0.40 (docs/VERSIONS.md).
-version = "0.35.1"
+version = "0.36.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -42,6 +42,9 @@ imaging = []
 laboratory = []
 # Article 14(1)(f), discharge reports.
 discharge = []
+# The MyHealth@EU vaccination history, outside the Article 14(1) categories
+# (MyHealth@EU Requirements Catalogue v10.0.0 §1.24).
+vaccination = []
 # The exchange format in FHIR R4: the R4 resources the serialisation writes,
 # with no openEHR crate, so the dataset and serialisation layers stay
 # openEHR-free.
