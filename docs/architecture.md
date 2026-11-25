@@ -2387,7 +2387,12 @@ are versioned rows: one write validates the kind's document, appends the
 version with its committer, derives the tenants and MLLP routes and
 notifies `ferrobridge_sources`, and each replica reloads the named source
 into a snapshot behind one pointer swap; a source names its secrets, which
-resolve through the `[secrets]` directory of `ferrohealth-secret`. Session advisory locks are not
+resolve through the `[secrets]` directory of `ferrohealth-secret`. The audit outbox (`0010`)
+holds each BALP `AuditEvent` until the Audit Record Repository takes it:
+the recorder commits the row before the answer, and each replica's
+`ihe-atna` forwarder claims the oldest unclaimed row for a lease with
+`FOR UPDATE SKIP LOCKED`, deletes it on a `2xx` and moves a refused one to
+`audit_quarantine`, so a replica that stops loses no access record. Session advisory locks are not
 used for leadership: they carry no fencing token and end with their
 connection while the task may run on
 (<https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS>).
