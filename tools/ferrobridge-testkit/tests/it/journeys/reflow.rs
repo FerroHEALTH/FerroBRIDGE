@@ -11,7 +11,6 @@ use serde_json::json;
 use thirtyfour::By;
 
 use crate::journeys::browser::{Browser, with_browser};
-use crate::journeys::editor::{TEMPLATE, context, context_path, draft, save};
 use crate::journeys::journeys_enabled;
 use crate::journeys::sign_in::sign_in;
 use crate::journeys::stack::Stack;
@@ -119,14 +118,6 @@ async fn every_page_reflows_at_320_pixels_with_the_modules_loaded_and_refused()
     let stack = Stack::start().await?;
     with_browser(async |browser| {
         sign_in(browser, &stack).await?;
-        let path = context_path("reflowed");
-        draft(browser, &stack, &path, &context("reflowed", TEMPLATE)).await?;
-        save(browser, "the revision the reflow opens").await?;
-        browser
-            .element(By::XPath(
-                "//*[contains(., 'Saved, and the set reloaded with it.')]",
-            ))
-            .await?;
         every_page_reads_whole(browser, &stack).await?;
         browser.console_clean("the reflow").await?;
         let cdp = browser.driver().cdp();

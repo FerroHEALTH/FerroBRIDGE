@@ -74,7 +74,7 @@ async fn an_imported_archive_is_a_revision_its_page_applies() -> Result<(), Box<
             .titled(&format!("Import a mapping set · {PRODUCT}"))
             .await?;
         browser
-            .element(By::XPath("//*[contains(., 'saved as revision 1')]"))
+            .element(By::XPath("//*[contains(., 'saved as revision 2')]"))
             .await?;
         browser
             .element(By::XPath(
@@ -83,7 +83,7 @@ async fn an_imported_archive_is_a_revision_its_page_applies() -> Result<(), Box<
             .await?
             .click()
             .await?;
-        browser.at(&stack.url("/mappings/revisions/1")).await?;
+        browser.at(&stack.url("/mappings/revisions/2")).await?;
         loaded(browser).await?;
         browser
             .element(By::Id("apply-reason"))
@@ -93,7 +93,7 @@ async fn an_imported_archive_is_a_revision_its_page_applies() -> Result<(), Box<
         press(browser, "apply").await?;
         browser
             .element(By::XPath(
-                "//*[contains(., 'Applied: the set compiled and runs as revision 2')]",
+                "//*[contains(., 'Applied: the set compiled and runs as revision 3')]",
             ))
             .await?;
         browser.goto(&stack.url("/mappings/files")).await?;

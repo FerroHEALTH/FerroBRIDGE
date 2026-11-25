@@ -301,15 +301,15 @@ pub(super) const MAPPINGS_REVISIONS: Shot = Shot::page(
     "mappings-revisions",
     "/mappings/:tab",
     "/mappings/revisions",
-    "//table//a[contains(@href, '/mappings/revisions/1')]",
+    "//table//a[contains(@href, '/mappings/revisions/2')]",
 );
 
-/// The imported revision with its diff against the running one and the
-/// apply docked.
+/// The baseline revision with its diff against the running one and the
+/// rollback docked.
 pub(super) const REVISION: Shot = Shot::page(
     "revision",
     "/mappings/revisions/:id",
-    "/mappings/revisions/2",
+    "/mappings/revisions/1",
     "//button[@name = 'decision' and @value = 'apply']",
 );
 
