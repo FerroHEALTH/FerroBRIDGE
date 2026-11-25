@@ -108,10 +108,9 @@ impl TerminologyServer for Server {
             LookupOutcome::Found { designations, .. } => Ok(designations
                 .into_iter()
                 .find(|designation| {
-                    designation
-                        .language
-                        .as_deref()
-                        .is_some_and(|held| held == language || held.starts_with(&format!("{language}-")))
+                    designation.language.as_deref().is_some_and(|held| {
+                        held == language || held.starts_with(&format!("{language}-"))
+                    })
                 })
                 .map(|designation| designation.value)),
             LookupOutcome::NotFound { .. } => Err(TerminologyError::NotFound {
