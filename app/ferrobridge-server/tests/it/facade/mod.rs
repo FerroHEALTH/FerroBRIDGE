@@ -26,6 +26,7 @@ mod launch_task;
 mod linked;
 mod losses;
 mod outbound;
+mod outbound_crash;
 mod party;
 mod patient_ehr;
 mod person;

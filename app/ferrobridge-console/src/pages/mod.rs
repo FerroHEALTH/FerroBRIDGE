@@ -31,4 +31,5 @@ pub mod preferences;
 pub mod search;
 pub mod settings;
 pub mod sign_in;
+pub mod sources;
 pub mod template;

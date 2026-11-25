@@ -238,25 +238,14 @@ pub struct FacadeCors {
 /// `Basic` at the facade's base.
 ///
 /// Off, `Basic` is an ordinary resource type a program may map. On, it is the
-/// App State endpoint, its resources kept in `store` apart from the identity
-/// map, and the discovery document lists `smart-app-state` (no specification
-/// governs the store: our own design).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+/// App State endpoint, its resources kept in the state store, and the
+/// discovery document lists `smart-app-state` (no specification governs the
+/// store: our own design).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FacadeAppState {
     /// Whether `Basic` is the App State endpoint.
     pub enabled: bool,
-    /// The file the App State resources are kept in.
-    pub store: PathBuf,
-}
-
-impl Default for FacadeAppState {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            store: PathBuf::from("app-state.redb"),
-        }
-    }
 }
 
 /// SMART launch `Task`s (SMART App Launch 2.2.0, Task profile for requesting
@@ -264,24 +253,13 @@ impl Default for FacadeAppState {
 ///
 /// Off, `Task` is an ordinary resource type a program may map. On, it serves
 /// the `task-ehr-launch` and `task-standalone-launch` profiles, its resources
-/// kept in `store` apart from the identity map (no specification governs the
-/// store: our own design).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+/// kept in the state store (no specification governs the store: our own
+/// design).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FacadeLaunchTask {
     /// Whether `Task` is the launch endpoint.
     pub enabled: bool,
-    /// The file the launch `Task`s are kept in.
-    pub store: PathBuf,
-}
-
-impl Default for FacadeLaunchTask {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            store: PathBuf::from("launch-tasks.redb"),
-        }
-    }
 }
 
 /// The bridge's technical endpoints, the draft `EEHRxF` Annex X group

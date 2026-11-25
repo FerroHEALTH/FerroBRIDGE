@@ -346,6 +346,31 @@ pub(super) const OMOP_RUN: Shot = Shot::page(
     "//*[contains(., 'the composition names a template the CDR does not hold')]",
 );
 
+/// The form of a new inbound source.
+pub(super) const SOURCE_NEW: Shot = Shot::page(
+    "source-new",
+    "/sources/new",
+    "/sources/new",
+    "//h1[. = 'New source']",
+);
+
+/// One inbound source with its versions and its edit form, just disabled;
+/// the capture reaches it by saving the form, so its address is not fixed.
+pub(super) const SOURCE: Shot = Shot::page(
+    "source",
+    "/sources/:id",
+    "/sources",
+    "//*[contains(., 'Saved: every replica serves this version')]",
+);
+
+/// The list of inbound sources, holding the one the capture created.
+pub(super) const SOURCES: Shot = Shot::page(
+    "sources",
+    "/sources",
+    "/sources",
+    "//a[contains(., 'ward-monitors')]",
+);
+
 /// Every shot the capture takes.
 pub(super) fn shots() -> impl Iterator<Item = &'static Shot> {
     [&SIGN_IN].into_iter().chain(PAGES.iter()).chain([
@@ -355,6 +380,9 @@ pub(super) fn shots() -> impl Iterator<Item = &'static Shot> {
         &EVENTS_DEGRADED,
         &OMOP_RUNS,
         &OMOP_RUN,
+        &SOURCE_NEW,
+        &SOURCE,
+        &SOURCES,
         &EDIT_CHECKED,
         &EDIT_CONFIRM,
         &EDIT_REFUSED,

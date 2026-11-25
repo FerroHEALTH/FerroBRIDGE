@@ -24,8 +24,7 @@ pub(super) fn resolve(config: &Config) -> Result<Option<OmopIncrementalSettings>
         (config.etl.is_some(), "[etl]"),
         (config.cdm.is_some(), "[cdm]"),
         (
-            config.mappings.omocl.is_some()
-                || (config.operator.enabled && config.operator.mapping_dir.is_some()),
+            config.mappings.omocl.is_some() || (config.operator.enabled && config.state.is_some()),
             "[mappings] omocl",
         ),
     ]

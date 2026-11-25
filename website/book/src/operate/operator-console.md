@@ -145,8 +145,8 @@ console answers with the page it drew.
   first, with what recorded it, when, who and why
   (`GET /operator/revisions`). The Files tab filters by path, language and
   owner, and pages its rows. More holds Reload the set, which asks first,
-  then compiles the files on disk and replaces the running set when they
-  compile.
+  then compiles the provisioned files and the running revision and replaces
+  the running set when they compile.
 - **A mapping file** (`/mappings/files/{path}`): the file as the bridge
   serves it, byte for byte, with numbered lines, highlighted YAML, its
   SHA-256 and the diagnostics beside it, each linked to its line. The
@@ -201,12 +201,23 @@ console answers with the page it drew.
   last failure with the cause, never an event body; then the events each
   consumer parked in the [dead-letter
   store](../integrate/change-feed.md#poisoned-events-and-the-dead-letter-store)
-  with their cause and passes, each with a Replay button that posts
-  `POST /operator/events/{consumer}/parked/{id}/replay` and comes back to
-  the page, where the event reads "Replay requested" until its consumer
-  offers it again; then the exchange, the routing-key grammar and the bound
+  with their cause and passes, each with a reason field and a Retry and a
+  Discard button that post `POST /operator/events/{consumer}/parked/{id}/retry`
+  or `…/discard` with the reason and come back to the page, where a retried
+  event reads "Retry pending" until its consumer offers it again and a
+  discarded one leaves the list; a consumer another replica leads reads
+  "Standby"; then the exchange, the routing-key grammar and the bound
   queues. The topology changes in the configuration. A bridge with no
   consumer says so in one line.
+- **Sources** (`/sources`, `/sources/new`, `/sources/{id}`): the inbound
+  sources of a bridge with a state store, each with its kind, its state, its
+  version and who wrote it; a source's page shows its facts, every version
+  with its committer, and the edit form (name, kind, Enabled, and the
+  document as JSON) whose Save posts `PUT /operator/sources/{id}` under the
+  `ETag` the page showed and whose Delete posts the `DELETE`; New source
+  posts `POST /operator/sources` and goes to the new source. A stale save
+  draws the bridge's `412`. A bridge without `[state]` says it keeps no
+  sources.
 - **Connections** (`/connections`, `/connections/{name}`,
   `/connections/{name}/settings`): each upstream with its host, how it
   signs in, the lanes that use it and its state from the bridge's
@@ -220,15 +231,16 @@ console answers with the page it drew.
 - **About** (`/about`): the console's and the bridge's versions, the
   licence and the maker, Cadasto B.V.
 
-The editor changes the console's own mapping files, which live under the
-bridge's `[operator] mapping_dir`:
+The editor changes the console's own mapping files, which live in the
+bridge's state store as revisions:
 
 1. **Check** compiles the whole set with your draft in place of the file
-   and lists every diagnostic. Nothing is written.
+   and lists every diagnostic. Nothing is recorded.
 2. **Save** needs a one-line reason and a confirmation in the bar at the
    foot of the page. The bridge compiles the set with the draft again and
-   writes the file only when it compiles, then reloads, so a refused draft
-   leaves the disk and the running set as they were. The save carries the
+   records it as the running revision only when it compiles, then every
+   replica swaps it in, so a refused draft leaves the revisions and the
+   running set as they were. The save carries the
    digest the file was opened at: when someone changed the file in the
    meantime, the bridge refuses with `412` and your draft stays in the
    editor. The draft is saved with LF line ends, whatever line ends the
@@ -327,8 +339,7 @@ The Revisions tab after a save. [Dark theme](img/console/mappings-revisions-dark
 
 ![A revision](img/console/revision.png)
 
-The baseline revision with its diff against the running one and the
-rollback docked. [Dark theme](img/console/revision-dark.png).
+A revision with its diff against the running one and the rollback docked. [Dark theme](img/console/revision-dark.png).
 
 ![The import page](img/console/mappings-import.png)
 
@@ -482,8 +493,23 @@ The Events page of a bridge whose events lane is off.
 
 The Events page of a bridge whose broker cannot be reached: the consumer
 reads degraded with its cause, its cursor stays where it was, and an event
-it parked waits for a replay.
+it parked waits for an operator to retry or discard it.
 [Dark theme](img/console/events-degraded-dark.png).
+
+![The inbound sources](img/console/sources.png)
+
+The Sources page with one MLLP source.
+[Dark theme](img/console/sources-dark.png).
+
+![A new source](img/console/source-new.png)
+
+The form of a new source.
+[Dark theme](img/console/source-new-dark.png).
+
+![One source](img/console/source.png)
+
+One source just disabled, with its versions and its edit form.
+[Dark theme](img/console/source-dark.png).
 
 ![Connections](img/console/connections.png)
 

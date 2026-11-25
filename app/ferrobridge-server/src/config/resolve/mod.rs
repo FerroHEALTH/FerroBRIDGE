@@ -95,14 +95,8 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
         party_search: party_search(facade)?,
         binding_issuers: facade.binding_identifier_issuers.clone(),
         consent: consent(facade)?,
-        app_state: facade
-            .app_state
-            .enabled
-            .then(|| facade.app_state.store.clone()),
-        launch_task: facade
-            .launch_task
-            .enabled
-            .then(|| facade.launch_task.store.clone()),
+        app_state: facade.app_state.enabled,
+        launch_task: facade.launch_task.enabled,
         cors: cors(facade)?,
         summary: summary(facade)?,
         endpoints: endpoints(&facade.endpoint)?,
@@ -760,7 +754,5 @@ pub(super) fn resolve_operator(
             needs: String::from("auth.enabled"),
         });
     }
-    Ok(operator.enabled.then(|| super::OperatorSettings {
-        mapping_dir: operator.mapping_dir.clone(),
-    }))
+    Ok(operator.enabled.then_some(super::OperatorSettings))
 }

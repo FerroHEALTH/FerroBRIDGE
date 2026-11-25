@@ -94,6 +94,8 @@ pub struct AppState {
     change_feed: Option<Arc<crate::change_feed::report::Report>>,
     /// The state store, when `[state]` is configured.
     store: Option<crate::store::Store>,
+    /// The inbound sources, when `[state]` is configured.
+    sources: Option<Arc<crate::sources::Sources>>,
 }
 
 impl AppState {
@@ -201,6 +203,7 @@ impl AppState {
             access_log: None,
             links: None,
             store,
+            sources: None,
         })
     }
 
@@ -227,6 +230,7 @@ impl AppState {
             access_log: None,
             links: None,
             store: None,
+            sources: None,
         }
     }
 
@@ -242,6 +246,19 @@ impl AppState {
     #[must_use]
     pub const fn store(&self) -> Option<&crate::store::Store> {
         self.store.as_ref()
+    }
+
+    /// Returns this state serving the inbound sources `sources`.
+    #[must_use]
+    pub fn with_sources(mut self, sources: Arc<crate::sources::Sources>) -> Self {
+        self.sources = Some(sources);
+        self
+    }
+
+    /// Returns the inbound sources, when `[state]` is configured.
+    #[must_use]
+    pub const fn sources(&self) -> Option<&Arc<crate::sources::Sources>> {
+        self.sources.as_ref()
     }
 
     /// Returns the links lane, when it is on.
@@ -400,7 +417,7 @@ impl AppState {
 
     /// Returns the document `GET /health/info` answers: the build facts, the
     /// pins and every lane, the HL7 v2 lane with its listen address, whether
-    /// its listener accepts now, its plain listener and its senders.
+    /// its listener accepts now, and its plain listener.
     #[must_use]
     pub fn info(&self) -> ferrobridge_operator_api::health::Info {
         let lanes = self
@@ -424,7 +441,6 @@ impl AppState {
                             .is_some_and(crate::hl7v2::Listening::is_up),
                     }
                 }),
-                senders: lane.senders.clone(),
             })
             .collect();
         crate::build_info::info(lanes)
@@ -575,9 +591,7 @@ mod tests {
     }
 
     #[test]
-    fn the_info_shows_the_plain_listener_and_each_sender_s_transport() {
-        use ferrobridge_operator_api::health::{Sender, Transport};
-
+    fn the_info_shows_the_plain_listener() {
         let plain = Listening::default();
         let state = AppState::with_health(Registry::default())
             .with_hl7v2(Listening::default())
@@ -587,16 +601,6 @@ mod tests {
                 enabled: true,
                 listen: Some(String::from("127.0.0.1:2575")),
                 plain_listen: Some(String::from("10.20.0.5:2576")),
-                senders: vec![
-                    Sender {
-                        facility: String::from("NORTHLAB"),
-                        transport: Transport::Tls,
-                    },
-                    Sender {
-                        facility: String::from("ANALYSER"),
-                        transport: Transport::Plain,
-                    },
-                ],
                 ..Lane::default()
             }]);
         plain.set(true);
@@ -604,9 +608,6 @@ mod tests {
         let lane = &document["lanes"][0];
         assert_eq!(Some("10.20.0.5:2576"), lane["plain"]["listen"].as_str());
         assert_eq!(Some(true), lane["plain"]["up"].as_bool());
-        assert_eq!(Some("tls"), lane["senders"][0]["transport"].as_str());
-        assert_eq!(Some("ANALYSER"), lane["senders"][1]["facility"].as_str());
-        assert_eq!(Some("plain"), lane["senders"][1]["transport"].as_str());
     }
 
     #[tokio::test]

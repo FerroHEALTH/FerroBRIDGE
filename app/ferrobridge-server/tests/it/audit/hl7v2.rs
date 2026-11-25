@@ -22,32 +22,39 @@ use crate::hl7v2::oru_r01;
 /// does not carry.
 const CDR: &str = "http://cdr.invalid/";
 
-/// Starts the face recording through a spool of at most `max_bytes`, and
-/// returns it with the repository and the spool's directory.
-async fn recorded(
-    max_bytes: u64,
-) -> Result<(Running, wiremock::MockServer, tempfile::TempDir), Box<dyn Error>> {
+/// Starts the face recording through the outbox of a state store, and
+/// returns it with the repository and the store; `None` unless
+/// `FERROBRIDGE_E2E=1`.
+async fn recorded() -> Result<
+    Option<(
+        Running,
+        wiremock::MockServer,
+        (
+            ferrobridge_testkit::containers::Postgres,
+            ferrobridge_server::store::Store,
+        ),
+    )>,
+    Box<dyn Error>,
+> {
+    let Some(state) = super::state().await? else {
+        return Ok(None);
+    };
     let arr = super::repository().await;
-    let spool = tempfile::tempdir()?;
-    let log = super::access_log(
-        &arr,
-        spool.path(),
-        &CDR.parse()?,
-        CategoryMap::default(),
-        max_bytes,
-    )?;
+    let log = super::access_log(&arr, &state.1, &CDR.parse()?, CategoryMap::default())?;
     let running = Running::start_recorded(
         face_settings(true),
         ResponseTemplate::new(200).set_body_string(ehr_body()),
         Some(log),
     )
     .await?;
-    Ok((running, arr, spool))
+    Ok(Some((running, arr, state)))
 }
 
 #[tokio::test]
 async fn a_committed_message_is_recorded_as_a_system_import() -> Result<(), Box<dyn Error>> {
-    let (running, arr, _spool) = recorded(64 << 20).await?;
+    let Some((running, arr, _state)) = recorded().await? else {
+        return Ok(());
+    };
     let ack = running.send(&oru_r01("MSG-V2-AUDIT-1")).await?;
     assert!(ack.contains("MSA|AA|MSG-V2-AUDIT-1"), "{ack}");
     let records = super::records(&arr, 1).await?;
@@ -80,9 +87,12 @@ async fn a_committed_message_is_recorded_as_a_system_import() -> Result<(), Box<
 }
 
 #[tokio::test]
-async fn a_message_whose_record_has_no_place_is_answered_ar_and_not_committed()
+async fn a_message_whose_record_the_outbox_cannot_take_is_answered_ar_and_not_committed()
 -> Result<(), Box<dyn Error>> {
-    let (running, arr, _spool) = recorded(1024).await?;
+    let Some((running, arr, state)) = recorded().await? else {
+        return Ok(());
+    };
+    state.1.pool().close().await;
     let ack = running.send(&oru_r01("MSG-V2-AUDIT-2")).await?;
     assert!(ack.contains("MSA|AR|MSG-V2-AUDIT-2"), "{ack}");
     assert_eq!(0, running.contributions().await, "nothing is committed");

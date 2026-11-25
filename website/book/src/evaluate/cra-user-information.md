@@ -165,16 +165,16 @@ The ones to know before you deploy:
   ([running it with compose](../operate/container.md#running-it-with-compose)).
 - **A sender's client certificate leaking.** The HL7 v2 face serves MLLP
   over TLS and admits a message only on a connection whose client certificate
-  carries the `certificate_subject` of the sender its MSH-4 names, so a
-  stolen client key sends as that sender until its authority revokes it.
-  Keep the keys of `[[hl7v2.senders]]` with the senders
+  carries the `certificate_subject` of the route its MSH-3 and MSH-4 name, so
+  a stolen client key sends as that sender until its authority revokes it or
+  an operator disables its source. Keep each client key with its sender
   ([the HL7 v2 face](../operate/hl7v2-face.md)).
 - **A lost identity store or lookup key.** A lost state database makes the
   next create of a resource the CDR already holds write a second composition,
   and a lost `[state.seal] lookup_key` leaves every stored digest unreadable
   ([the identity store](../operate/container.md#the-identity-store)).
-- **The operator scope rewrites mappings.** With `[operator] mapping_dir` set,
-  a token that carries `[auth] product_scope` can save and reload the
+- **The operator scope rewrites mappings.** With `[operator]` and `[state]`
+  set, a token that carries `[auth] product_scope` can save and reload the
   mappings that decide what the facade writes into the CDR
   ([the operator API](../operate/operator-api.md)).
 - **`sslmode=disable` on the CDM URL** sends the clinical rows the ETL writes
@@ -252,7 +252,8 @@ data;"
   grants access to patient data, and so does trusting an issuer in
   `[auth.issuer.<name>]`, whose client registry then decides which apps
   reach the facade.
-  `[operator] mapping_dir` lets an operator-scope token change the mappings.
+  `[operator] enabled` with `[state]` lets an operator-scope token change the
+  mappings.
   `[hl7v2] enabled` opens an MLLP listener that writes into the CDR. A name in
   `[telemetry] logged_query_parameters` lets that parameter's value reach the
   log, `[facade.references] fetch_bases` lets the facade fetch from the
@@ -283,9 +284,9 @@ Verify the new release
 ([verifying a release](https://github.com/FerroHEALTH/FerroBRIDGE/blob/main/SECURITY.md#verifying-a-release)),
 then replace the binary or deploy the new image by digest and restart. On
 `SIGTERM` the server drains its requests for up to
-`[server] shutdown_timeout` before it exits. Run one process per identity
-store, so on Kubernetes use the `Recreate` strategy
-([the identity store](../operate/container.md#the-identity-store)).
+`[server] shutdown_timeout` before it exits. Every replica shares the state
+store, so a rolling update keeps the identity map, the links and the facade's
+own resources ([the identity store](../operate/container.md#the-identity-store)).
 
 ### 8(d) Secure decommissioning, and removing user data
 
@@ -298,12 +299,13 @@ directories and schemas you name. To take a deployment out of service and
 remove its data, stop the server, the console and every ETL job, then
 delete:
 
-- the identity map in the `[state]` database (its `0003` tables), which maps
-  subject identifiers to `ehr_id`s and FHIR ids to compositions;
+- the `[state]` database, which holds the identity map (subject identifiers
+  to `ehr_id`s, FHIR ids to compositions), the SMART Health Links and the
+  facade's own App State and launch `Task`s;
 - the directory `[usage_report] state_dir` names, which holds the usage
   report's instance id;
-- the mapping directory, `[operator] mapping_dir` if you set it, and the
-  templates directory;
+- the mapping directory and the templates directory, and the mapping
+  revisions in the state store;
 - in the CDM database, the schema `[cdm] bridge_schema` names, with the side
   table, the watermarks and the id sequences, and the CDM schema itself if
   the data the ETL wrote there should go too;

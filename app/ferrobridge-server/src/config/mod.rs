@@ -122,6 +122,9 @@ pub struct Config {
     pub cdm: Option<Cdm>,
     /// The PostgreSQL state store, when one is configured.
     pub state: Option<State>,
+    /// The directory the secrets an inbound source names are read from,
+    /// one file per secret, when one is configured.
+    pub secrets: Option<ferrohealth_secret::dir::SecretDirConfig>,
     /// The OMOP ETL job, when one is configured.
     pub etl: Option<Etl>,
     /// Where the mapping files are read from.
@@ -340,6 +343,7 @@ impl Config {
                 .as_ref()
                 .map(|state| state::resolve(state).map(Box::new))
                 .transpose()?,
+            secrets: self.secrets.clone(),
             etl: self.etl.as_ref().map(resolve_etl).transpose()?,
             mapping_directory: self.mappings.directory.clone(),
             omocl_directory: self.mappings.omocl.clone(),
@@ -358,6 +362,7 @@ impl Config {
                 Some(change_feed::resolve_change_feed(
                     &self.change_feed,
                     self.cdr.is_some(),
+                    self.state.is_some(),
                     usize::from(self.events.enabled)
                         + usize::from(self.omop_incremental.enabled)
                         + usize::from(self.fhir_outbound.enabled),
@@ -376,11 +381,7 @@ impl Config {
             omop_incremental: omop_incremental::resolve(self)?,
             fhir_outbound: fhir_outbound::resolve(self)?,
             shl: shl::resolve(self)?,
-            hl7v2: if self.hl7v2.enabled {
-                Some(resolve_hl7v2(&self.hl7v2, self.facade.enabled)?)
-            } else {
-                None
-            },
+            hl7v2: resolve_hl7v2(self)?,
             operations: OperationsSettings {
                 enabled: self.operations.enabled,
                 device_reference: self.operations.device_reference.clone(),
@@ -395,6 +396,7 @@ impl Config {
                     &self.audit,
                     self.facade.enabled,
                     self.auth.enabled,
+                    self.state.is_some(),
                     &self.facade.system_id,
                 )?)
             } else {
@@ -430,12 +432,10 @@ pub struct FacadeSettings {
     pub binding_issuers: Vec<String>,
     /// The access directive exchange, when `Consent` is served.
     pub consent: Option<crate::consent::exchange::Settings>,
-    /// The file SMART App State is kept in, when `Basic` is the App State
-    /// endpoint.
-    pub app_state: Option<PathBuf>,
-    /// The file the SMART launch `Task`s are kept in, when `Task` is the launch
-    /// endpoint.
-    pub launch_task: Option<PathBuf>,
+    /// Whether `Basic` is the SMART App State endpoint.
+    pub app_state: bool,
+    /// Whether `Task` is the SMART launch endpoint.
+    pub launch_task: bool,
     /// The CORS policy of the FHIR base.
     pub cors: crate::facade::cors::Cors,
     /// The patient summary, when `Patient/[id]/$summary` is served.
@@ -454,41 +454,20 @@ pub struct SummarySettings {
     pub operator: String,
 }
 
-/// The HL7 v2 face, resolved.
+/// The HL7 v2 face's listeners, resolved; its senders are MLLP sources.
 #[derive(Debug, Clone)]
 pub struct Hl7v2Settings {
     /// The socket address the TLS listener binds, when one runs.
     pub listen: SocketAddr,
-    /// The character set a message with an empty MSH-18 is read in.
-    pub default_charset: ferrobridge_hl7v2::decode::Charset,
-    /// What an entry no program maps does to the message.
-    pub unmapped: crate::facade::ingest::UnmappedEntries,
-    /// The EHR policy of the face, when it differs from the facade's.
-    pub ehr_policy: Option<crate::facade::ehr::Policy>,
-    /// The profile each resource type claims when the message map wrote
-    /// none, by resource type.
-    pub profiles: BTreeMap<String, String>,
     /// How long a connection and a frame may wait on the peer.
     pub timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts,
     /// The largest message one frame may carry, in bytes.
     pub frame_limit: usize,
-    /// Whether an `AE` or an `AR` also logs the counted outcomes.
-    pub log_outcomes: bool,
-    /// The issuer a facility's namespace id is written under, when one is
-    /// configured.
-    pub facility_issuer: Option<String>,
-    /// The sending facilities the face accepts; empty accepts any.
-    pub senders: Vec<hl7v2::Sender>,
-    /// The senders that are devices, whose results commit as device acts.
-    pub devices: Vec<hl7v2::Device>,
-    /// The DNS name the client certificate of each sender carries.
-    pub subjects: Vec<hl7v2::Subject>,
     /// The TLS the listener serves, requiring a client certificate; `None`
-    /// when every sender is plain, and no TLS listener runs.
+    /// when no TLS listener runs.
     pub tls: Option<hl7v2::Tls>,
-    /// The plain listener for the devices that cannot speak TLS, when one
-    /// is configured.
-    pub plain: Option<hl7v2::Plain>,
+    /// The socket address the plain listener binds, when one runs.
+    pub plain: Option<SocketAddr>,
 }
 
 /// The settings the run path holds, with every secret already read.
@@ -510,6 +489,9 @@ pub struct Settings {
     /// The PostgreSQL state store, when one is configured, boxed so the
     /// settings stay small enough to move through a job's future.
     pub state: Option<Box<crate::store::Settings>>,
+    /// The directory of the secrets the inbound sources name, when one is
+    /// configured.
+    pub secrets: Option<ferrohealth_secret::dir::SecretDirConfig>,
     /// The OMOP ETL job, when it is configured.
     pub etl: Option<EtlSettings>,
     /// The directory the mapping files are read from, when one is configured.
@@ -594,12 +576,10 @@ pub struct OperationsSettings {
     pub composition_territory: Option<String>,
 }
 
-/// The operator API, resolved from `[operator]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OperatorSettings {
-    /// The writable directory console saves go to, when one is configured.
-    pub mapping_dir: Option<PathBuf>,
-}
+/// The operator API, resolved from `[operator]`: mounted, saving the
+/// console's mapping files when `[state]` is configured.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OperatorSettings;
 
 /// The derived visits a run writes before the compositions.
 #[derive(Debug, Clone, PartialEq, Eq)]

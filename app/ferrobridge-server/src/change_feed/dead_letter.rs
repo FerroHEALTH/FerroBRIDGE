@@ -1,30 +1,24 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The dead-letter store of the change feed, a `redb` file beside the
-//! watermarks.
+//! The dead letters of the change feed, in `dead_letter` and
+//! `poisoned_attempt` of the state store.
 //!
-//! It holds the events a consumer failed with a poisoned failure on the
-//! bound of passes, parked with their cause, and the count of poisoned
-//! passes of each event still in the feed.
-//!
-//! A parked event is never dropped: it stays in the store, keyed by reader
-//! and a number the store assigns, until a replay finishes it. A replay
-//! request marks it, and the follower offers it to its consumer again before
-//! its next page. Each write is one ACID transaction
-//! (<https://docs.rs/redb/4.3.0/redb/>). The rows hold an event's
-//! identifiers and provenance as the feed served them, never clinical
-//! content. No specification governs this: our own design.
+//! A consumer that fails an event with a poisoned failure on its bound of
+//! passes parks it with its cause; below the bound each pass is counted. A
+//! parked event is never dropped: it stays open until an operator settles it,
+//! by a retry, which the follower offers to its consumer again before its
+//! next page, or by a discard, and the row keeps who decided and why. Every
+//! write a follower makes is fenced by its lane lease. The rows hold an
+//! event's identifiers and provenance as the feed served them, never
+//! clinical content. No specification governs this: our own design.
 
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::fmt;
 
-use redb::Database;
-use redb::ReadableDatabase;
-use redb::ReadableTable;
-use redb::TableDefinition;
 use serde::Deserialize;
 use serde::Serialize;
+use sqlx::postgres::PgPool;
 
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
@@ -35,19 +29,8 @@ use crate::change_feed::Event;
 use crate::change_feed::Position;
 use crate::change_feed::ReaderName;
 use crate::change_feed::Seq;
-
-/// Reader and event position to the poisoned passes the event failed.
-const ATTEMPTS: TableDefinition<'static, (&str, &str), u32> =
-    TableDefinition::new("poisoned_attempts");
-
-/// Reader and parked number to the parked event, as JSON.
-const PARKED: TableDefinition<'static, (&str, u64), &str> = TableDefinition::new("parked_event");
-
-/// The one row holding the next parked number.
-const NEXT: TableDefinition<'static, &str, u64> = TableDefinition::new("parked_next");
-
-/// The key of the next parked number.
-const NEXT_KEY: &str = "next";
+use crate::store::lease::LeaseError;
+use crate::store::lease::Term;
 
 /// Why the dead-letter store refused a call.
 #[derive(Debug, thiserror::Error)]
@@ -55,11 +38,10 @@ const NEXT_KEY: &str = "next";
 pub enum DeadLetterError {
     /// The store refused a read or a write.
     #[error("the dead-letter store refused the call")]
-    Store {
-        /// What `redb` reported.
-        #[source]
-        source: Box<redb::Error>,
-    },
+    Store(#[from] sqlx::Error),
+    /// The follower's lease is no longer the lane's.
+    #[error("the follower no longer leads its lane")]
+    Lease(#[from] LeaseError),
     /// A stored row does not read, or an event cannot be written as one.
     #[error("a row of the dead-letter store does not read")]
     Row {
@@ -73,16 +55,6 @@ pub enum DeadLetterError {
         /// What does not read.
         what: &'static str,
     },
-    /// The store has assigned every parked number.
-    #[error("the dead-letter store has no parked number left")]
-    Exhausted,
-}
-
-/// Returns the store error `source` is.
-fn store(source: impl Into<redb::Error>) -> DeadLetterError {
-    DeadLetterError::Store {
-        source: Box::new(source.into()),
-    }
 }
 
 /// Returns the row error `source` is.
@@ -90,10 +62,57 @@ const fn row(source: serde_json::Error) -> DeadLetterError {
     DeadLetterError::Row { source }
 }
 
+/// How an operator settles a parked event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Decision {
+    /// Offer it to its consumer again before the next page.
+    Retry,
+    /// Settle it without offering it again.
+    Discard,
+}
+
+impl Decision {
+    /// Returns the decision as the store and the operator API write it.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Retry => "retry",
+            Self::Discard => "discard",
+        }
+    }
+
+    /// Returns the decision `text` names, `None` for any other text.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "retry" => Some(Self::Retry),
+            "discard" => Some(Self::Discard),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Decision {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// An operator's settlement of a parked event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Decided {
+    /// Retry or discard.
+    pub decision: Decision,
+    /// Who decided: the subject of the operator's token.
+    pub by: String,
+    /// Why, in the operator's words.
+    pub reason: String,
+}
+
 /// One parked event.
 #[derive(Debug, Clone)]
 pub struct Parked {
-    /// The number the store assigned it, unique per reader.
+    /// The number the store assigned it.
     pub id: u64,
     /// The event as the feed served it.
     pub event: Event,
@@ -103,248 +122,274 @@ pub struct Parked {
     pub attempts: u32,
     /// When it was parked, or parked again after a replay failed.
     pub at: jiff::Timestamp,
-    /// Whether a replay is requested and has not run yet.
+    /// Whether a retry is decided and has not run yet.
     pub replay: bool,
+    /// The last settlement an operator decided, when there is one.
+    pub decided: Option<Decided>,
 }
 
-/// The parked events and the poisoned-pass counts of every reader, on disk.
-#[derive(Debug)]
+/// The parked events and the poisoned-pass counts of every reader.
+#[derive(Debug, Clone)]
 pub struct DeadLetters {
-    /// The open database.
-    database: Database,
+    /// The state store's pool.
+    pool: PgPool,
 }
 
 impl DeadLetters {
-    /// Opens, or creates, the store at `path`.
-    ///
-    /// # Errors
-    /// Returns [`DeadLetterError::Store`] when the file cannot be opened or
-    /// created or its tables cannot be created.
-    pub fn open(path: &Path) -> Result<Self, DeadLetterError> {
-        let database = Database::create(path).map_err(store)?;
-        let write = database.begin_write().map_err(store)?;
-        write.open_table(ATTEMPTS).map_err(store).map(drop)?;
-        write.open_table(PARKED).map_err(store).map(drop)?;
-        write.open_table(NEXT).map_err(store).map(drop)?;
-        write.commit().map_err(store)?;
-        Ok(Self { database })
+    /// Returns the dead letters the state store behind `pool` keeps.
+    #[must_use]
+    pub const fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 
     /// Counts one more poisoned pass of the event at `position` for
-    /// `reader`, and returns the count.
+    /// `reader` under `term`, and returns the count.
     ///
     /// # Errors
-    /// Returns [`DeadLetterError`] when the write does not commit.
-    pub fn charge(&self, reader: &ReaderName, position: &Position) -> Result<u32, DeadLetterError> {
+    /// Returns [`DeadLetterError`] when the write does not commit or `term`
+    /// is no longer the lane's.
+    pub async fn charge(
+        &self,
+        term: &Term,
+        reader: &ReaderName,
+        position: &Position,
+    ) -> Result<u32, DeadLetterError> {
         let key = key(position)?;
-        let write = self.database.begin_write().map_err(store)?;
-        let count = {
-            let mut table = write.open_table(ATTEMPTS).map_err(store)?;
-            let before = table
-                .get((reader.as_str(), key.as_str()))
-                .map_err(store)?
-                .map_or(0, |count| count.value());
-            let count = before.saturating_add(1);
-            table
-                .insert((reader.as_str(), key.as_str()), count)
-                .map_err(store)?;
-            count
-        };
-        write.commit().map_err(store)?;
-        Ok(count)
+        let mut tx = self.pool.begin().await?;
+        term.fence(&mut tx).await?;
+        let count: i32 = sqlx::query_scalar(
+            "INSERT INTO poisoned_attempt (reader, position, attempts) VALUES ($1, $2, 1) \
+             ON CONFLICT (reader, position) DO UPDATE SET attempts = poisoned_attempt.attempts + 1 \
+             RETURNING attempts",
+        )
+        .bind(reader.as_str())
+        .bind(&key)
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(u32::try_from(count).unwrap_or(u32::MAX))
     }
 
-    /// Forgets the poisoned passes of the event at `position` for `reader`,
-    /// once it finished.
+    /// Forgets the poisoned passes of the event at `position` for `reader`
+    /// under `term`, once it finished.
     ///
     /// # Errors
-    /// Returns [`DeadLetterError`] when the write does not commit.
-    pub fn settle(&self, reader: &ReaderName, position: &Position) -> Result<(), DeadLetterError> {
+    /// Returns [`DeadLetterError`] when the write does not commit or `term`
+    /// is no longer the lane's.
+    pub async fn forget(
+        &self,
+        term: &Term,
+        reader: &ReaderName,
+        position: &Position,
+    ) -> Result<(), DeadLetterError> {
         let key = key(position)?;
-        let write = self.database.begin_write().map_err(store)?;
-        {
-            let mut table = write.open_table(ATTEMPTS).map_err(store)?;
-            table
-                .remove((reader.as_str(), key.as_str()))
-                .map_err(store)?;
-        }
-        write.commit().map_err(store)
+        let mut tx = self.pool.begin().await?;
+        term.fence(&mut tx).await?;
+        uncount(&mut tx, reader, &key).await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     /// Parks `event` for `reader` after `attempts` poisoned passes, the last
-    /// for `cause`, and forgets its count, in one transaction; returns the
-    /// number it is parked under.
+    /// for `cause`, and forgets its count, in one transaction under `term`;
+    /// returns the number it is parked under.
     ///
     /// # Errors
-    /// Returns [`DeadLetterError`] when the write does not commit or the
-    /// event cannot be written.
-    pub fn park(
+    /// Returns [`DeadLetterError`] when the write does not commit, `term` is
+    /// no longer the lane's, or the event cannot be written.
+    pub async fn park(
         &self,
+        term: &Term,
         reader: &ReaderName,
         event: &Event,
         cause: &str,
         attempts: u32,
     ) -> Result<u64, DeadLetterError> {
         let key = key(&event.position)?;
-        let text = serde_json::to_string(&Stored {
-            event: StoredEvent::from(event),
-            cause: cause.to_owned(),
-            attempts,
-            parked_at: jiff::Timestamp::now().to_string(),
-            replay: false,
-        })
-        .map_err(row)?;
-        let write = self.database.begin_write().map_err(store)?;
-        let id = {
-            let mut next = write.open_table(NEXT).map_err(store)?;
-            let id = next
-                .get(NEXT_KEY)
-                .map_err(store)?
-                .map_or(1, |value| value.value());
-            let after = id.checked_add(1).ok_or(DeadLetterError::Exhausted)?;
-            next.insert(NEXT_KEY, after).map_err(store)?;
-            let mut parked = write.open_table(PARKED).map_err(store)?;
-            parked
-                .insert((reader.as_str(), id), text.as_str())
-                .map_err(store)?;
-            let mut counts = write.open_table(ATTEMPTS).map_err(store)?;
-            counts
-                .remove((reader.as_str(), key.as_str()))
-                .map_err(store)?;
-            id
-        };
-        write.commit().map_err(store)?;
-        Ok(id)
+        let text = serde_json::to_string(&StoredEvent::from(event)).map_err(row)?;
+        let mut tx = self.pool.begin().await?;
+        term.fence(&mut tx).await?;
+        // NOTE: no specification governs this: our own design; an event parked
+        // again after a crash before its acknowledgement keeps its first row.
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO dead_letter (reader, position, event, reason, attempts) \
+             VALUES ($1, $2, $3::jsonb, $4, $5) \
+             ON CONFLICT (reader, position) DO UPDATE SET reason = excluded.reason, \
+             attempts = excluded.attempts, parked_at = now() RETURNING id",
+        )
+        .bind(reader.as_str())
+        .bind(&key)
+        .bind(&text)
+        .bind(cause)
+        .bind(i32::try_from(attempts).unwrap_or(i32::MAX))
+        .fetch_one(&mut *tx)
+        .await?;
+        uncount(&mut tx, reader, &key).await?;
+        tx.commit().await?;
+        Ok(id.cast_unsigned())
     }
 
-    /// Returns the events parked for `reader`, in the order they were first
-    /// parked.
+    /// Returns the open events parked for `reader`, in the order they were
+    /// first parked.
     ///
     /// # Errors
     /// Returns [`DeadLetterError`] when the read fails or a row does not
     /// read.
-    pub fn parked(&self, reader: &ReaderName) -> Result<Vec<Parked>, DeadLetterError> {
-        let read = self.database.begin_read().map_err(store)?;
-        let table = read.open_table(PARKED).map_err(store)?;
-        let mut parked = Vec::new();
-        for entry in table
-            .range((reader.as_str(), 0)..=(reader.as_str(), u64::MAX))
-            .map_err(store)?
-        {
-            let (key, value) = entry.map_err(store)?;
-            parked.push(decode(key.value().1, value.value())?);
-        }
-        Ok(parked)
+    pub async fn parked(&self, reader: &ReaderName) -> Result<Vec<Parked>, DeadLetterError> {
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT id, event::text, reason, attempts, \
+             to_char(parked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), \
+             replay_requested_at IS NOT NULL, decision, decided_by, decision_reason \
+             FROM dead_letter WHERE reader = $1 AND settled_at IS NULL ORDER BY id",
+        )
+        .bind(reader.as_str())
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(decode).collect()
     }
 
-    /// Marks the event `id` parked for `reader` for a replay; returns
-    /// whether the store holds it.
+    /// Settles the open event `id` parked for `reader` as `decided` says;
+    /// returns whether an open event has the number.
     ///
     /// # Errors
-    /// Returns [`DeadLetterError`] when the write does not commit or the row
-    /// does not read.
-    pub fn request_replay(&self, reader: &ReaderName, id: u64) -> Result<bool, DeadLetterError> {
-        self.rewrite(reader, id, |stored| stored.replay = true)
-    }
-
-    /// Removes the event `id` parked for `reader`, which a replay finished.
-    ///
-    /// # Errors
-    /// Returns [`DeadLetterError`] when the write does not commit.
-    pub fn replayed(&self, reader: &ReaderName, id: u64) -> Result<(), DeadLetterError> {
-        let write = self.database.begin_write().map_err(store)?;
-        {
-            let mut table = write.open_table(PARKED).map_err(store)?;
-            table.remove((reader.as_str(), id)).map_err(store)?;
-        }
-        write.commit().map_err(store)
-    }
-
-    /// Parks the event `id` of `reader` again after its replay failed for
-    /// `cause`: one more attempt, and no replay requested.
-    ///
-    /// # Errors
-    /// Returns [`DeadLetterError`] when the write does not commit or the row
-    /// does not read.
-    pub fn repark(&self, reader: &ReaderName, id: u64, cause: &str) -> Result<(), DeadLetterError> {
-        self.rewrite(reader, id, |stored| {
-            stored.attempts = stored.attempts.saturating_add(1);
-            cause.clone_into(&mut stored.cause);
-            stored.parked_at = jiff::Timestamp::now().to_string();
-            stored.replay = false;
-        })
-        .map(|_held| ())
-    }
-
-    /// Changes the row of `id` for `reader` with `change`; returns whether
-    /// the store holds it.
-    fn rewrite(
+    /// Returns [`DeadLetterError::Store`] when the write does not commit.
+    pub async fn decide(
         &self,
         reader: &ReaderName,
         id: u64,
-        change: impl FnOnce(&mut Stored),
+        decided: &Decided,
     ) -> Result<bool, DeadLetterError> {
-        let write = self.database.begin_write().map_err(store)?;
-        let held = {
-            let mut table = write.open_table(PARKED).map_err(store)?;
-            let stored = match table.get((reader.as_str(), id)).map_err(store)? {
-                Some(value) => Some(serde_json::from_str::<Stored>(value.value()).map_err(row)?),
-                None => None,
-            };
-            match stored {
-                Some(mut stored) => {
-                    change(&mut stored);
-                    let text = serde_json::to_string(&stored).map_err(row)?;
-                    table
-                        .insert((reader.as_str(), id), text.as_str())
-                        .map_err(store)?;
-                    true
-                }
-                None => false,
-            }
+        let Ok(id) = i64::try_from(id) else {
+            return Ok(false);
         };
-        write.commit().map_err(store)?;
-        Ok(held)
+        let done = sqlx::query(
+            "UPDATE dead_letter SET decision = $3, decided_by = $4, decision_reason = $5, \
+             replay_requested_at = CASE WHEN $3 = 'retry' THEN now() END, \
+             settled_at = CASE WHEN $3 = 'discard' THEN now() END \
+             WHERE reader = $1 AND id = $2 AND settled_at IS NULL",
+        )
+        .bind(reader.as_str())
+        .bind(id)
+        .bind(decided.decision.as_str())
+        .bind(&decided.by)
+        .bind(&decided.reason)
+        .execute(&self.pool)
+        .await?;
+        Ok(done.rows_affected() == 1)
+    }
+
+    /// Settles the events `ids` parked for `reader`, whose retry finished,
+    /// inside the follower's transaction on `connection`.
+    ///
+    /// # Errors
+    /// Returns [`DeadLetterError::Store`] when the statement fails.
+    pub async fn replayed(
+        &self,
+        connection: &mut sqlx::PgConnection,
+        reader: &ReaderName,
+        ids: &[u64],
+    ) -> Result<(), DeadLetterError> {
+        let ids: Vec<i64> = ids.iter().map(|id| id.cast_signed()).collect();
+        sqlx::query(
+            "UPDATE dead_letter SET settled_at = now(), replay_requested_at = NULL \
+             WHERE reader = $1 AND id = ANY($2)",
+        )
+        .bind(reader.as_str())
+        .bind(ids)
+        .execute(connection)
+        .await?;
+        Ok(())
+    }
+
+    /// Parks the event `id` of `reader` again after its retry failed for
+    /// `cause`, under `term`: one more attempt, and no retry pending.
+    ///
+    /// # Errors
+    /// Returns [`DeadLetterError`] when the write does not commit or `term`
+    /// is no longer the lane's.
+    pub async fn repark(
+        &self,
+        term: &Term,
+        reader: &ReaderName,
+        id: u64,
+        cause: &str,
+    ) -> Result<(), DeadLetterError> {
+        let mut tx = self.pool.begin().await?;
+        term.fence(&mut tx).await?;
+        sqlx::query(
+            "UPDATE dead_letter SET attempts = attempts + 1, reason = $3, parked_at = now(), \
+             replay_requested_at = NULL WHERE reader = $1 AND id = $2",
+        )
+        .bind(reader.as_str())
+        .bind(id.cast_signed())
+        .bind(cause)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
+
+/// Forgets the poisoned passes counted for `reader` at the position `key`,
+/// inside the caller's transaction.
+async fn uncount(
+    connection: &mut sqlx::PgConnection,
+    reader: &ReaderName,
+    key: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM poisoned_attempt WHERE reader = $1 AND position = $2")
+        .bind(reader.as_str())
+        .bind(key)
+        .execute(connection)
+        .await?;
+    Ok(())
+}
+
+/// One open row, as [`DeadLetters::parked`] reads it.
+type Row = (
+    i64,
+    String,
+    String,
+    i32,
+    String,
+    bool,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
 
 /// Returns the key an event's position is counted under.
 fn key(position: &Position) -> Result<String, DeadLetterError> {
     serde_json::to_string(&StoredPosition::from(position)).map_err(row)
 }
 
-/// Returns the parked event `text` holds under `id`.
-fn decode(id: u64, text: &str) -> Result<Parked, DeadLetterError> {
-    let stored: Stored = serde_json::from_str(text).map_err(row)?;
-    let parked_at = stored
-        .parked_at
+/// Returns the parked event `row` holds.
+fn decode(row_read: Row) -> Result<Parked, DeadLetterError> {
+    let (id, event, reason, attempts, parked_at, replay, decision, by, why) = row_read;
+    let stored: StoredEvent = serde_json::from_str(&event).map_err(row)?;
+    let at = parked_at
         .parse()
         .map_err(|_refused| DeadLetterError::Value {
             what: "a parking instant",
         })?;
+    let decided = match (decision, by, why) {
+        (Some(decision), Some(by), Some(reason)) => Some(Decided {
+            decision: Decision::parse(&decision)
+                .ok_or(DeadLetterError::Value { what: "a decision" })?,
+            by,
+            reason,
+        }),
+        _ => None,
+    };
     Ok(Parked {
-        id,
-        event: stored.event.into_event()?,
-        cause: stored.cause,
-        attempts: stored.attempts,
-        at: parked_at,
-        replay: stored.replay,
+        id: id.cast_unsigned(),
+        event: stored.into_event()?,
+        cause: reason,
+        attempts: u32::try_from(attempts).unwrap_or(0),
+        at,
+        replay,
+        decided,
     })
-}
-
-/// One parked event as it is stored.
-#[derive(Debug, Serialize, Deserialize)]
-struct Stored {
-    /// The event.
-    event: StoredEvent,
-    /// The last failure.
-    cause: String,
-    /// The poisoned passes.
-    attempts: u32,
-    /// When it was parked, RFC 3339.
-    parked_at: String,
-    /// Whether a replay is requested.
-    replay: bool,
 }
 
 /// An event as it is stored.
@@ -507,74 +552,5 @@ impl StoredEvent {
                 .collect(),
             envelope: self.envelope,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::DeadLetters;
-    use crate::change_feed::Domain;
-    use crate::change_feed::Event;
-    use crate::change_feed::Position;
-    use crate::change_feed::ReaderName;
-    use crate::change_feed::Seq;
-
-    fn event(seq: u64) -> Event {
-        Event {
-            position: Position::Outbox {
-                domain: Domain::Clinical,
-                seq: Seq::new(seq),
-            },
-            erasure: false,
-            contribution_id: None,
-            ehr_id: None,
-            committed_at: None,
-            versions: Vec::new(),
-            envelope: serde_json::Map::new(),
-        }
-    }
-
-    #[test]
-    fn a_parked_event_survives_a_reopen_and_leaves_on_its_replay() {
-        let dir = tempfile::tempdir().expect("a scratch directory");
-        let path = dir.path().join("dead-letters.redb");
-        let reader = ReaderName::new("a").expect("a reader name");
-        let other = ReaderName::new("b").expect("a reader name");
-        let id = {
-            let store = DeadLetters::open(&path).expect("the store opens");
-            assert_eq!(
-                1,
-                store.charge(&reader, &event(7).position).expect("a charge")
-            );
-            assert_eq!(
-                2,
-                store.charge(&reader, &event(7).position).expect("a charge")
-            );
-            store
-                .park(&reader, &event(7), "the mapping refused it", 2)
-                .expect("parked")
-        };
-        let store = DeadLetters::open(&path).expect("the store opens again");
-        assert!(store.parked(&other).expect("a read").is_empty());
-        let parked = store.parked(&reader).expect("a read");
-        assert_eq!(1, parked.len());
-        assert_eq!(event(7).position, parked[0].event.position);
-        assert_eq!("the mapping refused it", parked[0].cause);
-        assert!(!parked[0].replay);
-        assert_eq!(
-            1,
-            store.charge(&reader, &event(7).position).expect("a charge"),
-            "parking forgot the count"
-        );
-        assert!(store.request_replay(&reader, id).expect("a replay"));
-        assert!(!store.request_replay(&other, id).expect("a replay"));
-        store
-            .repark(&reader, id, "still refused")
-            .expect("parked again");
-        let again = store.parked(&reader).expect("a read");
-        assert_eq!(3, again[0].attempts);
-        assert!(!again[0].replay);
-        store.replayed(&reader, id).expect("replayed");
-        assert!(store.parked(&reader).expect("a read").is_empty());
     }
 }
