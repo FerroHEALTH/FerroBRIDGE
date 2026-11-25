@@ -642,9 +642,12 @@ The merge queue proves that the merged tree builds and its guards hold. The
 pull request already ran the full suite on the same change, so a merge-group
 run is light (the owner's ruling of 2026-11-25, #2128): every tier-1 job,
 `rustfmt`, `cargo-deny`, the crate-version guard, and the `test` shards over
-the packages the group reaches, each building them in the dev profile and
-running their unit tests (`--lib`, or `--bins` for a binary-only package),
-with no integration suite, doctest or extra feature set. Every other Rust
+the packages the group reaches, each compiling every test target of them in
+the dev profile (with every feature too where a package has more) and
+running only their unit tests (`--lib`, or `--bins` for a binary-only
+package), with no integration suite or doctest run. Compiling every test
+target stays in the queue: two pull requests that each passed alone can
+break a test binary together. Every other Rust
 lane (clippy, msrv, rustdoc, public dependencies, the codegen drift and
 full-emit tests, the conformance pass lists, e2e, sqlx-offline, the FHIR
 Validator, the browser journeys, perf and the publish dry run) is skipped in

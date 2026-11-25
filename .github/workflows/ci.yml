@@ -17,8 +17,9 @@
 #      reach is skipped, the test, clippy and msrv lanes run the reached
 #      packages in shards, and a push to main and a dispatch run everything.
 #      A merge group runs tier 1, rustfmt, cargo-deny, the crate-version guard
-#      and the unit tests of the packages the group reaches; the pull request
-#      ran the rest on the same change.
+#      and the smoke set of the packages the group reaches (every test target
+#      compiled, the unit tests run); the pull request ran the rest on the
+#      same change.
 #
 # The `conclusion` job is the single required status check on main; it is what
 # makes a mostly-skipped pipeline enforceable (docs/ci-cd.md).
@@ -878,7 +879,8 @@ jobs:
             cargo hack test --doc "${docs[@]}" --locked
           fi
       # The merge group's smoke set: the pull request ran every suite, so the
-      # queue builds the reached packages and runs their unit tests only, the
+      # queue compiles every test target of the reached packages, with every
+      # feature where a package has more, and runs only the unit tests, the
       # library's or a binary-only package's.
       - if: github.event_name == 'merge_group'
         env:
@@ -886,6 +888,12 @@ jobs:
         run: |
           set -euo pipefail
           read -ra packages <<<"$PACKAGES"
+          args=()
+          for package in "${packages[@]}"; do args+=(-p "$package"); done
+          cargo hack nextest run "${args[@]}" --no-run --locked
+          for package in $(bash scripts/checks/featured.sh "${packages[@]}"); do
+            cargo nextest run -p "$package" --all-features --no-run --locked
+          done
           libraries="$(cargo metadata --no-deps --format-version 1 --locked |
             jq -r '.packages[] | select(any(.targets[]; any(.kind[]; . == "lib" or . == "rlib"))) | .name')"
           lib=()

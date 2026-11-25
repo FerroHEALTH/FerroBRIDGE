@@ -13,9 +13,10 @@ already ran the full suite, so the merge_group run does not run it again
 (#2128). Queues of about ten entries dropped pull requests at the 60-minute
 check timeout when every group re-ran the full tests, e2e, perf and
 coverage. In merge_group CI runs tier 1, rustfmt, cargo-deny, the
-crate-version guard and the `test` shards in smoke mode (`--lib`, or
-`--bins` for a binary-only package, over the packages the group reaches
-from its base). Every other Rust lane carries
+crate-version guard and the `test` shards in smoke mode over the packages
+the group reaches from its base: every test target compiled, only the unit
+tests (`--lib`, or `--bins` for a binary-only package) run, since two pull
+requests that passed alone can break a test binary together. Every other Rust lane carries
 `github.event_name != 'merge_group'` in its job condition. `conclusion` keeps
 its name and reads skipped as passed, so the ruleset needs no edit.
 
