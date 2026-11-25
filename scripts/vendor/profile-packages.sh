@@ -446,6 +446,17 @@ publisher overwrites with every build. The pin is the sha256 in
 docs/VERSIONS.md, so a moved build is refused here and reported by
 \`scripts/checks/pin-freshness.sh\`, and a re-pin records the new build.
 PROV
+  elif [[ "$ver" == *-preview* ]]; then
+    cat << PROV
+
+## Why a preview
+
+The version is a preview of the guide, published to the FHIR package
+registry ahead of a release and not a release itself, built
+$(jq -r '.date // "unstated"' "$dir/package/package.json") (the \`date\` field of \`package/package.json\`). The registry's
+tarball is the pin; a later preview or the release is a new pin with its own
+row.
+PROV
   elif [[ -n "$canonical" ]]; then
     cat << PROV
 
