@@ -171,7 +171,7 @@ impl Ingest<'_> {
             }
         };
         match current.subject.external_ref {
-            Some(ref held) if *held == reference => return Ok(()),
+            Some(ref held) if **held == reference => return Ok(()),
             Some(_) => {
                 return Err(Refused::new(
                     StatusCode::CONFLICT,
@@ -183,7 +183,7 @@ impl Ingest<'_> {
             }
             None => {}
         }
-        current.subject.external_ref = Some(reference);
+        current.subject.external_ref = Some(Box::new(reference));
         let context = commit::status_context(&self.settings.system_id);
         let answered = self
             .client

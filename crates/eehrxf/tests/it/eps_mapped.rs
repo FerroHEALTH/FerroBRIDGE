@@ -534,12 +534,30 @@ fn a_vaccine_alone_writes_no_medication_summary_entry() -> Result<(), Box<dyn Er
 }
 
 /// The template overlays of FerroBRIDGE's patient summary template that
-/// specialise the section archetype `section`.
+/// specialise the section archetype `section`, named by its interface id or,
+/// for a pre-release, by its full id (BASE `master07-referencing` §Referencing).
 fn overlays(section: &str) -> impl Iterator<Item = &'static str> + '_ {
     FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE
         .split("template_overlay")
         .skip(1)
-        .filter(move |part| part.contains(&format!("specialize\n    {section}\n")))
+        .filter(move |part| {
+            part.split_once("specialize\n    ")
+                .and_then(|(_, rest)| rest.lines().next())
+                .and_then(|parent| parent.strip_prefix(section))
+                .is_some_and(|version| version.is_empty() || version.starts_with('.'))
+        })
+}
+
+/// Whether `overlay` places `archetype` by a `use_archetype` reference, named
+/// as [`overlays`] names a parent.
+fn names(overlay: &str, archetype: &str) -> bool {
+    overlay
+        .match_indices(&format!(", {archetype}"))
+        .any(|(at, found)| {
+            overlay
+                .get(at + found.len()..)
+                .is_some_and(|rest| rest.starts_with(']') || rest.starts_with('.'))
+        })
 }
 
 #[test]
@@ -557,7 +575,7 @@ fn every_source_names_the_template_section_that_holds_it() -> Result<(), Box<dyn
     {
         assert_eq!(*template, PATIENT_SUMMARY_TEMPLATE, "{path}");
         assert!(
-            overlays(section).any(|overlay| overlay.contains(&format!(", {archetype}]"))),
+            overlays(section).any(|overlay| names(overlay, archetype)),
             "{path}: the template's {section} holds {archetype}"
         );
         let row = PATIENT_SUMMARY
