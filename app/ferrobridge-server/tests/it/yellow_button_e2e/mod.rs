@@ -22,7 +22,6 @@ use ferrobridge_server::boot::Backoff;
 use ferrobridge_server::boot::serve_settings;
 use ferrobridge_testkit::containers;
 use http::StatusCode;
-use stack::Onward;
 use stack::Stack;
 
 use crate::facade::shl::decode;
@@ -45,22 +44,13 @@ async fn a_patient_downloads_shares_and_revokes_their_summary_through_ferrosmart
     if !containers::e2e_enabled() {
         return Ok(());
     }
-    Box::pin(run(Onward::Off)).await
+    Box::pin(run()).await
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn the_journey_holds_with_the_cdr_read_under_the_patient_s_exchanged_token()
--> Result<(), Box<dyn Error>> {
-    if !containers::e2e_enabled() {
-        return Ok(());
-    }
-    Box::pin(run(Onward::On)).await
-}
-
-/// Starts the platform with `onward`, serves the bridge and walks the
-/// journey, then stops the bridge.
-async fn run(onward: Onward) -> Result<(), Box<dyn Error>> {
-    let mut stack = Stack::start(onward).await?;
+/// Starts the platform, serves the bridge and walks the journey, then
+/// stops the bridge.
+async fn run() -> Result<(), Box<dyn Error>> {
+    let mut stack = Stack::start().await?;
     let listener = stack.listener.take().ok_or("the bridge's listener")?;
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let serving = Box::pin(serve_settings(
