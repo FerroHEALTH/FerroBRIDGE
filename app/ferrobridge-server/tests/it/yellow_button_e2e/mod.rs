@@ -18,8 +18,8 @@ mod stack;
 use std::error::Error;
 use std::time::Duration;
 
-use ferrobridge_server::boot::Backoff;
 use ferrobridge_server::boot::serve_settings;
+use ferrobridge_server::retry::Backoff;
 use ferrobridge_testkit::containers;
 use http::StatusCode;
 use stack::Stack;
