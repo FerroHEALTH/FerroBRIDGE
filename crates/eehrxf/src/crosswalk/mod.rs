@@ -86,6 +86,28 @@ impl Populate {
     }
 }
 
+/// The shall obligation of a row.
+pub(crate) const SHALL: Option<Populate> = Some(Populate::Shall);
+/// The should obligation of a row.
+pub(crate) const SHOULD: Option<Populate> = Some(Populate::Should);
+
+/// The row of `path`, its eHealth Network ids, its producer obligation and
+/// the profile element that carries it, fed by no context.
+pub(crate) const fn uncontexted(
+    path: &'static str,
+    ehn: &'static [&'static str],
+    producer: Option<Populate>,
+    eps: &'static str,
+) -> Row {
+    Row {
+        path,
+        ehn,
+        producer,
+        eps,
+        contexts: &[],
+    }
+}
+
 /// One element of the eHealth Network guideline's dataset, by its id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EhnElement {

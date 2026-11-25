@@ -14,8 +14,10 @@
 
 use crate::category::Root;
 use crate::crosswalk::Crosswalk;
-use crate::crosswalk::Populate;
 use crate::crosswalk::Row;
+use crate::crosswalk::SHALL;
+use crate::crosswalk::SHOULD;
+use crate::crosswalk::uncontexted as row;
 
 /// The canonical URL of the MyHealth@EU Vaccination `Immunization` profile,
 /// the one an immunisation entry claims.
@@ -36,84 +38,79 @@ pub static VACCINATION: Crosswalk<'static> = Crosswalk {
     gaps: &[],
 };
 
-/// The row of `path`, its producer obligation and the
-/// `vaccination-myhealtheu-euvac` element that carries it, with no context.
-const fn row(path: &'static str, producer: Option<Populate>, eps: &'static str) -> Row {
-    Row {
-        path,
-        ehn: &[],
-        producer,
-        eps,
-        contexts: &[],
-    }
-}
-
-/// The shall obligation.
-const SHALL: Option<Populate> = Some(Populate::Shall);
-/// The should obligation.
-const SHOULD: Option<Populate> = Some(Populate::Should);
-
 /// The rows, in the model's order.
 const ROWS: &[Row] = &[
     row(
         "EHDSImmunisation.header.subject",
+        &[],
         SHALL,
         "Immunization.patient",
     ),
     row(
         "EHDSImmunisation.header.identifier",
+        &[],
         SHOULD,
         "Immunization.identifier",
     ),
     row(
         "EHDSImmunisation.header.date",
+        &[],
         None,
         "Immunization.recorded",
     ),
     row(
         "EHDSImmunisation.header.status",
+        &[],
         SHALL,
         "Immunization.status",
     ),
     row(
         "EHDSImmunisation.header.source",
+        &[],
         None,
         "Immunization.extension:informationSource",
     ),
     row(
         "EHDSImmunisation.header.language",
+        &[],
         None,
         "Immunization.language",
     ),
     row(
         "EHDSImmunisation.diseaseOrAgentTargeted",
+        &[],
         None,
         "Immunization.protocolApplied.targetDisease",
     ),
     row(
         "EHDSImmunisation.vaccine",
+        &[],
         SHALL,
         "Immunization.vaccineCode",
     ),
     row(
         "EHDSImmunisation.administeredProduct",
+        &[],
         SHOULD,
         "Immunization.extension:administeredProduct",
     ),
     row(
         "EHDSImmunisation.administrationTime",
+        &[],
         SHALL,
         "Immunization.occurrence[x]",
     ),
     row(
         "EHDSImmunisation.administeringCentre",
+        &[],
         None,
         "Immunization.performer:administeringCentreOrHp",
     ),
     row(
         "EHDSImmunisation.administrator",
+        &[],
         None,
         "Immunization.performer:administeringCentreOrHp",
     ),
-    row("EHDSImmunisation.note", None, "Immunization.note"),
+    row("EHDSImmunisation.note", &[], None, "Immunization.note"),
 ];
