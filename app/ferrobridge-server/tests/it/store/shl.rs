@@ -13,7 +13,7 @@ use std::time::Duration;
 use ferrobridge_server::shl::store::{
     Answer, Fetched, FileEntry, Link, LinkStore, Resolution, StoreError,
 };
-use ferrobridge_server::store::lease::{Lane, Term};
+use ferrobridge_server::store::lease::{Holder, Lane, Lease, Term};
 
 /// The owner of every link here.
 const OWNER: &str = "Patient/p-1";
@@ -214,12 +214,20 @@ async fn a_sweeper_whose_lease_was_taken_over_sweeps_nothing() -> Result<(), Box
         .create("manifest-4", &expiring, &[String::from("jwe")])
         .await?;
     let lane = Lane::new("shl-sweep")?;
-    let former = state.lease(lane.clone(), Duration::from_secs(30));
+    let replica = |lane| {
+        Lease::new(
+            state.pool().clone(),
+            lane,
+            Holder::new(),
+            Duration::from_secs(30),
+        )
+    };
+    let former = replica(lane.clone());
     let first = former
         .claim()
         .await?
         .ok_or("the first replica takes the sweep")?;
-    let other = state.lease(lane, Duration::from_secs(30));
+    let other = replica(lane);
     assert_eq!(
         None,
         other.claim().await?,
