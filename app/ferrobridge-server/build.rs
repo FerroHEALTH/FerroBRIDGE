@@ -68,9 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
     // NOTE: a registry copy of `fhir-types` on an older line, which a crates.io
     // dependency pulls in, is that crate's own model, never the bridge's.
-    let fhir_types = locked_versions(&lock, |name, registry| {
-        !registry && name == "fhir-types"
-    });
+    let fhir_types = locked_versions(&lock, |name, registry| !registry && name == "fhir-types");
     for (key, versions) in [
         ("FERROBRIDGE_BUILD_OPENEHR_CRATES", openehr),
         ("FERROBRIDGE_BUILD_FHIR_TYPES", fhir_types),
