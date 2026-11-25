@@ -419,7 +419,8 @@ pub(crate) fn synthetic() -> Vec<(&'static str, String)> {
     any(
         feature = "patient-summary",
         feature = "laboratory",
-        feature = "imaging"
+        feature = "imaging",
+        feature = "discharge"
     )
 ))]
 pub(crate) fn annex_iii(code: &str) -> eehrxf::document::metadata::DocumentMetadata {

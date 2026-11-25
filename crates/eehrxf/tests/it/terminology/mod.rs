@@ -55,10 +55,7 @@ pub(crate) enum Script {
     /// match to anything else.
     #[cfg_attr(
         not(all(feature = "openehr", feature = "patient-summary")),
-        expect(
-            dead_code,
-            reason = "only the patient summary suites script a concept map"
-        )
+        expect(dead_code, reason = "only the EPS sections suite scripts a map")
     )]
     Map(Vec<Mapped>),
     /// `$lookup` answers this display.
