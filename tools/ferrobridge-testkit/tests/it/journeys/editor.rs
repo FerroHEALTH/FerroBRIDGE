@@ -204,7 +204,6 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
         .map_err(|error| -> Box<dyn Error> { error })?;
     let stack = Stack::start().await?;
     let path = context_path(SECOND);
-    let saved = stack.console_files().join(&path);
     let valid = context(SECOND, TEMPLATE);
     let invalid = context(SECOND, MISSING_TEMPLATE);
     with_browser(async |browser| {
@@ -233,7 +232,11 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
             )
             .await?;
         browser.console_clean("a refused draft").await?;
-        assert!(!saved.exists(), "a refused draft wrote {}", saved.display());
+        assert_eq!(
+            None,
+            stack.mapping_file(&path).await?,
+            "a refused draft records nothing"
+        );
         assert_eq!(vec![CONTEXT.to_owned()], contexts(browser, &stack).await?);
 
         draft(browser, &stack, &path, &valid).await?;
@@ -246,7 +249,10 @@ async fn a_refused_draft_changes_nothing_and_a_save_is_byte_identical_and_reload
             .text("main", "Saved, and the set reloaded with it.")
             .await?;
         browser.console_clean("a save").await?;
-        assert_eq!(valid.as_bytes(), std::fs::read(&saved)?.as_slice());
+        assert_eq!(
+            Some(valid.as_bytes().to_vec()),
+            stack.mapping_file(&path).await?
+        );
         assert_eq!(
             vec![CONTEXT.to_owned(), context_name(SECOND)],
             contexts(browser, &stack).await?

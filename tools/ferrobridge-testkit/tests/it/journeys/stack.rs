@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use ferrobridge_server::boot::{Backoff, serve_settings};
@@ -191,11 +191,13 @@ pub(crate) struct Stack {
     /// The CDR, kept so it outlives the bridge.
     _cdr: MockServer,
     /// The mapping tree, the templates and the identity store.
-    tree: tempfile::TempDir,
+    _tree: tempfile::TempDir,
     /// The test OpenID Provider.
     provider: Provider,
     /// The console's base URL.
     console: String,
+    /// The bridge's base URL.
+    bridge_url: String,
     /// The name of the console's session cookie.
     cookie: String,
     /// The operator's access token, which never reaches the browser.
@@ -287,9 +289,10 @@ impl Stack {
         ));
         Ok(Self {
             _cdr: cdr,
-            tree,
+            _tree: tree,
             provider,
             console,
+            bridge_url: bridge,
             cookie,
             access_token,
             bridge: running,
@@ -331,9 +334,18 @@ impl Stack {
         &self.cookie
     }
 
-    /// The directory the console saves its files into.
-    pub(crate) fn console_files(&self) -> PathBuf {
-        self.tree.path().join("console")
+    /// The bytes of the mapping file at the wire path `path`, as the
+    /// bridge's operator API serves it, `None` when it holds none.
+    pub(crate) async fn mapping_file(&self, path: &str) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
+        let answer = reqwest::Client::new()
+            .get(format!("{}/operator/mappings/{path}", self.bridge_url))
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+        if answer.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        Ok(Some(answer.error_for_status()?.bytes().await?.to_vec()))
     }
 }
 
