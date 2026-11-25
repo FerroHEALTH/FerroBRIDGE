@@ -34,31 +34,10 @@ use crate::change_feed::Stream;
 use crate::change_feed::dead_letter::DeadLetterError;
 use crate::change_feed::dead_letter::DeadLetters;
 use crate::change_feed::health::Following;
+use crate::retry::{Backoff, Failure, Waits};
 use crate::store::lease::Leadership;
 use crate::store::lease::Renewed;
 use crate::store::lease::Term;
-
-/// Whether a failed event may succeed when it is offered again unchanged.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Failure {
-    /// A failure of something the event depends on (an unreachable sink, a
-    /// timeout): the event is offered again on the next pass.
-    Transient,
-    /// A failure of the event itself (content no mapping admits): offering it
-    /// again fails the same way.
-    Poisoned,
-}
-
-impl Failure {
-    /// Returns the failure as one word of a sentence.
-    #[must_use]
-    pub const fn word(self) -> &'static str {
-        match self {
-            Self::Transient => "transient",
-            Self::Poisoned => "poisoned",
-        }
-    }
-}
 
 /// Why a consumer did not finish one event.
 #[derive(Debug, thiserror::Error)]
@@ -142,10 +121,8 @@ pub struct Polling {
     pub page_size: PageSize,
     /// How long to wait after a page that was not full.
     pub idle: Duration,
-    /// How long to wait after the first failed pass, doubled per failure.
-    pub backoff: Duration,
-    /// The longest wait after a failed pass.
-    pub max_backoff: Duration,
+    /// How long to wait after a failed pass.
+    pub backoff: Backoff,
 }
 
 impl Default for Polling {
@@ -153,8 +130,10 @@ impl Default for Polling {
         Self {
             page_size: PageSize::default(),
             idle: Duration::from_secs(1),
-            backoff: Duration::from_secs(1),
-            max_backoff: Duration::from_secs(60),
+            backoff: Backoff {
+                initial: Duration::from_secs(1),
+                max: Duration::from_secs(60),
+            },
         }
     }
 }
@@ -505,8 +484,7 @@ pub struct Lane {
 /// and stops reading once the lease is lost or a fenced write is refused. A
 /// full page that moved a cursor is followed by the next read at once, any
 /// other pass after `lane.polling.idle`; a failed pass is logged, recorded on
-/// `lane.following` and retried after a backoff that doubles up to
-/// `lane.polling.max_backoff`. On `stop` the leader releases the lane.
+/// `lane.following` and retried after `lane.polling.backoff`. On `stop` the leader releases the lane.
 pub async fn follow(
     feed: &dyn ChangeFeed,
     reader: &ReaderName,
@@ -519,7 +497,7 @@ pub async fn follow(
         .parking
         .clone()
         .map_or_else(Cursor::default, Cursor::parking);
-    let mut backoff = lane.polling.backoff;
+    let mut waits = Waits::new(lane.polling.backoff);
     tracing::info!(consumer = consumer.name(), reader = %reader, "following the change feed");
     loop {
         if *stop.borrow() {
@@ -545,8 +523,8 @@ pub async fn follow(
                     }
                     break;
                 }
-                backoff = lane.polling.backoff;
-                lane.polling.backoff
+                waits.reset();
+                lane.polling.backoff.initial
             }
             Ok(None) => {
                 lane.following.standby();
@@ -556,9 +534,7 @@ pub async fn follow(
                 let reason = crate::indicators::reason(&error);
                 tracing::warn!(consumer = consumer.name(), reader = %reader, reason = %reason, "the lease of the change-feed reader could not be claimed");
                 lane.following.stalled(reason);
-                let wait = backoff;
-                backoff = backoff.saturating_mul(2).min(lane.polling.max_backoff);
-                wait
+                waits.failed()
             }
         };
         if !pause(&mut stop, wait).await {
@@ -621,7 +597,7 @@ async fn lead(
         Arc::clone(&lost),
     ));
     cursor.acknowledged.clear();
-    let mut backoff = lane.polling.backoff;
+    let mut waits = Waits::new(lane.polling.backoff);
     let begun = feed.begin(reader, term).await;
     if let Err(error) = begun {
         lane.following.stalled(crate::indicators::reason(&error));
@@ -638,7 +614,7 @@ async fn lead(
         let wait = match passed {
             Ok(done) => {
                 lane.following.followed();
-                backoff = lane.polling.backoff;
+                waits.reset();
                 if done.read > 0 {
                     tracing::debug!(
                         consumer = consumer.name(),
@@ -663,9 +639,7 @@ async fn lead(
                     "a change-feed pass failed; the cursor stays where it was"
                 );
                 lane.following.stalled(reason);
-                let wait = backoff;
-                backoff = backoff.saturating_mul(2).min(lane.polling.max_backoff);
-                wait
+                waits.failed()
             }
         };
         if !pause(stop, wait).await {

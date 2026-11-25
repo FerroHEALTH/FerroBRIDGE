@@ -159,6 +159,15 @@ pub enum SectionRule {
         /// The section slices of which one is required.
         slices: &'static [&'static str],
     },
+    /// The `Bundle` profile's entry slice `entry` is required, and its
+    /// resources are the entries of the section `slice`: that section holds
+    /// at least one entry.
+    Entered {
+        /// The entry slice of the `Bundle` profile.
+        entry: &'static str,
+        /// The section slice whose entries the entry slice holds.
+        slice: &'static str,
+    },
 }
 
 /// The form of one category's document: its HL7 Europe profiles, its
@@ -190,8 +199,13 @@ pub struct Form {
     pub encounter: Option<&'static str>,
     /// Whether the form requires `Bundle.language`.
     pub language: bool,
-    /// The rules of the `Composition` profile over the sections.
+    /// The rules of the `Composition` and `Bundle` profiles over the
+    /// sections.
     pub rules: &'static [SectionRule],
+    /// Whether the form requires a legal authentication, the `attester` of
+    /// mode `legal` the document's metadata names
+    /// ([`super::metadata::DocumentMetadata::with_legal_authentication`]).
+    pub legal_authentication: bool,
 }
 
 /// The patient summary in the HL7 Europe Patient Summary 1.0.0-ballot form.
@@ -226,6 +240,7 @@ pub const PATIENT_SUMMARY_FORM: Form = Form {
             ],
         },
     ],
+    legal_authentication: false,
 };
 
 /// The patient summary in the HL7 International Patient Summary 2.0.1 form.
@@ -254,4 +269,5 @@ pub const IPS_PATIENT_SUMMARY_FORM: Form = Form {
             slices: &["sectionProblems", "sectionAllergies", "sectionMedications"],
         },
     ],
+    legal_authentication: false,
 };

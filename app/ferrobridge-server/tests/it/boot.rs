@@ -10,9 +10,10 @@
 //! documents no `5xx`; a `503` is the not-ready answer. No specification
 //! governs the wait: our own design.
 
-use ferrobridge_server::boot::{Backoff, serve_settings};
+use ferrobridge_server::boot::serve_settings;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::config::{Config, Settings};
+use ferrobridge_server::retry::Backoff;
 use http::StatusCode;
 use std::collections::BTreeMap;
 use std::error::Error;

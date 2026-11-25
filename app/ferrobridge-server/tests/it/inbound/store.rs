@@ -12,11 +12,11 @@ use std::time::Duration;
 
 use ferrobridge_operator_api::sources::{Kind, Write};
 use ferrobridge_server::inbound::event::{Change, EventMap, Reading};
-use ferrobridge_server::inbound::retry::{Failure, Policy};
 use ferrobridge_server::inbound::store::{
     Accepted, Claimed, InboxStore, Outcome, Replay, Returned, Settlement, WorkKey,
 };
 use ferrobridge_server::inbound::worker::{Attempt, Failed, Handler, Pool, Settings};
+use ferrobridge_server::retry::{Backoff, Failure, Policy};
 use ferrobridge_server::sources::{Source, Sources};
 use ferrobridge_server::store::Store;
 use ferrobridge_testkit::containers;
@@ -308,8 +308,10 @@ impl Handler for Recording {
 }
 
 const POLICY: Policy = Policy {
-    backoff: Duration::from_millis(10),
-    max_backoff: Duration::from_millis(40),
+    backoff: Backoff {
+        initial: Duration::from_millis(10),
+        max: Duration::from_millis(40),
+    },
     max_attempts: 2,
 };
 
@@ -500,7 +502,7 @@ async fn a_refusal_parks_at_once() -> Result<(), Box<dyn Error>> {
     let refusing = Pool::new(
         inbox.clone(),
         held,
-        Arc::new(Failing(Failure::Refusal)),
+        Arc::new(Failing(Failure::Poisoned)),
         settings(1),
     );
     assert!(refusing.step().await?);

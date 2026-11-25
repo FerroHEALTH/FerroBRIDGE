@@ -681,6 +681,42 @@ pub const ANNEX_X: Project = Project {
     followed: &[],
 };
 
+/// The MyHealth@EU Vaccination 10.0.0-preview project.
+///
+/// It maps over FerroBRIDGE's patient summary template. Its one root
+/// context, `ferrobridge_myhealtheu_euvac.context`, maps the composition to a
+/// `composition-euvac-myhealtheu` and enters the template's immunisations
+/// section, the CKM vaccination list, through its sub-context: each dose
+/// administered or aborted there is a `vaccination-myhealtheu-euvac` with the
+/// sequence number as its dose number and a `location-myhealtheu-core` in
+/// the composition's territory as its vaccination country. A document takes
+/// the run with [`crate::document::Document::with_mapped_composition`].
+#[cfg(feature = "vaccination")]
+pub const EUVAC: Project = Project {
+    directory: "euvac",
+    contexts: &["ferrobridge_myhealtheu_euvac.context"],
+    searches: &[],
+    files: &[
+        shipped!("euvac", "ferrobridge_myhealtheu_euvac.context.yml"),
+        shipped!(
+            "euvac",
+            "ferrobridge_health_summary.v1.VaccinationHistory.yml"
+        ),
+        shipped!(
+            "euvac",
+            "ferrobridge_myhealtheu_euvac_immunisation.context.yml"
+        ),
+        shipped!("euvac", "ferrobridge_section_immunisation_list.v0.yml"),
+        shipped!(
+            "euvac",
+            "ferrobridge_myhealtheu_euvac_immunisation_section.yml"
+        ),
+        shipped!("euvac", "ferrobridge_medication.v1.Vaccination.yml"),
+    ],
+    accounted: &[],
+    followed: &[],
+};
+
 /// Every project the enabled features ship.
 const SHIPPED: &[Project] = &[
     #[cfg(any(feature = "prescription", feature = "dispensation"))]
@@ -695,13 +731,16 @@ const SHIPPED: &[Project] = &[
     EPS,
     #[cfg(feature = "discharge")]
     HDR,
+    #[cfg(feature = "vaccination")]
+    EUVAC,
 ];
 
 /// Returns the shipped project that compiles a context mapping `contexts`
 /// names, if one does.
 ///
 /// Every context of one [`crate::mapping::Mapping`] maps its one template,
-/// and no two shipped projects map the same template, so one project answers.
+/// and no two shipped projects compile a context of the same name, so one
+/// project answers.
 pub(crate) fn shipped_for(contexts: &[&str]) -> Option<&'static Project> {
     SHIPPED
         .iter()

@@ -8,8 +8,8 @@
 
 use super::Config;
 use super::OmopIncrementalSettings;
+use super::change_feed::Consumer;
 use super::error::Error;
-use crate::change_feed::ReaderName;
 
 /// Returns the load `config` turns on, refused without the change feed,
 /// `[etl]`, `[cdm]` or an OMOCL directory it runs over, without a reader
@@ -36,20 +36,6 @@ pub(super) fn resolve(config: &Config) -> Result<Option<OmopIncrementalSettings>
             needs: String::from(needed),
         });
     }
-    if section.reader.is_empty() {
-        return Err(Error::Missing {
-            key: String::from("omop_incremental.reader"),
-        });
-    }
-    let reader = ReaderName::new(&section.reader).map_err(|source| Error::ReaderName {
-        key: String::from("omop_incremental.reader"),
-        source,
-    })?;
-    if config.events.enabled && config.events.reader == section.reader {
-        return Err(Error::Duplicate {
-            key: String::from("omop_incremental.reader"),
-            value: section.reader.clone(),
-        });
-    }
+    let reader = Consumer::OmopIncremental.reader(config)?;
     Ok(Some(OmopIncrementalSettings { reader }))
 }

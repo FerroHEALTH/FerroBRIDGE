@@ -16,7 +16,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
-use std::time::Duration;
 
 use axum::Router;
 use axum::routing::get;
@@ -24,34 +23,9 @@ use http::StatusCode;
 use tokio::net::TcpListener;
 
 use crate::config::Settings;
+use crate::retry::{Backoff, Waits};
 
 use ferrohealth_health::registry::{Check, HealthIndicator, Outcome};
-
-/// How long the start waits between two attempts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Backoff {
-    /// The wait after the first attempt that found the CDR not ready.
-    pub initial: Duration,
-    /// The longest wait between two attempts.
-    pub max: Duration,
-}
-
-impl Default for Backoff {
-    fn default() -> Self {
-        Self {
-            initial: Duration::from_secs(1),
-            max: Duration::from_secs(30),
-        }
-    }
-}
-
-impl Backoff {
-    /// Returns the wait that follows `delay`: twice as long, up to the ceiling.
-    #[must_use]
-    pub fn next(&self, delay: Duration) -> Duration {
-        delay.saturating_mul(2).min(self.max)
-    }
-}
 
 /// Where the start stands, shared between the attempts and the readiness
 /// indicator.
@@ -167,12 +141,13 @@ where
     Fut: Future<Output = anyhow::Result<T>>,
 {
     let mut error = first;
-    let mut delay = backoff.initial;
+    let mut waits = Waits::new(backoff);
     let mut attempts: u32 = 1;
     loop {
         if !not_ready(&error) {
             return Err(error);
         }
+        let delay = waits.failed();
         tracing::warn!(
             attempt = attempts,
             retry_in_ms = delay.as_millis(),
@@ -184,7 +159,6 @@ where
             delay.as_millis()
         ));
         tokio::time::sleep(delay).await;
-        delay = backoff.next(delay);
         attempts = attempts.saturating_add(1);
         match attempt().await {
             Ok(started) => {
@@ -437,17 +411,6 @@ async fn starting() -> StatusCode {
 mod tests {
     use super::{Backoff, Status, not_ready};
     use std::time::Duration;
-
-    #[test]
-    fn the_backoff_doubles_up_to_its_ceiling() {
-        let backoff = Backoff {
-            initial: Duration::from_secs(1),
-            max: Duration::from_secs(5),
-        };
-        assert_eq!(Duration::from_secs(2), backoff.next(Duration::from_secs(1)));
-        assert_eq!(Duration::from_secs(5), backoff.next(Duration::from_secs(4)));
-        assert_eq!(Duration::from_secs(5), backoff.next(Duration::from_secs(5)));
-    }
 
     #[test]
     fn an_error_with_no_cdr_call_in_its_chain_is_final() {
