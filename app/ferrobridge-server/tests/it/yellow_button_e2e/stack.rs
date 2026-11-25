@@ -240,7 +240,7 @@ fn smart_launch(
     });
     Ok(ferrosmart::Launch {
         port,
-        database_url: format!("{}?sslmode=disable", database.url()),
+        database_url: database.url().to_owned(),
         config,
         files: vec![
             (
@@ -305,7 +305,7 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [facade.summary]\nenabled = true\noperator = \"Synthetic operator\"\npackages = [{packages}]\n\n\
          [auth.issuer.ferrosmart]\nissuer = {smart:?}\n\n\
-         [state]\nurl = \"{state}?sslmode=disable\"\n\n\
+         [state]\nurl = \"{state}\"\n\n\
          [state.seal]\nlookup_key = {lookup:?}\n\n\
          [[state.seal.keys]]\nid = \"journey\"\nkey = {seal:?}\n\n\
          [shl]\nenabled = true\nbase_url = {origin:?}\n\n\
