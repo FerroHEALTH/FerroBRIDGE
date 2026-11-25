@@ -87,4 +87,5 @@ pub const DISCHARGE_REPORT_FORM: Form = Form {
         invariant: "cmp-hdr-2",
         slices: &["sectionDischargeSummary", "sectionHospitalCourse"],
     }],
+    legal_authentication: false,
 };

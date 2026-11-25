@@ -95,6 +95,15 @@ impl Document {
                         return Err(DocumentError::Lacking { slice });
                     }
                 }
+                SectionRule::Entered { entry, slice } => {
+                    if !self
+                        .sections
+                        .iter()
+                        .any(|section| section.slot.slice == slice && !section.entries.is_empty())
+                    {
+                        return Err(DocumentError::Unentered { entry, slice });
+                    }
+                }
                 SectionRule::OneOf { invariant, slices } => {
                     if !self
                         .sections
@@ -105,6 +114,23 @@ impl Document {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Holds the document to the parts its form requires: the encounter, the
+    /// language and the legal authentication.
+    pub(super) fn hold_parts(&self) -> Result<(), DocumentError> {
+        if self.form.encounter.is_some() && self.encounter.is_none() {
+            return Err(DocumentError::Missing { part: "encounter" });
+        }
+        if self.form.language && self.language.is_none() {
+            return Err(DocumentError::Missing { part: "language" });
+        }
+        if self.form.legal_authentication && !self.legally_authenticated() {
+            return Err(DocumentError::MissingMetadata {
+                element: "legalAuthentication",
+            });
         }
         Ok(())
     }

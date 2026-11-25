@@ -59,6 +59,13 @@ mod eps_mapped;
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod eps_sections;
 #[cfg(test)]
+#[cfg(all(
+    feature = "openehr",
+    feature = "patient-summary",
+    feature = "vaccination"
+))]
+mod euvac;
+#[cfg(test)]
 #[cfg(feature = "imaging")]
 mod imaging;
 #[cfg(test)]
