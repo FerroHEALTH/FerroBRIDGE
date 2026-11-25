@@ -13,7 +13,7 @@ use openehr_rm::v1_2::typing::base_name;
 
 use super::tail_walk;
 use super::tail_walk::concrete_forms;
-use super::{ENTRY_TIMES, FAMILIES, IDENTITIES, PARTY_ROOTS};
+use super::{ENTRY_TIMES, FAMILIES, FAMILY_TEXTS, IDENTITIES, PARTY_ROOTS};
 
 /// What the attribute a tail ends on holds.
 ///
@@ -38,6 +38,10 @@ pub enum Carried {
     /// node (`_provider` on an `ENTRY`) and the engine writes through
     /// [`crate::engine::family::provider`].
     Family,
+    /// A string attribute of a structural node, which FLAT writes as the
+    /// node's `_`-prefixed family ([`super::FAMILY_TEXTS`]) and the engine
+    /// reads as text.
+    FamilyText,
     /// A `DV_DATE_TIME` attribute of an entry the Web Template carries no
     /// node for, an `OBSERVATION`'s history origin or an `ACTION`'s time,
     /// which FLAT writes under the entry's node with the key
@@ -78,6 +82,12 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
     {
         return Some((owner, Carried::Family));
     }
+    if let Some(&(owner, _)) = FAMILY_TEXTS
+        .iter()
+        .find(|&&(owner, path)| path == wanted && model::is_a(class, owner))
+    {
+        return Some((owner, Carried::FamilyText));
+    }
     if let Some(&(owner, _)) = PARTY_ROOTS
         .iter()
         .find(|&&(owner, path)| path == wanted && class == owner)
@@ -90,11 +100,41 @@ pub fn carried(rm_type: &str, tail: &[&str]) -> Option<(&'static str, Carried)> 
     {
         return Some((owner, Carried::Value));
     }
+    if names_a_locatable(class, tail) {
+        return locatable_name(class, tail);
+    }
     let walked = walk(rm_type, tail)?;
     if walked.container != Container::None {
         return None;
     }
     Some((walked.owner, held(&walked.declared)?))
+}
+
+/// The attribute that names a `LOCATABLE` (RM common, the `LOCATABLE` class).
+pub const NAME: &str = "name";
+
+/// Returns what a tail through the `name` of a structural `LOCATABLE` such as
+/// an `ADDRESS` reaches, written as the class itself, `None` for any other
+/// tail.
+///
+/// The name is a `DV_TEXT` or `DV_CODED_TEXT`, so the tail below it is one of
+/// theirs. No FLAT key names a node's name, so the engine reads it from the
+/// instance and writes it as the node's `_name` family
+/// (`crate::engine::family::NAME`). No specification governs the family:
+/// our own design.
+fn locatable_name(class: &str, tail: &[&str]) -> Option<(&'static str, Carried)> {
+    let owner = model::class(class)?.name;
+    match tail.split_first()? {
+        (_, []) => Some((owner, Carried::Value)),
+        (_, rest) => carried("DV_TEXT", rest).map(|(_, held)| (owner, held)),
+    }
+}
+
+/// Whether `tail` steps through the `name` of a structural `LOCATABLE`.
+fn names_a_locatable(class: &str, tail: &[&str]) -> bool {
+    tail.first() == Some(&NAME)
+        && model::is_a(class, "LOCATABLE")
+        && model::is_a(class, derive::STRUCTURAL)
 }
 
 /// Returns the position in `tail` of each attribute that is a `List`, in
@@ -209,6 +249,30 @@ mod tests {
         assert_eq!(
             carried("DV_INTERVAL", &["lower_included"]),
             Some(("DV_INTERVAL", Carried::Boolean))
+        );
+    }
+
+    #[test]
+    fn the_name_of_a_structural_locatable_is_carried_as_its_class() {
+        // RM common §LOCATABLE: `name` is a DV_TEXT, which a DV_CODED_TEXT may fill.
+        assert_eq!(
+            carried("ADDRESS", &["name", "defining_code", "code_string"]),
+            Some(("ADDRESS", Carried::Text))
+        );
+        assert_eq!(
+            carried("ADDRESS", &["name"]),
+            Some(("ADDRESS", Carried::Value))
+        );
+        assert_eq!(carried("ADDRESS", &["name", "no_such_attribute"]), None);
+        assert_eq!(carried("ADDRESS", &["details"]), None);
+    }
+
+    #[test]
+    fn the_location_of_an_event_context_is_family_text() {
+        // RM ehr §EVENT_CONTEXT: `location` is a String; master05 §EVENT_CONTEXT `_location`.
+        assert_eq!(
+            carried("EVENT_CONTEXT", &["location"]),
+            Some(("EVENT_CONTEXT", Carried::FamilyText))
         );
     }
 

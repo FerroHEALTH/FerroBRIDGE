@@ -30,6 +30,7 @@ use openehr_query::ast::ContainsExpr;
 use openehr_query::ast::IdentifiedExpr;
 use openehr_query::ast::IdentifiedPath;
 use openehr_query::ast::LikeOperand;
+use openehr_query::ast::NodePredicate;
 use openehr_query::ast::ObjectPath;
 use openehr_query::ast::OrderByExpr;
 use openehr_query::ast::PathPart;
@@ -250,18 +251,31 @@ impl Conditions {
     }
 }
 
-/// Returns the class expression that binds `node` to `alias`.
+/// Returns the class expression that binds `node` to `alias`: the archetype
+/// root itself, or the root containing the node its step names.
 fn class(node: &Node, alias: &str) -> ContainsExpr {
-    ContainsExpr::Contained {
-        operand: ClassExprOperand::Class {
-            rm_type: node.class.clone(),
+    let root = |variable: Option<String>| ClassExprOperand::Class {
+        rm_type: node.class.clone(),
+        variable,
+        predicate: Some(PathPredicate::Archetype(ArchetypePredicate::Hrid(
+            node.archetype.clone(),
+        ))),
+    };
+    let Some(step) = &node.step else {
+        return containing(root(Some(alias.to_owned())), None);
+    };
+    let inner = containing(
+        ClassExprOperand::Class {
+            rm_type: step.class.clone(),
             variable: Some(alias.to_owned()),
-            predicate: Some(PathPredicate::Archetype(ArchetypePredicate::Hrid(
-                node.archetype.clone(),
-            ))),
+            predicate: Some(PathPredicate::Node(Box::new(NodePredicate::Code {
+                code: step.node_id.clone(),
+                name: None,
+            }))),
         },
-        contains: None,
-    }
+        None,
+    );
+    containing(root(None), Some(inner))
 }
 
 /// Returns `operand` constrained to contain `inner`, when there is one.
@@ -577,6 +591,7 @@ mod tests {
         let node = crate::facade::search::declaration::Node {
             class: String::from("EVALUATION"),
             archetype: String::from("openEHR-EHR-EVALUATION.problem_diagnosis.v1"),
+            step: None,
         };
         let mut conditions = Conditions::new("t");
         let first = conditions.alias(Some(&node));
@@ -627,10 +642,41 @@ mod tests {
     }
 
     #[test]
+    fn a_step_binds_the_node_inside_its_archetype_root() {
+        let node = crate::facade::search::declaration::Node {
+            class: String::from("OBSERVATION"),
+            archetype: String::from("openEHR-EHR-OBSERVATION.laboratory_test_result.v1"),
+            step: Some(crate::facade::search::declaration::Step {
+                class: String::from("EVENT"),
+                node_id: String::from("at0002"),
+            }),
+        };
+        let mut conditions = Conditions::new("t");
+        let alias = conditions.alias(Some(&node));
+        let code = conditions.bind("11502-2");
+        conditions.push(compare(
+            path(&format!(
+                "{alias}/data[at0003]/items[at0005]/value/defining_code/code_string"
+            )),
+            CompOp::Eq,
+            &code,
+        ));
+        let rows = rows_text(&conditions, &default_order());
+        assert!(
+            rows.contains(
+                "CONTAINS OBSERVATION[openEHR-EHR-OBSERVATION.laboratory_test_result.v1] CONTAINS EVENT n0[at0002]"
+            ),
+            "{rows}"
+        );
+        parses(&rows).expect("the stepped node parses");
+    }
+
+    #[test]
     fn an_entry_count_contains_the_entry_and_reads_no_composition() {
         let entry = crate::facade::search::declaration::Node {
             class: String::from("EVALUATION"),
             archetype: String::from("openEHR-EHR-EVALUATION.problem_diagnosis.v1"),
+            step: None,
         };
         let mut conditions = Conditions::new("t");
         let ehr = conditions.bind("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11");

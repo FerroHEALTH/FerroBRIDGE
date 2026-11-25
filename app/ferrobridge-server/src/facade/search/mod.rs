@@ -416,15 +416,25 @@ fn check_paths(declared: &Declared) -> Result<(), DeclarationError> {
 }
 
 /// Files `declared` under its type, refusing a second declaration over one
-/// template and a parameter set that differs from the type's first.
+/// template that could answer the same entry and a parameter set that
+/// differs from the type's first.
+///
+/// Two contexts of one type over one template answer disjoint entries only
+/// when each places its entry at an archetype of its own, so any other pair
+/// would answer one entry twice (no specification governs this: our own
+/// design).
 fn insert(catalog: &mut Catalog, declared: Declared) -> Result<(), DeclarationError> {
     let entries = catalog
         .by_type
         .entry(declared.resource_type.clone())
         .or_default();
+    let disjoint = |entry: &Declared| match (&entry.placement, &declared.placement) {
+        (Some(held), Some(placed)) => held.entry.archetype != placed.entry.archetype,
+        _ => false,
+    };
     if let Some(twin) = entries
         .iter()
-        .find(|entry| entry.template_id == declared.template_id)
+        .find(|entry| entry.template_id == declared.template_id && !disjoint(entry))
     {
         return Err(DeclarationError::Duplicate {
             first: twin.file.clone(),

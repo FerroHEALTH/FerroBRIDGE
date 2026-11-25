@@ -36,6 +36,13 @@ item="CKM EHDS archetypes (fixture)"
 dest="tools/ferrobridge-testkit/fixtures/ckm/ehds"
 paths=(
   "local/archetypes/entry/observation/openEHR-EHR-OBSERVATION.body_weight.v2.adl"
+  "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.precaution.v1.adl"
+  "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.advance_care_directive.v2.adl"
+  "local/archetypes/cluster/openEHR-EHR-CLUSTER.media_file.v1.adl"
+  "local/archetypes/entry/instruction/openEHR-EHR-INSTRUCTION.care_plan_request.v0.adl"
+  "local/archetypes/entry/observation/openEHR-EHR-OBSERVATION.pregnancy_assertion.v0.adl"
+  "local/archetypes/entry/evaluation/openEHR-EHR-EVALUATION.obstetric_summary.v1.adl"
+  "local/archetypes/entry/admin_entry/openEHR-EHR-ADMIN_ENTRY.travel_event.v0.adl"
 )
 
 pin="$(corpus_pin_cell "$item")"

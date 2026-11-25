@@ -1,0 +1,114 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/composition/org.openehr/report.v1.MedicationAdministration.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the archetype is the encounter COMPOSITION the EHDS record
+# template specialises, so the metadata name follows it, and no revision is
+# pinned, since the template's root carries its own. The
+# published `category` method (lines 104 to 186) is kept, its manual paths
+# naming `defining_code/terminology_id/value`, as manual.adoc writes it. The
+# other methods are left out: `statusDefault` writes `final`, which the R4
+# MedicationAdministration status set does not hold; `healthcareFacility`,
+# `composer` and the effective methods restate what the medication ACTION
+# carries; and `composerEmpty`, `contextStartTimeEmpty` and `categoryEmpty`
+# write `null_flavour` below a PARTY_PROXY, a DV_DATE_TIME and an
+# EVENT_CONTEXT, which carry none.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.encounter.v1.MedicationAdministration
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.encounter.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationAdministration
+
+mappings:
+  - name: category
+    with:
+      fhir: $resource.category.coding
+      openehr: $composition/context/setting
+    manual:
+      - name: outpatient
+        fhir:
+          - path: code
+            value: outpatient
+          - path: system
+            value: http://terminology.hl7.org/CodeSystem/medication-admin-category
+          - path: display
+            value: Outpatient
+        openehrCondition:
+          targetRoot: $openehrRoot
+          targetAttribute: defining_code/code_string
+          operator: one of
+          criteria: "228"
+        openehr:
+          - path: defining_code/terminology_id/value
+            value: openehr
+          - path: defining_code/code_string
+            value: "228"
+          - path: value
+            value: primary medical care
+        fhirCondition:
+          targetRoot: $fhirRoot
+          targetAttribute: code
+          operator: one of
+          criteria: outpatient
+
+      - name: inpatient
+        fhir:
+          - path: code
+            value: inpatient
+          - path: system
+            value: http://terminology.hl7.org/CodeSystem/medication-admin-category
+          - path: display
+            value: Inpatient
+        openehrCondition:
+          targetRoot: $openehrRoot
+          targetAttribute: defining_code/code_string
+          operator: one of
+          criteria: "232"
+        openehr:
+          - path: defining_code/terminology_id/value
+            value: openehr
+          - path: defining_code/code_string
+            value: "232"
+          - path: value
+            value: secondary medical care
+        fhirCondition:
+          targetRoot: $fhirRoot
+          targetAttribute: code
+          operator: one of
+          criteria: inpatient
+
+      - name: community
+        fhir:
+          - path: code
+            value: community
+          - path: system
+            value: http://terminology.hl7.org/CodeSystem/medication-admin-category
+          - path: display
+            value: Community
+        openehrCondition:
+          targetRoot: $openehrRoot
+          targetAttribute: defining_code/code_string
+          operator: one of
+          criteria: "238"
+        openehr:
+          - path: defining_code/terminology_id/value
+            value: openehr
+          - path: defining_code/code_string
+            value: "238"
+          - path: value
+            value: Community
+        fhirCondition:
+          targetRoot: $fhirRoot
+          targetAttribute: code
+          operator: one of
+          criteria: community

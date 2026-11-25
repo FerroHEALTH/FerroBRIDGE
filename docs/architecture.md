@@ -1138,7 +1138,18 @@ expression is a load error: the reference CDR's connector let `where()` and
   the profile HL7 Europe Base and Core 2.0.1 gives the group and the IHE
   QEDm 3.0.0 PCC-44 searches of its option as a search declaration beside
   it (#2087). A date search may read `ACTION.time` and `HISTORY.origin`,
-  which the RM defines and the Web Template leaves out.
+  which the RM defines and the Web Template leaves out, and a string search
+  `EVENT_CONTEXT.location`. Two contexts of one type may share a template
+  when each starts at an archetype of its own. A context whose mappings all
+  run openEHR to FHIR, such as the Location derived from an encounter's
+  context, is read-only: a write answers `405`. A `Consent` search without
+  `scope` answers the access directives and then the mapped advance
+  directives (scope `adr`) as one paged searchset, a `scope` picks the
+  lane its code names, and a read reaches the access directives for their
+  64-hex-digit id and the mapped lane for any other. A `patient-eu-core` party
+  write refuses an identifier without a type, as draft Annex X gives
+  `EHDSPatient.identifier.type` 1..1. Each of these is FerroBRIDGE's own
+  design.
 - **Status codes are mapped as types**, from the ITS-REST outcome to the FHIR
   outcome, in a table that is FerroBRIDGE's own design with both sides cited
   and every row pinned by a wire test: a CDR `422` (template validation) is a

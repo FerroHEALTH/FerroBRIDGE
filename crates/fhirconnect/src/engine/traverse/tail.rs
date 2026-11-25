@@ -58,7 +58,7 @@ const DV_DATE_TIME: &str = "DV_DATE_TIME";
 impl<T: Table + ?Sized> Run<'_, T> {
     /// Writes one FHIR element as the `_`-prefixed family a tail names below a
     /// structural node: a `PARTY_IDENTIFIED` as `family::provider` spells it,
-    /// a `DV_DATE_TIME` as `family::end_time` does.
+    /// a `DV_DATE_TIME` as `family::text` does.
     fn convert_family(
         &mut self,
         owner: &str,
@@ -119,7 +119,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     .extend(family::provider(node, &binding.openehr, &under, party));
             }
             RmValue::DateTime(ref date_time) => {
-                self.families.push(family::end_time(
+                self.families.push(family::text(
                     node,
                     &binding.openehr,
                     &under,
@@ -136,6 +136,39 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 });
             }
         }
+        Ok(())
+    }
+
+    /// Writes one FHIR string as the `_`-prefixed family of a string
+    /// attribute of a structural node ([`rm::FAMILY_TEXTS`]).
+    fn convert_family_text(
+        &mut self,
+        class: &str,
+        mapping: &Mapping,
+        target: &FhirTarget,
+        openehr: &OpenehrTarget,
+        view: &FhirValue,
+        binding: &Binding,
+    ) -> Result<(), EngineError> {
+        let node = openehr.node();
+        let segments = tail_segments(openehr);
+        let text = match *view {
+            FhirValue::String(ref string) => string.value.as_deref(),
+            _ => None,
+        }
+        .ok_or_else(|| EngineError::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(LensError::NoCell {
+                rm_type: String::from("String"),
+                kind: view.kind().as_str(),
+                direction: Direction::FhirToOpenehr,
+            }),
+        })?;
+        let under =
+            rm::family_of(class, &segments).ok_or_else(|| unsupported_tail(mapping, openehr))?;
+        self.families
+            .push(family::text(node, &binding.openehr, &under, text));
         Ok(())
     }
 
@@ -170,6 +203,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
         }
         if carried == Carried::Family {
             return self.convert_family(class, mapping, target, openehr, view, binding);
+        }
+        if carried == Carried::FamilyText {
+            return self.convert_family_text(class, mapping, target, openehr, view, binding);
         }
         let object = self
             .held_object(&binding.openehr, node.flat_id())
@@ -483,9 +519,11 @@ fn scalar_json(
     };
     match carried {
         Carried::Text if written.as_str().is_some() => Ok(serde_json::Value::String(text)),
-        Carried::Text | Carried::Value | Carried::Family | Carried::EntryTime => {
-            Err(refuse("text"))
-        }
+        Carried::Text
+        | Carried::Value
+        | Carried::Family
+        | Carried::FamilyText
+        | Carried::EntryTime => Err(refuse("text")),
         Carried::Real => serde_json::from_str::<serde_json::Number>(&text)
             .map(serde_json::Value::Number)
             .map_err(|_refused| refuse("a real number")),

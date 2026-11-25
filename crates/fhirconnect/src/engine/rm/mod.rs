@@ -369,6 +369,15 @@ pub const FAMILIES: &[(&str, &str)] = &[
     ("ELEMENT", NULL_FLAVOUR),
 ];
 
+/// The string attributes of a structural node that the Simplified Formats
+/// write as the node's `_`-prefixed family and the engine reads as text.
+///
+/// `EVENT_CONTEXT.location` is a `String` (RM ehr, the `EVENT_CONTEXT`
+/// class), spelled `_location` under the context
+/// (`docs/specs/its-rest/docs/simplified_formats/master05-rm_mapping.adoc`,
+/// the `EVENT_CONTEXT` table).
+pub const FAMILY_TEXTS: &[(&str, &str)] = &[("EVENT_CONTEXT", "location")];
+
 /// The date-time attributes of an entry a Web Template carries no node for.
 ///
 /// Each row is the entry class and the tail that names the attribute; the
@@ -570,7 +579,7 @@ mod tests {
             carried("EVENT_CONTEXT", &["health_care_facility"]),
             Some(("EVENT_CONTEXT", Carried::Family))
         );
-        assert_eq!(carried("EVENT_CONTEXT", &["location"]), None);
+        assert_eq!(carried("EVENT_CONTEXT", &["participations"]), None);
     }
 
     #[test]
