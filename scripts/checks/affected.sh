@@ -216,10 +216,11 @@ classify() {
     # The pass lists, the badges and the README badge block are read by the
     # conformance tests and scripts/checks/conformance.sh alone: a corpus's
     # list and badge by the one package that measures it, the script and the
-    # README block by every conformance package.
+    # README block by every conformance package, as are the badge logos the
+    # script writes into every badge.
     conformance/badges/*) corpus_class "$(badge_corpus "$path")" ;;
     conformance/*/*) corpus_class "$(cut -d/ -f2 <<<"$path")" ;;
-    conformance/* | scripts/checks/conformance.sh | README.md) echo "packages $(conformance_packages)" ;;
+    conformance/* | scripts/checks/conformance.sh | scripts/checks/badge-logos/* | README.md) echo "packages $(conformance_packages)" ;;
     scripts/checks/sqlx-offline.sh) echo "packages omop-cdm" ;;
     # The exchange-format validator lane judges the documents the eehrxf
     # suites write, so a change to it runs those suites and the lane.
