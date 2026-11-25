@@ -246,6 +246,17 @@ pub enum HarnessError {
         /// How long the probe waited.
         budget: Duration,
     },
+    /// A started container did not serve; its log says why.
+    #[error("the {image} container did not serve; its log:\n{log}")]
+    Unserved {
+        /// The image of the container.
+        image: &'static str,
+        /// Why it was found not serving.
+        #[source]
+        source: Box<HarnessError>,
+        /// What the container wrote on stdout and stderr.
+        log: String,
+    },
     /// A step of packing the value package could not run.
     #[error("could not {step}")]
     Pack {
@@ -658,7 +669,6 @@ pub(crate) fn cdr_request(
 ) -> ContainerRequest<GenericImage> {
     image
         .image()
-        .with_wait_for(WaitFor::message_on_stdout("ferroehr-rest listening"))
         .with_exposed_port(CDR_PORT.tcp())
         .with_network(network)
         .with_env_var("FERROEHR__DATABASE__URL", dsn)
@@ -684,6 +694,20 @@ pub(crate) fn postgres_health_check(role: &str, database: &str) -> Healthcheck {
         .with_interval(HEALTH_INTERVAL)
         .with_timeout(HEALTH_INTERVAL)
         .with_retries(HEALTH_RETRIES)
+}
+
+/// Returns what `container` wrote on stdout and stderr, as far as Docker
+/// still holds it.
+pub(crate) async fn log_of(container: &ContainerAsync<GenericImage>) -> String {
+    // NOTE: no specification governs this: a log that cannot be read leaves
+    // the failure it explains reported without it.
+    let stdout = container.stdout_to_vec().await.unwrap_or_default();
+    let stderr = container.stderr_to_vec().await.unwrap_or_default();
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&stdout),
+        String::from_utf8_lossy(&stderr)
+    )
 }
 
 /// Polls `url` until it answers `200`, or the budget runs out.

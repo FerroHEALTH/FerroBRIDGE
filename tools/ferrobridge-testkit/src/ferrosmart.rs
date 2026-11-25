@@ -20,7 +20,7 @@ use testcontainers::core::{CopyDataSource, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ContainerRequest, GenericImage, ImageExt};
 
-use crate::containers::{FERROSMART, HarnessError, await_readiness};
+use crate::containers::{FERROSMART, HarnessError, await_readiness, log_of};
 
 /// The directory every file of a run is copied to in the container.
 const ETC: &str = "/etc/ferrosmart";
@@ -217,15 +217,4 @@ fn request(image: GenericImage, launch: &Launch) -> ContainerRequest<GenericImag
         );
     }
     request
-}
-
-/// Returns what `container` wrote on stdout and stderr.
-async fn log_of(container: &ContainerAsync<GenericImage>) -> String {
-    let stdout = container.stdout_to_vec().await.unwrap_or_default();
-    let stderr = container.stderr_to_vec().await.unwrap_or_default();
-    format!(
-        "{}{}",
-        String::from_utf8_lossy(&stdout),
-        String::from_utf8_lossy(&stderr)
-    )
 }

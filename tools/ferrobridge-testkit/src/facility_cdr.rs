@@ -16,7 +16,7 @@
 
 use crate::containers::{
     CDR, CDR_DATABASE_ROLE, CDR_PORT, CDR_POSTGRES, Cdr, HarnessError, NETWORK_SEQUENCE,
-    POSTGRES_PORT, PinnedImage, await_readiness, cdr_request, postgres_health_check,
+    POSTGRES_PORT, PinnedImage, await_readiness, cdr_request, log_of, postgres_health_check,
 };
 use serde::Serialize;
 use std::sync::atomic::Ordering;
@@ -88,6 +88,31 @@ pub(crate) async fn serve(
         source,
     };
     let server = request.start().await.map_err(failed)?;
+    let origin = match reach(&server).await {
+        Ok(origin) => origin,
+        Err(source) => {
+            return Err(HarnessError::Unserved {
+                image: CDR.repository,
+                source: Box::new(source),
+                log: log_of(&server).await,
+            });
+        }
+    };
+    Ok(Cdr {
+        server,
+        database,
+        base_url: format!("{origin}/ferroehr/rest/openehr/v1"),
+        extensions_url: format!("{origin}/ferroehr/rest/extensions/v1"),
+    })
+}
+
+/// Returns the origin `server` answers at once its readiness endpoint
+/// answers `200`.
+async fn reach(server: &ContainerAsync<GenericImage>) -> Result<String, HarnessError> {
+    let failed = |source| HarnessError::Container {
+        image: CDR.repository,
+        source,
+    };
     let host = server.get_host().await.map_err(failed)?;
     let port = server
         .get_host_port_ipv4(CDR_PORT.tcp())
@@ -95,12 +120,7 @@ pub(crate) async fn serve(
         .map_err(failed)?;
     let origin = format!("http://{host}:{port}");
     await_readiness(&format!("{origin}/health/readiness")).await?;
-    Ok(Cdr {
-        server,
-        database,
-        base_url: format!("{origin}/ferroehr/rest/openehr/v1"),
-        extensions_url: format!("{origin}/ferroehr/rest/extensions/v1"),
-    })
+    Ok(origin)
 }
 
 /// One facility identifier a relay client commits for: an
