@@ -2470,6 +2470,20 @@ takes `flate2` 1.1.10 on its pure-Rust `rust_backend` and `tar` 0.4.46
 without its default `xattr` feature for the `.tgz` form of a FHIR package,
 the pair FerroFED reads its packages with.
 
+The FHIR Mapping Language engine (#2051, `src/structuremap/`) renders a
+source's own JSON as FHIR R4: a map in the R4 language
+(<https://hl7.org/fhir/R4/mapping-language.html>, grammar `mapping.g4`)
+runs over an instance of a logical model, a `StructureDefinition` of `kind =
+logical`, which `structuremap::openapi` generates from the schema a
+source's `OpenAPI` document publishes. FHIRconnect maps openEHR to FHIR and
+cannot describe another source, so this second language serves the inbound
+sources. The grammar leaves `fhirPath` a placeholder, so an embedded
+expression is parenthesized or runs to the next clause, as the tutorial
+writes it, and `ferrobridge-fhirpath` evaluates it with the map's variables
+bound by name over untyped logical-model nodes. `translate` waits on the
+terminology client (#2118); `dateOp` and `escape`, which R4 leaves
+undocumented, are refused.
+
 ## 8. What each seam carries
 
 - `openehr-mapping-core` to both language crates: a parsed header, a YAML

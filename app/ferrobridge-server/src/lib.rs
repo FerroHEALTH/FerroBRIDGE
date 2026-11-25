@@ -46,6 +46,7 @@ pub mod sources;
 pub mod startup;
 pub mod state;
 pub mod store;
+pub mod structuremap;
 pub mod terminology;
 pub mod usage_report;
 pub mod walk;
