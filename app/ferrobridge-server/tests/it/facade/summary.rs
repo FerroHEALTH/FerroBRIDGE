@@ -709,6 +709,7 @@ async fn a_document_that_breaks_its_profile_is_refused_with_422() -> Result<(), 
         items.retain(|item| item["archetype_node_id"] != "id4");
     }
     harness.cdr.reset().await;
+    crate::support::mount_pseudonym(&harness.cdr, NAMESPACE).await;
     mount_person_template(&harness.cdr).await?;
     mount_patient(&harness.cdr, &undated).await;
     Mock::given(matchers::method("GET"))

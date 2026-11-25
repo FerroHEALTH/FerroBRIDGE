@@ -140,6 +140,17 @@ pub(crate) async fn served_identity(
     .await
 }
 
+/// Mounts on `server` an identity source under `/pix` that answers every
+/// patient with [`PSEUDONYM`] in `domain`.
+pub(crate) async fn mount_pseudonym(server: &MockServer, domain: &str) {
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path(PIX_PATH))
+        .respond_with(pseudonym_answer(domain, PSEUDONYM))
+        .with_priority(10)
+        .mount(server)
+        .await;
+}
+
 /// Returns `settings` asking the identity source served by `server` under
 /// `/pix`, which answers every patient with [`PSEUDONYM`] and accepts source
 /// identifiers in `accepted`.
@@ -149,12 +160,7 @@ pub(crate) async fn served_identity_accepting(
     accepted: &[&str],
 ) -> ferrobridge_server::facade::Settings {
     let domain = settings.subject.namespace().to_owned();
-    wiremock::Mock::given(wiremock::matchers::method("POST"))
-        .and(wiremock::matchers::path(PIX_PATH))
-        .respond_with(pseudonym_answer(&domain, PSEUDONYM))
-        .with_priority(10)
-        .mount(server)
-        .await;
+    mount_pseudonym(server, &domain).await;
     let base = format!("{}/pix", server.uri());
     ferrobridge_server::facade::Settings {
         subject: ferrobridge_server::facade::subject::SubjectLink::new(identity_source_accepting(
