@@ -4,12 +4,11 @@
 //! Checking and compiling the whole mapping set, then swapping it in.
 //!
 //! A reload compiles the provisioned files and the running revision's files
-//! together,
-//! once for the check and once more for each lane that takes its templates
-//! from another source, and only a set that compiled for every lane replaces
-//! the running one: the facade's programs and search declarations, the
-//! operations lane's programs and the operator snapshot, each in one pointer
-//! swap. A request takes its set at entry, so a request in flight finishes on
+//! together, once for the check and once more for each lane that takes its
+//! templates from another source, and only a set that compiled for every
+//! lane replaces the running one: the facade's programs and search
+//! declarations, the operations lane's programs, the FHIR Mapping Language
+//! maps and the operator snapshot, each in one pointer swap. A request takes its set at entry, so a request in flight finishes on
 //! the old set. No specification governs the reload: our own design.
 
 use std::collections::BTreeMap;
@@ -70,6 +69,8 @@ pub struct Reloader {
     pub facade: Option<Arc<Facade>>,
     /// The operations lane, when it runs.
     pub operations: Option<Arc<OperationsLane>>,
+    /// The FHIR Mapping Language maps the inbound sources run.
+    pub structuremaps: Option<Arc<crate::structuremap::Running>>,
 }
 
 /// A set that compiled for every lane, ready to swap in.
@@ -81,6 +82,7 @@ pub struct Prepared {
     facade: Option<(Programs, Catalog)>,
     /// The operations lane's programs.
     operations: Option<ProgramSet>,
+    structuremaps: Vec<crate::structuremap::syntax::StructureMap>,
 }
 
 impl Prepared {
@@ -105,6 +107,7 @@ impl Reloader {
             fhirconnect,
             declarations,
             omocl,
+            structuremap,
         } = sources;
         let templates = match (self.templates.as_deref(), self.cdr.as_ref()) {
             (Some(directory), _) => Some(Templates::Directory(directory)),
@@ -115,6 +118,7 @@ impl Reloader {
             (self.fhirconnect.is_some() || !fhirconnect.is_empty()).then_some(fhirconnect),
             templates,
             (self.omocl || !omocl.is_empty()).then_some(omocl),
+            (!structuremap.is_empty()).then_some(structuremap),
         )
         .await
         .map_err(ReloadError::Check)?;
@@ -179,10 +183,12 @@ impl Reloader {
             .map_or_else(BTreeMap::new, |(programs, catalog)| {
                 searches(programs, catalog)
             });
+        let structuremaps = report.structuremaps().to_vec();
         Ok(Prepared {
             snapshot: Snapshot::new(report, searches),
             facade,
             operations,
+            structuremaps,
         })
     }
 
@@ -195,6 +201,9 @@ impl Reloader {
         }
         if let (Some(lane), Some(programs)) = (self.operations.as_ref(), prepared.operations) {
             lane.replace(programs);
+        }
+        if let Some(running) = self.structuremaps.as_ref() {
+            running.replace(prepared.structuremaps);
         }
         prepared.snapshot
     }
