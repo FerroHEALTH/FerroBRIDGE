@@ -36,12 +36,8 @@ pub(crate) struct Started {
 }
 
 impl Started {
-    /// Logs the boot summary and the indicators readiness runs, and starts
-    /// the replica's `LISTEN` session on the inbound sources.
+    /// Logs the boot summary and the indicators readiness runs.
     pub(crate) fn announce(&self) {
-        if let (Some(store), Some(sources)) = (self.state.store(), self.state.sources()) {
-            store.listeners(&[sources.listened()]).spawn();
-        }
         startup::log(&self.lanes);
         tracing::info!(
             version = crate::build_info::VERSION,
