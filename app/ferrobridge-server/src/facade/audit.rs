@@ -99,7 +99,8 @@ pub async fn record(
     };
     let reach = Reach::default();
     let response = reach.clone().around(next.run(request)).await;
-    let record = recording.record(asked, &reach.reached(), response.status());
+    let categories = recording.log.categories().await;
+    let record = recording.record(asked, &reach.reached(), response.status(), &categories);
     match place.store(record).await {
         Ok(()) => response,
         Err(error) => {
@@ -224,16 +225,21 @@ fn accessor(caller: &Caller) -> Accessor {
 
 impl Recording {
     /// Returns the record of `asked`, which reached `reached` and was answered
-    /// with `status`.
-    fn record(&self, asked: Pending, reached: &Reached, status: StatusCode) -> AccessRecord {
+    /// with `status`, classified under `categories`.
+    fn record(
+        &self,
+        asked: Pending,
+        reached: &Reached,
+        status: StatusCode,
+        categories: &crate::settings::Categories,
+    ) -> AccessRecord {
         let action = action(asked.interaction, reached);
         let basis = match action {
             Action::Create | Action::Update | Action::Delete => Basis::Written,
             _ => Basis::Returned,
         };
-        let categories = self
-            .log
-            .categories()
+        let categories = categories
+            .map()
             .classify(&Evidence::reached(basis, reached.objects()));
         // NOTE: Regulation (EU) 2025/327 Annex II 3.2(e): every datum the facade reaches is
         // the CDR's, so the CDR is the one origin of an access that reached any.

@@ -74,21 +74,81 @@ impl Register {
     /// [`RegisterError::Categories`] for a category map that does not hold.
     pub fn check(self, document: &serde_json::Value) -> Result<(), RegisterError> {
         match self {
-            Self::AuditCategories => {
-                let categories: crate::config::section::audit::AuditCategories =
-                    serde_json::from_value(document.clone()).map_err(RegisterError::Shape)?;
-                // NOTE: openEHR BASE Release 1.3.0, Identification Package: template and
-                // archetype ids compare case-insensitively.
-                ehds_logging::map::CategoryMap::declare_with(
-                    ehds_logging::map::Matching::OpenEhr,
-                    &categories.national,
-                    &categories.templates,
-                    &categories.archetypes,
-                )
-                .map(|_map| ())
-                .map_err(RegisterError::Categories)
-            }
+            Self::AuditCategories => category_map(document).map(|_map| ()),
         }
+    }
+}
+
+/// The `audit-categories` document (Annex II 3.2(c)): each template id and
+/// archetype id to its Art 14(1) categories, or to `none`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CategoryDocument {
+    /// The national categories the map may name, each `<system>|<code>`.
+    pub national: Vec<String>,
+    /// The categories of the data under each template id.
+    pub templates: BTreeMap<String, ehds_logging::map::Declared>,
+    /// The categories of the data under each archetype id.
+    pub archetypes: BTreeMap<String, ehds_logging::map::Declared>,
+}
+
+/// Returns the category map an `audit-categories` document declares.
+fn category_map(
+    document: &serde_json::Value,
+) -> Result<ehds_logging::map::CategoryMap, RegisterError> {
+    let categories: CategoryDocument =
+        serde_json::from_value(document.clone()).map_err(RegisterError::Shape)?;
+    // NOTE: openEHR BASE Release 1.3.0, Identification Package: template and archetype
+    // ids compare case-insensitively.
+    ehds_logging::map::CategoryMap::declare_with(
+        ehds_logging::map::Matching::OpenEhr,
+        &categories.national,
+        &categories.templates,
+        &categories.archetypes,
+    )
+    .map_err(RegisterError::Categories)
+}
+
+/// The category map of one `audit-categories` version, named by that version
+/// so every record classified under it names the revision.
+#[derive(Debug)]
+pub struct Categories {
+    /// The version it was compiled from.
+    number: i64,
+    /// The map, its digest `audit-categories/<number>`.
+    map: ehds_logging::map::CategoryMap,
+}
+
+impl Categories {
+    /// Compiles the category map of `version` of `audit-categories`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the check's error for a document that does not hold.
+    pub fn compile(version: &Version) -> Result<Self, RegisterError> {
+        // NOTE: no specification governs this: our own design; the digest names the
+        // register revision, so a record classified during an outage can be re-checked.
+        let map = category_map(&version.document)?.with_digest(format!(
+            "{}/{}",
+            Register::AuditCategories.name(),
+            version.number
+        ));
+        Ok(Self {
+            number: version.number,
+            map,
+        })
+    }
+
+    /// Returns the version the map was compiled from.
+    #[must_use]
+    pub const fn number(&self) -> i64 {
+        self.number
+    }
+
+    /// Returns the map.
+    #[must_use]
+    pub const fn map(&self) -> &ehds_logging::map::CategoryMap {
+        &self.map
     }
 }
 
@@ -392,6 +452,30 @@ mod tests {
                 .expect("the default holds");
         }
         assert_eq!(None, Register::of_name("access-delay"));
+    }
+
+    #[test]
+    fn a_category_naming_no_art_14_category_is_refused() {
+        let refused = Register::AuditCategories.check(&serde_json::json!({
+            "templates": {"Synthetic.v1": ["No-Such-Category"]},
+        }));
+        assert!(
+            matches!(refused, Err(RegisterError::Categories(_))),
+            "{refused:?}"
+        );
+    }
+
+    #[test]
+    fn a_compiled_map_names_its_register_revision() {
+        let version = super::Version {
+            number: 3,
+            document: Register::AuditCategories.default_document(),
+            committer: None,
+            committed_at: None,
+        };
+        let compiled = super::Categories::compile(&version).expect("the default compiles");
+        assert_eq!(Some("audit-categories/3"), compiled.map().digest());
+        assert_eq!(3, compiled.number());
     }
 
     #[test]

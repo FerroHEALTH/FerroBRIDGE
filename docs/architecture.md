@@ -2372,7 +2372,16 @@ State held in memory listens on one `LISTEN` session per replica, apart
 from the pool: a notification marks the copy stale, a reconnect drops it
 whole, and while the session is down every request reads the store;
 PostgreSQL delivers a `NOTIFY` at commit and never on rollback
-(<https://www.postgresql.org/docs/current/sql-notify.html>). `[state.seal]`
+(<https://www.postgresql.org/docs/current/sql-notify.html>). Operational policy the operator changes at runtime is a settings register
+(`settings_register`, `0002`): each write appends a version naming the version
+it replaces in `If-Match` (a stale writer answers `412`, RFC 9110 §13.1.1) and
+notifies `ferrobridge_settings`, and a register with no version holds its
+default. The first register is `audit-categories`, the Annex II 3.2(c)
+category map; every access record names the revision it was classified under
+as the map digest, a replica refuses to start without the register, and a
+replica that cannot read it later classifies with the newest revision it
+holds and logs a warning naming that revision. The register mechanics and the
+revision field are our own design. `[state.seal]`
 lists the keys stored bodies are sealed under, each named by the id a sealed
 row carries, the first one sealing. The `redb` files stay until each area
 has moved. No specification governs where the bridge keeps its state: our

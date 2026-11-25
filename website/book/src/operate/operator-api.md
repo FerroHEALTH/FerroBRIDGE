@@ -397,7 +397,7 @@ The body is the whole new document, as JSON. The write names, in
 
 | Answer | When |
 |---|---|
-| `200` | The version is committed and every replica reads it from its next request on. The body is the new version and the `ETag` its number |
+| `200` | The version is committed and every replica classifies by it from its next request on. The body is the new version and the `ETag` its number |
 | `400` | The document is no JSON, is not the register's shape, or breaks its rules (`bad-register`); the version in force stays |
 | `404` | No register has the name |
 | `409` | No `[state]` is configured |

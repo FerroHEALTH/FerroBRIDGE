@@ -15,9 +15,6 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::body::Body;
-use ehds_logging::map::CategoryMap;
-use ehds_logging::map::Declared;
-use ehds_logging::map::Matching;
 use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
@@ -106,14 +103,14 @@ async fn recorded_under(
         .as_str()
         .ok_or("the fixture composition names its template")?
         .to_owned();
-    let categories = CategoryMap::declare_with(
-        Matching::OpenEhr,
-        &[],
-        &BTreeMap::from([(template, Declared::Codes(vec![CATEGORY.to_owned()]))]),
-        &BTreeMap::new(),
-    )?;
-    let log =
-        crate::audit::access_log(&arr, &store, harness.facade.client().base_url(), categories)?;
+    let categories = serde_json::json!({ "templates": { template: [CATEGORY] } });
+    let log = crate::audit::access_log(
+        &arr,
+        &store,
+        harness.facade.client().base_url(),
+        Some(categories),
+    )
+    .await?;
     Ok(Some(Recorded {
         harness,
         issuer,
@@ -510,5 +507,61 @@ async fn a_professional_with_patient_scopes_is_not_the_person_s_own() -> Result<
         return Ok(());
     };
     assert!(details(&record, "binding").is_empty(), "{record}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_record_classified_while_the_register_is_unreadable_names_the_revision_it_used()
+-> Result<(), Box<dyn Error>> {
+    let Some(case) = recorded(harness().await).await? else {
+        return Ok(());
+    };
+    let template = case.harness.composition()["archetype_details"]["template_id"]["value"]
+        .as_str()
+        .ok_or("the fixture composition names its template")?
+        .to_owned();
+    let revised = serde_json::json!({
+        "templates": { template: [CATEGORY] },
+        "archetypes": { "openEHR-EHR-COMPOSITION.synthetic.v1": "none" },
+    });
+    ferrobridge_server::settings::Registers::new(&case.store)
+        .write(
+            ferrobridge_server::settings::Register::AuditCategories,
+            1,
+            &revised,
+            "synthetic-client-sub",
+        )
+        .await?;
+    let outage = |sql: &'static str| sqlx::query(sql).execute(case.store.pool());
+    outage("ALTER TABLE settings_register RENAME TO settings_register_away").await?;
+    mount_ehr(&case.harness.cdr).await;
+    mount_create(&case.harness.cdr, VERSION_ONE, &case.harness.composition()).await;
+    let create = || case.as_caller(post_condition(&condition()), "system/Condition.c");
+    assert_eq!(
+        StatusCode::CREATED,
+        raw(case.app(), create()).await?.status()
+    );
+    let during = case.records(1).await?;
+    let record = during[0].to_string();
+    assert!(
+        record.contains(CATEGORY),
+        "the record keeps its category: {record}"
+    );
+    assert!(
+        record.contains("audit-categories/1"),
+        "the record names the revision it was classified under: {record}"
+    );
+    outage("ALTER TABLE settings_register_away RENAME TO settings_register").await?;
+    assert_eq!(
+        StatusCode::CREATED,
+        raw(case.app(), create()).await?.status()
+    );
+    let after = case.records(2).await?;
+    assert!(
+        after
+            .iter()
+            .any(|record| record.to_string().contains("audit-categories/2")),
+        "the next record is classified under the newest revision: {after:?}"
+    );
     Ok(())
 }

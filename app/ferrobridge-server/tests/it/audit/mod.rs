@@ -15,9 +15,9 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ehds_logging::map::CategoryMap;
 use ferrobridge_server::audit::AccessLog;
 use ferrobridge_server::audit::Settings;
+use ferrobridge_server::settings::{Register, Registers};
 use ferrobridge_server::store::Store;
 use ferrobridge_testkit::containers;
 use ferrohealth_secret::secret_url::SecretUrl;
@@ -62,14 +62,26 @@ pub(crate) async fn state() -> Result<Option<(containers::Postgres, Store)>, Box
 }
 
 /// Opens an access-record lane that delivers to `arr` from the outbox of
-/// `store`, classifying by `categories`, for a facade over the CDR at `cdr`,
-/// and starts its delivery.
-pub(crate) fn access_log(
+/// `store`, classifying by the `audit-categories` document `categories`
+/// committed as the register's first version (its default for `None`), for a
+/// facade over the CDR at `cdr`, and starts its delivery.
+pub(crate) async fn access_log(
     arr: &MockServer,
     store: &Store,
     cdr: &url::Url,
-    categories: CategoryMap,
+    categories: Option<serde_json::Value>,
 ) -> Result<Arc<AccessLog>, Box<dyn Error>> {
+    let registers = Arc::new(Registers::new(store));
+    if let Some(document) = categories {
+        registers
+            .write(
+                Register::AuditCategories,
+                0,
+                &document,
+                "synthetic-client-sub",
+            )
+            .await?;
+    }
     let client = OutboundClient::build(
         &EndpointSection {
             url: SecretUrl::new(arr.uri()),
@@ -88,9 +100,9 @@ pub(crate) fn access_log(
         feed: ferrobridge_server::audit::feed::repository(client, true)?,
         source_id: String::from("ferrobridge.test"),
         site: None,
-        categories,
     };
-    let log = Arc::new(AccessLog::open(&settings, &BASE_URL.parse()?, cdr, store));
+    let log =
+        Arc::new(AccessLog::open(&settings, (&BASE_URL.parse()?, cdr), store, registers).await?);
     drop(log.spawn());
     Ok(log)
 }

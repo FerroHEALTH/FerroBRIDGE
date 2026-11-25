@@ -10,7 +10,6 @@
 use std::error::Error;
 use std::time::Duration;
 
-use ehds_logging::map::CategoryMap;
 use wiremock::ResponseTemplate;
 
 use crate::facade::ehr_body;
@@ -40,7 +39,7 @@ async fn recorded() -> Result<
         return Ok(None);
     };
     let arr = super::repository().await;
-    let log = super::access_log(&arr, &state.1, &CDR.parse()?, CategoryMap::default())?;
+    let log = super::access_log(&arr, &state.1, &CDR.parse()?, None).await?;
     let running = Running::start_recorded(
         face_settings(true),
         ResponseTemplate::new(200).set_body_string(ehr_body()),
