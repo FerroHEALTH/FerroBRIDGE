@@ -1,0 +1,8 @@
+EHDSAllergyIntolerance
+EHDSCondition
+EHDSImmunisation
+EHDSMedication
+EHDSMedicationUse
+EHDSObservation
+EHDSProcedure
+total 33
