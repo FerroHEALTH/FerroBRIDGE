@@ -41,10 +41,11 @@ pub enum OwnedError {
     },
 }
 
-/// Returns the error a database failure is.
-fn database(source: sqlx::Error) -> OwnedError {
-    OwnedError::Database {
-        source: Box::new(source),
+impl From<sqlx::Error> for OwnedError {
+    fn from(source: sqlx::Error) -> Self {
+        Self::Database {
+            source: Box::new(source),
+        }
     }
 }
 
@@ -121,8 +122,7 @@ impl OwnedStore {
         .bind(&id)
         .bind(&body)
         .execute(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         Ok(stamped)
     }
 
@@ -140,8 +140,7 @@ impl OwnedStore {
         .bind(resource_type)
         .bind(id)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         row.map(|row| held_of(&key_of(resource_type, id), &row))
             .transpose()
     }
@@ -162,7 +161,7 @@ impl OwnedStore {
         decide: impl FnOnce(Option<&Held>) -> Result<Change, R> + Send,
     ) -> Result<Result<Held, R>, OwnedError> {
         let key = key_of(resource_type, id);
-        let mut tx = self.pool.begin().await.map_err(database)?;
+        let mut tx = self.pool.begin().await?;
         // NOTE: no specification governs this: our own design; a version 0 row
         // stands for an absent resource, so a create by id has a row to hold.
         sqlx::query(
@@ -172,8 +171,7 @@ impl OwnedStore {
         .bind(resource_type)
         .bind(id)
         .execute(&mut *tx)
-        .await
-        .map_err(database)?;
+        .await?;
         let row = sqlx::query(
             "SELECT version, body FROM owned_resource WHERE resource_type = $1 AND id = $2 \
              FOR UPDATE",
@@ -181,9 +179,8 @@ impl OwnedStore {
         .bind(resource_type)
         .bind(id)
         .fetch_one(&mut *tx)
-        .await
-        .map_err(database)?;
-        let version: i64 = row.try_get("version").map_err(database)?;
+        .await?;
+        let version: i64 = row.try_get("version")?;
         let held = if version == 0 {
             None
         } else {
@@ -191,7 +188,7 @@ impl OwnedStore {
         };
         let change = match decide(held.as_ref()) {
             Err(refusal) => {
-                tx.rollback().await.map_err(database)?;
+                tx.rollback().await?;
                 return Ok(Err(refusal));
             }
             Ok(change) => change,
@@ -226,8 +223,8 @@ impl OwnedStore {
         .bind(&body)
         .execute(&mut *tx)
         .await
-        .map_err(database)?;
-        tx.commit().await.map_err(database)?;
+        ?;
+        tx.commit().await?;
         Ok(Ok(Held::from(record)))
     }
 
@@ -243,12 +240,11 @@ impl OwnedStore {
         )
         .bind(resource_type)
         .fetch_all(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         rows.iter()
             .map(|row| {
-                let id: String = row.try_get("id").map_err(database)?;
-                let body: serde_json::Value = row.try_get("body").map_err(database)?;
+                let id: String = row.try_get("id")?;
+                let body: serde_json::Value = row.try_get("body")?;
                 decode(&key_of(resource_type, &id), body)
             })
             .collect()
@@ -257,9 +253,9 @@ impl OwnedStore {
 
 /// Returns what a row holds under `key`.
 fn held_of(key: &str, row: &sqlx::postgres::PgRow) -> Result<Held, OwnedError> {
-    let version: i64 = row.try_get("version").map_err(database)?;
+    let version: i64 = row.try_get("version")?;
     let version = u64::try_from(version).map_err(|_negative| exhausted(key))?;
-    let body: Option<serde_json::Value> = row.try_get("body").map_err(database)?;
+    let body: Option<serde_json::Value> = row.try_get("body")?;
     Ok(Held::from(Record {
         version,
         resource: body.map(|body| decode(key, body)).transpose()?,

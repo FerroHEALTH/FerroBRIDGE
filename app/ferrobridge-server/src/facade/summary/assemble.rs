@@ -79,6 +79,9 @@ pub(super) struct Inputs<'a> {
     pub(super) patient: Patient,
     /// The name of the organisation that operates this server.
     pub(super) operator: &'a str,
+    /// The custodian the document names: the healthcare provider that holds
+    /// the records behind the CDR.
+    pub(super) custodian: &'a crate::facade::Custodian,
     /// The patient summary compositions of the patient's EHR, canonical JSON.
     pub(super) compositions: &'a [String],
 }
@@ -146,6 +149,10 @@ pub(super) async fn assemble(
         name: Some(inputs.operator.into()),
         ..Organization::default()
     })))?;
+    document.with_custodian(Organization {
+        id: Some(String::from("custodian")),
+        ..inputs.custodian.organization()
+    })?;
     let settings = Settings::new(device.clone(), inputs.timestamp);
     let mut translator =
         Translator::new(terminology, &ehn::PATIENT_SUMMARY).with_bindings(inputs.bindings);
