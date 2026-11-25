@@ -28,11 +28,11 @@ use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::CodePhraseLens;
 use crate::engine::lens::code_phrase::text_of;
 use crate::engine::lens::term_mapping::Withheld;
-use crate::engine::lens::term_mapping::coding_of;
-use crate::engine::lens::term_mapping::equivalents;
 use crate::engine::lens::term_mapping::mappings_of;
 use crate::engine::lens::term_mapping::uncarried;
 use crate::engine::lens::term_mapping::withheld;
+use crate::engine::lens::text::concept_of;
+use crate::engine::lens::text::untexted;
 use crate::model::ast::keyword::Direction;
 
 /// The name the `CodeableConcept` cell carries in a diagnostic.
@@ -98,15 +98,12 @@ impl Lens<DvCodedText, CodeableConcept> for CodedTextLens {
             .preferred_term
             .clone()
             .map(primitives::String::from);
-        let mut codings = vec![defining];
-        for mapping in equivalents(source.mappings.iter().flatten()) {
-            codings.push(coding_of(mapping, CODEABLE_CONCEPT_CELL)?);
-        }
-        Ok(CodeableConcept {
-            coding: codings,
-            text: Some(primitives::String::from(source.value.clone())),
-            ..CodeableConcept::default()
-        })
+        concept_of(
+            vec![defining],
+            source.mappings.iter().flatten(),
+            &source.value,
+            CODEABLE_CONCEPT_CELL,
+        )
     }
 
     fn put(
@@ -147,10 +144,7 @@ impl Lens<DvCodedText, CodeableConcept> for CodedTextLens {
     }
 
     fn fallbacks(&self, view: &CodeableConcept) -> Vec<Fallback> {
-        if text_of(view.text.as_ref().map(|text| &text.value)).is_some() {
-            return Vec::new();
-        }
-        vec![Fallback::new(CODEABLE_CONCEPT_CELL, "DV_TEXT.value")]
+        untexted(view, CODEABLE_CONCEPT_CELL)
     }
 
     fn withheld(&self, source: &DvCodedText) -> Vec<Withheld> {

@@ -279,23 +279,7 @@ pub fn to_openehr<T: Table + ?Sized>(
     context: &CallContext,
 ) -> Result<Outcome<CanonicalComposition>, EngineError> {
     composition_program(program)?;
-    let mut run = Run::new(
-        program,
-        table,
-        index,
-        Direction::FhirToOpenehr,
-        *seams,
-        context,
-        document.clone(),
-        None,
-    );
-    // NOTE: basics/Variables.adoc, `$archetype` is the root as `$resource` is, so one
-    // resource maps into one instance of the start archetype and its axes are bound.
-    run.pins = program
-        .root_axes()
-        .iter()
-        .map(|axis| (axis.clone(), RmPosition::first()))
-        .collect();
+    let mut run = Run::inbound(program, table, index, seams, context, document);
     run.whole_program()?;
     let mut defaulted = run.apply_defaults(defaults)?;
     let unplaced = run.place_facility(defaults, &mut defaulted)?;
@@ -751,6 +735,36 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
             reads: Vec::new(),
             carried: core::cell::RefCell::default(),
         }
+    }
+
+    /// Creates a run from a FHIR resource into openEHR, the start
+    /// archetype's axes bound to its first instance.
+    fn inbound(
+        program: &'a Program,
+        table: &'a T,
+        index: &'a WebTemplateIndex,
+        seams: &Seams<'a>,
+        context: &'a CallContext,
+        document: &Value,
+    ) -> Self {
+        let mut run = Self::new(
+            program,
+            table,
+            index,
+            Direction::FhirToOpenehr,
+            *seams,
+            context,
+            document.clone(),
+            None,
+        );
+        // NOTE: basics/Variables.adoc, `$archetype` is the root as `$resource` is, so one
+        // resource maps into one instance of the start archetype and its axes are bound.
+        run.pins = program
+            .root_axes()
+            .iter()
+            .map(|axis| (axis.clone(), RmPosition::first()))
+            .collect();
+        run
     }
 }
 

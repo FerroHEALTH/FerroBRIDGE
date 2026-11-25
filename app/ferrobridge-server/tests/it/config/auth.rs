@@ -20,10 +20,10 @@ use ferrobridge_server::smart::SmartSettings;
 use ferrohealth_smart::basic::Credential;
 use ferrohealth_smart::basic::StoreError;
 use ferrohealth_smart::config::ConfigError;
+use ferrohealth_smart::jws::algorithm::Algorithm;
 use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_smart::metadata::DiscoveryError;
 use ferrohealth_smart::resource::ResourceError;
-use jsonwebtoken::Algorithm;
 use secrecy::SecretString;
 
 use crate::support::random_secret;
@@ -137,12 +137,12 @@ fn a_minimal_section_takes_the_defaults() -> Result<(), Box<dyn std::error::Erro
     );
     assert_eq!(
         vec![
-            Algorithm::RS256,
-            Algorithm::RS384,
-            Algorithm::PS256,
-            Algorithm::PS384,
-            Algorithm::ES256,
-            Algorithm::ES384,
+            Algorithm::Rs256,
+            Algorithm::Rs384,
+            Algorithm::Ps256,
+            Algorithm::Ps384,
+            Algorithm::Es256,
+            Algorithm::Es384,
         ],
         issuer.algorithms
     );
@@ -204,7 +204,7 @@ fn every_key_reads() -> Result<(), Box<dyn std::error::Error>> {
     );
     let auth = settings(&text)?.ok_or("auth is on")?;
     let issuer = &auth.issuers[0];
-    assert_eq!(vec![Algorithm::ES384, Algorithm::PS256], issuer.algorithms);
+    assert_eq!(vec![Algorithm::Es384, Algorithm::Ps256], issuer.algorithms);
     assert_eq!(vec![String::from("JWT")], issuer.profile.token_types);
     assert_eq!(2, issuer.profile.max_actor_chain);
     assert_eq!(Duration::from_secs(5), issuer.clock_skew);
@@ -644,17 +644,7 @@ fn an_issuer_without_an_audience_takes_the_facade_base() -> Result<(), Box<dyn s
 
 #[test]
 fn a_symmetric_or_unknown_algorithm_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-    let error = refusal(&format!("{MINIMAL}algorithms = [\"HS256\"]\n"))?;
-    assert!(
-        matches!(
-            issuer_rule(&error),
-            Some(ResourceError::SymmetricAlgorithm {
-                algorithm: Algorithm::HS256
-            })
-        ),
-        "{error:?}"
-    );
-    for algorithm in ["none", "RSA-OAEP"] {
+    for algorithm in ["HS256", "none", "RSA-OAEP"] {
         let error = refusal(&format!("{MINIMAL}algorithms = [\"{algorithm}\"]\n"))?;
         assert!(
             matches!(error, Error::Parse { .. }),
