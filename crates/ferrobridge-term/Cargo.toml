@@ -4,7 +4,7 @@
 name = "ferrobridge-term"
 description = "The FerroBRIDGE FHIR terminology client for $lookup, $translate, $validate-code, $expand and $subsumes"
 # The crate line is the fhir-types line (docs/VERSIONS.md).
-version = "0.21.0"
+version = "0.21.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -51,6 +51,10 @@ client = [
     "dep:secrecy",
     "dep:tracing",
 ]
+# The identifier NamingSystem search (`Client::identifier_systems`), which
+# reads NamingSystem, a resource outside the fhir-types terminology root set,
+# so it compiles every resource of the releases the features enable.
+naming-system = ["client", "fhir-types/resources"]
 stu3 = ["fhir-types/stu3"]
 r4 = ["fhir-types/r4"]
 r4b = ["fhir-types/r4b"]

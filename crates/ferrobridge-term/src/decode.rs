@@ -145,6 +145,22 @@ pub(crate) fn search_total(version: WireVersion, answer: &Answer) -> Result<u32,
     Err(refusal(crate::CODE_SYSTEM_SEARCH, answer, upstream))
 }
 
+/// Returns the identifier systems of the `NamingSystem` search `answer`
+/// carries for the unique id `value`.
+#[cfg(feature = "naming-system")]
+pub(crate) fn identifier_systems(
+    version: WireVersion,
+    answer: &Answer,
+    value: &str,
+) -> Result<Vec<String>, Error> {
+    if answer.status == StatusCode::OK {
+        return crate::wire::identifier_systems(version, &answer.body, value)
+            .map_err(|source| body(crate::NAMING_SYSTEM_SEARCH, answer, source));
+    }
+    let upstream = UpstreamError::new(version, answer.status, answer.body.clone());
+    Err(refusal(crate::NAMING_SYSTEM_SEARCH, answer, upstream))
+}
+
 /// Returns the outcome one batch entry carries, in the shape of its request.
 pub(crate) fn batch_entry(
     version: WireVersion,

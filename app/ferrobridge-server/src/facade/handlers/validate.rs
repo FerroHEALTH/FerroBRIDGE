@@ -71,8 +71,9 @@ pub(crate) async fn validate(
     crate::facade::handlers::supported(facade, resource_type)?;
     let inbound = read::parse(body, resource_type)?;
     let program = &write::select_program(facade, &inbound, headers)?;
-    let person = match inbound.subject(&facade.settings().subject) {
-        Ok(person) => person,
+    let link = &facade.settings().subject;
+    let subject = match inbound.subject(link) {
+        Ok(subject) => subject,
         Err(refusal) => {
             return Ok(reply::issues(
                 StatusCode::OK,
@@ -84,18 +85,20 @@ pub(crate) async fn validate(
             ));
         }
     };
+    let access = admission.access;
+    let client = facade.client_for(headers, access).await?;
+    let person = facade.patients(&client, access).person(subject).await?;
     // NOTE: no specification governs this: our own design, a dry run commits
     // nothing, so the operator scope admits it like the guard does.
-    let access = admission.access;
-    let admitted = admission
+    let mut admitted = admission
         .operator
-        .is_some_and(|operator| access.has_scope(operator))
-        || [Permission::Create, Permission::Update]
-            .into_iter()
-            .any(|permission| {
-                compartment::admit_person(facade, access, permission, resource_type, Some(&person))
-                    .is_ok()
-            });
+        .is_some_and(|operator| access.has_scope(operator));
+    for permission in [Permission::Create, Permission::Update] {
+        admitted = admitted
+            || compartment::admit_person(facade, access, permission, resource_type, Some(&person))
+                .await
+                .is_ok();
+    }
     if !admitted {
         return Err(crate::facade::guard::forbidden());
     }
@@ -103,7 +106,6 @@ pub(crate) async fn validate(
     // every defaulted time of one run, and this one is discarded with the
     // composition it builds.
     let now = jiff::Timestamp::now().to_string();
-    let client = facade.client_for(headers, access).await?;
     let resolved = crate::facade::references::resolve(facade, &client, inbound.document()).await;
     // NOTE: R4 operation-resource-validate.html: validation changes nothing, so a linked
     // composition is answered with the probe URI and never committed (our own design).

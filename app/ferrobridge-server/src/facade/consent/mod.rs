@@ -460,8 +460,7 @@ pub async fn subject(
     permission: Permission,
     reference: Option<&str>,
 ) -> Result<Subject, Refusal> {
-    let link = &facade.settings().subject;
-    let person = reference
+    let subject = reference
         .ok_or_else(|| {
             reply::refusal(
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -470,7 +469,7 @@ pub async fn subject(
             )
         })
         .and_then(|literal| {
-            link.person_of_reference(literal).map_err(|error| {
+            crate::facade::subject::patient_of_reference(literal).map_err(|error| {
                 reply::refusal(
                     StatusCode::UNPROCESSABLE_ENTITY,
                     Issue::error(IssueType::Value)
@@ -478,10 +477,12 @@ pub async fn subject(
                 )
             })
         })?;
-    compartment::admit_person(facade, access, permission, CONSENT, Some(&person))?;
-    let ehr = ehr::resolve(client, facade.store(), &person, link, ehr::Policy::Existing)
+    let person = facade.patients(client, access).person(subject).await?;
+    compartment::admit_person(facade, access, permission, CONSENT, Some(&person)).await?;
+    let ehr = ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing)
         .await
-        .map_err(|error| Refusal::from(crate::facade::ingest::refusal::ehr_refusal(&error)))?;
+        .map_err(|error| Refusal::from(crate::facade::ingest::refusal::ehr_refusal(&error)))?
+        .id;
     Ok(Subject { person, ehr })
 }
 
@@ -525,9 +526,18 @@ pub async fn export_context(
         .person_of(ehr)
         .await
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
-    let reference = person
-        .as_ref()
-        .and_then(|person| facade.settings().subject.reference_of(person));
+    let reference = match person.as_ref() {
+        Some(person) => {
+            crate::facade::subject::reference_of(
+                &facade.settings().subject,
+                facade.store(),
+                &facade.programs(),
+                person,
+            )
+            .await?
+        }
+        None => None,
+    };
     let subject = match reference {
         Some(reference) => Ref {
             reference: Some(reference),

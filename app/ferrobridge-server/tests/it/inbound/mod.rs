@@ -5,6 +5,7 @@
 //! through their public API, and the inbox and the intake over the state
 //! store.
 
+mod apply;
 mod event;
 pub(crate) mod intake;
 mod notification;

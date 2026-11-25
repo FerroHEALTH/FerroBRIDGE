@@ -1223,9 +1223,9 @@ checksum = "217698eaf96b4a3f0bc4f3662aaa55bdf913cd54d7204591faa790070c6d0853"
 
 [[package]]
 name = "crc32fast"
-version = "1.5.2"
+version = "1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01a7799fd6b852db0e61728dde9a204c423b44d689dbd432522543614b490e78"
+checksum = "fd9ae8fcb3ea71b0b26338b4ffb13006bb175de8fd07921089a906ce7e5e6945"
 dependencies = [
  "cfg-if",
 ]
@@ -1507,14 +1507,14 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.39.0"
+version = "0.41.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
  "ferrobridge-term",
  "ferrobridge-testkit",
  "ferrobridge-validator",
- "fhir-types 0.2.0",
+ "fhir-types",
  "fhirconnect",
  "flate2",
  "http",
@@ -1536,9 +1536,9 @@ dependencies = [
 
 [[package]]
 name = "ehds-logging"
-version = "0.23.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "870bb093329606aeb22f429b473ff08392a68b8a4bdb81b880caa19dbed65b64"
+checksum = "0595ae20c8fae9c1892db05bb3acbee4c9230305e6d705d9c2504c841718b8e5"
 dependencies = [
  "async-trait",
  "ihe-atna",
@@ -1689,10 +1689,10 @@ dependencies = [
  "ferrohealth-secret",
  "ferrohealth-server",
  "ferrohealth-session",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.35.0",
  "ferrohealth-telemetry",
  "ferrohealth-ui",
- "fhir-types 0.2.0",
+ "fhir-types",
  "fluent-templates",
  "http",
  "jsonwebtoken",
@@ -1718,7 +1718,7 @@ dependencies = [
  "base64 0.23.1",
  "chumsky",
  "ferrobridge-testkit",
- "fhir-types 0.2.0",
+ "fhir-types",
  "jiff",
  "logos",
  "quick-xml",
@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.35.0"
+version = "0.35.1"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1740,7 +1740,7 @@ dependencies = [
  "ferrobridge-term",
  "ferrobridge-testkit",
  "ferrobridge-validator",
- "fhir-types 0.2.0",
+ "fhir-types",
  "fhirconnect",
  "hl7v2-types",
  "insta",
@@ -1792,16 +1792,17 @@ dependencies = [
  "ferrohealth-health",
  "ferrohealth-secret",
  "ferrohealth-server",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.35.0",
  "ferrohealth-telemetry",
  "ferrohealth-usage-report",
  "fhir-search",
- "fhir-types 0.2.0",
+ "fhir-types",
  "fhirconnect",
  "futures-core",
  "futures-util",
  "http",
  "ihe-atna",
+ "ihe-iti",
  "insta",
  "ipnet",
  "jiff",
@@ -1848,14 +1849,14 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "async-trait",
  "backon",
  "ferrobridge-testkit",
  "ferrohealth-config",
- "ferrohealth-smart",
- "fhir-types 0.2.0",
+ "ferrohealth-smart 0.35.0",
+ "fhir-types",
  "http",
  "rcgen",
  "reqwest",
@@ -1882,7 +1883,7 @@ dependencies = [
  "ferrobridge-operator-api",
  "ferrobridge-server",
  "ferrohealth-ui",
- "fhir-types 0.2.0",
+ "fhir-types",
  "jiff",
  "jsonwebtoken",
  "omop-cdm",
@@ -1911,12 +1912,12 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
  "ferrobridge-testkit",
- "fhir-types 0.2.0",
+ "fhir-types",
  "flate2",
  "http",
  "regex",
@@ -2011,7 +2012,7 @@ dependencies = [
  "cookie",
  "ferrohealth-config",
  "ferrohealth-secret",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.35.0",
  "ferrohealth-ui",
  "http",
  "jiff",
@@ -2020,6 +2021,32 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "ferrohealth-smart"
+version = "0.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b07089669e8f38d9ff0b2ad0fbc192fc1cf62facc4a59687de63cec8e6f7e05"
+dependencies = [
+ "argon2",
+ "aws-lc-rs",
+ "base64 0.23.1",
+ "ferrohealth-config",
+ "ferrohealth-secret",
+ "http",
+ "jiff",
+ "jsonwebtoken",
+ "reqwest",
+ "rustls",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "toml",
  "tracing",
  "url",
 ]
@@ -2135,7 +2162,7 @@ version = "0.0.29"
 dependencies = [
  "anyhow",
  "clap",
- "fhir-types 0.2.0",
+ "fhir-types",
  "generated-tree",
  "hl7v2-types",
  "insta",
@@ -2159,18 +2186,6 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.131"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "295ec4729d0e3595a79b426afc54831a5386648c41b376fe0b7c38af19041d4a"
-dependencies = [
- "quick-xml",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "fhir-types"
 version = "0.2.0"
 dependencies = [
  "quick-xml",
@@ -2185,7 +2200,7 @@ version = "0.13.1"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
- "fhir-types 0.2.0",
+ "fhir-types",
  "insta",
  "jsonschema",
  "openehr-adl",
@@ -3064,14 +3079,15 @@ dependencies = [
 
 [[package]]
 name = "ihe-atna"
-version = "0.23.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f3b6f7c35c130608acf28416c65c0e68a4de5a1981f1e87e164716019944c7e"
+checksum = "e80c1964088be423a90645f4c67b62b8b833238e7988f1f5eb4a42010ae003fc"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
+ "crc32fast",
  "ferrohealth-secret",
- "fhir-types 0.1.131",
+ "fhir-types",
  "http",
  "jiff",
  "secrecy",
@@ -3079,6 +3095,26 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "url",
+]
+
+[[package]]
+name = "ihe-iti"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6610e6ad1ae8c9636e4d6f43e82b230b198a43bb79c9bddbe02ac665b54cff4"
+dependencies = [
+ "ferrohealth-smart 0.34.0",
+ "fhir-search",
+ "fhir-types",
+ "http",
+ "ihe-atna",
+ "jiff",
+ "reqwest",
+ "secrecy",
+ "serde_json",
+ "thiserror",
+ "tokio",
  "url",
 ]
 
@@ -3376,9 +3412,11 @@ dependencies = [
  "base64 0.22.1",
  "getrandom 0.2.17",
  "js-sys",
+ "pem 3.0.6",
  "serde",
  "serde_json",
  "signature",
+ "simple_asn1",
  "zeroize",
 ]
 
@@ -4231,6 +4269,16 @@ dependencies = [
 
 [[package]]
 name = "pem"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d30c53c26bc5b31a98cd02d20f25a7c8567146caf63ed593a9d87b2775291be"
+dependencies = [
+ "base64 0.22.1",
+ "serde_core",
+]
+
+[[package]]
+name = "pem"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d354a98a3d1251555de99e8fdd8afda05573c31b82f59063a7b0a29b5527f120"
@@ -4750,7 +4798,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8774e05a7d0de114588e6a28fe7e71694b82614ed569d86d8b389dfbc98b8ad8"
 dependencies = [
  "aws-lc-rs",
- "pem",
+ "pem 4.0.0",
  "rustls-pki-types",
  "time",
  "x509-parser",
@@ -5441,6 +5489,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2f8bec09ae8fae0f4f265a4559a9334be3929d8504e9b536df0a41302bd1733"
 dependencies = [
  "bstr",
+]
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d585997b0ac10be3c5ee635f1bab02d512760d14b7c468801ac8a01d9ae5f1d"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "thiserror",
+ "time",
 ]
 
 [[package]]

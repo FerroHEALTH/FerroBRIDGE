@@ -14,7 +14,7 @@ use super::refusal;
 
 /// A guarded facade the lane can record, and the state store its outbox
 /// lives in.
-const FACADE: &str = "[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n";
+const FACADE: &str = "[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[auth]\nenabled = true\n\n[auth.issuer.ferro]\nissuer = \"https://as.example.org/realms/ferro\"\naudience = [\"https://bridge.example.org/fhir\"]\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n";
 
 /// The keys every complete lane names.
 const COMPLETE: &str = "endpoint.url = \"https://arr.example.org/fhir/\"\n";
@@ -114,7 +114,7 @@ fn the_lane_needs_the_facade() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn the_lane_needs_authenticated_callers() -> Result<(), Box<dyn std::error::Error>> {
     let text = format!(
-        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[audit]\nenabled = true\n{COMPLETE}"
+        "[auth]\nenabled = false\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[audit]\nenabled = true\n{COMPLETE}"
     );
     let error = refusal(&text)?;
     assert!(

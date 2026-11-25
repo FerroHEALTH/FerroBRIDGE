@@ -22,6 +22,7 @@ pub mod error;
 mod events;
 mod fhir_outbound;
 pub mod hl7v2;
+pub mod identity_source;
 mod inbound;
 mod omop_incremental;
 mod resolve;
@@ -68,6 +69,7 @@ use section::change_feed::ChangeFeed;
 use section::events::Events;
 use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
+use section::identity_source::IdentitySource;
 use section::inbound::Inbound;
 use section::omop_incremental::OmopIncremental;
 use section::shl::Shl;
@@ -120,6 +122,9 @@ pub struct Config {
     pub cdr: Option<Cdr>,
     /// The FHIR terminology server, when one is configured.
     pub terminology: Option<Terminology>,
+    /// The identity source every EHR subject is asked of, when one is
+    /// configured.
+    pub identity_source: Option<IdentitySource>,
     /// The OMOP CDM database, when one is configured.
     pub cdm: Option<Cdm>,
     /// The PostgreSQL state store, when one is configured.
@@ -316,6 +321,19 @@ impl Config {
         Ok(())
     }
 
+    /// Returns the identity source `[identity_source]` names, refused while
+    /// the facade is on without one.
+    fn identity_source(&self) -> Result<Option<crate::identity_source::IdentitySource>, Error> {
+        match self.identity_source.as_ref() {
+            Some(section) => identity_source::resolve(section).map(Some),
+            None if self.facade.enabled => Err(Error::Needs {
+                key: String::from("facade.enabled"),
+                needs: String::from("[identity_source]"),
+            }),
+            None => Ok(None),
+        }
+    }
+
     /// Resolves this tree into the settings `process` holds.
     ///
     /// Every `_file` sibling is read here, so a secret reaches the process
@@ -348,6 +366,7 @@ impl Config {
         self.onward_guarded(serves)?;
         self.assurance_guarded(serves)?;
         self.consent_onward()?;
+        let identity_source = self.identity_source()?.map(std::sync::Arc::new);
         Ok(Settings {
             server: self.server.clone(),
             telemetry: self.telemetry.clone(),
@@ -357,6 +376,7 @@ impl Config {
                 .as_ref()
                 .map(resolve_terminology)
                 .transpose()?,
+            identity_source: identity_source.clone(),
             display_fallback: self
                 .terminology
                 .as_ref()
@@ -372,10 +392,9 @@ impl Config {
             mapping_directory: self.mappings.directory.clone(),
             omocl_directory: self.mappings.omocl.clone(),
             mappings: resolve_mappings(&self.mappings)?,
-            facade: if self.facade.enabled {
-                Some(resolve_facade(&self.facade)?)
-            } else {
-                None
+            facade: match (self.facade.enabled, identity_source) {
+                (true, Some(identity)) => Some(resolve_facade(&self.facade, identity)?),
+                _ => None,
             },
             auth: if serves && self.guards_a_surface() {
                 auth::resolve_auth(self)?
@@ -503,6 +522,9 @@ pub struct Settings {
     pub cdr: Option<crate::cdr::config::CdrConfig>,
     /// The terminology client, when the lane is on.
     pub terminology: Option<ferrobridge_term::client::Client>,
+    /// The identity source every EHR subject is asked of, when one is
+    /// configured.
+    pub identity_source: Option<std::sync::Arc<crate::identity_source::IdentitySource>>,
     /// Whether a code the terminology server does not know takes its code as
     /// display (`[terminology] display_fallback`).
     pub display_fallback: bool,

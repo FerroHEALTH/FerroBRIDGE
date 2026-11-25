@@ -2557,6 +2557,24 @@ the outbound sink), each lane keeping its numbers and its park rule. An
 operator settles a parked item (retry or discard,
 recorded with the token's subject and the reason) and replays work by
 entity or by received range through `/operator/sources/{id}/…`.
+The workers run one handler, `inbound::apply::Apply`, and every inbound step
+is written inside it (our own design). An upsert reads the source's entity
+as an R4 `Patient` through the source's declared resolution, keeps only the
+identifiers, names, birth date, gender and deceased status with the
+tenant's local identifier (GDPR Art 5(1)(c)), feeds it to the identity
+source as an ITI-104 Add or Revise Patient through the `ihe-iti` Patient
+Identity Source (PIXm 3.1.0 §2:3.104.4.1), asks ITI-83 by the local
+identifier for the pseudonym and ensures exactly one EHR for it, a `409` on
+`POST /ehr` read again by subject (ITS-REST 1.1.0 EHR API). A `Patient` the
+source links `replaced-by` to another of its identifiers is forwarded as a
+Resolve Duplicate Patient (§2:3.104.4.2) and ensures no EHR: the bridge
+decides no merge. A remove sends `Patient.active = false`: an inbound event
+never deletes an EHR (WGBO, BW 7:454 lid 3). A refused feed parks the item,
+and a `5xx`, `429`, `423` or no answer runs it again. A source that declares
+no resolution parks its items as `resolution-undeclared`. Under `[audit]`
+each feed is recorded as the system's PHI import and each EHR the handler
+creates as a create on the CDR, beside the BALP ITI-104 Source and ITI-83
+Consumer records, each place taken in the audit outbox before its step.
 Recovery is the receiver's job for a webhook source that retries nothing on
 its own: a source declares a `redeliver` call, made when a replica first
 leads the source and after a run of `503` answers, and `reconcile` polls
@@ -2793,16 +2811,71 @@ draft upstream change.
       W --> V["meta.versionId = version_tree_id"]
       K --> V
   ```
-- **Patient identity.** The REST API chapter names the arrangement to aim for:
-  the engine resolves an EHR id to a patient through whatever owns patient
-  identity in the deployment, and `context.patient` is the caller's fallback.
-  FerroBRIDGE's identity map is that local table; a configured external
-  resolver is a later adapter behind the same seam. `person_id` maps one
+- **Patient identity.** The bridge keeps no patient identity of its own.
+  Every EHR is keyed by the patient's pseudonym, which the identity source
+  (`[identity_source]`, a PIXm Manager; FerroPIX is the reference) holds in
+  `pseudonym_domain`. The facade and the inbound engine ask for it over ITI-83
+  by `POST`, so the source identifier never sits in a URL (PIXm 3.1.0
+  §2:3.83.4.1.2.2, <https://profiles.ihe.net/ITI/PIXm/3.1.0/ITI-83.html>),
+  through the published `ihe-iti` PIXm Consumer (`identity_source`).
+  `EHR_STATUS.subject.external_ref` names the pseudonym as a `PARTY_REF` of
+  type `PERSON` whose namespace and `GENERIC_ID` scheme are the domain (RM
+  Common IM §4.2.1.1), so no direct identifier reaches the CDR (GDPR Art 4(5),
+  Art 25(1), Art 5(1)(c)). The `Patient` logical id takes one of two forms:
+
+  | Deployment | `Patient` logical id | `Patient/<id>` resolves through |
+  |---|---|---|
+  | A `Patient` party context is loaded | The party's `versioned_object_uid` | The sealed `party_person` table of the state store (party uid to pseudonym); on a miss, a party read, its identifier asked over ITI-83, and the answer recorded |
+  | No `Patient` party context | The pseudonym | Nothing: the id is the person key |
+
+  The `party_person` row is written when the facade creates or updates the
+  `Patient` and on the first resolution of a party it does not know, and
+  rewritten when the accepted identifier changes; a rendered subject reverses
+  it, and a pseudonym with no row renders as a logical reference by
+  identifier. A subject named by identifier, and a `Patient` itself, is asked
+  of ITI-83 by its identifier in an accepted domain. ITI-83 takes one
+  `sourceIdentifier` (PIXm 3.1.0 §2:3.83.4.1.2.1) and the order of
+  `Patient.identifier` carries no meaning, so the bridge asks by the first
+  domain of the ordered `source_domains` list the `Patient` carries one in,
+  and an identifier without a system, or none in an accepted domain, is a
+  `422` naming the list (our own design). A failed query is a typed refusal
+  naming the upstream status, and never an EHR under another subject: `422`
+  when the identity source knows no such patient or holds no single
+  pseudonym, `503` on a timeout, a transport failure, a `429` or a `5xx`, and
+  `502` otherwise (R4 http.html leaves an upstream failure to the server: our
+  own design). A patient-scoped token's launch patient and every search
+  subject resolve the same way, the identity map first and on a miss the
+  party read and ITI-83, so a `Patient` with no party the CDR holds reaches
+  no data (our own design). Under `[audit]` the bridge records each ITI-83
+  exchange in the audit outbox as the PIXm Query Consumer `AuditEvent`
+  (PIXm 3.1.0 §2:3.83.5.1.1). `person_id` maps one
   `ehr_id` to one person on the OMOP side; reconciling one person across
   several EHRs is a deployment decision the CDM leaves to the ETL, and the
   bridge does not guess it.
+
+  ```mermaid
+  sequenceDiagram
+      participant C as Caller
+      participant F as Facade
+      participant M as Identity map
+      participant P as Identity source (ITI-83)
+      participant R as CDR
+      C->>F: write naming Patient/<id> or an identifier
+      alt Patient/<id> under a Patient party context
+          F->>M: party uid to pseudonym
+          opt no row
+              F->>R: GET /demographic/person/<uid>
+              F->>P: POST $ihe-pix (sourceIdentifier, targetSystem)
+              F->>M: record party uid to pseudonym
+          end
+      else an identifier
+          F->>P: POST $ihe-pix (sourceIdentifier, targetSystem)
+      end
+      F->>R: GET /ehr?subject_id=<pseudonym>&subject_namespace=<domain>
+  ```
 - **Party identity.** A resource a party context serves (section 4.11) takes
-  its id from the CDR and writes no identity-map entry. The id is the
+  its id from the CDR; the identity map records only a `Patient` party's
+  pseudonym (the patient identity bullet above). The id is the
   `versioned_object_uid`, the `object_id` of the `VERSIONED_PARTY`, and never
   the full `OBJECT_VERSION_ID`; `meta.versionId` carries the `version_tree_id`.
   The ground is the one above: only the `object_id` is stable across versions
@@ -3209,13 +3282,8 @@ composition is re-read through the strict RM reader before it is sent, so a
 bad document never reaches the CDR; an EHR is resolved by subject id and
 namespace and created on first sight only under a configured policy, with the
 `EHR_STATUS.subject` shape (`PARTY_SELF` over a `PARTY_REF` whose `GENERIC_ID`
-scheme is the namespace) pinned by test, with the namespace, the id form and
-the `PARTY_REF.type` configured so the link matches the one the CDR's owner
-writes (`[facade] subject_namespace`, `subject_id_form`, `subject_type`;
-RM Common IM §4.2.1.1, the type checked against BASE `PARTY_REF`
-`Type_validity` through `openehr-base`, #467; a Patient keys its own EHR the
-same way under the owner-link forms, by its logical id, #867), and no subject id the CDR
-mints itself, such as a pseudonym, ever derived by the bridge; every declared `meta.profile` is
+scheme is the namespace) pinned by test, its subject always the ITI-83
+pseudonym the identity source holds (section 9, #2102); every declared `meta.profile` is
 considered, never only the first; `Prefer` is honoured and `Location` names
 the FHIR resource, with the openEHR version uid carried in `meta.source`; and
 a clinical resource is never emitted without a subject.

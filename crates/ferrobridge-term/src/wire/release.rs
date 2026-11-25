@@ -588,19 +588,67 @@ macro_rules! per_release {
                 })
             }
 
-            /// Returns the `Bundle.total` of the `searchset` `body` carries.
+            /// Returns the `Bundle` `body` carries, refused unless it is a
+            /// `searchset`.
             #[cfg(feature = "client")]
-            pub(crate) fn search_total(body: &str) -> Result<u32, BodyError> {
+            fn searchset(body: &str) -> Result<Bundle, BodyError> {
                 let bundle = serde_json::from_str::<Bundle>(body)?;
                 let kind = bundle.r#type.value.clone().unwrap_or_default();
                 if kind != super::SEARCHSET {
                     return Err(BodyError::SearchType { found: kind });
                 }
+                Ok(bundle)
+            }
+
+            /// Returns the `Bundle.total` of the `searchset` `body` carries.
+            #[cfg(feature = "client")]
+            pub(crate) fn search_total(body: &str) -> Result<u32, BodyError> {
+                let bundle = searchset(body)?;
                 bundle
                     .total
                     .as_ref()
                     .and_then(|total| total.value)
                     .ok_or(BodyError::MissingValue { parameter: "total" })
+            }
+
+            /// Returns the `uri` unique id of every `identifier` `NamingSystem`
+            /// the `searchset` `body` carries that is not retired and holds a
+            /// unique id equal to `value`, each once, in entry order.
+            #[cfg(feature = "naming-system")]
+            pub(crate) fn identifier_systems(body: &str, value: &str) -> Result<Vec<String>, BodyError> {
+                let bundle = searchset(body)?;
+                let mut systems: Vec<String> = Vec::new();
+                for entry in &bundle.entry {
+                    let Some(Resource::NamingSystem(naming)) = entry.resource.as_ref() else {
+                        continue;
+                    };
+                    let code = |held: &fhir_types::$release::primitives::Code| held.value.clone();
+                    if code(&naming.kind).as_deref() != Some("identifier")
+                        || code(&naming.status).as_deref() == Some("retired")
+                        || !naming
+                            .unique_id
+                            .iter()
+                            .any(|unique| unique.value.value.as_deref() == Some(value))
+                    {
+                        continue;
+                    }
+                    let uris = || {
+                        naming
+                            .unique_id
+                            .iter()
+                            .filter(|unique| unique.r#type.value.as_deref() == Some("uri"))
+                    };
+                    let preferred = uris()
+                        .find(|unique| unique.preferred.as_ref().and_then(|flag| flag.value) == Some(true))
+                        .or_else(|| uris().next())
+                        .and_then(|unique| unique.value.value.clone());
+                    if let Some(uri) = preferred
+                        && !systems.contains(&uri)
+                    {
+                        systems.push(uri);
+                    }
+                }
+                Ok(systems)
             }
 
             /// Returns `coding` in the release-neutral shape.

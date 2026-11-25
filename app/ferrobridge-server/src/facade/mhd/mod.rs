@@ -236,8 +236,9 @@ async fn scoped(
     (pairs, strict): (&[(String, String)], bool),
 ) -> Result<(params::Read, Vec<EhrId>), Refusal> {
     let request = params::read(pairs, declared, strict)?;
-    let named = patients(facade, client, &request).await?;
-    let ehrs = reach(facade, access, resource_type, named).await?;
+    let resolver = facade.patients(client, access);
+    let named = patients(facade, (client, &resolver), &request).await?;
+    let ehrs = reach(facade, (access, &resolver), resource_type, named).await?;
     Ok((request, ehrs))
 }
 
@@ -249,7 +250,7 @@ async fn scoped(
 /// reference to another server names no patient of this one.
 async fn patients(
     facade: &Facade,
-    client: &CdrClient,
+    resolver: (&CdrClient, &crate::facade::subject::Patients<'_>),
     request: &params::Read,
 ) -> Result<Option<Vec<EhrId>>, Refusal> {
     let mut named: Option<Vec<EhrId>> = None;
@@ -261,7 +262,7 @@ async fn patients(
                     if let Some(id) = patient_id(facade, reference)
                         && let Some(ehr) =
                             crate::facade::handlers::search::identifier::ehr_of_party(
-                                facade, client, &id,
+                                facade, resolver, &id,
                             )
                             .await?
                     {
@@ -274,7 +275,7 @@ async fn patients(
                     found.extend(
                         crate::facade::handlers::search::identifier::ehrs_of(
                             facade,
-                            client,
+                            resolver,
                             "patient.identifier",
                             token,
                         )
@@ -319,7 +320,7 @@ fn patient_id(facade: &Facade, reference: &str) -> Option<String> {
 /// our own design).
 async fn reach(
     facade: &Facade,
-    access: &Access,
+    (access, patients): (&Access, &crate::facade::subject::Patients<'_>),
     resource_type: &str,
     named: Option<Vec<EhrId>>,
 ) -> Result<Vec<EhrId>, Refusal> {
@@ -333,7 +334,8 @@ async fn reach(
             )
         }),
         Some(Compartment::Patient(patient)) => {
-            let own = crate::facade::handlers::search::compartment_ehrs(facade, &patient).await?;
+            let own = crate::facade::handlers::search::compartment_ehrs(facade, patients, &patient)
+                .await?;
             Ok(match named {
                 Some(named) => own.into_iter().filter(|ehr| named.contains(ehr)).collect(),
                 None => own,

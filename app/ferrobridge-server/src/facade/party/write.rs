@@ -40,6 +40,7 @@ use crate::facade::commit::Change;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::read::parse;
 use crate::facade::handlers::write::same_id;
+use crate::facade::identity::PersonId;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -63,10 +64,18 @@ pub(crate) async fn create(
 ) -> Result<axum::response::Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Present)?;
     party::admit(access, Permission::Create, resource_type, None)?;
-    let inbound = parse(body, resource_type)?;
-    let built = build(facade, loaded, inbound.document()).await?;
-    party::unbound(facade, resource_type, built.value())?;
-    let client = facade.client_for(headers, access).await?;
+    let Prepared {
+        built,
+        client,
+        person,
+    } = prepared(
+        facade,
+        (access, headers),
+        loaded,
+        (resource_type, None),
+        body,
+    )
+    .await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let creation = commit(facade, loaded, Change::Creation)?;
@@ -81,13 +90,13 @@ pub(crate) async fn create(
                 return Err(unrelated.into_refusal(resource_type));
             }
         };
-    party::provision::provision(facade, &client, resource_type, &version).await?;
+    let written = (&built, &version);
     respond(
         facade,
         loaded,
         resource_type,
-        &built,
-        &version,
+        written,
+        (&client, person),
         StatusCode::CREATED,
     )
     .await
@@ -109,11 +118,18 @@ pub(crate) async fn update(
     crate::facade::handlers::guard(headers, uri, Body::Present)?;
     party::admit(access, Permission::Update, resource_type, Some(id))?;
     let uid = party::party_id(resource_type, id)?;
-    let inbound = parse(body, resource_type)?;
-    same_id(&inbound, id)?;
-    let built = build(facade, loaded, inbound.document()).await?;
-    party::unbound(facade, resource_type, built.value())?;
-    let client = facade.client_for(headers, access).await?;
+    let Prepared {
+        built,
+        client,
+        person,
+    } = prepared(
+        facade,
+        (access, headers),
+        loaded,
+        (resource_type, Some(id)),
+        body,
+    )
+    .await?;
     let demographic = party::demographic(&client)?;
     let class = class_of(loaded)?;
     let latest = party::get(demographic, class, resource_type, uid.value()).await?;
@@ -130,12 +146,13 @@ pub(crate) async fn update(
         Some((uid.value(), &preceding)),
     )
     .await?;
+    let written = (&built, &version);
     respond(
         facade,
         loaded,
         resource_type,
-        &built,
-        &version,
+        written,
+        (&client, person),
         StatusCode::OK,
     )
     .await
@@ -196,6 +213,43 @@ async fn delete_version(
 }
 
 /// Maps one inbound resource to its party.
+/// The party a create or an update writes, the caller's CDR client and, for
+/// a `Patient`, the person its ITI-83 pseudonym names.
+struct Prepared {
+    /// The party built from the body.
+    built: CanonicalParty,
+    /// The caller's CDR client.
+    client: crate::cdr::CdrClient,
+    /// The person, for a `Patient`.
+    person: Option<PersonId>,
+}
+
+/// Reads `body` as a `resource_type`, the id `id` names for an update, and
+/// builds the party it describes, refused while it names a bound party.
+async fn prepared(
+    facade: &Facade,
+    (access, headers): (&Access, &HeaderMap),
+    loaded: &Loaded,
+    (resource_type, id): (&str, Option<&str>),
+    body: &[u8],
+) -> Result<Prepared, Refusal> {
+    let inbound = parse(body, resource_type)?;
+    if let Some(id) = id {
+        same_id(&inbound, id)?;
+    }
+    let built = build(facade, loaded, inbound.document()).await?;
+    party::unbound(facade, resource_type, built.value())?;
+    let client = facade.client_for(headers, access).await?;
+    let person =
+        party::provision::pseudonym(facade, (access, &client), resource_type, inbound.document())
+            .await?;
+    Ok(Prepared {
+        built,
+        client,
+        person,
+    })
+}
+
 async fn build(
     facade: &Facade,
     loaded: &Loaded,
@@ -424,7 +478,7 @@ async fn commit_party(
                             &upstream,
                             headers.etag.as_deref(),
                         )?,
-                        _ => return Err(party::refused(&upstream)),
+                        _ => return Err(party::refused(&upstream).into()),
                     }
                 }
                 Some((uid, preceding)) => {
@@ -444,7 +498,7 @@ async fn commit_party(
                             &upstream,
                             headers.etag.as_deref(),
                         )?,
-                        _ => return Err(party::refused(&upstream)),
+                        _ => return Err(party::refused(&upstream).into()),
                     }
                 }
             }
@@ -476,19 +530,23 @@ async fn commit_party(
 }
 
 /// Answers a write from the party it sent, under `version`, as `Prefer`
-/// asks (<https://hl7.org/fhir/R4/http.html#return>).
+/// asks (<https://hl7.org/fhir/R4/http.html#return>), once the EHR of
+/// `person`, a `Patient`'s, is provisioned through `client`.
 async fn respond(
     facade: &Facade,
     loaded: &Loaded,
     resource_type: &str,
-    party: &CanonicalParty,
-    version: &ObjectVersionId,
+    (party, version): (&CanonicalParty, &ObjectVersionId),
+    (client, person): (&crate::cdr::CdrClient, Option<PersonId>),
     status: StatusCode,
 ) -> Result<axum::response::Response, Refusal> {
+    if let Some(person) = person {
+        party::provision::provision(facade, client, version, &person).await?;
+    }
     let headers = [
         Header::location(&party::location(facade, resource_type, version)),
         Header::entity_tag(version.version_tree_id().value()),
     ];
-    let resource = party::render(facade, loaded, party, version).await?;
+    let resource = party::render(facade.renders(), loaded, party, version).await?;
     Ok(reply::resource(status, &resource, &headers))
 }

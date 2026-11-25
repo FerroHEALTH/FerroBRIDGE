@@ -31,7 +31,7 @@ use crate::cdr::ids::SubjectNamespace;
 use crate::facade::identity::PersonId;
 use crate::facade::identity::store::Store;
 use crate::facade::identity::store::StoreError;
-use crate::facade::subject::SubjectLink;
+use crate::facade::subject::PARTY_TYPE;
 
 /// The archetype every openEHR `EHR_STATUS` declares.
 ///
@@ -94,8 +94,16 @@ pub enum EhrError {
     },
 }
 
-/// Returns the EHR of `person`, resolving or creating it per `policy`, with
-/// the `PARTY_REF.type` `link` configures on an EHR it creates.
+/// The EHR of a person, and whether resolving it created it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ensured {
+    /// The EHR.
+    pub id: EhrId,
+    /// Whether this resolution created it in the CDR.
+    pub created: bool,
+}
+
+/// Returns the EHR of `person`, resolving or creating it per `policy`.
 ///
 /// # Errors
 ///
@@ -106,11 +114,10 @@ pub async fn resolve(
     client: &CdrClient,
     store: &dyn Store,
     person: &PersonId,
-    link: &SubjectLink,
     policy: Policy,
-) -> Result<EhrId, EhrError> {
-    if let Some(known) = store.ehr_of(person).await.map_err(store_error)? {
-        return Ok(known);
+) -> Result<Ensured, EhrError> {
+    if let Some(id) = store.ehr_of(person).await.map_err(store_error)? {
+        return Ok(Ensured { id, created: false });
     }
     let subject_id = SubjectId::new(person.id()).map_err(|source| EhrError::Subject {
         subject: person.to_string(),
@@ -125,20 +132,22 @@ pub async fn resolve(
         .ehr_by_subject(&subject_id, &namespace)
         .await
         .map_err(client_error)?;
-    let ehr_id = match found.outcome {
-        EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body)?,
+    let (ehr_id, created) = match found.outcome {
+        EhrGetBySubjectOutcome::Ok { body, .. } => (ehr_id_of(&body)?, false),
         EhrGetBySubjectOutcome::NotFound { .. } => match policy {
             Policy::Existing => {
                 return Err(EhrError::Absent {
                     subject: person.to_string(),
                 });
             }
-            Policy::CreateOnFirstWrite => {
-                create(client, person, link, &subject_id, &namespace).await?
-            }
+            Policy::CreateOnFirstWrite => create(client, person, &subject_id, &namespace).await?,
         },
     };
-    store.record_ehr(person, &ehr_id).await.map_err(store_error)
+    let id = store
+        .record_ehr(person, &ehr_id)
+        .await
+        .map_err(store_error)?;
+    Ok(Ensured { id, created })
 }
 
 /// Creates an EHR whose `EHR_STATUS.subject` names `person`, or returns the
@@ -147,15 +156,14 @@ pub async fn resolve(
 /// Under `return=minimal` the service answers `201` or `204`, and the `ETag`
 /// of either names the new `ehr_id`; a `409` means an EHR with that subject
 /// already exists (`ehr-codegen.openapi.yaml`, `ehr_create`), so the subject
-/// is read again.
+/// is read again, and the EHR is answered as not created.
 async fn create(
     client: &CdrClient,
     person: &PersonId,
-    link: &SubjectLink,
     subject_id: &SubjectId,
     namespace: &SubjectNamespace,
-) -> Result<EhrId, EhrError> {
-    let status = status_of(person, link);
+) -> Result<(EhrId, bool), EhrError> {
+    let status = status_of(person);
     let answered = client
         .create_ehr(Some(&status), Prefer::Minimal)
         .await
@@ -163,10 +171,12 @@ async fn create(
     match answered.outcome {
         EhrCreateOutcome::Created { headers, .. } => {
             crate::cdr::ehr_id_from_etag(StatusCode::CREATED, headers.etag.as_deref())
+                .map(|id| (id, true))
                 .map_err(client_error)
         }
         EhrCreateOutcome::NoContent { headers } => {
             crate::cdr::ehr_id_from_etag(StatusCode::NO_CONTENT, headers.etag.as_deref())
+                .map(|id| (id, true))
                 .map_err(client_error)
         }
         EhrCreateOutcome::BadRequest { body } => Err(EhrError::Refused {
@@ -179,7 +189,7 @@ async fn create(
                 .await
                 .map_err(client_error)?;
             match found.outcome {
-                EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body),
+                EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body).map(|id| (id, false)),
                 EhrGetBySubjectOutcome::NotFound { .. } => Err(EhrError::Refused {
                     subject: person.to_string(),
                     detail: crate::facade::status::diagnostics(StatusCode::CONFLICT, &body),
@@ -190,9 +200,9 @@ async fn create(
 }
 
 /// Returns the `EHR_STATUS` an EHR for `person` is created with, its subject
-/// a `PARTY_REF` of the type `link` configures.
+/// a `PARTY_REF` to a `PERSON`.
 #[must_use]
-pub fn status_of(person: &PersonId, link: &SubjectLink) -> EhrStatus {
+pub fn status_of(person: &PersonId) -> EhrStatus {
     EhrStatus {
         name: DvText::DvText(DvTextData {
             value: String::from("EHR Status"),
@@ -221,7 +231,7 @@ pub fn status_of(person: &PersonId, link: &SubjectLink) -> EhrStatus {
         subject: PartySelf {
             external_ref: Some(Box::new(PartyRef {
                 namespace: String::from(person.namespace()),
-                r#type: String::from(link.party_type()),
+                r#type: String::from(PARTY_TYPE),
                 id: ObjectId::GenericId(GenericId {
                     value: String::from(person.id()),
                     scheme: String::from(person.namespace()),
@@ -260,15 +270,7 @@ fn store_error(source: StoreError) -> EhrError {
 mod tests {
     use super::{EHR_STATUS_ARCHETYPE, Policy, status_of};
     use crate::facade::identity::PersonId;
-    use crate::facade::subject::IdForm;
-    use crate::facade::subject::SubjectLink;
     use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
-
-    /// Returns a subject link whose `PARTY_REF.type` is `party_type`.
-    fn link(party_type: &str) -> SubjectLink {
-        SubjectLink::new("http://example.org/mrn", IdForm::Reference, party_type)
-            .expect("a legal subject link")
-    }
 
     #[test]
     fn the_default_policy_writes_into_an_existing_ehr_only() {
@@ -278,7 +280,7 @@ mod tests {
     #[test]
     fn the_status_subject_is_a_generic_id_in_the_namespace() {
         let person = PersonId::new("http://example.org/mrn", "p-1").expect("a legal person id");
-        let status = status_of(&person, &link("PERSON"));
+        let status = status_of(&person);
         assert_eq!(EHR_STATUS_ARCHETYPE, status.archetype_node_id);
         let reference = status
             .subject
@@ -296,7 +298,7 @@ mod tests {
     #[test]
     fn the_status_names_rm_release_1_1_0() {
         let person = PersonId::new("http://example.org/mrn", "p-1").expect("a legal person id");
-        let status = status_of(&person, &link("PERSON"));
+        let status = status_of(&person);
         let details = status
             .archetype_details
             .expect("an archetype root carries its details");
@@ -304,20 +306,9 @@ mod tests {
     }
 
     #[test]
-    fn the_subject_names_the_configured_party_type() {
-        let person = PersonId::new("http://example.org/mrn", "g-1").expect("a legal person id");
-        let status = status_of(&person, &link("GROUP"));
-        let reference = status
-            .subject
-            .external_ref
-            .expect("the subject names an external reference");
-        assert_eq!("GROUP", reference.r#type);
-    }
-
-    #[test]
     fn a_created_ehr_is_queryable_and_modifiable() {
         let person = PersonId::new("http://example.org/mrn", "p-1").expect("a legal person id");
-        let status = status_of(&person, &link("PERSON"));
+        let status = status_of(&person);
         assert!(status.is_queryable);
         assert!(status.is_modifiable);
     }

@@ -9,7 +9,9 @@
 //! template and archetype ids the request reached ([`crate::cdr::reach`]), and written
 //! as an IHE BALP `AuditEvent` ([`crate::facade::audit`]). Each message the HL7 v2 face
 //! commits is recorded as a system import ([`hl7v2`], ITI TF-2 Table
-//! 3.20.4.1.1.1-1 "PHI-import"). Both are stored in the state store's audit
+//! 3.20.4.1.1.1-1 "PHI-import"), and so is each patient the inbound engine
+//! feeds to the identity source, beside each EHR it creates ([`inbound`]).
+//! All are stored in the state store's audit
 //! outbox ([`outbox`]) before the answer, and sent from there over the ITI-20
 //! ATX: FHIR Feed (ITI TF-2 §3.20.4.2) by the `ihe-atna` forwarder of
 //! whichever replica claims them, so a replica that stops loses no record.
@@ -21,6 +23,7 @@
 
 pub mod feed;
 pub mod hl7v2;
+pub mod inbound;
 pub mod outbox;
 
 use std::sync::Arc;
@@ -153,8 +156,8 @@ impl AccessLog {
 
     /// Returns the recorder a record of the system's own is stored through.
     #[must_use]
-    pub fn recorder(&self) -> &dyn AuditRecorder {
-        self.recorder.as_ref()
+    pub const fn recorder(&self) -> &Arc<dyn AuditRecorder> {
+        &self.recorder
     }
 
     /// Returns the address the facade's requests arrive at.

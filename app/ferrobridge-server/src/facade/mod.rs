@@ -417,6 +417,32 @@ impl Facade {
         &self.translator
     }
 
+    /// Returns what resolves a subject to its person for one request,
+    /// reading parties through `client` and asking the identity source on
+    /// behalf of the caller `access` names.
+    #[must_use]
+    pub fn patients<'a>(
+        &'a self,
+        client: &'a CdrClient,
+        access: &ferrohealth_smart::resource::Access,
+    ) -> subject::Patients<'a> {
+        subject::Patients {
+            link: &self.settings.subject,
+            store: self.store.as_ref(),
+            programs: self.programs(),
+            client,
+            renders: self.renders(),
+            on_behalf: subject::on_behalf(access),
+        }
+    }
+
+    /// Returns what a party is rendered through: the terminology server and
+    /// the demographics endpoint.
+    #[must_use]
+    pub fn renders(&self) -> (&Translator, &dyn Demographics) {
+        (&self.translator, self.demographics.as_ref())
+    }
+
     /// Returns this facade resolving a reference the request does not carry
     /// under `policy`.
     ///

@@ -101,7 +101,9 @@ impl<'a> Run<'a> {
                         .to_vec(),
                     match &write.value {
                         Pending::Ready(value) => Some(value.clone()),
-                        Pending::Translation { .. } | Pending::Sibling { .. } => None,
+                        Pending::Translation { .. }
+                        | Pending::Registry { .. }
+                        | Pending::Sibling { .. } => None,
                     },
                 ));
             }
@@ -163,6 +165,7 @@ impl<'a> Run<'a> {
                 .map(|resource| resource.writes.len())
                 .collect(),
             requests: self.requests.len(),
+            lookups: self.lookups.len(),
             outcomes: self.outcomes.len(),
         }
     }
@@ -175,6 +178,7 @@ impl<'a> Run<'a> {
             resource.writes.truncate(*length);
         }
         self.requests.truncate(mark.requests);
+        self.lookups.truncate(mark.lookups);
         self.outcomes.truncate(mark.outcomes);
     }
 
@@ -302,6 +306,10 @@ impl<'a> Run<'a> {
                     path,
                 };
                 self.absence(&inner, row, &reference, &own, base)?;
+                continue;
+            }
+            if let Condition::Registry { .. } = &row.condition {
+                self.registry(&inner, row, &reference, part, base)?;
                 continue;
             }
             if !self.gate(&inner, row, &reference)? {

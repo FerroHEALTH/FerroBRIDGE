@@ -29,7 +29,6 @@ use super::super::handle;
 use super::super::harness;
 use super::super::settings;
 use super::OTHER_CONTAINER;
-use super::SUBJECT;
 use super::get;
 use super::matches;
 use super::mount_rows;
@@ -252,7 +251,7 @@ async fn two_programs_over_one_template_answer_one_entry_per_composition()
     let store = Arc::new(MemoryStore::default());
     store
         .record_ehr(
-            &PersonId::new("http://example.org/fhir", SUBJECT)?,
+            &PersonId::new("http://example.org/fhir", super::PSEUDONYM)?,
             &EhrId::new(EHR_ID)?,
         )
         .await?;

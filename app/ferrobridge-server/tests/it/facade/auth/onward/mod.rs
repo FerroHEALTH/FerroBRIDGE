@@ -314,7 +314,8 @@ impl World {
     }
 
     /// Returns the `Authorization` value of every CDR call after the
-    /// template fetch, with its method and path.
+    /// template fetch, with its method and path; the identity source the
+    /// stub also serves under `/pix` is no CDR.
     async fn cdr_calls(&self) -> Vec<(String, Option<String>)> {
         self.harness
             .cdr
@@ -322,7 +323,10 @@ impl World {
             .await
             .unwrap_or_default()
             .iter()
-            .filter(|request| !request.url.path().starts_with("/definition/"))
+            .filter(|request| {
+                !request.url.path().starts_with("/definition/")
+                    && !request.url.path().starts_with("/pix/")
+            })
             .map(|request| {
                 (
                     format!("{} {}", request.method, request.url.path()),

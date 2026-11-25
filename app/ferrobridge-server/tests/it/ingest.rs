@@ -100,7 +100,8 @@ async fn facade_answering(echo: Echo) -> Result<(MockServer, Facade), Box<dyn Er
     let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
     let compiled = programs::compile_set(&set, &templates)?;
     let store = Arc::new(MemoryStore::default());
-    let facade = Facade::new(compiled, handle(&store), client(&cdr), settings());
+    let facade_settings = crate::support::served_identity(&cdr, settings()).await;
+    let facade = Facade::new(compiled, handle(&store), client(&cdr), facade_settings);
     Ok((cdr, facade))
 }
 

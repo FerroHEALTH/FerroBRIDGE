@@ -30,7 +30,7 @@ fn the_corpus_conditions_parse_or_are_refused_as_counted_forms() {
     let mut unsupported = BTreeMap::new();
     for row in corpus.maps().flat_map(|map| map.rows.iter()) {
         match &row.condition {
-            Condition::Computable(_) => computable += 1,
+            Condition::Computable(_) | Condition::Registry { .. } => computable += 1,
             Condition::Unsupported { text, .. } => {
                 refused += 1;
                 *unsupported.entry(text.clone()).or_insert(0usize) += 1;

@@ -777,11 +777,41 @@ endpoint.url = "https://cdr.example.org/openehr/v1"
 directory = "/etc/ferrobridge/mappings"
 ```
 
+### `[identity_source]`
+
+The identity source every EHR subject comes from: a PIXm Manager such as
+FerroPIX. The facade and the inbound engine ask it for the patient's
+pseudonym in `pseudonym_domain` over ITI-83 by `POST`, so the patient's
+identifier never sits in a URL (PIXm 3.1.0 §2:3.83.4.1.2.2), and each EHR's
+`EHR_STATUS.subject.external_ref` names that pseudonym. An enabled facade
+refuses to start without this table.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `endpoint.url` | none, required | The FHIR base of the PIXm Manager; `$ihe-pix` is called under it |
+| `endpoint.timeout` | `10s` | How long one question may take |
+| `endpoint.credentials` | none | The credential the bridge asks with, the same keys as `[cdr.endpoint.credentials]` |
+| `pseudonym_domain` | none, required | The identifier system of the pseudonym, the ITI-83 `targetSystem` and the namespace of every EHR subject |
+| `source_domains` | none, required | The identifier systems the bridge may ask by, in order: a `Patient` is asked for by its identifier in the first of these it carries |
+
+Each domain is an absolute URI and is named once; a missing, relative or
+repeated domain is a boot error naming the key. The order of
+`source_domains` decides because ITI-83 takes one source identifier and the
+order of `Patient.identifier` means nothing.
+
+```toml
+[identity_source]
+endpoint.url = "https://pix.example.org/fhir"
+pseudonym_domain = "https://example.org/fhir/sid/pseudonym"
+source_domains = ["http://fhir.nl/fhir/NamingSystem/bsn", "https://example.org/fhir/sid/mrn"]
+```
+
 ### `[facade]`
 
 The FHIR R4 facade. It is off until `enabled` is true, and a disabled facade
 mounts no route, so a request to `/fhir` answers `404` rather than `403`. An
-enabled facade needs `[cdr]` and `[mappings] directory`: it compiles the
+enabled facade needs `[cdr]`, `[mappings] directory` and
+[`[identity_source]`](#identity_source): it compiles the
 mapping set at boot against the templates the CDR holds, so a mapping that does
 not compile refuses the start rather than the first request that touches it.
 This lane reaches identifiable data, and the server says so once at start-up.
@@ -791,9 +821,6 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `enabled` | `false` | Whether the facade routes are mounted |
 | `base_url` | `http://127.0.0.1:8080/fhir` | The absolute FHIR service base a client reaches, which `Location` is written under |
 | `ehr_policy` | `existing` | `existing` writes only into an EHR the CDR already holds; `create_on_first_write` creates one for an unknown subject |
-| `subject_namespace` | `ferrobridge` | The namespace a literal subject reference is looked up in on the CDR, the `PARTY_REF.namespace` of `EHR_STATUS.subject` |
-| `subject_id_form` | `reference` | How the id of a literal subject reference is written: `reference` keeps `Patient/<id>`, `logical_id` keeps the bare `<id>`, and `uuid` keeps the bare `<id>` and refuses one that is no UUID |
-| `subject_type` | `PERSON` | The `PARTY_REF.type` of the subject of an EHR the facade creates, one of the BASE `Type_validity` values (`PERSON`, `ORGANISATION`, `GROUP`, `AGENT`, `ROLE`, `PARTY`, `ACTOR`) or `ANY` |
 | `ehr_status_identifier_system` | none | The `Identifier.system` whose identifier a mapping that offers the subject of the EHR (`ehrStatusAddExternalREF`) writes as `EHR_STATUS.subject.external_ref` |
 | `system_id` | `FerroBRIDGE` | The `AUDIT_DETAILS.system_id` every commit records |
 | `composition_language` | none, required | The `COMPOSITION.language` every commit carries, an ISO 639-1 code |
@@ -815,25 +842,28 @@ composition/document information", and HL7 Europe EU Health Data API
 `EehrxfMhdDocumentReference` requires `DocumentReference.custodian`. An
 enabled facade refuses to start without each of the three keys.
 
-The three `subject_` keys make the facade's link between a Patient and its
-EHR match the one the CDR's owner writes, because the facade finds an EHR
-with `GET /ehr?subject_id=&subject_namespace=`. A CDR whose owner links each
-EHR to a demographic party under its own namespace takes that namespace and
-`logical_id`, so a subject `Patient/<party uid>` is looked up as the party
-uid. A CDR that accepts only UUID pseudonyms as subject ids takes the
-namespace it lists and `uuid`, so a subject whose id is no UUID is refused
-with a diagnostic naming `facade.subject_id_form` before the CDR is called.
-Under `logical_id` and `uuid` a `Patient` keys its own EHR the same way, by
-its logical id in `subject_namespace`, so creating or updating a Patient finds
-the EHR its resources are written into; a Patient with no `id`, or under
-`uuid` one whose `id` is no UUID, is refused naming `facade.subject_id_form`.
-Under `reference` a Patient keys its EHR by its first `identifier` with a
-value, as before.
-The facade never derives a pseudonym itself: name a subject by the id the CDR
-already holds. A subject named by `identifier` keeps the identifier's
-`system` as its namespace and its `value` as its id. A `subject_type` outside
-the BASE set, or a `subject_namespace` that breaks the `OBJECT_REF`
-namespace rule, is a boot error naming the key.
+The facade finds an EHR with `GET /ehr?subject_id=&subject_namespace=`, and
+every subject is the patient's pseudonym that [`[identity_source]`](#identity_source)
+holds, so the facade keeps no patient identity of its own. The `Patient`
+logical id depends on the mapping set:
+
+- **With a `Patient` party context:** the id is the party's
+  `versioned_object_uid`. Creating or updating the `Patient` asks the identity
+  source for its pseudonym before the party is committed, and the state store
+  records the party against it, so a resource naming `Patient/<uid>` finds the
+  EHR without asking again. A party the store has not recorded is read once,
+  asked for, and recorded.
+- **Without one:** the id is the pseudonym itself, so `Patient/<pseudonym>`
+  needs no question to the identity source.
+
+A subject named by `identifier`, and a `Patient` resource, is asked for by
+its identifier in the first domain of `source_domains` it carries. One with no
+identifier in an accepted domain, or an identifier with no `system`, answers
+`422` naming the list. A failed question is never an EHR under another
+subject: `422` when the identity source knows no such patient or holds no
+single pseudonym for it, `503` when it timed out, could not be reached or
+answered `429` or `5xx`, and `502` for any other answer, each naming the
+status it answered.
 
 A mapping can offer the resource's identifiers as the subject of the EHR,
 as the published `KDS_admin_entry_person.yml` does with
@@ -843,7 +873,7 @@ as the published `KDS_admin_entry_person.yml` does with
 pseudonyms only (FerroEHR with `[privacy] subject_namespaces`) takes the
 system its pseudonyms are issued in. The reference is written the way the
 facade writes the subject of an EHR it creates: namespace and scheme from the
-`system`, id from the `value`, type from `subject_type`. Before the
+`system`, id from the `value`, type `PERSON`. Before the
 composition is committed the facade reads the `EHR_STATUS`: one that already
 holds the reference is left as it is, one with no subject reference takes it
 with `If-Match` on the version read, and one that names another subject
@@ -859,9 +889,9 @@ project performing the mapping, and there is no correct language for a clinical
 record you did not write, so an enabled facade with either key unset is a boot
 error naming the key.
 
-The identity map holds identifiers: a subject to its `ehr_id`, a resource id
-to the composition it came from, and the source identity of every resource the
-facade consumed. It lives in the state store, so the facade needs `[state]` and
+The identity map holds identifiers: a subject to its `ehr_id`, a `Patient`
+party to its pseudonym, a resource id to the composition it came from, and the
+source identity of every resource the facade consumed. It lives in the state store, so the facade needs `[state]` and
 `[state.seal]`, and every replica shares it. No clinical content and no
 identifier value in clear is written into it. Back the database up with the
 CDR, because a lost map means the next create writes a second composition for a
@@ -1728,11 +1758,15 @@ wire_version = "r4"
 [mappings]
 directory = "/etc/ferrobridge/mappings"
 
+[identity_source]
+endpoint.url = "https://pix.example.org/fhir"
+pseudonym_domain = "https://example.org/fhir/sid/pseudonym"
+source_domains = ["http://fhir.nl/fhir/NamingSystem/bsn", "https://example.org/fhir/sid/mrn"]
+
 [facade]
 enabled = true
 base_url = "https://bridge.example.org/fhir"
 ehr_policy = "create_on_first_write"
-subject_namespace = "https://example.org/fhir/sid/patient"
 composition_language = "en"
 composition_territory = "GB"
 

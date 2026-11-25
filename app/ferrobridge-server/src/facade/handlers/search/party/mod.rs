@@ -233,7 +233,7 @@ async fn rendered(
     held: &Held,
 ) -> Result<Match, Refusal> {
     let canonical = party::accept(loaded, resource_type, uid, held)?;
-    let resource = party::render(facade, loaded, &canonical, &held.version).await?;
+    let resource = party::render(facade.renders(), loaded, &canonical, &held.version).await?;
     let id = FhirResourceId::new(uid).map_err(|error| {
         write::refuse(&status::Answer::new(
             status::UPSTREAM,

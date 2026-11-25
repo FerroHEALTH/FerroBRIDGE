@@ -285,9 +285,15 @@ async fn an_adt_a01_admits_its_patient_creating_the_ehr_under_the_face_policy()
         serde_json::from_slice(created.first().ok_or("an EHR_STATUS body")?)?;
     assert_eq!(Some("EHR_STATUS"), status["_type"].as_str(), "{status}");
     assert_eq!(
-        Some("synthetic-subject-0001"),
+        Some(crate::support::PSEUDONYM),
         status["subject"]["external_ref"]["id"]["value"].as_str(),
-        "the EHR names the PID-3 subject: {status}"
+        "the EHR names the pseudonym of the PID-3 subject: {status}"
+    );
+    let asked = running.requests("POST", crate::support::PIX_PATH).await;
+    let asked = String::from_utf8(asked.first().cloned().unwrap_or_default())?;
+    assert!(
+        asked.contains("urn:oid:2.999.1") && asked.contains("synthetic-subject-0001"),
+        "the identity source is asked by the PID-3 identifier: {asked}"
     );
     assert_eq!(1, running.contributions().await, "one commit into the EHR");
     let committed = running
@@ -342,7 +348,8 @@ async fn an_oru_r01_over_mllp_commits_a_composition_into_a_real_cdr() -> Result<
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
     let compiled = programs::compile_set(&set, &templates)?;
-    let mut facade_settings = settings();
+    let pix = wiremock::MockServer::start().await;
+    let mut facade_settings = crate::support::served_identity(&pix, settings()).await;
     facade_settings.ehr_policy = Policy::CreateOnFirstWrite;
     let facade = Arc::new(Facade::new(
         compiled,

@@ -13,7 +13,8 @@ use ferrobridge_server::config::error::Error;
 /// An enabled facade with `tables` after its `[facade]` table.
 fn with(tables: &str) -> String {
     format!(
-        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n{tables}"
+        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n{}[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n{tables}",
+        crate::support::IDENTITY_SOURCE
     )
 }
 

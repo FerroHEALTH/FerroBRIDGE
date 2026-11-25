@@ -33,6 +33,8 @@ pub(crate) struct Started {
     pub(crate) face: Option<StartedFace>,
     /// The change-feed consumers that run.
     pub(crate) feeds: Vec<StartedFeed>,
+    /// The inbound workers, when the intake and the facade run.
+    pub(crate) workers: Option<Arc<crate::inbound::worker::Pool>>,
 }
 
 impl Started {
@@ -78,17 +80,22 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     state = open_sources(settings, state)?;
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
+        let mut lane = lane.clone();
+        if let Some(audit) = settings.audit.as_ref() {
+            let log = start_audit(audit, settings, &lane, &state).await?;
+            let identity = lane.settings.subject.identity().clone();
+            lane.settings.subject = facade::subject::SubjectLink::new(Arc::new(
+                identity.audited(Arc::clone(log.recorder())),
+            ));
+            state = state.with_access_log(Arc::new(log));
+        }
         let (mounted, counts) =
-            build_facade(settings, lane, state.terminology().cloned(), state.store())
+            build_facade(settings, &lane, state.terminology().cloned(), state.store())
                 .await
                 .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
-    }
-    if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
-        let log = start_audit(audit, mounted, &state).await?;
-        state = state.with_access_log(Arc::new(log));
     }
     state = start_links(settings, state)?;
     if settings.operator.is_some() {
@@ -135,12 +142,44 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_change_feed(report);
         feeds = started;
     }
+    let workers = inbound_workers(settings, &state);
     Ok(Started {
         state,
         lanes,
         face,
         feeds,
+        workers,
     })
+}
+
+/// Returns the inbound workers of `state`, applying each item with the one
+/// handler over the facade's identity source, CDR client and identity map,
+/// when both the intake and the facade run.
+fn inbound_workers(
+    settings: &Settings,
+    state: &AppState,
+) -> Option<Arc<crate::inbound::worker::Pool>> {
+    let (Some(inbound), Some(store), Some(sources), Some(facade)) = (
+        settings.inbound,
+        state.store(),
+        state.sources(),
+        state.facade(),
+    ) else {
+        return None;
+    };
+    let handler = crate::inbound::apply::Apply::new(
+        Arc::new(crate::inbound::apply::Undeclared),
+        facade.settings().subject.identity_handle(),
+        facade.client().clone(),
+        facade.store_handle(),
+    )
+    .with_access_log(state.access_log().cloned());
+    Some(Arc::new(crate::inbound::worker::Pool::new(
+        crate::inbound::store::InboxStore::new(store.pool().clone()),
+        Arc::clone(sources),
+        Arc::new(handler),
+        inbound.workers,
+    )))
 }
 
 /// Returns `state` serving the inbound sources of its state store, the
@@ -156,7 +195,6 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
             .context("opening the [secrets] directory the inbound sources name")?,
     );
     let intake = settings.inbound.map(|inbound| {
-        // TODO(#2048): start the worker pool with the identity-feed handler.
         crate::inbound::intake::Intake::new(
             Arc::clone(&sources),
             crate::inbound::store::InboxStore::new(store.pool().clone()),
@@ -211,14 +249,18 @@ impl StartedFeed {
 }
 
 /// Spawns every change-feed follower, the inbound recovery and the link
-/// sweeper of `state`, each on its own task until `stop` reads `true`.
+/// sweeper of `state`, and the inbound `workers`, each on its own task until
+/// `stop` reads `true`.
 pub(crate) fn spawn_followers(
-    feeds: Vec<StartedFeed>,
+    (feeds, workers): (Vec<StartedFeed>, Option<Arc<crate::inbound::worker::Pool>>),
     state: &AppState,
     settings: &Settings,
     stop: &tokio::sync::watch::Sender<bool>,
 ) -> Vec<tokio::task::JoinHandle<()>> {
     let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let Some(workers) = workers {
+        followers.extend(workers.spawn(&stop.subscribe()));
+    }
     if let (Some(recoverer), Some(inbound)) = (
         state.intake().and_then(|intake| intake.recoverer()),
         settings.inbound,
@@ -625,31 +667,32 @@ fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::
     }
 }
 
-/// Opens the access-record lane `audit` describes for the facade `mounted`,
-/// its outbox and its category register in the state store of `state`.
+/// Opens the access-record lane `audit` describes for the facade `lane` over
+/// the CDR of `settings`, its outbox and its category register in the state
+/// store of `state`.
 async fn start_audit(
     audit: &crate::audit::Settings,
-    mounted: &facade::Facade,
+    settings: &Settings,
+    lane: &config::FacadeSettings,
     state: &AppState,
 ) -> anyhow::Result<crate::audit::AccessLog> {
     use anyhow::Context;
 
-    let base = url::Url::parse(&mounted.settings().base_url)
+    let base = url::Url::parse(&lane.settings.base_url)
         .context("reading [facade] base_url as the address the access records name")?;
+    let cdr = settings
+        .cdr
+        .as_ref()
+        .context("the facade needs a [cdr] section: it maps every request onto CDR operations")?;
     let store = state.store().context(
         "the access-record lane keeps its outbox in the state store, and [state] is not set",
     )?;
     let registers = state.registers().cloned().context(
         "the access records are classified by a settings register, and [state] is not set",
     )?;
-    let log = crate::audit::AccessLog::open(
-        audit,
-        (&base, mounted.client().base_url()),
-        store,
-        registers,
-    )
-    .await
-    .context("reading the audit-categories register the access records are classified by")?;
+    let log = crate::audit::AccessLog::open(audit, (&base, &cdr.base_url), store, registers)
+        .await
+        .context("reading the audit-categories register the access records are classified by")?;
     tracing::info!(
         lane = "audit",
         repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),

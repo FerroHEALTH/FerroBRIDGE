@@ -58,7 +58,7 @@ use crate::config::Hl7v2Settings;
 use crate::config::hl7v2::Sender;
 use crate::facade::Facade;
 use crate::facade::ingest::Provenance;
-use crate::hl7v2::answer::{Settled, Tally};
+use crate::hl7v2::answer::{Settled, Tally, unsettled};
 use crate::hl7v2::plain::Lane;
 use crate::hl7v2::stamped::Stamped;
 use crate::sources::Routes;
@@ -461,6 +461,10 @@ impl Face {
         };
         self.directory.served(mapped.applied());
         tally.outcomes = mapped.counts();
+        let unsettled = unsettled(mapped.outcomes());
+        if !unsettled.is_empty() {
+            return (Settled::Unregistered(unsettled), tally);
+        }
         let type_code = [message.message_type(1), message.message_type(2)]
             .into_iter()
             .flatten()

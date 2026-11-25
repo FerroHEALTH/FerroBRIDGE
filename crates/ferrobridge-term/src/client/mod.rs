@@ -386,6 +386,38 @@ impl Client {
         crate::decode::search_total(self.config.wire_version, &answer)
     }
 
+    /// Returns the identifier systems the server registers under the unique
+    /// id `value`, asked as
+    /// `GET [base]/NamingSystem?kind=identifier&value=<value>`
+    /// (<https://hl7.org/fhir/R4/namingsystem.html#search>).
+    ///
+    /// Each is the `uri` unique id of a `NamingSystem` that is not retired
+    /// and holds a unique id equal to `value`, the preferred one first, so an
+    /// empty list says the server registers no identifier system under it.
+    /// The `value` search parameter is a `string`, which matches by prefix
+    /// without regard to case (<https://hl7.org/fhir/R4/search.html#string>),
+    /// so the equality is checked on the answer.
+    ///
+    /// # Errors
+    /// Returns [`Error::Refused`] when the server refused the search, and
+    /// [`Error::Body`] when the answer is not a `searchset` `Bundle`;
+    /// [`Error`] otherwise when the call did not reach an answer.
+    #[cfg(feature = "naming-system")]
+    pub async fn identifier_systems(&self, value: &str) -> Result<Vec<String>, Error> {
+        let mut url = self.url("NamingSystem")?;
+        url.query_pairs_mut()
+            .append_pair("kind", "identifier")
+            .append_pair("value", value);
+        let answer = self
+            .execute(Call {
+                operation: crate::NAMING_SYSTEM_SEARCH,
+                url,
+                body: None,
+            })
+            .await?;
+        crate::decode::identifier_systems(self.config.wire_version, &answer, value)
+    }
+
     /// Translates the code `translation` names, through the concept map,
     /// into the target system and in the direction it names.
     ///

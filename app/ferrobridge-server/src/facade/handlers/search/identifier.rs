@@ -34,7 +34,7 @@ use fhir_search::token::Token;
 /// parameter `name` names, in the order the identifier query returns them.
 pub(crate) async fn ehrs_of(
     facade: &Facade,
-    client: &CdrClient,
+    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
     name: &str,
     token: &Token,
 ) -> Result<Vec<EhrId>, Refusal> {
@@ -63,7 +63,7 @@ pub(crate) async fn ehrs_of(
     })?;
     let mut ehrs = Vec::new();
     for party in &parties {
-        if let Some(found) = ehr_of_party(facade, client, party).await?
+        if let Some(found) = ehr_of_party(facade, (client, patients), party).await?
             && !ehrs.contains(&found)
         {
             ehrs.push(found);
@@ -76,17 +76,16 @@ pub(crate) async fn ehrs_of(
 /// the CDR holds none.
 pub(crate) async fn ehr_of_party(
     facade: &Facade,
-    client: &CdrClient,
+    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
     party: &str,
 ) -> Result<Option<EhrId>, Refusal> {
-    let link = &facade.settings().subject;
-    // NOTE: no specification governs this: our own design, a party uid no person key
-    // can hold names no subject the facade links, so it matches nothing.
-    let Ok(person) = link.person_of_patient(party) else {
+    // NOTE: no specification governs this: our own design, a party that names no
+    // person matches nothing.
+    let Some(person) = patients.known_person(party).await? else {
         return Ok(None);
     };
-    match ehr::resolve(client, facade.store(), &person, link, ehr::Policy::Existing).await {
-        Ok(found) => Ok(Some(found)),
+    match ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing).await {
+        Ok(found) => Ok(Some(found.id)),
         Err(ehr::EhrError::Absent { .. }) => Ok(None),
         Err(ehr::EhrError::Client { ref source }) => {
             Err(write::refuse(&status::of_client_error(source)))
