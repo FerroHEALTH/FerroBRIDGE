@@ -9,12 +9,11 @@
 //! Required (ITI TF-1: Table 33.1-1). Each document is the Bundle
 //! `Composition/[id]/$document` assembles from one composition of a
 //! Composition context, so a `DocumentReference` is the draft `EEHRxF`
-//! Annex III description of that document under the Composition's id
-//! ([`reference`]), its `content.attachment.url` the `$document` URL ITI-68
-//! retrieves (ITI TF-2: 3.67.4.2.2.1). A `List` is a submission set, one per
-//! CONTRIBUTION that committed the latest version of a document composition
-//! ([`list`]); no specification maps a CONTRIBUTION to a submission set: our
-//! own design.
+//! Annex III description of that document under the Composition's id, its
+//! `content.attachment.url` the `$document` URL ITI-68 retrieves (ITI TF-2:
+//! 3.67.4.2.2.1). A `List` is a submission set, one per CONTRIBUTION that
+//! committed the latest version of a document composition; no specification
+//! maps a CONTRIBUTION to a submission set: our own design.
 //!
 //! A search ignores a parameter it does not support, as MHD asks ("should be
 //! ignored", ITI TF-2: 3.66.4.1.2, 3.67.4.1.2) and FHIR R4 does under
