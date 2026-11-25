@@ -292,7 +292,7 @@ pub mod procedure;
 pub mod prod_characteristic;
 #[cfg(any(feature = "resources", feature = "r4-resources"))]
 pub mod product_shelf_life;
-#[cfg(any(feature = "resources", feature = "r4-resources"))]
+#[cfg(feature = "terminology")]
 pub mod provenance;
 #[cfg(feature = "terminology")]
 pub mod quantity;

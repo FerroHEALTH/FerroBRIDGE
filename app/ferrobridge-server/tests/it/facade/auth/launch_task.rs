@@ -40,16 +40,19 @@ struct Guarded {
 
 impl Guarded {
     /// Returns a guarded facade serving launch `Task`s.
-    async fn new() -> Result<Self, Box<dyn Error>> {
+    async fn new() -> Result<Option<Self>, Box<dyn Error>> {
+        let Some(case) = Case::new().await? else {
+            return Ok(None);
+        };
         let key = ec_key("k1", Algorithm::ES256);
         let issuer = Issuer::start(&[&key]).await;
         let authority = authority(issuer.settings()).await;
-        Ok(Self {
+        Ok(Some(Self {
             issuer,
             key,
-            case: Case::new().await?,
+            case,
             authority,
-        })
+        }))
     }
 
     /// Returns a token granting `scope`, launched for `patient` when given.
@@ -78,7 +81,9 @@ impl Guarded {
 #[tokio::test]
 async fn a_patient_grant_reaches_the_tasks_of_its_launch_patient_only() -> Result<(), Box<dyn Error>>
 {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let (status, created) = guarded
         .send(
             post_task(EHR_LAUNCH),
@@ -122,7 +127,9 @@ async fn a_patient_grant_reaches_the_tasks_of_its_launch_patient_only() -> Resul
 
 #[tokio::test]
 async fn each_interaction_needs_its_task_permission() -> Result<(), Box<dyn Error>> {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let (status, _) = guarded
         .send(post_task(EHR_LAUNCH), &guarded.token("user/Task.rs", None))
         .await?;
@@ -137,7 +144,9 @@ async fn each_interaction_needs_its_task_permission() -> Result<(), Box<dyn Erro
 #[tokio::test]
 async fn every_launch_task_route_reaches_its_handler_under_a_full_scope()
 -> Result<(), Box<dyn Error>> {
-    let guarded = Guarded::new().await?;
+    let Some(guarded) = Guarded::new().await? else {
+        return Ok(());
+    };
     let token = guarded.token("system/*.cruds", None);
     for (method, template, _) in ferrobridge_server::facade::guard::LAUNCH_TASK {
         let path = format!("/fhir{template}").replace("{id}", "unknown-id");

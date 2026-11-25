@@ -131,58 +131,6 @@ fn fetched(package: Package) -> bool {
     present
 }
 
-/// The elements whose shape the 6.0.0-ballot5 core model changed from R5 and
-/// whose 6.0.0-ballot5 examples carry a value the new model refuses, with the
-/// change.
-///
-/// The examples package writes `null` or `{}` where a value of the R5 type
-/// did not carry over into the ballot's type, and keeps an element the ballot
-/// removed. R6 ballot5 json.html §2.1.6.4 says "Objects are never empty", and
-/// its §2.1.6.4.3 admits `null` only in an array of primitive values aligned
-/// with its `_` array, so the decoder refuses each one. A failure on a listed
-/// element stays a failure, never a pass, and carries the outcome
-/// `ballot-drift <element>` so the corpus counts it; every element listed
-/// must still meet such a failure, so the list follows the pins (#380).
-const R6_BALLOT_DRIFT: [(&str, &str); 10] = [
-    (
-        "AllergyIntolerance.category",
-        "CodeableConcept 0..*, code 0..* in R5",
-    ),
-    (
-        "ClinicalUseDefinition.subject",
-        "CodeableReference 1..*, Reference 0..* in R5",
-    ),
-    (
-        "Condition.bodyStructure",
-        "CodeableReference 0..*, new in the ballot",
-    ),
-    (
-        "DiagnosticReport.conclusionCode",
-        "CodeableReference 0..*, CodeableConcept 0..* in R5",
-    ),
-    (
-        "OrganizationAffiliation.network",
-        "removed in the ballot, Reference 0..* in R5",
-    ),
-    (
-        "Procedure.bodyStructure",
-        "CodeableReference 0..*, new in the ballot",
-    ),
-    (
-        "Provenance.authorization",
-        "CodeableConcept 0..*, CodeableReference 0..* in R5",
-    ),
-    (
-        "ServiceRequest.asNeededFor",
-        "CodeableConcept 0..*, new in the ballot",
-    ),
-    ("Task.focus", "BackboneElement 0..*, Reference 0..1 in R5"),
-    (
-        "TerminologyCapabilities.codeSystem.version",
-        "BackboneElement 0..*, items written as null",
-    ),
-];
-
 /// The element a decode failure of `original` lands on, as the resource type
 /// holding it and the element names below that resource (`Task.focus`), or
 /// `None` for a failure of any other kind.
@@ -331,7 +279,7 @@ fn conformance_the_fhir_r6_examples_hold_their_pass_list() -> Result<(), Box<dyn
         Package::R6,
         Corpus::FhirR6,
         &fhir_types::r6::schema::SCHEMAS,
-        &R6_BALLOT_DRIFT,
+        &[],
     )
 }
 

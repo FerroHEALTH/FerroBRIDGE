@@ -14,25 +14,26 @@ use crate::change_feed::aql::Start;
 use crate::change_feed::follow::Polling;
 
 /// Returns the change feed `section` describes, refused when it has no CDR
-/// to read, a key out of range, or no consumer to feed.
+/// to read, no state store to keep its cursors and dead letters in, a key
+/// out of range, or no consumer to feed.
 ///
 /// `consumers` counts the consumer sections that are on.
 pub(super) fn resolve_change_feed(
     section: &ChangeFeed,
     cdr: bool,
+    state: bool,
     consumers: usize,
 ) -> Result<Settings, Error> {
-    if !cdr {
-        return Err(Error::Needs {
-            key: String::from("change_feed.enabled"),
-            needs: String::from("[cdr]"),
-        });
+    for (present, needs) in [(cdr, "[cdr]"), (state, "[state]")] {
+        if !present {
+            return Err(Error::Needs {
+                key: String::from("change_feed.enabled"),
+                needs: String::from(needs),
+            });
+        }
     }
     let source = match section.source.as_str() {
         "aql" => Source::Aql {
-            watermarks: section.watermarks.clone().ok_or_else(|| Error::Missing {
-                key: String::from("change_feed.watermarks"),
-            })?,
             start: start_of(&section.start)?,
         },
         "ferroehr" => Source::FerroEhr {
@@ -53,6 +54,7 @@ pub(super) fn resolve_change_feed(
     for (key, value) in [
         ("change_feed.poll_interval", section.poll_interval),
         ("change_feed.backoff", section.backoff),
+        ("change_feed.lease", section.lease),
     ] {
         if value.is_zero() {
             return Err(Error::Bound {
@@ -78,9 +80,6 @@ pub(super) fn resolve_change_feed(
             value: section.max_attempts,
             reason: "an event fails 1 to 1000 poisoned passes before it is parked",
         })?;
-    let dead_letters = section.dead_letters.clone().ok_or_else(|| Error::Missing {
-        key: String::from("change_feed.dead_letters"),
-    })?;
     if consumers == 0 {
         return Err(Error::NoConsumer {
             key: String::from("change_feed.enabled"),
@@ -88,7 +87,7 @@ pub(super) fn resolve_change_feed(
     }
     Ok(Settings {
         source,
-        dead_letters,
+        lease: section.lease.get(),
         max_attempts,
         polling: Polling {
             page_size,

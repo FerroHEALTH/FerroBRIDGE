@@ -7,8 +7,6 @@
 //! where it sets one (a `location` lives at most one hour); the rest is our
 //! own design.
 
-use std::path::PathBuf;
-
 use ferrohealth_config::units::Duration;
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +16,6 @@ use serde::{Deserialize, Serialize};
 pub struct Shl {
     /// Whether the person's links are served.
     pub enabled: bool,
-    /// The `redb` file the links are kept in.
-    pub store: Option<PathBuf>,
     /// The public origin a receiver reaches the bridge at, such as
     /// `https://bridge.example.org`; a link's URL is this origin, `/shl/m/`
     /// and 43 characters, at most 128 in all.
@@ -40,7 +36,6 @@ impl Default for Shl {
     fn default() -> Self {
         Self {
             enabled: false,
-            store: None,
             base_url: String::new(),
             default_expiry: Duration::from_secs(24 * 3600),
             max_expiry: Duration::from_secs(7 * 24 * 3600),

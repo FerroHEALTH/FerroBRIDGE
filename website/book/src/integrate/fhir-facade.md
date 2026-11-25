@@ -310,19 +310,21 @@ lowercase base32 characters. `meta.versionId` carries the openEHR
 composition reads back under the same id with a new `meta.versionId`.
 `meta.source` names the openEHR version uid the answer was read from.
 
-The identity map is a `redb` file with seven tables: a patient identifier to its
+The identity map lives in the state store ([`[state]`](../operate/configuration.md#state)),
+which every replica shares, in eight tables: a patient identifier to its
 `ehr_id` and each `ehr_id` back to the first person recorded for it, an
 external resource id to the internal one, an internal id to the
 composition version container with the entry path and split occurrence, and the
 source resource `id` with its `meta.versionId` to the mapping that consumed
-them, beside the contribution each source was committed in and each
-`Resource.identifier` of a committed resource. The map wins once written. The
-store file records its schema, and a file an earlier schema wrote is refused at
-boot with its path named: the ids this release derives differ from the ids the
-facade served before 0.0.14, so the reset is to remove the file, which the
-bridge then creates anew. The store keeps identifiers and nothing else:
-no clinical content is written into it, and a test greps the file for a mapped
-value to prove it.
+them, beside the contribution each source was committed in, each
+`Resource.identifier` of a committed resource, and one row that pins the
+identity derivation and the lookup key. The map wins once written: every row
+is recorded once, so two replicas agree on the one that stands. A map another
+derivation wrote is refused at start. The store keeps identifiers and nothing
+else, and no identifier value in clear: a patient identifier and every
+`Resource.identifier` value are stored as an HMAC under the `[state.seal]`
+lookup key, and the person of an EHR is sealed, which a test proves by
+scanning the tables for the value.
 
 That last table is what makes create idempotent. A resource re-sent with the
 same `id` and `meta.versionId` commits nothing and answers `200 OK` with the
@@ -741,7 +743,8 @@ With `[facade.app_state]` on, `Basic` at the facade's base is the SMART App
 State endpoint of SMART App Launch 2.2.0, Persisting App State: an app keeps
 a small amount of its own state at the EHR, such as display preferences or
 the keys to an external data set. The CDR holds no `Basic`, so the facade
-keeps these resources in a store of its own, apart from the identity map. The
+keeps these resources in the state store, apart from the identity map, so
+every replica serves the same ones. The
 discovery document lists `smart-app-state`, and the `CapabilityStatement`
 instantiates `smart-app-state-server` and lists `Basic` with the
 `smart-app-state-basic` profile.
@@ -787,7 +790,7 @@ launch: `task-ehr-launch` asks the EHR to launch an app with an optional
 EHR viewer lists the `Task`s for the patient in view and acts on one; for an
 EHR launch it registers the launch at the authorization server's launch API
 with the `Task`'s `for`, `encounter` and `appContext`. The CDR holds no
-`Task`, so the facade keeps them in a store of its own.
+`Task`, so the facade keeps them in the state store, shared by every replica.
 
 | Interaction | Route | Answer |
 |---|---|---|
@@ -874,6 +877,33 @@ Bundle generated on demand from the latest information the CDR holds.
 
 The read path, the empty reasons, the `404` for another patient and the
 refusal of an invalid document are FerroBRIDGE's own design.
+
+## The EEHRxF Annex X data groups as resources
+
+Art 7(2) of the draft EEHRxF implementing act (Have your say initiative
+17512, 2026-11-23) exchanges the 33 common data groups of its Annex X as
+individual resources as well as inside documents. The `eehrxf` crate ships
+the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
+(`eehrxf::mappings::ANNEX_X`), with a search declaration beside each
+context. Point `[mappings] directory` at a copy of it
+(`ANNEX_X.write_to(dir)` writes one) and load its two templates into the
+CDR: FerroBRIDGE's patient summary template and its EHDS record template.
+
+| Annex X group | Resource | Profile | Search (IHE QEDm 3.0.0 PCC-44) |
+|---|---|---|---|
+| EHDSAllergyIntolerance | `AllergyIntolerance` | `allergyIntolerance-eu-core` | `patient` (2:3.44.4.1.2.2) |
+| EHDSCondition | `Condition` | `condition-eu-core` | `patient`, `onset-date` (2:3.44.4.1.2.1.3) |
+| EHDSMedicationUse | `MedicationStatement` | `medicationStatement-eu-core` | `patient` with `_include=MedicationStatement:medication` (2:3.44.4.1.2.1.5) |
+| EHDSMedication | `Medication` | `medication-eu-core` | read, and included by the statement that references it |
+| EHDSImmunisation | `Immunization` | `immunization-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.6) |
+| EHDSObservation | `Observation` | FHIR R4 `bodyweight` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| EHDSProcedure | `Procedure` | `procedure-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.7) |
+
+The profiles other than `bodyweight` are HL7 Europe Base and Core 2.0.1.
+A body weight observation carries the category `vital-signs` and the LOINC
+code `29463-7` the profile fixes, so both are `fixed` tokens. The
+`conformance/eehrxf-annex-x` pass list records the groups served, and its
+badge counts them out of 33.
 
 ## `$validate` is a dry run of this server
 
@@ -1001,6 +1031,13 @@ parameters:
   recorded:
     type: date
     path: context/start_time/value             # no node: read under the composition
+  category:
+    type: token
+    fixed:                                     # the coding the mapping writes as a constant
+      system: "http://terminology.hl7.org/CodeSystem/condition-category"
+      code: problem-list-item
+include:                                       # the reference parameters _include may name
+  - evidence-detail
 ```
 
 A parameter names the node it is read under with `node`, the RM class and
@@ -1010,7 +1047,35 @@ names the coded value itself, a `DV_CODED_TEXT`, a `DV_TEXT` or a
 `CODE_PHRASE`, and the facade reads its code and its system from that one
 value, so `[system]|[code]` never pairs the system of one diagnosis with the
 code of another. A `string` or a `date` names a data value, with any
-attribute below it.
+attribute below it. A `date` may also name `time/value` under an `ACTION`
+and `data[atNNNN]/origin/value` under an `OBSERVATION`: the RM defines both
+instants, each once, and the Web Template leaves them out.
+
+A `token` whose value the mapping writes as a constant, such as the category
+of every observation a context maps, has no openEHR path to compare. Declare
+it with `fixed`, the one coding every resource of the context carries, and no
+`node` or `path`: a value that matches the coding adds no condition, and any
+other value answers an empty `searchset` with no query to the CDR.
+
+`include` lists the codes of the type's standard R4 reference parameters a
+search may name in `_include`. The facade stores nothing, so it includes the
+resources the match's own mapping creates beside it and the match references
+through that parameter's R4 expression, each once with
+`search.mode = include`. The `CapabilityStatement` names each as
+`searchInclude`.
+
+A `token` whose value the mapping writes as a constant, such as the category
+of every observation a context maps, has no openEHR path to compare. Declare
+it with `fixed`, the one coding every resource of the context carries, and no
+`node` or `path`: a value that matches the coding adds no condition, and any
+other value answers an empty `searchset` with no query to the CDR.
+
+`include` lists the codes of the type's standard R4 reference parameters a
+search may name in `_include`. The facade stores nothing, so it includes the
+resources the match's own mapping creates beside it and the match references
+through that parameter's R4 expression, each once with
+`search.mode = include`. The `CapabilityStatement` names each as
+`searchInclude`.
 
 The facade writes the query itself:
 `SELECT e/ehr_id/value, v/uid/value, c FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c`,
@@ -1031,7 +1096,9 @@ that crosses a node which may occur more than once below the bound one (bind
 that node instead), a token over a value that is not coded, a path that is not
 one AQL path, a query that does not parse as AQL, two declarations of one
 resource type over one template, two declarations of one type that state
-different parameters, and a parameter that takes the code of a standard R4
+different parameters or includes, a `fixed` coding beside a `node` or a
+`path` or on a type other than `token`, an `include` code that is no standard
+R4 reference parameter of the type, and a parameter that takes the code of a standard R4
 search parameter of the resource type with another type (`code` on a
 `Condition` is a `token`; `patient` and `subject` are references). R4 says
 "standard parameters cannot be redefined". A parameter that takes a standard
@@ -1056,6 +1123,7 @@ key that is unique per composition.
 | `_sort` | declared parameters read under the composition, `-` for descending, ahead of the declared order; a parameter read under a node is refused, because it has a value per node |
 | `_summary` | `count` answers the total alone; `false` is the default |
 | `_total` | `none`, `estimate` or `accurate` |
+| `_include` | `[type]:[parameter]` or `[type]:[parameter]:[target type]` for a declared include; `:iterate` and any other include are a `400`, or ignored under `Prefer: handling=lenient` |
 
 A comma inside a value is an OR and a repeated parameter an AND. An empty
 parameter is ignored. A subject or an id the identity map does not know

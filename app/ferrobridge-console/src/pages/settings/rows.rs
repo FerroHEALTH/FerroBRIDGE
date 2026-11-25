@@ -20,7 +20,7 @@ const fn row(label: Msg, description: Msg, keys: &'static [(&'static str, Shape)
 }
 
 /// The FHIR facade and its operations.
-pub const FACADE: [Row; 9] = [
+pub const FACADE: [Row; 8] = [
     row(
         Msg::RowFacade,
         Msg::RowFacadeDesc,
@@ -35,11 +35,6 @@ pub const FACADE: [Row; 9] = [
         Msg::RowEhrs,
         Msg::RowFacadeEhrsDesc,
         &[("facade.ehr_policy", Shape::Word)],
-    ),
-    row(
-        Msg::RowIdentityStore,
-        Msg::RowIdentityStoreDesc,
-        &[("facade.identity_store", Shape::Code)],
     ),
     row(
         Msg::RowLanguageTerritory,

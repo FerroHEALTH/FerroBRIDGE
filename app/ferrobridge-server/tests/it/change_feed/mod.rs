@@ -3,7 +3,7 @@
 
 //! The change-feed adapter against stub CDRs: the vendor-neutral AQL source,
 //! the reference CDR's outbox feed, and the follower that moves a reader's
-//! cursor only over what its consumer finished.
+//! cursor only over what its consumer finished, under its lane lease.
 //!
 //! Every body is synthetic: identifiers and instants invented for the test.
 
@@ -11,6 +11,7 @@ mod aql;
 mod dead_letter;
 mod ferroehr;
 mod follow;
+mod takeover;
 
 use std::error::Error;
 use std::sync::Mutex;
@@ -24,6 +25,16 @@ use ferrobridge_server::change_feed::Position;
 use ferrobridge_server::change_feed::ReaderName;
 use ferrobridge_server::change_feed::follow::Consumer;
 use ferrobridge_server::change_feed::follow::ConsumerError;
+use ferrobridge_server::store::Settings;
+use ferrobridge_server::store::Store;
+use ferrobridge_server::store::lease::Generation;
+use ferrobridge_server::store::lease::Holder;
+use ferrobridge_server::store::lease::Lane;
+use ferrobridge_server::store::lease::Leadership;
+use ferrobridge_server::store::lease::Lease;
+use ferrobridge_server::store::lease::LeaseError;
+use ferrobridge_server::store::lease::Renewed;
+use ferrobridge_server::store::lease::Term;
 use openehr_its::rest::client::RetryPolicy;
 use wiremock::MockServer;
 
@@ -98,5 +109,62 @@ impl Consumer for Recording {
             .unwrap_or_else(PoisonError::into_inner)
             .push(event.position.clone());
         Ok(())
+    }
+}
+
+/// A lease on a pool that reaches no database, for the cases whose feed and
+/// consumer write nothing to the state store.
+pub(crate) fn idle_term() -> Term {
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .connect_lazy("postgres://bridge@db.invalid/state")
+        .expect("a lazy pool");
+    let lease = Lease::new(
+        pool,
+        Lane::new("change-feed:ferrobridge-test").expect("a named lane"),
+        Holder::new(),
+        Duration::from_secs(30),
+    );
+    Term::new(lease, Generation::new(1))
+}
+
+/// A migrated state store on `url` and the lease of the test reader's lane
+/// it holds.
+pub(crate) async fn led(url: &str) -> Result<(Store, Term), Box<dyn Error>> {
+    let store = Store::open(&Settings {
+        connection: omop_cdm::connection::CdmConnection::new(url, None)?,
+        max_connections: 4,
+        acquire_timeout: Duration::from_secs(5),
+        seal: None,
+    })
+    .await?;
+    let lease = store.lease(
+        Lane::new(format!("change-feed:{}", reader()))?,
+        Duration::from_secs(30),
+    );
+    let generation = lease.claim().await?.ok_or("the lane is free")?;
+    Ok((store, Term::new(lease, generation)))
+}
+
+/// A leadership that always holds the lane, for the follower loop's cases
+/// that reach no database.
+#[derive(Debug)]
+pub(crate) struct Unopposed;
+
+#[async_trait::async_trait]
+impl Leadership for Unopposed {
+    async fn claim(&self) -> Result<Option<Term>, LeaseError> {
+        Ok(Some(idle_term()))
+    }
+
+    async fn renew(&self, _term: &Term) -> Result<Renewed, LeaseError> {
+        Ok(Renewed::Held)
+    }
+
+    async fn release(&self, _term: &Term) -> Result<(), LeaseError> {
+        Ok(())
+    }
+
+    fn renew_every(&self) -> Duration {
+        Duration::from_secs(10)
     }
 }

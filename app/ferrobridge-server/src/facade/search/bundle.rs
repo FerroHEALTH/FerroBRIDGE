@@ -48,10 +48,23 @@ pub enum BundleError {
     Encode(#[source] fhir_types::codec::EncodeError),
 }
 
-/// One match: its logical id and the resource.
+/// One match: its logical id, the resource and what `_include` adds for it.
 #[derive(Debug, Clone)]
 pub struct Match {
     /// The logical id.
+    pub id: FhirResourceId,
+    /// The rendered resource.
+    pub resource: Object,
+    /// The resources an `_include` follows from this one.
+    pub included: Vec<Inclusion>,
+}
+
+/// One resource an `_include` adds to a searchset.
+#[derive(Debug, Clone)]
+pub struct Inclusion {
+    /// Its resource type.
+    pub resource_type: String,
+    /// Its logical id.
     pub id: FhirResourceId,
     /// The rendered resource.
     pub resource: Object,
@@ -115,25 +128,32 @@ pub fn page_url(
 pub fn searchset(envelope: &Envelope<'_>, matches: &[Match]) -> Result<Object, BundleError> {
     let base = envelope.base.trim_end_matches('/');
     let mut entry = Vec::with_capacity(matches.len().saturating_add(1));
+    let mut included: std::collections::BTreeSet<(&str, &str)> = std::collections::BTreeSet::new();
+    let mut inclusions = Vec::new();
     for found in matches {
-        let resource =
-            Resource::from_json(&found.resource, &mut Path::root(envelope.resource_type)).map_err(
-                |source| BundleError::Resource {
-                    resource_type: envelope.resource_type.to_owned(),
-                    source,
-                },
-            )?;
-        entry.push(BundleEntry {
-            full_url: Some(
-                format!("{base}/{}/{}", envelope.resource_type, found.id.as_str()).into(),
-            ),
-            resource: Some(resource),
-            search: Some(BundleEntrySearch {
-                mode: Some("match".into()),
-                ..BundleEntrySearch::default()
-            }),
-            ..BundleEntry::default()
-        });
+        entry.push(searchset_entry(
+            base,
+            envelope.resource_type,
+            found.id.as_str(),
+            &found.resource,
+            "match",
+        )?);
+        for inclusion in &found.included {
+            if included.insert((inclusion.resource_type.as_str(), inclusion.id.as_str())) {
+                inclusions.push(inclusion);
+            }
+        }
+    }
+    // NOTE: R4 search.html §3.1.1.5.4: an included resource is one entry with
+    // `search.mode` `include`, however many matches reference it.
+    for inclusion in inclusions {
+        entry.push(searchset_entry(
+            base,
+            &inclusion.resource_type,
+            inclusion.id.as_str(),
+            &inclusion.resource,
+            "include",
+        )?);
     }
     if !envelope.outcome.is_empty() {
         entry.push(BundleEntry {
@@ -174,6 +194,31 @@ pub fn searchset(envelope: &Envelope<'_>, matches: &[Match]) -> Result<Object, B
         ..Bundle::default()
     };
     bundle.to_json().map_err(BundleError::Encode)
+}
+
+/// Returns one searchset entry of `mode` for a rendered resource.
+fn searchset_entry(
+    base: &str,
+    resource_type: &str,
+    id: &str,
+    body: &Object,
+    mode: &str,
+) -> Result<BundleEntry, BundleError> {
+    let resource = Resource::from_json(body, &mut Path::root(resource_type)).map_err(|source| {
+        BundleError::Resource {
+            resource_type: resource_type.to_owned(),
+            source,
+        }
+    })?;
+    Ok(BundleEntry {
+        full_url: Some(format!("{base}/{resource_type}/{id}").into()),
+        resource: Some(resource),
+        search: Some(BundleEntrySearch {
+            mode: Some(mode.into()),
+            ..BundleEntrySearch::default()
+        }),
+        ..BundleEntry::default()
+    })
 }
 
 #[cfg(test)]

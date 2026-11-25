@@ -567,6 +567,17 @@ fn resource(name: &str, search: &Catalog, chains: Chains) -> CapabilityStatement
         search_param: surface
             .map(|surface| search_params(name, &surface, chains))
             .unwrap_or_default(),
+        search_include: search
+            .of_type(name)
+            .first()
+            .map(|declared| {
+                declared
+                    .includes()
+                    .keys()
+                    .map(|code| format!("{name}:{code}").into())
+                    .collect()
+            })
+            .unwrap_or_default(),
         versioning: Some(VERSIONING.into()),
         read_history: Some(true.into()),
         update_create: Some(false.into()),

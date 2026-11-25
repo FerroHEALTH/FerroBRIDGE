@@ -57,7 +57,7 @@ pub(crate) async fn read(
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
-    let (internal, binding) = bound(facade, (headers, uri), (resource_type, id), readable)?;
+    let (internal, binding) = bound(facade, (headers, uri), (resource_type, id), readable).await?;
     let placed = Placed::of(facade, &binding, &internal)?;
     let (version, composition) = placed.fetch(facade, client, &binding).await?;
     let history = history(client, &placed.ehr_id, &placed.container).await?;
@@ -90,7 +90,7 @@ pub(crate) async fn document(
     (headers, uri): (&HeaderMap, &Uri),
     id: &str,
 ) -> Result<axum::response::Response, Refusal> {
-    let (internal, binding) = bound(facade, (headers, uri), (COMPOSITION, id), supported)?;
+    let (internal, binding) = bound(facade, (headers, uri), (COMPOSITION, id), supported).await?;
     if binding.created.is_some() {
         return Err(reply::refusal(
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -104,7 +104,7 @@ pub(crate) async fn document(
     let (version, composition) = placed.fetch(facade, client, &binding).await?;
     let composition = entry_view(program, &composition, &binding, &internal)?;
     let source = render::composition_url(client.base_url(), ehr_id, &version)?;
-    let subject = render::subject_of(facade, ehr_id)?;
+    let subject = render::subject_of(facade, ehr_id).await?;
     let (own, created) = render::render_document(
         program.program(),
         program.index(),
@@ -125,7 +125,8 @@ pub(crate) async fn document(
             ferrohealth_smart::scope::Permission::Read,
             kind,
             ehr_id,
-        )?;
+        )
+        .await?;
     }
     let base = url::Url::parse(&facade.settings().base_url).map_err(|error| {
         reply::refusal(
@@ -164,7 +165,7 @@ pub(crate) async fn vread(
     uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
     let (resource_type, id, vid) = target;
-    let (internal, binding) = bound(facade, (headers, uri), (resource_type, id), readable)?;
+    let (internal, binding) = bound(facade, (headers, uri), (resource_type, id), readable).await?;
     let placed = Placed::of(facade, &binding, &internal)?;
     let tree = version_tree(resource_type, id, vid)?;
     let history = history(client, &placed.ehr_id, &placed.container).await?;
@@ -222,7 +223,7 @@ pub(crate) async fn current(
     resource_type: &str,
     id: &FhirResourceId,
 ) -> Result<Option<fhir_types::codec::Object>, Refusal> {
-    let Some(binding) = binding(facade, resource_type, id)? else {
+    let Some(binding) = binding(facade, resource_type, id).await? else {
         return Ok(None);
     };
     let placed = Placed::of(facade, &binding, id)?;
@@ -297,7 +298,7 @@ impl Placed {
         let (_, id, binding) = bound;
         let composition = entry_view(&self.program, composition, binding, id)?;
         let source = render::composition_url(client.base_url(), &self.ehr_id, version)?;
-        let subject = render::subject_of(facade, &self.ehr_id)?;
+        let subject = render::subject_of(facade, &self.ehr_id).await?;
         render_bound(
             facade,
             &self.program,
@@ -355,6 +356,7 @@ pub(crate) async fn render_bound(
     if facade
         .store()
         .binding_of(&created.parent_type, &parent)
+        .await
         .map_err(|error| write::store_refusal(&error))?
         .is_none()
     {
@@ -383,7 +385,7 @@ pub(crate) async fn render_bound(
 /// Returns the internal id and the binding of `target`, a read's first
 /// steps: the request guard, the check `typed` makes of the type, and the
 /// identity lookup, which answers `404` for a resource the map does not bind.
-fn bound(
+async fn bound(
     facade: &Facade,
     (headers, uri): (&HeaderMap, &Uri),
     (resource_type, id): (&str, &str),
@@ -392,8 +394,9 @@ fn bound(
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     typed(facade, resource_type)?;
     let internal = internal_id(id)?;
-    let binding =
-        binding(facade, resource_type, &internal)?.ok_or_else(|| unknown(resource_type, id))?;
+    let binding = binding(facade, resource_type, &internal)
+        .await?
+        .ok_or_else(|| unknown(resource_type, id))?;
     Ok((internal, binding))
 }
 
@@ -457,7 +460,7 @@ pub(crate) fn internal_id(id: &str) -> Result<FhirResourceId, Refusal> {
 }
 
 /// Returns what the identity map holds for one logical id.
-pub(crate) fn binding(
+pub(crate) async fn binding(
     facade: &Facade,
     resource_type: &str,
     id: &FhirResourceId,
@@ -465,6 +468,7 @@ pub(crate) fn binding(
     facade
         .store()
         .binding_of(resource_type, id)
+        .await
         .map_err(|error| write::store_refusal(&error))
 }
 

@@ -610,7 +610,8 @@ tls_ca_file = "/run/secrets/state_ca.pem"
 
 ### `[state.seal]`
 
-The keys the store seals stored bodies under. Each key is 32 random bytes
+The keys the store seals stored values under, and the key it digests
+identifier values under. Each key is 32 random bytes
 written as base64 (`openssl rand -base64 32`) and named by an id that every
 sealed row records. The first key seals; every listed key opens what was
 sealed under it, so a rotation adds the new key first and keeps the old one
@@ -622,8 +623,13 @@ until no row names it.
 | `keys.id` | none, required | no | The id, 1 to 64 characters of `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, unique in the list |
 | `keys.key` | none, required | yes | The base64 of the key's 32 bytes |
 | `keys.key_file` | none | yes | A file holding that base64, read at boot |
+| `lookup_key` | none, required when the section is present | yes | The base64 of the 32-byte key identifier values are stored as an HMAC under. It never changes: the store pins its fingerprint and refuses to start under another |
+| `lookup_key_file` | none | yes | A file holding that base64, read at boot |
 
 ```toml
+[state.seal]
+lookup_key_file = "/run/secrets/state_lookup_key"
+
 [[state.seal.keys]]
 id = "2026-11"
 key_file = "/run/secrets/state_seal_2026_11"
@@ -785,7 +791,6 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `enabled` | `false` | Whether the facade routes are mounted |
 | `base_url` | `http://127.0.0.1:8080/fhir` | The absolute FHIR service base a client reaches, which `Location` is written under |
 | `ehr_policy` | `existing` | `existing` writes only into an EHR the CDR already holds; `create_on_first_write` creates one for an unknown subject |
-| `identity_store` | `identity.redb` | The file the identity map is kept in, opened at boot and refused when it cannot be written |
 | `subject_namespace` | `ferrobridge` | The namespace a literal subject reference is looked up in on the CDR, the `PARTY_REF.namespace` of `EHR_STATUS.subject` |
 | `subject_id_form` | `reference` | How the id of a literal subject reference is written: `reference` keeps `Patient/<id>`, `logical_id` keeps the bare `<id>`, and `uuid` keeps the bare `<id>` and refuses one that is no UUID |
 | `subject_type` | `PERSON` | The `PARTY_REF.type` of the subject of an EHR the facade creates, one of the BASE `Type_validity` values (`PERSON`, `ORGANISATION`, `GROUP`, `AGENT`, `ROLE`, `PARTY`, `ACTOR`) or `ANY` |
@@ -841,13 +846,13 @@ project performing the mapping, and there is no correct language for a clinical
 record you did not write, so an enabled facade with either key unset is a boot
 error naming the key.
 
-The identity store holds identifiers: a subject to its `ehr_id`, a resource id
+The identity map holds identifiers: a subject to its `ehr_id`, a resource id
 to the composition it came from, and the source identity of every resource the
-facade consumed. No clinical content is written into it. Back it up with the
+facade consumed. It lives in the state store, so the facade needs `[state]` and
+`[state.seal]`, and every replica shares it. No clinical content and no
+identifier value in clear is written into it. Back the database up with the
 CDR, because a lost map means the next create writes a second composition for a
-resource the CDR already holds. In a container with a read-only root
-filesystem, put the file on a persistent volume and run one process per file
-([the identity store](container.md#the-identity-store)).
+resource the CDR already holds ([the identity store](container.md#the-identity-store)).
 
 ### `[facade.references]`
 
@@ -948,11 +953,11 @@ maps `Basic` is then a boot error, and a reload that adds one is refused.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Basic` is the SMART App State endpoint |
-| `store` | `app-state.redb` | The file the App State resources are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. App State can
-hold an app's keys, so keep the file on storage you protect as you protect the
-CDR's. The store and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__APP_STATE__<KEY>`. The resources
+live in the state store, so the endpoint needs `[state]`. App State can hold an
+app's keys, so protect the state database as you protect the CDR's. The store
+is FerroBRIDGE's own design.
 
 ### `[facade.launch_task]`
 
@@ -966,10 +971,10 @@ SMART launch), served as `Task` at the facade's base (the Integrate page,
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether `Task` is the launch endpoint |
-| `store` | `launch-tasks.redb` | The file the launch `Task`s are kept in, apart from the identity map |
 
-Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
-and its file are FerroBRIDGE's own design.
+Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The `Task`s
+live in the state store, so the endpoint needs `[state]`. The store is
+FerroBRIDGE's own design.
 
 ### `[facade.summary]`
 
@@ -1327,8 +1332,10 @@ naming the key.
 
 The source the change-feed consumers follow: the commits of the CDR, read
 after each consumer's own watermark. It is off until `enabled` is true, and
-an enabled feed is a boot error without a `[cdr]` section, and while no
-consumer section is switched on. The [change feed](../integrate/change-feed.md)
+an enabled feed is a boot error without a `[cdr]` section, without a
+[`[state]`](#state) section, which keeps the watermarks of the `aql` source,
+the dead letters and the reader leases, and while no consumer section is
+switched on. The [change feed](../integrate/change-feed.md)
 page states what each source reads and what it cannot guarantee. No
 specification governs the change feed: it is FerroBRIDGE's own design.
 
@@ -1337,17 +1344,16 @@ specification governs the change feed: it is FerroBRIDGE's own design.
 | `enabled` | `false` | Whether the consumers follow the source |
 | `source` | `aql` | `aql`, the poll of `/query/aql` that works against any CDR, or `ferroehr`, the reference CDR's outbox feed |
 | `url` | none | `ferroehr` only, required: the root of the CDR's extensions, the path `/admin/outbox` lives under |
-| `watermarks` | none | `aql` only, required: the `redb` file each reader's watermark is kept in |
 | `start` | `now` | `aql` only: where a reader with no watermark starts, `now`, `beginning` or an RFC 3339 instant |
-| `dead_letters` | none, required | The `redb` file the consumers park a poisoned event in and count its poisoned passes in; keep it beside `watermarks` |
 | `max_attempts` | `5` | How many passes an event may fail with a poisoned failure before it is parked, 1 to 1000 |
 | `page_size` | `100` | How many events one read asks for, 1 to 1000 |
 | `poll_interval` | `"1s"` | How long a consumer waits after a read that found no full page |
 | `backoff` | `"1s"` | How long a consumer waits after its first failed read, doubled per failure |
 | `max_backoff` | `"1min"` | The longest wait after a failed read, at least `backoff` |
+| `lease` | `"30s"` | How long a replica's lease on a reader holds; the leader renews it every third of the period, and another replica takes the reader over once it runs out |
 
-A missing `dead_letters`, an unknown `source`, a `start` that names no
-instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait of `"0s"`,
+An unknown `source`, a `start` that names no
+instant, a `page_size` or `max_attempts` outside 1 to 1000, a wait or a `lease` of `"0s"`,
 and a `url` that is no http or https base without a query or a fragment are
 each a boot error naming the key. Both sources call
 the CDR with the `[cdr]` credentials.
@@ -1440,14 +1446,17 @@ concept resolver cannot reach refuse the start. Over `[change_feed] source =
 The person's SMART Health Links, the one-time share of their patient
 summary (SMART Health Cards and Links 1.0.0; the Integrate page,
 [The Yellow Button API](../integrate/yellow-button.md)). On, the server needs
-`[facade.summary]` and `[auth]`, and opens the store at boot; a store that
-cannot be opened refuses the start. The store is one `redb` file, so the lane
-runs on one replica.
+`[facade.summary]`, `[auth]`, `[state]` and `[state.seal]`. The links live in
+the state store, so every replica serves and revokes the same ones: each
+change of a link holds its row, so a file location is served once and the
+passcode attempts and the answers are counted across replicas. A link's
+manifest id, its handle and each location token are stored as their SHA-256,
+the handle also sealed so its owner can list it, and the sweep of expired
+links runs on one replica at a time.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Whether the `/shl` routes are served |
-| `store` | none | The `redb` file the links are kept in. Required when on |
 | `base_url` | none | The public origin a receiver reaches the bridge at, such as `https://bridge.example.org`. A link's URL is this origin, `/shl/m/` and 43 characters, and the start is refused when that passes 128 characters. Required when on |
 | `default_expiry` | `"24h"` | How long a link lives when its creator names no `exp` |
 | `max_expiry` | `"7d"` | The longest a link may live |
@@ -1553,6 +1562,7 @@ it carries.
 | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__TERMINOLOGY__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
 | `FERROBRIDGE__CDM__URL` | `FERROBRIDGE__CDM__URL_FILE` |
 | `FERROBRIDGE__STATE__URL` | `FERROBRIDGE__STATE__URL_FILE` |
+| `FERROBRIDGE__STATE__SEAL__LOOKUP_KEY` | `FERROBRIDGE__STATE__SEAL__LOOKUP_KEY_FILE` |
 | `FERROBRIDGE__EVENTS__URL` | `FERROBRIDGE__EVENTS__URL_FILE` |
 | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__PASSWORD_FILE` |
 | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET` | `FERROBRIDGE__FHIR_OUTBOUND__ENDPOINT__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE` |
@@ -1625,7 +1635,6 @@ directory = "/etc/ferrobridge/mappings"
 enabled = true
 base_url = "https://bridge.example.org/fhir"
 ehr_policy = "create_on_first_write"
-identity_store = "/var/lib/ferrobridge/identity.redb"
 subject_namespace = "https://example.org/fhir/sid/patient"
 composition_language = "en"
 composition_territory = "GB"

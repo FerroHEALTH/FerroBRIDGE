@@ -58,7 +58,7 @@ pub enum Corpus {
     FhirR4b,
     /// The FHIR R5 examples package through `fhir-types`, one case per file.
     FhirR5,
-    /// The FHIR R6 ballot examples package through `fhir-types`, one case per
+    /// The FHIR R6 examples package through `fhir-types`, one case per
     /// file.
     FhirR6,
     /// The FHIR R4 examples the facade serves, one case per context and file.
@@ -73,11 +73,14 @@ pub enum Corpus {
     /// The R4 profile validator against the HL7 FHIR Validator's recorded
     /// outcomes on a synthetic corpus, one case per resource.
     ValidatorAgreement,
+    /// The data groups of draft `EEHRxF` Annex X the facade serves as
+    /// individual resources, one case per group.
+    EehrxfAnnexX,
 }
 
 impl Corpus {
     /// Every corpus, in the order the gate reports them.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::FhirconnectMappingLib,
         Self::Omocl,
         Self::Roundtrip,
@@ -93,6 +96,7 @@ impl Corpus {
         Self::FhirpathR4,
         Self::FhirpathR4Stu3,
         Self::ValidatorAgreement,
+        Self::EehrxfAnnexX,
     ];
 
     /// Returns the corpus identifier, which names its directory under
@@ -115,6 +119,7 @@ impl Corpus {
             Self::FhirpathR4 => "fhirpath-r4",
             Self::FhirpathR4Stu3 => "fhirpath-r4-stu3",
             Self::ValidatorAgreement => "validator-agreement",
+            Self::EehrxfAnnexX => "eehrxf-annex-x",
         }
     }
 

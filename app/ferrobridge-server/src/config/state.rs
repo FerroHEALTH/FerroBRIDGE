@@ -9,7 +9,7 @@ use super::credentials::{ConnectionKeys, secret};
 use super::error::Error;
 use super::section::state::{State, StateSeal};
 use crate::store::Settings;
-use crate::store::seal::{KeyId, SealKeys, SealingKey};
+use crate::store::seal::{KeyId, LookupKey, SealKeys, SealingKey};
 
 /// Returns the store `state` describes, its URL, CA and sealing keys read.
 pub(super) fn resolve(state: &State) -> Result<Settings, Error> {
@@ -85,5 +85,22 @@ fn resolve_seal(seal: &StateSeal) -> Result<SealKeys, Error> {
     let current = keys.next().ok_or(Error::Missing {
         key: String::from("state.seal.keys"),
     })?;
-    Ok(SealKeys::new(current, keys.collect()))
+    let lookup = secret(
+        "state.seal.lookup_key",
+        seal.lookup_key.as_ref(),
+        seal.lookup_key_file.as_deref(),
+    )?
+    .ok_or(Error::Missing {
+        key: String::from("state.seal.lookup_key"),
+    })?;
+    let lookup =
+        SealingKey::from_base64(lookup.expose_secret()).map_err(|source| Error::SealKey {
+            key: String::from("state.seal.lookup_key"),
+            source,
+        })?;
+    Ok(SealKeys::new(
+        current,
+        keys.collect(),
+        LookupKey::new(&lookup),
+    ))
 }

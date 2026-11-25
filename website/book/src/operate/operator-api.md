@@ -90,16 +90,29 @@ lane is off answers `200` with no consumer and a `null` topology.
   reports as), its `source` (`aql` or `ferroehr`), its `reader`, its
   `positions` (one per stream: `clinical` or `party` with the last
   acknowledged `seq` in `at`, or `committed` with the watermark instant in
-  `at` and `versions_at_instant`), its `state` (`starting`, `following` or
-  `stalled`), the messages it `published` since the bridge started, the
-  instant it `last_published`, and its `last_error`, the `at` and `cause` of
-  the last failed pass, kept after it recovers;
+  `at` and `versions_at_instant`), its `state` (`starting`, `standby` while
+  another replica leads its reader, `following` or `stalled`), the messages
+  it `published` since the bridge started, the instant it `last_published`,
+  its `last_error`, the `at` and `cause` of the last failed pass, kept after
+  it recovers, and its open `parked` events, each with its `id`, position,
+  identifiers, `cause`, `attempts`, `at`, `replay_requested` and the last
+  `decision` an operator recorded (`retry` or `discard`, `by` and `reason`);
 - `topology`: the `exchange`, the `routing_key` grammar
   (`<kind>.<change_type>.<template_id>`) and the bound `queues`, each a
   `name` and a `binding`.
 
 The document carries identifiers, instants and counts, never an event body,
 and never the broker URL.
+
+### `POST /operator/events/{consumer}/parked/{id}/{decision}`
+
+Settles one open parked event: `retry` offers it to its consumer again
+before the consumer's next page (`202`), and `discard` settles it without
+offering it again (`204`). The `ferrobridge-reason` header carries why, one
+line of at most 200 characters, and the subject of the operator's token is
+recorded as who decided. A settlement without a reason answers `400`
+[`reason-required`](problems.md#reason-required); a consumer that does not
+run, an event that is not open or another decision answers `404`.
 
 ## `GET /operator/etl/runs`
 

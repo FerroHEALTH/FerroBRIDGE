@@ -90,67 +90,64 @@ the quickstart's server writes almost nothing: no cache, no scratch file, no
 upload directory, and every secret is read once at boot. It keeps the
 [usage report](usage-report.md)'s instance id on the named volume
 `ferrobridge-state`, mounted at `/home/nonroot`, the image's home directory,
-which its runtime user owns. The other file the server writes is the FHIR
-facade's identity store, and the facade is off in the quickstart;
-[the identity store](#the-identity-store) says what to mount when you turn it
+which its runtime user owns. The FHIR facade keeps its identity map in the
+state store, a PostgreSQL database, and the facade is off in the quickstart;
+[the identity store](#the-identity-store) says what it needs when you turn it
 on.
 
 ## The identity store
 
-With `[facade] enabled = true`, the server keeps its identity map in one
-file, `[facade] identity_store` (`FERROBRIDGE__FACADE__IDENTITY_STORE`). The map
-records each subject's `ehr_id`, each FHIR resource id and the composition it
-came from, and the source identity of every resource the facade consumed. It
-holds no clinical content. The server opens the file at boot, creating it when
-it is absent, and refuses to start when it cannot. The default, `identity.redb`,
-is relative to the working directory, which is `/` in the image: root-owned and
-read-only, so set the key to a path on a volume.
+With `[facade] enabled = true`, the server keeps its identity map in the
+state store ([`[state]`](configuration.md#state)), a PostgreSQL 19 database
+every replica shares. The map records each subject's `ehr_id`, each FHIR
+resource id and the composition it came from, and the source identity of
+every resource the facade consumed. It holds no clinical content, and no
+identifier value in clear: a subject identifier and every
+`Resource.identifier` value are stored as an HMAC under the
+`[state.seal] lookup_key`, and the subject an EHR was recorded for is sealed
+under a `[state.seal]` key. The server refuses to start the facade without
+`[state]` and `[state.seal]`.
 
-- **Where it lives:** a path on a writable volume mounted into the container,
-  such as `/var/lib/ferrobridge/identity.redb`. The image runs as user
-  `65532`, so the volume must be writable by that user (in Kubernetes,
-  `securityContext.fsGroup: 65532` on the pod).
-- **What volume it needs:** a persistent one. The file survives a restart
-  only if the volume does, so use a `PersistentVolumeClaim` (or a named volume
-  under Compose), never an `emptyDir` or a `tmpfs`. A lost file is a lost map:
-  the next create of a resource the CDR already holds writes a second
-  composition, and a client's FHIR ids stop resolving. Back the file up with
-  the CDR.
-- **Replicas:** one process per file. The store takes an exclusive lock on the
-  file when it opens it, so a second process pointed at the same file refuses
-  its start, and a network filesystem that does not honour the lock is not a
-  safe place for it. Two replicas with a file each would keep two maps that
-  disagree. Run the facade as a single replica (a `StatefulSet` of one with a
-  `ReadWriteOnce` claim), and use the `Recreate` strategy for a `Deployment`,
-  so the old pod releases the file before the new one opens it.
-- **Restarts:** the map is read from the file at boot, so a restarted process
-  answers with the ids it handed out before. The claims that order
-  overlapping deliveries live in the process, and a restart drops them with
-  the deliveries they held; a retry is then recognised from the identity map
+- **What it needs:** the `[state]` URL and the `[state.seal]` keys, each
+  through its `_file` sibling from a mounted secret. The container writes no
+  file for the map, so a read-only root filesystem needs no volume for it.
+- **The lookup key never changes:** every stored digest depends on it, so
+  the server pins its fingerprint in the store and refuses to start under
+  another key. Back the key up with the database.
+- **Replicas:** every replica opens the same store, and each write records
+  once, so two replicas that record one binding agree on the one that
+  stands. The claims that order overlapping deliveries of one resource live
+  in each process, so point every sender of a feed at one replica, or accept
+  that two replicas may each map one delivery and keep the first binding.
+- **Backups:** back the database up with the CDR. A lost map makes the next
+  create of a resource the CDR already holds write a second composition, and
+  a client's FHIR ids stop resolving
   ([Failure and identity behaviour](failure-and-identity.md)).
 
-A Kubernetes pod spec with a read-only root filesystem keeps the store on its
-claim:
+A Kubernetes pod spec mounts the secrets as files:
 
 ```yaml
-securityContext:
-  runAsNonRoot: true
-  fsGroup: 65532
 containers:
   - name: ferrobridge
     securityContext:
       readOnlyRootFilesystem: true
     env:
-      - name: FERROBRIDGE__FACADE__IDENTITY_STORE
-        value: /var/lib/ferrobridge/identity.redb
+      - name: FERROBRIDGE__STATE__URL_FILE
+        value: /run/secrets/ferrobridge/state_url
+      - name: FERROBRIDGE__STATE__SEAL__LOOKUP_KEY_FILE
+        value: /run/secrets/ferrobridge/lookup_key
     volumeMounts:
-      - name: identity
-        mountPath: /var/lib/ferrobridge
+      - name: secrets
+        mountPath: /run/secrets/ferrobridge
+        readOnly: true
 volumes:
-  - name: identity
-    persistentVolumeClaim:
-      claimName: ferrobridge-identity
+  - name: secrets
+    secret:
+      secretName: ferrobridge
 ```
+
+The sealing keys are a list (`[[state.seal.keys]]`), so name them in the
+configuration file, each with its `key_file`.
 
 ## The environment variables
 

@@ -300,7 +300,7 @@ impl Ingest<'_> {
     }
 
     /// Records the identity of a committed write, and returns what stands.
-    pub(super) fn record(
+    pub(super) async fn record(
         &self,
         program: &Loaded,
         inbound: &Inbound,
@@ -308,14 +308,17 @@ impl Ingest<'_> {
         version: &ObjectVersionId,
         composition: &CanonicalComposition,
     ) -> Result<Written, Refused> {
-        let (id, stood) = self.bind(
-            program,
-            inbound.resource_type(),
-            ehr_id,
-            version,
-            composition,
-        )?;
+        let (id, stood) = self
+            .bind(
+                program,
+                inbound.resource_type(),
+                ehr_id,
+                version,
+                composition,
+            )
+            .await?;
         self.finish_write(inbound, id, &stood, ehr_id, version, composition.clone())
+            .await
     }
 
     /// Records the identity of a committed update of the entry `path` names,
@@ -325,7 +328,7 @@ impl Ingest<'_> {
     ///
     /// Returns a `500` [`Refused`] when the committed composition holds no
     /// entry at `path`, and an identity store that cannot be written.
-    pub(super) fn record_entry(
+    pub(super) async fn record_entry(
         &self,
         program: &Loaded,
         inbound: &Inbound,
@@ -342,14 +345,16 @@ impl Ingest<'_> {
                 ),
             )
         })?;
-        let (id, stood) = self.bind_entry(
-            program,
-            inbound.resource_type(),
-            ehr_id,
-            version,
-            composition,
-            &entry,
-        )?;
+        let (id, stood) = self
+            .bind_entry(
+                program,
+                inbound.resource_type(),
+                ehr_id,
+                version,
+                composition,
+                &entry,
+            )
+            .await?;
         self.finish_write(
             inbound,
             id,
@@ -358,11 +363,12 @@ impl Ingest<'_> {
             version,
             entry.isolate(composition),
         )
+        .await
     }
 
     /// Indexes and consumes the source of one bound write, and returns what
     /// stands.
-    fn finish_write(
+    async fn finish_write(
         &self,
         inbound: &Inbound,
         id: FhirResourceId,
@@ -371,9 +377,9 @@ impl Ingest<'_> {
         version: &ObjectVersionId,
         composition: CanonicalComposition,
     ) -> Result<Written, Refused> {
-        self.index(inbound, &id)?;
+        self.index(inbound, &id).await?;
         if let Some(source) = resource_source(inbound) {
-            self.consume(&source, stood, &id)?;
+            self.consume(&source, stood, &id).await?;
         }
         Ok(Written {
             id,
@@ -393,7 +399,7 @@ impl Ingest<'_> {
     /// delivery committed, never a fresh build that differs from it in its
     /// clock-filled times (no specification governs the identity: our own
     /// design).
-    pub(super) fn place(
+    pub(super) async fn place(
         &self,
         mapped: &[Mapped],
         sources: &[Option<SourceVersion>],
@@ -403,16 +409,18 @@ impl Ingest<'_> {
         let mut placed = Vec::with_capacity(stored.len());
         for ((entry, (version, held)), source) in mapped.iter().zip(stored).zip(sources) {
             let composition = canonical_of(&held, &entry.built)?;
-            let (id, stood) = self.bind(
-                &entry.program,
-                entry.inbound.resource_type(),
-                ehr_id,
-                &version,
-                &composition,
-            )?;
-            self.index(&entry.inbound, &id)?;
+            let (id, stood) = self
+                .bind(
+                    &entry.program,
+                    entry.inbound.resource_type(),
+                    ehr_id,
+                    &version,
+                    &composition,
+                )
+                .await?;
+            self.index(&entry.inbound, &id).await?;
             if let Some(source) = source {
-                self.consume(source, &stood, &id)?;
+                self.consume(source, &stood, &id).await?;
             }
             placed.push(Placed {
                 id,
@@ -425,7 +433,7 @@ impl Ingest<'_> {
 
     /// Records the identity binding of one committed composition, and returns
     /// the resource id and the binding that stand.
-    pub(crate) fn bind(
+    pub(crate) async fn bind(
         &self,
         program: &Loaded,
         resource_type: &str,
@@ -443,6 +451,7 @@ impl Ingest<'_> {
             )
             })?;
         self.bind_entry(program, resource_type, ehr_id, version, composition, &entry)
+            .await
     }
 
     /// Records the identity binding of one entry of a committed composition,
@@ -450,7 +459,7 @@ impl Ingest<'_> {
     ///
     /// Each entry of the program's archetype is a resource of its own, keyed
     /// by the composition and [`engine::entry::Entry::identity_path`].
-    pub(crate) fn bind_entry(
+    pub(crate) async fn bind_entry(
         &self,
         program: &Loaded,
         resource_type: &str,
@@ -465,17 +474,11 @@ impl Ingest<'_> {
         let path = entry.identity_path().to_owned();
         let key = EntryKey::new(version.versioned_object_id(), path.as_str());
         let map_key = derive::map_key(&key);
-        let recorded = self
+        let id = self
             .store
-            .internal_of(resource_type, &map_key)
+            .record_internal(resource_type, &map_key, &derive::entry_id(&key))
+            .await
             .map_err(|error| store_refusal(&error))?;
-        let id = if let Some(known) = recorded {
-            known
-        } else {
-            self.store
-                .record_internal(resource_type, &map_key, &derive::entry_id(&key))
-                .map_err(|error| store_refusal(&error))?
-        };
         let binding = CompositionBinding {
             ehr_id: String::from(ehr_id.as_str()),
             versioned_object_uid: String::from(version.versioned_object_id().value()),
@@ -490,6 +493,7 @@ impl Ingest<'_> {
         let stood = self
             .store
             .record_binding(resource_type, &id, &binding)
+            .await
             .map_err(|error| store_refusal(&error))?;
         Ok((id, stood))
     }
@@ -497,17 +501,18 @@ impl Ingest<'_> {
     /// Records every `Resource.identifier` of `inbound` against `id`, so a
     /// conditional create's `identifier` search finds the resource
     /// (<https://hl7.org/fhir/R4/http.html#ccreate>).
-    fn index(&self, inbound: &Inbound, id: &FhirResourceId) -> Result<(), Refused> {
+    async fn index(&self, inbound: &Inbound, id: &FhirResourceId) -> Result<(), Refused> {
         for identifier in identifiers_of(inbound) {
             self.store
                 .record_identifier(inbound.resource_type(), &identifier, id)
+                .await
                 .map_err(|error| store_refusal(&error))?;
         }
         Ok(())
     }
 
     /// Records that `source` was consumed by the composition `stood` binds.
-    fn consume(
+    async fn consume(
         &self,
         source: &SourceVersion,
         stood: &CompositionBinding,
@@ -523,6 +528,7 @@ impl Ingest<'_> {
                     context: stood.context.clone(),
                 },
             )
+            .await
             .map_err(|error| store_refusal(&error))?;
         Ok(())
     }

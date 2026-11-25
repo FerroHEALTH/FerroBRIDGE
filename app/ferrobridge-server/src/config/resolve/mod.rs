@@ -89,21 +89,14 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
             ehr_status_system: (!facade.ehr_status_identifier_system.is_empty())
                 .then(|| facade.ehr_status_identifier_system.clone()),
         },
-        identity_store: facade.identity_store.clone(),
         search: search_limits(facade)?,
         references: reference_policy(facade)?,
         identifier: identifier_search(facade)?,
         party_search: party_search(facade)?,
         binding_issuers: facade.binding_identifier_issuers.clone(),
         consent: consent(facade)?,
-        app_state: facade
-            .app_state
-            .enabled
-            .then(|| facade.app_state.store.clone()),
-        launch_task: facade
-            .launch_task
-            .enabled
-            .then(|| facade.launch_task.store.clone()),
+        app_state: facade.app_state.enabled,
+        launch_task: facade.launch_task.enabled,
         cors: cors(facade)?,
         summary: summary(facade)?,
     })
