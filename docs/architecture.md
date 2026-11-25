@@ -1093,7 +1093,12 @@ expression is a load error: the reference CDR's connector let `where()` and
   the total count those resources, the count reads the rows, and an `_id`
   naming a created resource answers it alone (#731). One resource type
   answers one parameter set, and two declarations of one type over one
-  template are refused at load. A parameter outside the set is refused unless the client
+  template are refused at load. A `token` the mapping writes as a constant
+  is declared `fixed` with its one coding and compared without a query, and
+  an `include` list names the standard reference parameters `_include` may
+  follow to the resources the match's own run creates, each answered once
+  with `search.mode` `include` (R4 search §3.1.1.5.4; the IHE QEDm 3.0.0
+  PCC-44 category and `_include` searches, #2087). A parameter outside the set is refused unless the client
   sends `Prefer: handling=lenient` (R4 search §3.1.1.3); an unsupported
   modifier is always refused (§3.1.1.4.4); `_count=0` answers the total
   alone, as R4 treats it as `_summary=count` (§3.1.1.5.3). The one chain

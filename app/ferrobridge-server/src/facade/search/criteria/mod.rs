@@ -157,11 +157,26 @@ pub struct Criteria {
     pub total: Option<Total>,
     /// The cursor of the page asked for.
     pub cursor: Option<String>,
+    /// Each `_include` the search names.
+    pub includes: Vec<Included>,
     /// The parameters the search used, as received, without `_count` and the
     /// cursor.
     pub used: Vec<(String, String)>,
     /// The parameters ignored under lenient handling.
     pub ignored: Vec<String>,
+}
+
+/// One `_include`: the reference parameter followed and the type of the
+/// resources it admits, when the value names one
+/// (<https://hl7.org/fhir/R4/search.html#include>).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Included {
+    /// The reference parameter's code.
+    pub code: String,
+    /// The FHIRPath expression of the standard parameter.
+    pub expression: &'static str,
+    /// The target type the value names.
+    pub target: Option<String>,
 }
 
 /// Why one parameter refuses the search.
@@ -310,6 +325,7 @@ impl Reader<'_> {
             }),
             "_total" => self.control(name, modifier, "_total", |reader| reader.total(name, text)),
             "_id" => self.ids(name, modifier, text),
+            "_include" => self.include(name, modifier, text),
             _ => self.declared_parameter(name, base, modifier, text),
         }
     }
@@ -338,6 +354,46 @@ impl Reader<'_> {
         }
         self.seen.push(key);
         read(self);
+    }
+
+    /// Reads one `_include` value, `[source type]:[parameter]` with an
+    /// optional `:[target type]` (<https://hl7.org/fhir/R4/search.html#include>).
+    ///
+    /// The source type is the searched type and the parameter one the
+    /// declaration lists; `:iterate` is refused, since an included resource
+    /// is never followed further (no specification asks a server to support
+    /// it: our own design).
+    fn include(&mut self, name: &str, modifier: Option<&str>, text: &str) {
+        if let Some(modifier) = modifier {
+            self.errors.push(CriteriaError::Modifier {
+                name: String::from("_include"),
+                modifier: modifier.to_owned(),
+            });
+            return;
+        }
+        let mut parts = text.split(':');
+        let (source, code, target) = (parts.next(), parts.next(), parts.next());
+        let declared = code.and_then(|code| self.declared.includes().get(code));
+        match (source, declared, parts.next()) {
+            (Some(source), Some(include), None) if source == self.declared.resource_type() => {
+                self.criteria.includes.push(Included {
+                    code: include.code.clone(),
+                    expression: include.expression,
+                    target: target.map(str::to_owned),
+                });
+                self.criteria.used.push((name.to_owned(), text.to_owned()));
+            }
+            _ => match self.handling {
+                Handling::Strict => self.errors.push(CriteriaError::Unsupported {
+                    name: String::from("_include"),
+                    reason: format!(
+                        "{text} is no include this server answers for {}; GET [base]/metadata names them in searchInclude",
+                        self.declared.resource_type()
+                    ),
+                }),
+                Handling::Lenient => self.criteria.ignored.push(format!("_include={text}")),
+            },
+        }
     }
 
     /// Reads `_count` through the one reader the request guard uses.

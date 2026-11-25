@@ -1001,6 +1001,13 @@ parameters:
   recorded:
     type: date
     path: context/start_time/value             # no node: read under the composition
+  category:
+    type: token
+    fixed:                                     # the coding the mapping writes as a constant
+      system: "http://terminology.hl7.org/CodeSystem/condition-category"
+      code: problem-list-item
+include:                                       # the reference parameters _include may name
+  - evidence-detail
 ```
 
 A parameter names the node it is read under with `node`, the RM class and
@@ -1011,6 +1018,19 @@ names the coded value itself, a `DV_CODED_TEXT`, a `DV_TEXT` or a
 value, so `[system]|[code]` never pairs the system of one diagnosis with the
 code of another. A `string` or a `date` names a data value, with any
 attribute below it.
+
+A `token` whose value the mapping writes as a constant, such as the category
+of every observation a context maps, has no openEHR path to compare. Declare
+it with `fixed`, the one coding every resource of the context carries, and no
+`node` or `path`: a value that matches the coding adds no condition, and any
+other value answers an empty `searchset` with no query to the CDR.
+
+`include` lists the codes of the type's standard R4 reference parameters a
+search may name in `_include`. The facade stores nothing, so it includes the
+resources the match's own mapping creates beside it and the match references
+through that parameter's R4 expression, each once with
+`search.mode = include`. The `CapabilityStatement` names each as
+`searchInclude`.
 
 The facade writes the query itself:
 `SELECT e/ehr_id/value, v/uid/value, c FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c`,
@@ -1031,7 +1051,9 @@ that crosses a node which may occur more than once below the bound one (bind
 that node instead), a token over a value that is not coded, a path that is not
 one AQL path, a query that does not parse as AQL, two declarations of one
 resource type over one template, two declarations of one type that state
-different parameters, and a parameter that takes the code of a standard R4
+different parameters or includes, a `fixed` coding beside a `node` or a
+`path` or on a type other than `token`, an `include` code that is no standard
+R4 reference parameter of the type, and a parameter that takes the code of a standard R4
 search parameter of the resource type with another type (`code` on a
 `Condition` is a `token`; `patient` and `subject` are references). R4 says
 "standard parameters cannot be redefined". A parameter that takes a standard
@@ -1056,6 +1078,7 @@ key that is unique per composition.
 | `_sort` | declared parameters read under the composition, `-` for descending, ahead of the declared order; a parameter read under a node is refused, because it has a value per node |
 | `_summary` | `count` answers the total alone; `false` is the default |
 | `_total` | `none`, `estimate` or `accurate` |
+| `_include` | `[type]:[parameter]` or `[type]:[parameter]:[target type]` for a declared include; `:iterate` and any other include are a `400`, or ignored under `Prefer: handling=lenient` |
 
 A comma inside a value is an OR and a repeated parameter an AND. An empty
 parameter is ignored. A subject or an id the identity map does not know

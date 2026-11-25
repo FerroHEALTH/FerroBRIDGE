@@ -208,16 +208,25 @@ pub(crate) async fn render_created(
     decorate(body, resource_type, id, &origin, None, warnings)
 }
 
+/// What one outbound run answers a search with.
+pub(crate) struct Units {
+    /// Every resource of the program's own type, the entry's own first.
+    pub(crate) own: Vec<(FhirResourceId, Rendered)>,
+    /// Every resource of another type the run creates, with its type, which
+    /// an `_include` may add.
+    pub(crate) others: Vec<(String, FhirResourceId, Rendered)>,
+}
+
 /// Returns every resource of the program's own type the outbound run over
 /// `composition` answers: the entry's own resource first, then each one the
 /// run creates beside it (a further `hierarchy.split` occurrence), in the
 /// order the run creates them, each decorated as [`render`] decorates the
-/// entry's own.
+/// entry's own; and beside them every created resource of another type.
 ///
-/// A search lists all of them, because each is a resource of the searched
-/// type this server serves (no specification governs how a created resource
-/// is reached from a row: our own design). The declared losses of the run
-/// travel with the entry's own resource alone.
+/// A search lists all of the own type, because each is a resource of the
+/// searched type this server serves (no specification governs how a created
+/// resource is reached from a row: our own design). The declared losses of
+/// the run travel with the entry's own resource alone.
 ///
 /// # Errors
 ///
@@ -229,7 +238,7 @@ pub(crate) async fn render_units(
     composition: &CanonicalComposition,
     origin: Origin<'_>,
     session: &Session<'_>,
-) -> Result<Vec<(FhirResourceId, Rendered)>, Refusal> {
+) -> Result<Units, Refusal> {
     let resource_type = program.resource().as_str();
     let (value, created, warnings) = produce(program, index, composition, &origin, session).await?;
     let body = resource_object(value, resource_type)?;
@@ -241,12 +250,19 @@ pub(crate) async fn render_units(
         Some(program.profile().url().as_str()),
         warnings,
     )?;
-    let mut units = vec![(origin.id.clone(), own)];
+    let mut units = Units {
+        own: vec![(origin.id.clone(), own)],
+        others: Vec::new(),
+    };
     for resource in created {
-        if resource.get("resourceType").and_then(Value::as_str) != Some(resource_type) {
-            continue;
-        }
         let Value::Object(body) = resource else {
+            continue;
+        };
+        let Some(created_type) = body
+            .get("resourceType")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
             continue;
         };
         let text = body.get("id").and_then(Value::as_str).unwrap_or_default();
@@ -254,12 +270,16 @@ pub(crate) async fn render_units(
             reply::refusal(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Issue::error(IssueType::Exception).diagnosing(format!(
-                    "a {resource_type} the mapping created carries an id outside the R4 grammar: {error}"
+                    "a {created_type} the mapping created carries an id outside the R4 grammar: {error}"
                 )),
             )
         })?;
-        let rendered = decorate(body, resource_type, &id, &origin, None, Vec::new())?;
-        units.push((id, rendered));
+        let rendered = decorate(body, &created_type, &id, &origin, None, Vec::new())?;
+        if created_type == resource_type {
+            units.own.push((id, rendered));
+        } else {
+            units.others.push((created_type, id, rendered));
+        }
     }
     Ok(units)
 }
