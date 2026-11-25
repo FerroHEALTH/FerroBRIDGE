@@ -244,7 +244,7 @@ async fn a_poisoned_event_is_parked_on_the_bound_and_the_cursor_moves_past_it()
         store,
         term,
         mut cursor,
-        ..
+        _postgres,
     }) = parking().await?
     else {
         return Ok(());
@@ -288,7 +288,7 @@ async fn a_transient_failure_never_charges_the_bound() -> Result<(), Box<dyn Err
         store,
         term,
         mut cursor,
-        ..
+        _postgres,
     }) = parking().await?
     else {
         return Ok(());
@@ -322,7 +322,7 @@ async fn an_event_that_recovers_below_the_bound_starts_its_count_again()
         store,
         term,
         mut cursor,
-        ..
+        _postgres,
     }) = parking().await?
     else {
         return Ok(());
@@ -351,7 +351,7 @@ async fn a_replay_offers_the_parked_event_again_before_the_next_page() -> Result
         store,
         term,
         mut cursor,
-        ..
+        _postgres,
     }) = parking().await?
     else {
         return Ok(());
@@ -411,7 +411,7 @@ async fn a_discard_settles_the_parked_event_and_it_is_never_offered_again()
         store,
         term,
         mut cursor,
-        ..
+        _postgres,
     }) = parking().await?
     else {
         return Ok(());
@@ -469,7 +469,7 @@ async fn a_replay_that_meets_a_transient_failure_stays_requested() -> Result<(),
         store,
         term,
         mut cursor,
-        ..
+        _postgres,
     }) = parking().await?
     else {
         return Ok(());
