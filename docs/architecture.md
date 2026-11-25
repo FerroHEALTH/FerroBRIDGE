@@ -1682,9 +1682,11 @@ mapping rooted at a party: a context binds a composition template, and
   every relationship aside, and `WebTemplateIndex::source_relationships`
   writes it in once the party's uid is known. A facade create commits the
   party, then commits a second version with its relationships sourced at
-  the uid the CDR assigned; when that second write fails, the answer is the
-  CDR's refusal with a warning naming the party that stands without its
-  relationships. An update sources them before its one write.
+  the uid the CDR assigned; when that second write fails, the facade
+  deletes the party again (ITS-REST 1.1.0 Demographic API, `person_delete`)
+  and answers the CDR's refusal, and when the deletion fails too it answers
+  a `500` naming the party's version and both refusals. An update sources
+  them before its one write.
 - **The draft archetypes.** Every `openEHR-DEMOGRAPHIC-*` archetype in the
   international CKM is a v0 draft
   (<https://ckm.openehr.org/ckm/archetypes/1013.1.479>). The tests run against

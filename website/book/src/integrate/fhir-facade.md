@@ -946,9 +946,12 @@ RelatedPerson, so the context names the FHIR R4 profile. Every relationship
 a party holds has the party as its source (RM Demographic IM, `PARTY`
 invariant `Relationships_validity`), and the CDR assigns the uid when it
 commits the party, so a create commits the person, then a second version
-whose relationship names it as the source. When that second write fails,
-the answer is the CDR's refusal with a warning that the person stands
-without its relationship; an update writes it again. An update sources the
+whose relationship names it as the source. FerroEHR refuses a relationship
+in a new party's first version, because the commit assigns the uid its
+source must name. When the second write fails, the facade deletes the
+person again and answers the CDR's refusal, so a failed create leaves no
+person behind. When the deletion fails as well, the answer is a `500`
+naming the person's version and both refusals. An update sources the
 relationship before its one write.
 
 The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device,

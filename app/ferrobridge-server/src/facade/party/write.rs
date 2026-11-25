@@ -5,7 +5,8 @@
 //!
 //! A create maps the resource to a party and commits its first version, and
 //! for a party holding relationships a second version that sources them at
-//! the uid the CDR assigned; an update commits a new version over the one
+//! the uid the CDR assigned, deleting the party again when that second write
+//! fails; an update commits a new version over the one
 //! `If-Match` names, or over the latest when the request names none, so a
 //! concurrent writer still meets the `412` the CDR answers; a delete removes
 //! the latest version
@@ -70,10 +71,16 @@ pub(crate) async fn create(
     let class = class_of(loaded)?;
     let creation = commit(facade, loaded, Change::Creation)?;
     let modification = commit(facade, loaded, Change::Modification)?;
+    let deletion = commit(facade, loaded, Change::Deleted)?;
     let first = commit_party(demographic, class, &built, &creation, None).await?;
-    let (built, version) = relate(loaded, (demographic, class), &built, &modification, first)
-        .await
-        .map_err(|refused| Refusal::from(refused.with_issue(unrelated(resource_type))))?;
+    let (built, version) =
+        match relate(loaded, (demographic, class), &built, &modification, &first).await {
+            Ok(related) => related,
+            Err(relating) => {
+                let unrelated = withdraw((demographic, class), &first, &deletion, relating).await;
+                return Err(unrelated.into_refusal(resource_type));
+            }
+        };
     party::provision::provision(facade, &client, resource_type, &version).await?;
     respond(
         facade,
@@ -154,17 +161,30 @@ pub(crate) async fn delete(
     party::accept(loaded, resource_type, id, &latest)?;
     party::unbound(facade, resource_type, &latest.value)?;
     let commit = commit(facade, loaded, Change::Deleted)?;
+    delete_version((demographic, class), &latest.version, &commit).await?;
+    Ok(reply::minimal(StatusCode::NO_CONTENT, &[]))
+}
+
+/// Deletes the party version `version` names, which must be its latest
+/// (ITS-REST 1.1.0 Demographic API, `person_delete` and its siblings: "The
+/// `uid_based_id` MUST be in a form of an `OBJECT_VERSION_ID` identifier taken
+/// from the last (most recent) `VERSION.uid.value`").
+async fn delete_version(
+    (demographic, class): (Demographic<'_>, PartyClass),
+    version: &ObjectVersionId,
+    commit: &CommitContext,
+) -> Result<(), Refused> {
     macro_rules! delete_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
             let Answered { outcome, upstream } = demographic
-                .$call(&latest.version, &commit)
+                .$call(version, commit)
                 .await
                 .map_err(|error| party::client_refusal(&error))?
                 .answered;
             match outcome {
-                $outcome::NoContent { .. } => {}
-                _ => return Err(party::refused(&upstream).into()),
+                $outcome::NoContent { .. } => Ok(()),
+                _ => Err(party::refused(&upstream)),
             }
         }};
     }
@@ -173,7 +193,6 @@ pub(crate) async fn delete(
         PartyClass::Organisation => delete_as!(organisation_delete, OrganisationDeleteOutcome),
         PartyClass::Role => delete_as!(role_delete, RoleDeleteOutcome),
     }
-    Ok(reply::minimal(StatusCode::NO_CONTENT, &[]))
 }
 
 /// Maps one inbound resource to its party.
@@ -211,10 +230,10 @@ async fn relate(
     (demographic, class): (Demographic<'_>, PartyClass),
     built: &CanonicalParty,
     commit: &CommitContext,
-    first: ObjectVersionId,
+    first: &ObjectVersionId,
 ) -> Result<(CanonicalParty, ObjectVersionId), Refused> {
     if !built.awaits_source() {
-        return Ok((built.clone(), first));
+        return Ok((built.clone(), first.clone()));
     }
     let uid = first.versioned_object_id();
     let related = loaded
@@ -226,20 +245,76 @@ async fn relate(
         class,
         &related,
         commit,
-        Some((uid.value(), &first)),
+        Some((uid.value(), first)),
     )
     .await?;
     Ok((related, version))
 }
 
-/// Returns the warning a create whose relationships were not committed adds:
-/// the party stands under its id without them.
-fn unrelated(resource_type: &str) -> Issue {
-    Issue::warning(IssueType::Informational).diagnosing(format!(
-        "the {resource_type} was created in the {} and its relationships were not: it stands \
-         without them until an update writes them",
-        party::LABEL
-    ))
+/// A create whose party the CDR committed and whose relationships it refused.
+///
+/// The create is one interaction (<https://hl7.org/fhir/R4/http.html#create>),
+/// so it leaves no party behind: the party is deleted again. No specification
+/// governs the compensation: our own design.
+#[derive(Debug)]
+enum Unrelated {
+    /// The party was deleted, and the create answers the relationships'
+    /// refusal.
+    Withdrawn(Refused),
+    /// The deletion was refused as well, so the party stands at `version`
+    /// without its relationships.
+    Stranded {
+        /// The refusal of the relationships.
+        relating: Refused,
+        /// The refusal of the deletion.
+        withdrawing: Refused,
+        /// The version of the party that stands.
+        version: ObjectVersionId,
+    },
+}
+
+impl Unrelated {
+    /// Returns the refusal the create answers with.
+    fn into_refusal(self, resource_type: &str) -> Refusal {
+        match self {
+            Self::Withdrawn(relating) => Refusal::from(relating),
+            Self::Stranded {
+                relating,
+                withdrawing,
+                version,
+            } => {
+                let stands = Issue::error(IssueType::Exception).diagnosing(format!(
+                    "the {} refused the relationships of the {resource_type} it created as \
+                     `{}`, and then refused its deletion: it stands without its relationships. \
+                     The issues that follow are the two refusals, in that order",
+                    party::LABEL,
+                    version.value()
+                ));
+                let issues = std::iter::once(stands)
+                    .chain(relating.issues().iter().cloned())
+                    .chain(withdrawing.issues().iter().cloned())
+                    .collect();
+                Refusal::from(Refused::of(StatusCode::INTERNAL_SERVER_ERROR, issues))
+            }
+        }
+    }
+}
+
+/// Deletes the party `first` names after the CDR refused its relationships.
+async fn withdraw(
+    target: (Demographic<'_>, PartyClass),
+    first: &ObjectVersionId,
+    commit: &CommitContext,
+    relating: Refused,
+) -> Unrelated {
+    match delete_version(target, first, commit).await {
+        Ok(()) => Unrelated::Withdrawn(relating),
+        Err(withdrawing) => Unrelated::Stranded {
+            relating,
+            withdrawing,
+            version: first.clone(),
+        },
+    }
 }
 
 /// Returns `built` with the relationships it awaits sourced at the party

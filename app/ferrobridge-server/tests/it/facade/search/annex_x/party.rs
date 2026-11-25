@@ -574,13 +574,7 @@ async fn a_related_person_create_sources_its_relationship_in_a_second_version()
         )
         .mount(&harness.cdr)
         .await;
-    let (status, body) = call(
-        harness.app(),
-        Request::post("/fhir/RelatedPerson")
-            .header(header::CONTENT_TYPE, "application/fhir+json")
-            .body(Body::from(related_resource().to_string()))?,
-    )
-    .await?;
+    let (status, body) = create_related(&harness).await?;
     assert_eq!(StatusCode::CREATED, status, "{body}");
     assert_eq!(Some("2"), body["meta"]["versionId"].as_str(), "{body}");
     assert_eq!(
@@ -601,11 +595,8 @@ async fn a_related_person_create_sources_its_relationship_in_a_second_version()
     Ok(())
 }
 
-#[tokio::test]
-async fn a_refused_second_version_answers_the_refusal_and_names_the_unrelated_person()
--> Result<(), Box<dyn Error>> {
-    let harness = annex_x().await?;
-    mount_created(&harness).await;
+/// Mounts the CDR's refusal of the second version of the created `PERSON`.
+async fn mount_refused_relationships(harness: &super::super::super::Harness) {
     Mock::given(matchers::method("PUT"))
         .and(matchers::path(format!("/demographic/person/{RELATED_UID}")))
         .respond_with(
@@ -616,24 +607,70 @@ async fn a_refused_second_version_answers_the_refusal_and_names_the_unrelated_pe
         )
         .mount(&harness.cdr)
         .await;
-    let (status, body) = call(
+}
+
+/// Mounts the CDR's answer `status` to the deletion of the created `PERSON`'s
+/// first version.
+async fn mount_withdrawal(harness: &super::super::super::Harness, status: u16) {
+    Mock::given(matchers::method("DELETE"))
+        .and(matchers::path(format!(
+            "/demographic/person/{RELATED_UID}::synthetic.example::1"
+        )))
+        .respond_with(ResponseTemplate::new(status))
+        .expect(1)
+        .mount(&harness.cdr)
+        .await;
+}
+
+/// Posts the synthetic `RelatedPerson` to the facade.
+async fn create_related(
+    harness: &super::super::super::Harness,
+) -> Result<(StatusCode, serde_json::Value), Box<dyn Error>> {
+    call(
         harness.app(),
         Request::post("/fhir/RelatedPerson")
             .header(header::CONTENT_TYPE, "application/fhir+json")
             .body(Body::from(related_resource().to_string()))?,
     )
-    .await?;
+    .await
+}
+
+#[tokio::test]
+async fn a_refused_second_version_deletes_the_person_and_answers_the_refusal()
+-> Result<(), Box<dyn Error>> {
+    let harness = annex_x().await?;
+    mount_created(&harness).await;
+    mount_refused_relationships(&harness).await;
+    mount_withdrawal(&harness, 204).await;
+    let (status, body) = create_related(&harness).await?;
     assert_eq!(StatusCode::PRECONDITION_FAILED, status, "{body}");
-    let warning = body["issue"]
+    harness.cdr.verify().await;
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_deletion_after_a_refused_second_version_names_both_refusals()
+-> Result<(), Box<dyn Error>> {
+    let harness = annex_x().await?;
+    mount_created(&harness).await;
+    mount_refused_relationships(&harness).await;
+    mount_withdrawal(&harness, 409).await;
+    let (status, body) = create_related(&harness).await?;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status, "{body}");
+    let issues = body["issue"]
         .as_array()
-        .and_then(|issues| issues.iter().find(|issue| issue["severity"] == "warning"))
-        .ok_or_else(|| format!("no warning in {body}"))?;
+        .ok_or_else(|| format!("no issues in {body}"))?;
     assert!(
-        warning["diagnostics"]
-            .as_str()
-            .is_some_and(|text| text.contains("relationships were not")),
+        issues.len() >= 3,
+        "the stranded person, the relationships' refusal and the deletion's refusal: {body}"
+    );
+    assert!(
+        issues[0]["diagnostics"].as_str().is_some_and(|text| text
+            .contains(&format!("{RELATED_UID}::synthetic.example::1"))
+            && text.contains("refused its deletion")),
         "{body}"
     );
+    harness.cdr.verify().await;
     Ok(())
 }
 
