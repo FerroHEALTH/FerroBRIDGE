@@ -168,7 +168,7 @@ ferrohealth-health = { version = "=0.1.1", default-features = false }
 # bound, compression, the health routes), the listener, the bounded drain, the
 # healthcheck, the `serve`, `config check` and `healthcheck` subcommands, and
 # the RFC 9457 problem details of every non-FHIR error body.
-ferrohealth-server = { version = "=0.12.1", default-features = false }
+ferrohealth-server = { version = "=0.12.2", default-features = false }
 # The family's telemetry (FerroSYS): the `[telemetry]` section, the console,
 # the request log and the panic line; 0.5 installs its own bridge from the
 # `log` crate beside the subscriber.
