@@ -329,12 +329,15 @@ impl DocumentMetadata {
                 attachment,
                 ..DocumentReferenceContent::default()
             }],
+            // NOTE: R4 Element ele-1: an element holds a value or children, so a context with
+            // neither event, period nor practice setting is left out.
             context: Some(DocumentReferenceContext {
                 event: self.events.clone(),
                 period: self.period.clone(),
                 practice_setting,
                 ..DocumentReferenceContext::default()
-            }),
+            })
+            .filter(|context| *context != DocumentReferenceContext::default()),
             ..DocumentReference::default()
         })
     }

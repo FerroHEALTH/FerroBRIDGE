@@ -4,7 +4,9 @@
 # 1.0.0 MedicationDispense-eu-mpd profile: its canonical, and the required
 # `recorded` extension (the FHIR R5 MedicationDispense.recorded carried into
 # R4), the time the dispense was recorded, which the composition's context
-# start time holds.
+# start time holds. The dispense's identifier is the ACTION's uid, and the
+# prescription it was dispensed against is the one the ACTION's
+# instruction_details name.
 grammar: FHIRConnect/v1.0.0
 type: extension
 metadata:
@@ -52,3 +54,17 @@ mappings:
               fhir:
                 - path: "url"
                   value: "http://hl7.org/fhir/5.0/StructureDefinition/extension-MedicationDispense.recorded"
+
+  - name: "identifier"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.identifier"
+      openehr: "$archetype/uid"
+
+  - name: "authorizingPrescription"
+    extension: "add"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.authorizingPrescription"
+      openehr: "$archetype/instruction_details/instruction_id"
