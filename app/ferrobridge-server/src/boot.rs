@@ -280,7 +280,8 @@ where
         }
         Err(error) => return Err(error),
     };
-    let followers = crate::lanes::spawn_followers(started.feeds, &started.state, settings, &stop);
+    let running = (started.feeds, started.workers);
+    let followers = crate::lanes::spawn_followers(running, &started.state, settings, &stop);
     let state = Arc::new(started.state.with_lanes(started.lanes));
     let delivery = state.access_log().map(|log| log.spawn());
     listen(&state);

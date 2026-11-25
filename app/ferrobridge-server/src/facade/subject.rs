@@ -94,6 +94,13 @@ impl SubjectLink {
         &self.identity
     }
 
+    /// Returns a handle on the identity source, for a lane that outlives one
+    /// request.
+    #[must_use]
+    pub fn identity_handle(&self) -> Arc<IdentitySource> {
+        Arc::clone(&self.identity)
+    }
+
     /// Returns the person whose pseudonym is `id`.
     ///
     /// # Errors

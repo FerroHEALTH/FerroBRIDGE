@@ -33,6 +33,8 @@ pub(crate) struct Started {
     pub(crate) face: Option<StartedFace>,
     /// The change-feed consumers that run.
     pub(crate) feeds: Vec<StartedFeed>,
+    /// The inbound workers, when the intake and the facade run.
+    pub(crate) workers: Option<Arc<crate::inbound::worker::Pool>>,
 }
 
 impl Started {
@@ -40,7 +42,9 @@ impl Started {
     /// the replica's `LISTEN` session on the inbound sources.
     pub(crate) fn announce(&self) {
         if let (Some(store), Some(sources)) = (self.state.store(), self.state.sources()) {
-            store.listeners(&[sources.listened()]).spawn();
+            let mut listened = vec![sources.listened()];
+            listened.extend(self.workers.as_ref().map(|workers| workers.listened()));
+            store.listeners(&listened).spawn();
         }
         startup::log(&self.lanes);
         tracing::info!(
@@ -139,12 +143,46 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_change_feed(report);
         feeds = started;
     }
+    let workers = inbound_workers(settings, &state);
     Ok(Started {
         state,
         lanes,
         face,
         feeds,
+        workers,
     })
+}
+
+/// Returns the inbound workers of `state`, applying each item with the one
+/// handler over the facade's identity source, CDR client and identity map,
+/// when both the intake and the facade run.
+fn inbound_workers(
+    settings: &Settings,
+    state: &AppState,
+) -> Option<Arc<crate::inbound::worker::Pool>> {
+    let (Some(inbound), Some(store), Some(sources), Some(facade)) = (
+        settings.inbound,
+        state.store(),
+        state.sources(),
+        state.facade(),
+    ) else {
+        return None;
+    };
+    let handler = crate::inbound::apply::Apply::new(
+        (
+            Arc::new(crate::inbound::apply::Undeclared),
+            Arc::new(crate::inbound::apply::Unavailable),
+        ),
+        facade.settings().subject.identity_handle(),
+        facade.client().clone(),
+        facade.store_handle(),
+    );
+    Some(Arc::new(crate::inbound::worker::Pool::new(
+        crate::inbound::store::InboxStore::new(store.pool().clone()),
+        Arc::clone(sources),
+        Arc::new(handler),
+        inbound.workers,
+    )))
 }
 
 /// Returns `state` serving the inbound sources of its state store, the
@@ -160,7 +198,6 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
             .context("opening the [secrets] directory the inbound sources name")?,
     );
     let intake = settings.inbound.map(|inbound| {
-        // TODO(#2048): start the worker pool with the identity-feed handler.
         crate::inbound::intake::Intake::new(
             Arc::clone(&sources),
             crate::inbound::store::InboxStore::new(store.pool().clone()),
@@ -214,15 +251,18 @@ impl StartedFeed {
     }
 }
 
-/// Spawns every change-feed follower and the inbound recovery of `state`,
-/// each on its own task until `stop` reads `true`.
+/// Spawns every change-feed follower, the inbound recovery of `state` and
+/// the inbound `workers`, each on its own task until `stop` reads `true`.
 pub(crate) fn spawn_followers(
-    feeds: Vec<StartedFeed>,
+    (feeds, workers): (Vec<StartedFeed>, Option<Arc<crate::inbound::worker::Pool>>),
     state: &AppState,
     settings: &Settings,
     stop: &tokio::sync::watch::Sender<bool>,
 ) -> Vec<tokio::task::JoinHandle<()>> {
     let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let Some(workers) = workers {
+        followers.extend(workers.spawn(&stop.subscribe()));
+    }
     if let (Some(recoverer), Some(inbound)) = (
         state.intake().and_then(|intake| intake.recoverer()),
         settings.inbound,

@@ -10,6 +10,7 @@
 //! (ITS-REST 1.1.0 defines no change notification): our own design, built on
 //! the standard of each step.
 
+pub mod apply;
 pub mod event;
 pub mod intake;
 pub mod keeper;
