@@ -1129,7 +1129,8 @@ node the template does not hold, a path the template does not hold, a path
 that crosses a node which may occur more than once below the bound one (bind
 that node instead), a token over a value that is not coded, a path that is not
 one AQL path, a query that does not parse as AQL, two declarations of one
-resource type over one template, two declarations of one type that state
+resource type over one template whose contexts do not each start at an
+archetype of their own, two declarations of one type that state
 different parameters or includes, a `fixed` coding beside a `node` or a
 `path` or on a type other than `token`, an `include` code that is no standard
 R4 reference parameter of the type, and a parameter that takes the code of a standard R4

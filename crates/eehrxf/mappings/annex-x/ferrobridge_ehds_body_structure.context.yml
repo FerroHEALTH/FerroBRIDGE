@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSBodyStructure (Table 7), served by the facade as an individual
+# BodyStructure (draft act Art 7(2), #2087): each CLUSTER.anatomical_location.v1
+# the EHDS record template places in a problem's structured body site
+# becomes one BodyStructure with the HL7 Europe Base and Core 2.0.1
+# bodyStructure-eu-core profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_body_structure.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/bodyStructure-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "CLUSTER.anatomical_location.v1.BodyStructure"
+  start: "CLUSTER.anatomical_location.v1.BodyStructure"

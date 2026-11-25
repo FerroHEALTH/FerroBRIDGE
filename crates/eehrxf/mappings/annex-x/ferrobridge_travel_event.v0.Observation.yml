@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM ADMIN_ENTRY.travel_event.v0
+# (revision 0.0.1-alpha) to a FHIR R4 Observation, the draft EEHRxF Annex X
+# data group EHDSTravelHistory: LOINC 94651-7 (Country of travel) with the
+# country of the destination as the value, from the date of departure to
+# the date of return.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ADMIN_ENTRY.travel_event.v0.Observation
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ADMIN_ENTRY.travel_event.v0
+    revision: 0.0.1-alpha
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Observation
+
+mappings:
+  - name: "statusCode"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "countryOfTravel"
+        fhir:
+          - path: "status"
+            value: "final"
+          - path: "category.coding.system"
+            value: "http://terminology.hl7.org/CodeSystem/observation-category"
+          - path: "category.coding.code"
+            value: "social-history"
+          - path: "code.coding.system"
+            value: "http://loinc.org"
+          - path: "code.coding.code"
+            value: "94651-7"
+
+  - name: "country"
+    with:
+      fhir: "$resource.value.as(CodeableConcept)"
+      openehr: "$archetype/data[at0001]/items[at0010]/items[at0011]"
+
+  - name: "period"
+    with:
+      fhir: "$resource.effective.as(Period)"
+      openehr: "$archetype/data[at0001]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "departure"
+          with:
+            fhir: "start"
+            openehr: "items[at0009]"
+        - name: "return"
+          with:
+            fhir: "end"
+            openehr: "items[at0019]"

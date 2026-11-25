@@ -325,6 +325,244 @@ pub(super) fn group_specimen() -> Group {
     }
 }
 
+/// HL7 Europe Patient Summary 1.0.0-ballot.
+const EPS: &str = "http://hl7.eu/fhir/eps/StructureDefinition";
+
+/// HL7 Europe Hospital Discharge Report 1.0.0.
+const HDR: &str = "http://hl7.eu/fhir/hdr/StructureDefinition";
+
+/// HL7 International Patient Summary 2.0.1.
+const IPS: &str = "http://hl7.org/fhir/uv/ips/StructureDefinition";
+
+/// Returns the `EHDSAlert` group.
+pub(super) fn group_alert() -> Group {
+    Group {
+        name: "EHDSAlert",
+        context: "ferrobridge_ehds_alert.context",
+        resource_type: "Flag",
+        archetype: "openEHR-EHR-EVALUATION.precaution.v1",
+        profile: format!("{BASE}/flag-patient-eu-core"),
+        resource: serde_json::json!({
+            "resourceType": "Flag",
+            "status": "active",
+            "code": { "text": "Latex precautions" },
+            "period": { "start": "2026-06-01T00:00:00Z" },
+            "subject": subject()
+        }),
+        // R4 Flag search parameters `patient` and `date`.
+        searches: &[
+            "patient=Patient/p-1",
+            "patient=Patient/p-1&date=ge2026-05-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSAdvanceDirective` group, its directive document the
+/// `EHDSAttachment`.
+pub(super) fn group_advance_directive() -> Group {
+    Group {
+        name: "EHDSAdvanceDirective",
+        context: "ferrobridge_ehds_advance_directive.context",
+        resource_type: "Consent",
+        archetype: "openEHR-EHR-EVALUATION.advance_care_directive.v2",
+        profile: format!("{EPS}/consent-eu-eps"),
+        resource: serde_json::json!({
+            "resourceType": "Consent",
+            "status": "active",
+            "scope": { "coding": [{
+                "system": "http://terminology.hl7.org/CodeSystem/consentscope", "code": "adr"
+            }]},
+            "category": [{ "coding": [{ "system": "http://loinc.org", "code": "42348-3" }]}],
+            "patient": subject(),
+            "dateTime": "2026-02-01T10:00:00Z",
+            "sourceAttachment": {
+                "contentType": "application/pdf",
+                "url": "http://example.org/fhir/Binary/synthetic-directive",
+                "size": 2048
+            },
+            "provision": { "period": { "start": "2026-02-01T00:00:00Z" } }
+        }),
+        // R4 Consent search parameters `patient`, `scope` and `date`.
+        searches: &[
+            "patient=Patient/p-1&scope=adr",
+            "patient=Patient/p-1&scope=adr&date=ge2026-01-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSBodyStructure` group.
+pub(super) fn group_body_structure() -> Group {
+    Group {
+        name: "EHDSBodyStructure",
+        context: "ferrobridge_ehds_body_structure.context",
+        resource_type: "BodyStructure",
+        archetype: "openEHR-EHR-CLUSTER.anatomical_location.v1",
+        profile: format!("{BASE}/bodyStructure-eu-core"),
+        resource: serde_json::json!({
+            "resourceType": "BodyStructure",
+            "extension": [{
+                "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-BodyStructure.includedStructure",
+                "extension": [{ "url": "structure", "valueCodeableConcept": { "text": "Left knee" } }]
+            }],
+            "description": "The medial side of the left knee",
+            "patient": subject()
+        }),
+        // R4 BodyStructure search parameter `patient`.
+        searches: &["patient=Patient/p-1"],
+    }
+}
+
+/// Returns the `EHDSCarePlan` group.
+pub(super) fn group_care_plan() -> Group {
+    Group {
+        name: "EHDSCarePlan",
+        context: "ferrobridge_ehds_care_plan.context",
+        resource_type: "CarePlan",
+        archetype: "openEHR-EHR-INSTRUCTION.care_plan_request.v0",
+        profile: format!("{HDR}/carePlan-eu-hdr"),
+        resource: serde_json::json!({
+            "resourceType": "CarePlan",
+            "status": "active",
+            "intent": "plan",
+            "title": "Rehabilitation after knee surgery",
+            "description": "Physiotherapy twice a week",
+            "period": { "start": "2026-07-01T00:00:00Z" },
+            "subject": subject()
+        }),
+        // R4 CarePlan search parameters `patient` and `date`.
+        searches: &[
+            "patient=Patient/p-1",
+            "patient=Patient/p-1&date=ge2026-06-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSCurrentPregnancyStatus` group.
+pub(super) fn group_pregnancy_status() -> Group {
+    Group {
+        name: "EHDSCurrentPregnancyStatus",
+        context: "ferrobridge_ehds_pregnancy_status.context",
+        resource_type: "Observation",
+        archetype: "openEHR-EHR-OBSERVATION.pregnancy_assertion.v0",
+        profile: format!("{IPS}/Observation-pregnancy-status-uv-ips"),
+        resource: serde_json::json!({
+            "resourceType": "Observation",
+            "status": "final",
+            "code": { "coding": [{ "system": "http://loinc.org", "code": "82810-3" }]},
+            "effectiveDateTime": "2026-08-01T09:00:00Z",
+            "valueCodeableConcept": { "coding": [{ "system": "http://loinc.org", "code": "LA15173-0" }]},
+            "subject": subject()
+        }),
+        // PCC-44 2:3.44.4.1.2.1.1.
+        searches: &[
+            "patient=Patient/p-1&code=http://loinc.org|82810-3",
+            "patient=Patient/p-1&code=82810-3&date=ge2026-07-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSPregnancyHistory` group.
+pub(super) fn group_pregnancy_history() -> Group {
+    Group {
+        name: "EHDSPregnancyHistory",
+        context: "ferrobridge_ehds_pregnancy_history.context",
+        resource_type: "Observation",
+        archetype: "openEHR-EHR-EVALUATION.obstetric_summary.v1",
+        profile: format!("{IPS}/Observation-pregnancy-outcome-uv-ips"),
+        resource: serde_json::json!({
+            "resourceType": "Observation",
+            "status": "final",
+            "code": { "coding": [{ "system": "http://loinc.org", "code": "11636-8" }]},
+            "effectiveDateTime": "2026-08-02T09:00:00Z",
+            "valueQuantity": { "value": 2 },
+            "subject": subject()
+        }),
+        // PCC-44 2:3.44.4.1.2.1.1.
+        searches: &[
+            "patient=Patient/p-1&code=http://loinc.org|11636-8",
+            "patient=Patient/p-1&code=11636-8&date=ge2026-07-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSTravelHistory` group.
+pub(super) fn group_travel_history() -> Group {
+    Group {
+        name: "EHDSTravelHistory",
+        context: "ferrobridge_ehds_travel_history.context",
+        resource_type: "Observation",
+        archetype: "openEHR-EHR-ADMIN_ENTRY.travel_event.v0",
+        profile: format!("{EPS}/observation-travel-eu-eps"),
+        resource: serde_json::json!({
+            "resourceType": "Observation",
+            "status": "final",
+            "code": { "coding": [{ "system": "http://loinc.org", "code": "94651-7" }]},
+            "effectivePeriod": { "start": "2026-05-01T00:00:00Z", "end": "2026-05-15T00:00:00Z" },
+            "valueCodeableConcept": { "coding": [{ "system": "urn:iso:std:iso:3166", "code": "IT" }]},
+            "subject": subject()
+        }),
+        // PCC-44 2:3.44.4.1.2.1.1.
+        searches: &[
+            "patient=Patient/p-1&code=http://loinc.org|94651-7",
+            "patient=Patient/p-1&code=94651-7&date=ge2026-04-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSMedicationAdministration` group, its dosage the
+/// `EHDSAdministeredDosage`.
+pub(super) fn group_medication_administration() -> Group {
+    Group {
+        name: "EHDSMedicationAdministration",
+        context: "ferrobridge_ehds_medication_administration.context",
+        resource_type: "MedicationAdministration",
+        archetype: "openEHR-EHR-ACTION.medication.v1",
+        profile: format!("{HDR}/medicationAdministration-eu-hdr"),
+        resource: serde_json::json!({
+            "resourceType": "MedicationAdministration",
+            "status": "completed",
+            "category": { "coding": [{
+                "system": "http://terminology.hl7.org/CodeSystem/medication-admin-category",
+                "code": "inpatient"
+            }]},
+            "medicationCodeableConcept": { "coding": [{
+                "system": "http://snomed.info/sct", "code": "387517004", "display": "Paracetamol"
+            }]},
+            "effectiveDateTime": "2026-09-01T08:00:00Z",
+            "dosage": {
+                "text": "One gram",
+                "dose": { "value": 1, "unit": "g", "system": "http://unitsofmeasure.org", "code": "g" }
+            },
+            "subject": subject()
+        }),
+        // R4 MedicationAdministration search parameters `patient` and `effective-time`.
+        searches: &[
+            "patient=Patient/p-1",
+            "patient=Patient/p-1&effective-time=ge2026-08-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSEncounter` group.
+pub(super) fn group_encounter() -> Group {
+    Group {
+        name: "EHDSEncounter",
+        context: "ferrobridge_ehds_encounter.context",
+        resource_type: "Encounter",
+        archetype: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1",
+        profile: format!("{HDR}/encounter-eu-hdr"),
+        resource: serde_json::json!({
+            "resourceType": "Encounter",
+            "status": "finished",
+            "class": { "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "IMP" },
+            "period": { "start": "2026-09-01T08:00:00Z", "end": "2026-09-03T12:00:00Z" },
+            "subject": subject()
+        }),
+        // R4 Encounter search parameter `patient`.
+        searches: &["patient=Patient/p-1"],
+    }
+}
+
 /// Returns the groups this suite serves.
 pub(super) fn groups() -> Vec<Group> {
     vec![
@@ -338,5 +576,14 @@ pub(super) fn groups() -> Vec<Group> {
         group_device_use(),
         group_specimen(),
         group_service_request(),
+        group_alert(),
+        group_advance_directive(),
+        group_body_structure(),
+        group_care_plan(),
+        group_pregnancy_status(),
+        group_pregnancy_history(),
+        group_travel_history(),
+        group_medication_administration(),
+        group_encounter(),
     ]
 }

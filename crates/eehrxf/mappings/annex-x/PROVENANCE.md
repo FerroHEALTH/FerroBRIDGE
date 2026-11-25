@@ -3,7 +3,7 @@
 
 # Provenance of the Annex X project
 
-Eight mapping files of this project are copies of files of the
+Ten mapping files of this project are copies of files of the
 FHIRconnect mapping library, and keep its licence. Every other file here is
 FerroBRIDGE's own design under the Business Source License 1.1.
 
@@ -25,5 +25,7 @@ FerroBRIDGE's own design under the Business Source License 1.1.
 | `ferrobridge_request.v1.ServiceRequest.yml` | `model/composition/org.openehr/request.v1.ServiceRequest.yml` | Apache-2.0 |
 | `ferrobridge_kds_laborauftrag.yml` | `projects/org.highmed/KDS/laborauftrag/KDS_laborauftrag.yml` | Apache-2.0 |
 | `ferrobridge_organisation.v1.yml` | `model/cluster/org.openehr/organisation.v1.yml` | Apache-2.0 |
+| `ferrobridge_encounter.v1.Encounter.yml` | `model/composition/org.highmed/fall.v1.Encounter.yml` | Apache-2.0 |
+| `ferrobridge_encounter.v1.MedicationAdministration.yml` | `model/composition/org.openehr/report.v1.MedicationAdministration.yml` | Apache-2.0 |
 
 Each file's header states what changed from its source.

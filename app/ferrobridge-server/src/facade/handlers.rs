@@ -82,7 +82,7 @@ pub async fn create_route(
     uri: Uri,
     body: Bytes,
 ) -> Response {
-    if resource_type == consent::CONSENT {
+    if resource_type == consent::CONSENT && consent::directs_access(&facade, &body) {
         return consent::fhir::create(&facade, &access, &headers, &body)
             .await
             .unwrap_or_else(Refusal::into_response);
@@ -113,7 +113,7 @@ pub async fn search_route(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
-    if resource_type == consent::CONSENT {
+    if resource_type == consent::CONSENT && consent::searches_access(&facade, &uri) {
         return consent::fhir::search(&facade, &access, &headers, &uri)
             .await
             .unwrap_or_else(Refusal::into_response);
@@ -154,7 +154,7 @@ pub async fn read_route(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
-    if resource_type == consent::CONSENT {
+    if resource_type == consent::CONSENT && consent::reads_access(&facade, &id) {
         return consent::fhir::read(&facade, &access, &id, &headers)
             .await
             .unwrap_or_else(Refusal::into_response);
@@ -621,10 +621,7 @@ fn metadata(
     if facade.consent().is_some()
         && let Some(rest) = statement.rest.first_mut()
     {
-        let at = rest
-            .resource
-            .partition_point(|entry| entry.r#type.value.as_deref() < Some(consent::CONSENT));
-        rest.resource.insert(at, consent::capability());
+        consent::declare(&mut rest.resource);
     }
     if facade.app_state().is_some() {
         statement

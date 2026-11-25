@@ -13,6 +13,7 @@ use std::sync::Arc;
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::cdr::ids::EhrId;
+use ferrobridge_server::consent::exchange::Settings as ExchangeSettings;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::endpoint::Endpoints;
 use ferrobridge_server::facade::identity::PersonId;
@@ -26,6 +27,8 @@ use ferrobridge_testkit::conformance::record;
 use ferrobridge_testkit::fixtures::CKM_EHDS_ARCHETYPES;
 use ferrobridge_testkit::fixtures::CKM_MEDICATION_ARCHETYPES;
 use ferrobridge_testkit::fixtures::CKM_PATIENT_SUMMARY_ARCHETYPES;
+use ferrobridge_testkit::fixtures::FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE;
+use ferrobridge_testkit::fixtures::FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE_ID;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_EHDS_RECORD_TEMPLATE;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_EHDS_RECORD_TEMPLATE_ID;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE;
@@ -122,6 +125,15 @@ async fn annex_x() -> Result<Harness, Box<dyn Error>> {
 
 /// Returns the Annex X harness serving `endpoints` beside its FHIR base.
 async fn annex_x_with(endpoints: Endpoints) -> Result<Harness, Box<dyn Error>> {
+    annex_x_over(endpoints, None).await
+}
+
+/// Returns the Annex X harness serving `endpoints`, and the access directives
+/// as `Consent` when `consent` is set.
+async fn annex_x_over(
+    endpoints: Endpoints,
+    consent: Option<ExchangeSettings>,
+) -> Result<Harness, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     mount_template(
         &cdr,
@@ -142,6 +154,15 @@ async fn annex_x_with(endpoints: Endpoints) -> Result<Harness, Box<dyn Error>> {
             CKM_MEDICATION_ARCHETYPES
                 .iter()
                 .chain(CKM_EHDS_ARCHETYPES.iter()),
+        )?,
+    )
+    .await;
+    mount_template(
+        &cdr,
+        FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE_ID,
+        operational(
+            FERROBRIDGE_EHDS_ADMINISTRATION_TEMPLATE,
+            CKM_MEDICATION_ARCHETYPES.iter(),
         )?,
     )
     .await;
@@ -198,7 +219,8 @@ async fn annex_x_with(endpoints: Endpoints) -> Result<Harness, Box<dyn Error>> {
     let facade = Arc::new(
         built
             .with_search(catalog, Limits::default())
-            .with_endpoints(Some(endpoints)),
+            .with_endpoints(Some(endpoints))
+            .with_consent(consent),
     );
     let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
     store.record_ehr(&person, &EhrId::new(EHR_ID)?)?;
@@ -225,6 +247,7 @@ struct Group {
     searches: &'static [&'static str],
 }
 
+mod consent;
 mod endpoint;
 mod groups;
 mod party;
@@ -421,14 +444,30 @@ struct Embedded {
 }
 
 /// Returns the data-type groups the suite asserts, by name.
-const fn embedded_groups() -> [(&'static str, Embedded); 1] {
-    [(
-        "EHDSDosage",
-        Embedded {
-            by: "EHDSMedicationUse",
-            pointer: "/dosage/0/text",
-        },
-    )]
+const fn embedded_groups() -> [(&'static str, Embedded); 3] {
+    [
+        (
+            "EHDSDosage",
+            Embedded {
+                by: "EHDSMedicationUse",
+                pointer: "/dosage/0/text",
+            },
+        ),
+        (
+            "EHDSAdministeredDosage",
+            Embedded {
+                by: "EHDSMedicationAdministration",
+                pointer: "/dosage/dose/value",
+            },
+        ),
+        (
+            "EHDSAttachment",
+            Embedded {
+                by: "EHDSAdvanceDirective",
+                pointer: "/sourceAttachment/url",
+            },
+        ),
+    ]
 }
 
 /// The data-type groups asserted in the served `Patient`, by name, with the
@@ -495,7 +534,6 @@ async fn serve_embedded(embedded: &Embedded) -> Result<(), Box<dyn Error>> {
     })
 }
 
-/// Serves `EHDSEndpoint`: the facade's own FHIR base, searched by its
 /// Returns the verdict on the Annex X group `name`.
 async fn verdict(name: &str) -> Result<(), Box<dyn Error>> {
     if name == "EHDSEndpoint" {

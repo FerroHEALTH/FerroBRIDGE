@@ -6,18 +6,27 @@
 
 use std::error::Error;
 
+use axum::body::Body;
 use ferrobridge_testkit::fixtures::FERROEHR_PATIENT_PERSON_ID;
 use ferrobridge_testkit::fixtures::FERROEHR_PROFESSIONAL_PERSON_ID;
 use ferrobridge_testkit::fixtures::ORGANISATION_TEMPLATE_ID;
+use http::Request;
 use http::StatusCode;
+use http::header;
 use wiremock::Mock;
 use wiremock::ResponseTemplate;
 use wiremock::matchers;
 
+use super::super::super::call;
 use super::super::get;
 use super::BASE;
 use super::annex_x;
 use super::ensure;
+
+/// The `FerroTERM` code system of the Annex X identifier types HL7 v2-0203
+/// lacks.
+pub(super) const EHDS_IDENTIFIER_TYPE: &str =
+    "https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type";
 
 /// The object id of the synthetic patient `PERSON`.
 pub(super) const PATIENT_UID: &str = "a1b2c3d4-0000-4000-8000-0000000000e1";
@@ -41,6 +50,11 @@ pub(super) fn patient_person() -> serde_json::Value {
                     "http://example.org/fhir/sid/synthetic-national-id",
                     "SYN-NI-0001",
                     "http://terminology.hl7.org/CodeSystem/v2-0203::NI"
+                )),
+                element("id3", "Patient identifier", identifier(
+                    "http://example.org/fhir/sid/synthetic-health-id",
+                    "SYN-HI-0001",
+                    &format!("{EHDS_IDENTIFIER_TYPE}::HI")
                 )),
                 element("id4", "Date of birth", serde_json::json!({"_type": "DV_DATE", "value": "1970-01-01"})),
                 element("id5", "Sex", sex)
@@ -278,4 +292,68 @@ pub(super) fn party_groups() -> [(&'static str, Party); 3] {
         ("EHDSHealthProfessional", health_professional()),
         ("EHDSOrganisation", organisation()),
     ]
+}
+
+#[tokio::test]
+async fn each_patient_identifier_reads_with_its_annex_x_type() -> Result<(), Box<dyn Error>> {
+    let read = serve_party(&patient()).await?;
+    let types: Vec<(Option<&str>, Option<&str>)> = read["identifier"]
+        .as_array()
+        .ok_or("identifiers")?
+        .iter()
+        .map(|identifier| {
+            let coding = &identifier["type"]["coding"][0];
+            (coding["system"].as_str(), coding["code"].as_str())
+        })
+        .collect();
+    assert_eq!(
+        vec![
+            (
+                Some("http://terminology.hl7.org/CodeSystem/v2-0203"),
+                Some("NI")
+            ),
+            (Some(EHDS_IDENTIFIER_TYPE), Some("HI")),
+        ],
+        types,
+        "{read}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_patient_identifier_without_a_type_is_refused() -> Result<(), Box<dyn Error>> {
+    // Draft Annex X EHDSPatient.identifier.type 1..1.
+    let harness = annex_x().await?;
+    let patient = serde_json::json!({
+        "resourceType": "Patient",
+        "meta": { "profile": [format!("{BASE}/patient-eu-core")] },
+        "identifier": [
+            {
+                "type": { "coding": [{
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "NI"
+                }]},
+                "system": "http://example.org/fhir/sid/synthetic-national-id",
+                "value": "SYN-NI-0002"
+            },
+            { "system": "http://example.org/fhir/sid/synthetic-health-id", "value": "SYN-HI-0002" }
+        ],
+        "name": [{ "family": "Patient", "given": ["Synthetic"] }],
+        "birthDate": "1970-01-01"
+    });
+    let (status, body) = call(
+        harness.app(),
+        Request::post("/fhir/Patient")
+            .header(header::CONTENT_TYPE, "application/fhir+json")
+            .body(Body::from(patient.to_string()))?,
+    )
+    .await?;
+    assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
+    let issue = &body["issue"][0];
+    assert_eq!(Some("required"), issue["code"].as_str(), "{body}");
+    assert_eq!(
+        Some("Patient.identifier[1].type"),
+        issue["location"][0].as_str(),
+        "{body}"
+    );
+    Ok(())
 }

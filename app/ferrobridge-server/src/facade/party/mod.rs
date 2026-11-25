@@ -25,6 +25,7 @@
 //! Cadasto's experimental AQL demographic extension
 //! (`crate::facade::search::party`), and the `CapabilityStatement` says so.
 
+pub(crate) mod ehds;
 pub(crate) mod provision;
 pub(crate) mod read;
 pub(crate) mod write;

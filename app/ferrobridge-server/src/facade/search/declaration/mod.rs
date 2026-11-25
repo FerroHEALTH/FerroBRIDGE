@@ -402,9 +402,10 @@ pub enum DeclarationError {
         /// The context it names.
         context: String,
     },
-    /// Two files declare search for one resource type over one template.
+    /// Two files declare search for one resource type over one template
+    /// and one entry.
     #[error(
-        "the search declarations {} and {} both answer {resource_type} over the template {template}",
+        "the search declarations {} and {} both answer {resource_type} from one entry of the template {template}",
         first.display(),
         second.display()
     )]

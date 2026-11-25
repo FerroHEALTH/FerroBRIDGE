@@ -40,6 +40,7 @@ use crate::facade::compartment;
 use crate::facade::ehr;
 use crate::facade::handlers::write::refuse;
 use crate::facade::identity::PersonId;
+use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
@@ -64,6 +65,91 @@ const OPERATION_BASE: &str = "https://ferrobridge.eu/fhir/OperationDefinition/";
 
 /// The `rest.resource.documentation` of `Consent`.
 const DOCUMENTATION: &str = "One openEHR access directive of the EHR_ACCESS of the patient's EHR is one Consent. A Consent with a construct no access directive holds is refused naming the element. FHIR R5 is read and written under application/fhir+json; fhirVersion=5.0. $bppc and $appc import and export the directives as IHE BPPC acknowledgements and IHE APPC Privacy Consent Documents.";
+
+/// The `Consent.scope` code of an advance directive (R4
+/// `codesystem-consentscope`), which the access directives never carry.
+const ADVANCE_DIRECTIVE: &str = "adr";
+
+/// The search parameter that names a `Consent`'s scope (R4
+/// `consent.html#search`).
+const SCOPE: &str = "scope";
+
+/// Whether a `Consent` create of `body` writes an access directive: the
+/// facade serves them, and the body is no advance directive, which a
+/// loaded mapping writes as a record.
+///
+/// An access directive is one kind of `Consent`, and its scope tells it from
+/// an advance directive (R4 `Consent.scope`). No specification governs the
+/// split: our own design.
+#[must_use]
+pub fn directs_access(facade: &Facade, body: &[u8]) -> bool {
+    let advance = serde_json::from_slice::<serde_json::Value>(body)
+        .ok()
+        .and_then(|resource| resource.get("scope").cloned())
+        .and_then(|scope| scope.get("coding").cloned())
+        .and_then(|coding| coding.as_array().cloned())
+        .is_some_and(|coding| {
+            coding.iter().any(|code| {
+                code.get("code").and_then(serde_json::Value::as_str) == Some(ADVANCE_DIRECTIVE)
+            })
+        });
+    facade.consent().is_some() && !(advance && maps_consent(facade))
+}
+
+/// Whether a `Consent` search of `uri` reads the access directives: the
+/// facade serves them, and the search names no `scope`, which the
+/// advance directives a loaded mapping serves are searched by.
+#[must_use]
+pub fn searches_access(facade: &Facade, uri: &http::Uri) -> bool {
+    let scoped = media::query_pairs(uri.query().unwrap_or_default().as_bytes())
+        .iter()
+        .any(|(name, _)| name == SCOPE);
+    facade.consent().is_some() && !(scoped && maps_consent(facade))
+}
+
+/// Whether a `Consent` read of `id` reads an access directive: the facade
+/// serves them and `id` is the logical id of one ([`parse_id`]), which no
+/// mapped resource's id takes.
+#[must_use]
+pub fn reads_access(facade: &Facade, id: &str) -> bool {
+    facade.consent().is_some() && (parse_id(id).is_some() || !maps_consent(facade))
+}
+
+/// Whether a loaded mapping serves `Consent`.
+fn maps_consent(facade: &Facade) -> bool {
+    !facade.mappings().search().of_type(CONSENT).is_empty()
+}
+
+/// Adds the `Consent` the access directives serve to `resources`, in type
+/// order, joined with the entry of the advance directives a loaded mapping
+/// serves.
+pub fn declare(resources: &mut Vec<CapabilityStatementRestResource>) {
+    let served = capability();
+    if let Some(mapped) = resources
+        .iter_mut()
+        .find(|entry| entry.r#type.value.as_deref() == Some(CONSENT))
+    {
+        for interaction in served.interaction {
+            if !mapped
+                .interaction
+                .iter()
+                .any(|held| held.code == interaction.code)
+            {
+                mapped.interaction.push(interaction);
+            }
+        }
+        mapped.operation.extend(served.operation);
+        mapped.documentation = Some(
+            format!(
+                "{DOCUMENTATION} A Consent of scope adr is an advance directive, served from the mapped records and searched with scope."
+            )
+            .into(),
+        );
+        return;
+    }
+    let at = resources.partition_point(|entry| entry.r#type.value.as_deref() < Some(CONSENT));
+    resources.insert(at, served);
+}
 
 /// Returns the `rest.resource` entry of `Consent`.
 #[must_use]

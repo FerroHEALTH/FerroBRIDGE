@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSEncounter (Table 14), served by the facade as an individual Encounter
+# (draft act Art 7(2), #2087): each EHDS record COMPOSITION, an encounter
+# composition, becomes one Encounter with the HL7 Europe Hospital Discharge
+# Report 1.0.0 encounter-eu-hdr profile, from its EVENT_CONTEXT.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_encounter.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/hdr/StructureDefinition/encounter-eu-hdr"
+    version: "1.0.0"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "COMPOSITION.encounter.v1.Encounter"
+  extensions:
+    - "ferrobridge_ehds_encounter"
+  start: "COMPOSITION.encounter.v1.Encounter"
