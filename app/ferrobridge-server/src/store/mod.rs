@@ -11,6 +11,7 @@
 //! a database of its own and never this one. No specification governs where
 //! the bridge keeps its state: our own design on family precedent.
 
+pub mod claim;
 pub mod lease;
 pub mod listen;
 pub mod seal;
