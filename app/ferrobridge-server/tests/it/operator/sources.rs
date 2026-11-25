@@ -115,7 +115,7 @@ async fn tenants(store: &Store, id: &str) -> Result<Vec<String>, Box<dyn Error>>
 #[tokio::test]
 async fn a_source_and_its_tenants_are_created_changed_disabled_and_deleted_with_if_match()
 -> Result<(), Box<dyn Error>> {
-    let Some(Sourced { case, store, .. }) = sourced().await? else {
+    let Some(Sourced { case, store, _kept }) = sourced().await? else {
         return Ok(());
     };
     let created = case
@@ -223,7 +223,7 @@ async fn a_source_and_its_tenants_are_created_changed_disabled_and_deleted_with_
 #[tokio::test]
 async fn a_document_naming_a_missing_secret_or_a_taken_name_is_refused()
 -> Result<(), Box<dyn Error>> {
-    let Some(Sourced { case, store, .. }) = sourced().await? else {
+    let Some(Sourced { case, store, _kept }) = sourced().await? else {
         return Ok(());
     };
     let mut missing = webhook("ons-missing", true, &[]);
@@ -294,7 +294,7 @@ async fn a_document_naming_a_missing_secret_or_a_taken_name_is_refused()
 
 #[tokio::test]
 async fn the_sources_need_the_operator_scope() -> Result<(), Box<dyn Error>> {
-    let Some(Sourced { case, .. }) = sourced().await? else {
+    let Some(Sourced { case, _kept, .. }) = sourced().await? else {
         return Ok(());
     };
     let refused = case
