@@ -44,6 +44,7 @@ use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::assemble::parse_artefact;
 use openehr_adl::opt::create_opt;
 use openehr_adl::parse::Dialect;
+use openehr_rm::draft::access_control::terminology::AccessDefault;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -65,6 +66,9 @@ const ANNEX_X: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../crates/eehrxf/mappings/annex-x"
 );
+
+/// The CDR's extensions root under the stub, as the reference CDR serves it.
+const EXTENSIONS: &str = "/ferroehr/rest/extensions/v1";
 
 /// HL7 Europe Base and Core 2.0.1.
 const BASE: &str = "http://hl7.eu/fhir/base/StructureDefinition";
@@ -129,12 +133,20 @@ async fn annex_x_with(endpoints: Endpoints) -> Result<Harness, Box<dyn Error>> {
 }
 
 /// Returns the Annex X harness serving `endpoints`, and the access directives
-/// as `Consent` when `consent` is set.
+/// as `Consent` under the default access `consent` when it is set, over the
+/// stub CDR's extensions root.
 async fn annex_x_over(
     endpoints: Endpoints,
-    consent: Option<ExchangeSettings>,
+    consent: Option<AccessDefault>,
 ) -> Result<Harness, Box<dyn Error>> {
     let cdr = MockServer::start().await;
+    let consent = match consent {
+        Some(default_access) => Some(ExchangeSettings {
+            extensions_root: url::Url::parse(&format!("{}{EXTENSIONS}", cdr.uri()))?,
+            default_access,
+        }),
+        None => None,
+    };
     mount_template(
         &cdr,
         FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID,

@@ -30,7 +30,9 @@ use fhirconnect::resolve::program::hierarchy::Create;
 use fhirconnect::resolve::program::hierarchy::Hierarchy;
 use fhirconnect::resolve::program::hierarchy::Split;
 
-/// Returns the `Bundle.total` of one page, when it is known or asked for.
+/// Returns the `Bundle.total` of the page from the first to the second
+/// position of `span`, when it is known or asked for, `lead_count` matches of
+/// another lane counted beside the declarations'.
 ///
 /// A first page that leaves no next page holds every match, so its size is
 /// the exact total at no cost. Otherwise the matches are counted only when
@@ -41,17 +43,19 @@ pub(super) async fn total_of(
     client: &CdrClient,
     plans: &[Plan<'_>],
     criteria: &Criteria,
-    start: Position,
-    next: Option<Position>,
+    span: (Position, Option<Position>),
     answered: usize,
+    lead_count: u64,
 ) -> Result<Option<u64>, Refusal> {
     match criteria.total {
         Some(Total::None) => Ok(None),
-        _ if start == Position::START && next.is_none() => {
+        _ if span == (Position::START, None) => {
             Ok(Some(u64::try_from(answered).unwrap_or(u64::MAX)))
         }
         Some(Total::Accurate | Total::Estimate) => Ok(Some(
-            count_all(facade, client, plans, Accuracy::of(criteria)).await?,
+            count_all(facade, client, plans, Accuracy::of(criteria))
+                .await?
+                .saturating_add(lead_count),
         )),
         None => Ok(None),
     }

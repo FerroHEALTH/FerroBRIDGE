@@ -24,7 +24,7 @@ mod conditional;
 pub(crate) mod emit;
 pub(crate) mod read;
 mod render;
-mod search;
+pub(crate) mod search;
 mod transaction;
 mod validate;
 pub(crate) mod write;
@@ -113,10 +113,10 @@ pub async fn search_route(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
-    if resource_type == consent::CONSENT && consent::searches_access(&facade, &uri) {
-        return consent::fhir::search(&facade, &access, &headers, &uri)
-            .await
-            .unwrap_or_else(Refusal::into_response);
+    if resource_type == consent::CONSENT
+        && let Some(answer) = consent_search(&facade, &access, &headers, &uri, None).await
+    {
+        return answer;
     }
     if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
         return endpoint::search(&facade, &access, &headers, &uri, &[])
@@ -141,9 +141,42 @@ pub async fn search_form_route(
         return endpoint::search(&facade, &access, &headers, &uri, &body)
             .unwrap_or_else(Refusal::into_response);
     }
+    if resource_type == consent::CONSENT
+        && let Some(answer) = consent_search(&facade, &access, &headers, &uri, Some(&body)).await
+    {
+        return answer;
+    }
     search::search_post(&facade, &access, &resource_type, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
+}
+
+/// Answers a `Consent` search, its parameters in the query and in `form`, a
+/// `POST _search` body, when it reaches the access directives
+/// ([`consent::lanes`]); `None` for one the mapped search answers alone.
+async fn consent_search(
+    facade: &Facade,
+    access: &Access,
+    headers: &HeaderMap,
+    uri: &Uri,
+    form: Option<&[u8]>,
+) -> Option<Response> {
+    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    if let Some(body) = form {
+        if let Err(refusal) = search::form::check_form(headers) {
+            return Some(refusal.into_response());
+        }
+        pairs.extend(media::query_pairs(body));
+    }
+    let lanes = consent::lanes(facade, &pairs);
+    if lanes == consent::Lanes::Mapped {
+        return None;
+    }
+    Some(
+        consent::fhir::search(facade, access, headers, uri, &pairs, lanes)
+            .await
+            .unwrap_or_else(Refusal::into_response),
+    )
 }
 
 /// `GET [base]/{type}/{id}`: read one mapped resource back out of the CDR.

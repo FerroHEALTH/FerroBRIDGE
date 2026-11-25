@@ -14,7 +14,7 @@
 //! search never answers an empty Bundle for a failed call
 //! (no specification governs this: our own design).
 
-mod form;
+pub(crate) mod form;
 mod identifier;
 mod include;
 mod party;
@@ -85,7 +85,7 @@ pub(crate) async fn search_get(
 ) -> Result<Response, Refusal> {
     crate::facade::handlers::guard(headers, uri, Body::Absent)?;
     let pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    search(facade, access, resource_type, headers, &pairs).await
+    search(facade, access, resource_type, headers, &pairs, None).await
 }
 
 /// `POST [base]/{type}/_search`, the parameters in the URL and the form body.
@@ -101,16 +101,22 @@ pub(crate) async fn search_post(
     form::check_form(headers)?;
     let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
     pairs.extend(media::query_pairs(body));
-    search(facade, access, resource_type, headers, &pairs).await
+    search(facade, access, resource_type, headers, &pairs, None).await
 }
 
-/// Runs one search.
-async fn search(
+/// Runs one search, its searchset opened with `lead` when another lane of
+/// the type answers first.
+///
+/// The lead is paged before the declarations' matches, so a cursor's
+/// declaration `0` is an index into it and declaration `n + 1` is the
+/// declaration `n` (no specification governs the cursor: our own design).
+pub(crate) async fn search(
     facade: &Facade,
     access: &Access,
     resource_type: &str,
     headers: &HeaderMap,
     pairs: &[(String, String)],
+    lead: Option<Vec<Match>>,
 ) -> Result<Response, Refusal> {
     if let Some(loaded) = facade.programs().party(resource_type) {
         return party::search(facade, access, loaded, resource_type, headers, pairs).await;
@@ -143,7 +149,13 @@ async fn search(
         reply::refusals(StatusCode::BAD_REQUEST, &issues, &[])
     })?;
     let fingerprint = cursor::fingerprint(resource_type, &criteria.used);
-    let start = start_of(&criteria, &fingerprint, declarations.len())?;
+    let start = start_of(
+        &criteria,
+        &fingerprint,
+        declarations
+            .len()
+            .saturating_add(usize::from(lead.is_some())),
+    )?;
     let client = facade.client_for(headers, access).await?;
     let mut resolved = resolve(facade, &client, resource_type, &criteria).await?;
     if let Compartment::Patient(patient) = compartment {
@@ -156,28 +168,16 @@ async fn search(
         .count
         .unwrap_or(limits.default_count)
         .min(limits.max_count);
-    // NOTE: R4 search.html §3.1.1.5.3: "if _count has the value 0, this shall be
-    // treated the same as _summary=count", a Bundle.total and no entries or links.
-    let (matches, next, total) = if criteria.summary_count || page_size == 0 {
-        (
-            Vec::new(),
-            None,
-            Some(count_all(facade, &client, &plans, Accuracy::of(&criteria)).await?),
-        )
-    } else {
-        let (matches, next) = page(facade, &client, &plans, start, page_size).await?;
-        let total = total_of(
-            facade,
-            &client,
-            &plans,
-            &criteria,
-            start,
-            next,
-            matches.len(),
-        )
-        .await?;
-        (matches, next, total)
-    };
+    let (matches, next, total) = answer(
+        facade,
+        &client,
+        &plans,
+        &criteria,
+        lead.as_deref(),
+        start,
+        page_size,
+    )
+    .await?;
     let self_cursor = criteria.cursor.as_deref();
     let envelope = bundle::Envelope {
         id: &uuid::Uuid::new_v4().to_string(),
@@ -195,14 +195,8 @@ async fn search(
                 Some(&cursor::encode(position, &fingerprint)),
             )
         }),
-        outcome: ignored_issues(&criteria),
+        outcome: ignored_issues(&criteria.ignored),
     };
-    let body = bundle::searchset(&envelope, &matches).map_err(|error| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),
-        )
-    })?;
     tracing::info!(
         resource_type,
         matches = matches.len(),
@@ -210,7 +204,57 @@ async fn search(
         paged = next.is_some(),
         "the search answered"
     );
+    searchset_reply(&envelope, &matches)
+}
+
+/// Answers the `searchset` Bundle of `matches` in `envelope`, or the `500`
+/// of a rendered resource the R4 model refuses.
+fn searchset_reply(
+    envelope: &bundle::Envelope<'_>,
+    matches: &[Match],
+) -> Result<Response, Refusal> {
+    let body = bundle::searchset(envelope, matches).map_err(|error| {
+        reply::refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),
+        )
+    })?;
     Ok(reply::resource(StatusCode::OK, &body, &[]))
+}
+
+/// Returns the matches of the page from `start` of at most `page_size`, the
+/// position of the next page and the total, the matches of `lead` first.
+async fn answer(
+    facade: &Facade,
+    client: &CdrClient,
+    plans: &[Plan<'_>],
+    criteria: &Criteria,
+    lead: Option<&[Match]>,
+    start: Position,
+    page_size: u32,
+) -> Result<(Vec<Match>, Option<Position>, Option<u64>), Refusal> {
+    let lead_count = u64::try_from(lead.map_or(0, <[Match]>::len)).unwrap_or(u64::MAX);
+    // NOTE: R4 search.html §3.1.1.5.3: "if _count has the value 0, this shall be
+    // treated the same as _summary=count", a Bundle.total and no entries or links.
+    if criteria.summary_count || page_size == 0 {
+        let counted = count_all(facade, client, plans, Accuracy::of(criteria)).await?;
+        return Ok((Vec::new(), None, Some(counted.saturating_add(lead_count))));
+    }
+    let (matches, next) = match lead {
+        None => page(facade, client, plans, start, page_size).await?,
+        Some(lead) => page_led(facade, client, plans, lead, start, page_size).await?,
+    };
+    let total = total_of(
+        facade,
+        client,
+        plans,
+        criteria,
+        (start, next),
+        matches.len(),
+        lead_count,
+    )
+    .await?;
+    Ok((matches, next, total))
 }
 
 /// One declaration with the query the request makes of it.
@@ -461,6 +505,59 @@ async fn page(
         tally.skip = 0;
     }
     Ok((tally.matches, None))
+}
+
+/// Reads one page of a search opened with `lead`, starting at `start`, of
+/// at most `size` matches: the lead from the index a cursor's declaration
+/// `0` names, then the declarations' matches.
+async fn page_led(
+    facade: &Facade,
+    client: &CdrClient,
+    plans: &[Plan<'_>],
+    lead: &[Match],
+    start: Position,
+    size: u32,
+) -> Result<(Vec<Match>, Option<Position>), Refusal> {
+    let (mut matches, room, from) = if start.declaration == 0 {
+        let first = usize::try_from(start.offset).unwrap_or(usize::MAX);
+        let room = usize::try_from(size).unwrap_or(usize::MAX);
+        let taken: Vec<Match> = lead.iter().skip(first).take(room).cloned().collect();
+        let next = first.saturating_add(taken.len());
+        if next < lead.len() {
+            return Ok((
+                taken,
+                Some(Position {
+                    declaration: 0,
+                    offset: i64::try_from(next).unwrap_or(i64::MAX),
+                    skip: 0,
+                }),
+            ));
+        }
+        let left = room.saturating_sub(taken.len());
+        (
+            taken,
+            u32::try_from(left).unwrap_or(u32::MAX),
+            Position::START,
+        )
+    } else {
+        (
+            Vec::new(),
+            size,
+            Position {
+                declaration: start.declaration.saturating_sub(1),
+                ..start
+            },
+        )
+    };
+    let (more, next) = page(facade, client, plans, from, room).await?;
+    matches.extend(more);
+    Ok((
+        matches,
+        next.map(|position| Position {
+            declaration: position.declaration.saturating_add(1),
+            ..position
+        }),
+    ))
 }
 
 /// What a page holds and has still to pass over.
@@ -746,9 +843,8 @@ fn malformed_answer(detail: &str) -> Refusal {
 }
 
 /// Returns the warning issues naming the parameters lenient handling ignored.
-fn ignored_issues(criteria: &Criteria) -> Vec<Issue> {
-    criteria
-        .ignored
+fn ignored_issues(ignored: &[String]) -> Vec<Issue> {
+    ignored
         .iter()
         .map(|name| {
             Issue::warning(IssueType::NotSupported)

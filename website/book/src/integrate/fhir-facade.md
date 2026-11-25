@@ -689,14 +689,14 @@ of the controller's `ACCESS_POLICY` is read under the bridge's own token with
 |---|---|---|
 | create | `POST [base]/Consent` | `201` with the `Location` of the first directive created |
 | read | `GET [base]/Consent/{id}` | the `Consent` of one directive in force |
-| search | `GET [base]/Consent?patient=Patient/{id}` | a `searchset` of every directive in force |
+| search | `GET [base]/Consent?patient=Patient/{id}` | a `searchset` of every directive in force, `scope` (R4) narrowing it |
 | `$bppc` import | `POST [base]/Consent/$bppc?patient=…&evidence=…` | `201` with an `OperationOutcome` naming each `Consent` created |
 | `$bppc` export | `GET [base]/Consent/$bppc?patient=…` | a `collection` Bundle of `Binary` documents |
 | `$appc` import | `POST [base]/Consent/$appc?patient=…` | `201` with an `OperationOutcome` naming each `Consent` created |
 | `$appc` export | `GET [base]/Consent/$appc?patient=…` | a `collection` Bundle holding one `Binary` document |
 
 The `CapabilityStatement` lists `Consent` with `create`, `read` and
-`search-type`, the `patient` parameter, and the two operations. A `Consent` is
+`search-type`, the `patient` and `scope` parameters, and the two operations. A `Consent` is
 R4 unless the media type names R5, `application/fhir+json; fhirVersion=5.0`
 in `Content-Type` for a create or in `Accept` for a read or a search (FHIR R4
 `versioning.html`, version negotiation); the answer carries the same media
@@ -955,10 +955,17 @@ too.
 The CKM publishes no alert archetype, so the precaution
 (`EVALUATION.precaution.v1`), a warning to heed in the care of the patient,
 carries EHDSAlert: FerroBRIDGE's own choice. The facade serves the access
-directives of the CDR as `Consent` too, so a `Consent` search that names
-`scope` and a read of an id the access directives never issue reach the
-advance directives, whose scope is `adr`; any other `Consent` request
-reaches the access directives. A medication administration has a template
+directives of the CDR as `Consent` too. A search returns every matching
+`Consent` (FHIR R4 search, §3.1.1), so a `Consent` search without `scope`
+answers the patient's access directives first and then the advance
+directives, paged as one searchset; it takes `patient`, `scope` and the
+paging parameters, and refuses any other parameter, since the access
+directives cannot match it. `scope=adr` reaches the advance directives
+alone, with their `date`, and `scope=patient-privacy` the access directives
+alone (R4 `Consent.scope`). A read reaches the access directives for a
+64-hex-digit id and the advance directives for any other: an advance
+directive's id is a 52-character FHIRconnect deterministic id, so the two
+never meet. A search of both answers FHIR R4 only. A medication administration has a template
 of its own, because the EHDS record template holds `ACTION.medication.v1`
 for an immunisation and a template overlay leaves no trace in the data that
 would tell the two apart. openEHR has no party class for a place, so each

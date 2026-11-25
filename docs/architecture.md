@@ -1121,9 +1121,11 @@ expression is a load error: the reference CDR's connector let `where()` and
   `EVENT_CONTEXT.location`. Two contexts of one type may share a template
   when each starts at an archetype of its own. A context whose mappings all
   run openEHR to FHIR, such as the Location derived from an encounter's
-  context, is read-only: a write answers `405`. A `Consent` search naming
-  `scope`, or a read of an id the access directives never issue, reaches
-  the mapped advance directives (scope `adr`). A `patient-eu-core` party
+  context, is read-only: a write answers `405`. A `Consent` search without
+  `scope` answers the access directives and then the mapped advance
+  directives (scope `adr`) as one paged searchset, a `scope` picks the
+  lane its code names, and a read reaches the access directives for their
+  64-hex-digit id and the mapped lane for any other. A `patient-eu-core` party
   write refuses an identifier without a type, as draft Annex X gives
   `EHDSPatient.identifier.type` 1..1. Each of these is FerroBRIDGE's own
   design.

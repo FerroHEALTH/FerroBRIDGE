@@ -111,11 +111,7 @@ impl WebTemplateIndex {
 
     /// Writes each of `names` into `built`, an instance of the template's
     /// root.
-    pub(crate) fn write_names(
-        &self,
-        built: &mut Value,
-        names: Vec<Name>,
-    ) -> Result<(), PathError> {
+    pub(crate) fn write_names(&self, built: &mut Value, names: Vec<Name>) -> Result<(), PathError> {
         let root = openehr_rm::v1_2::typing::RmType::simple(self.root().rm_type());
         for (path, name) in names {
             openehr_rm::v1_2::paths::write::set_at_path(built, &root, &path, name).map_err(
