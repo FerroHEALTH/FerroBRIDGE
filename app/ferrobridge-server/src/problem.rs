@@ -69,13 +69,25 @@ pub enum Kind {
     RunHistoryUnavailable,
     /// `503`: the inbound sources could not be read or written.
     SourcesUnavailable,
+    /// `401`: an inbound request does not prove it comes from its source.
+    Unverified,
+    /// `400`: an inbound body is no event the source's map reads.
+    UnreadableEvent,
+    /// `404`: no enabled webhook source has the name.
+    UnknownSource,
+    /// `404`: no parked item has the entity.
+    NotParked,
+    /// `503`: the intake holds as much pending work as the source allows.
+    InboundBusy,
+    /// `503`: the inbox could not be read or written.
+    InboundUnavailable,
     /// `503`: the access token could not be checked.
     AuthorizationUnavailable,
 }
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 27] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
@@ -96,6 +108,12 @@ impl Kind {
         Self::ReloadUnavailable,
         Self::RunHistoryUnavailable,
         Self::SourcesUnavailable,
+        Self::Unverified,
+        Self::UnreadableEvent,
+        Self::UnknownSource,
+        Self::NotParked,
+        Self::InboundBusy,
+        Self::InboundUnavailable,
         Self::AuthorizationUnavailable,
     ];
 
@@ -203,6 +221,36 @@ impl Kind {
             Self::SourcesUnavailable => (
                 "sources-unavailable",
                 "The inbound sources could not be read or written",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::Unverified => (
+                "unverified",
+                "The request does not prove it comes from the source",
+                StatusCode::UNAUTHORIZED,
+            ),
+            Self::UnreadableEvent => (
+                "unreadable-event",
+                "The body is no event the source reads",
+                StatusCode::BAD_REQUEST,
+            ),
+            Self::UnknownSource => (
+                "unknown-source",
+                "No enabled webhook source has this name",
+                StatusCode::NOT_FOUND,
+            ),
+            Self::NotParked => (
+                "not-parked",
+                "No parked item has this entity",
+                StatusCode::NOT_FOUND,
+            ),
+            Self::InboundBusy => (
+                "inbound-busy",
+                "The source has as much pending work as it may",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::InboundUnavailable => (
+                "inbound-unavailable",
+                "The inbox could not be read or written",
                 StatusCode::SERVICE_UNAVAILABLE,
             ),
             Self::AuthorizationUnavailable => (

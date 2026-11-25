@@ -303,6 +303,18 @@ impl Sources {
         Ok(self.held.store.named(name).await?.map(Arc::new))
     }
 
+    /// Returns the source `id`: from the snapshot while the listener is
+    /// connected, from its row otherwise.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the row must be read and cannot be.
+    pub async fn get(&self, id: Uuid) -> Result<Option<Arc<Source>>, sqlx::Error> {
+        if self.trusted() {
+            return Ok(self.held.current().by_id.get(&id).cloned());
+        }
+        Ok(self.held.store.get(id).await?.map(Arc::new))
+    }
+
     /// Returns the source the MLLP sender `application` at `facility` is
     /// routed to: from the snapshot while the listener is connected, from
     /// its row otherwise.

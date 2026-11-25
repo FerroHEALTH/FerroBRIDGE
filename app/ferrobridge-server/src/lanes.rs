@@ -162,9 +162,23 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
     let Some(store) = state.store() else {
         return Ok(state);
     };
-    let sources = crate::sources::Sources::open(store, settings.secrets.as_ref())
-        .context("opening the [secrets] directory the inbound sources name")?;
-    Ok(state.with_sources(Arc::new(sources)))
+    let sources = Arc::new(
+        crate::sources::Sources::open(store, settings.secrets.as_ref())
+            .context("opening the [secrets] directory the inbound sources name")?,
+    );
+    let intake = settings.inbound.map(|inbound| {
+        // TODO(#2048): start the worker pool with the identity-feed handler.
+        crate::inbound::intake::Intake::new(
+            Arc::clone(&sources),
+            crate::inbound::store::InboxStore::new(store.pool().clone()),
+            inbound.body_limit,
+        )
+    });
+    let state = state.with_sources(sources);
+    Ok(match intake {
+        Some(intake) => state.with_intake(Arc::new(intake)),
+        None => state,
+    })
 }
 
 /// One change-feed consumer, ready to follow its source.

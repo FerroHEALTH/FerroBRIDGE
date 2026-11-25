@@ -50,35 +50,46 @@ impl Default for Tenant {
     }
 }
 
-/// How a webhook proves a notification is the source's.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Verify {
-    /// The scheme: `hmac-sha256` over the raw body.
-    pub scheme: Scheme,
-    /// The header the signature travels in.
-    pub header: String,
-    /// The keys, any of which verifies, newest first.
-    pub keys: Vec<SecretRef>,
-}
-
-/// The signature schemes a webhook verifier knows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Scheme {
-    /// HMAC-SHA-256 over the raw body (RFC 2104).
-    HmacSha256,
-}
-
 /// A webhook source.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Webhook {
     /// How a notification is verified.
-    pub verify: Verify,
+    pub verify: crate::inbound::verify::Verifier,
+    /// The keys the verifier checks with, any of which verifies, newest
+    /// first; none for `mtls`.
+    #[serde(default)]
+    pub keys: Vec<SecretRef>,
+    /// How a verified notification is read.
+    pub events: crate::inbound::event::EventMap,
     /// The tenants.
     #[serde(default)]
     pub tenants: Vec<Tenant>,
+    /// The bounds of what the source may send and the engine may do.
+    #[serde(default)]
+    pub limits: Limits,
+}
+
+/// The bounds of one webhook source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Limits {
+    /// The largest body read, in bytes, within `[inbound] body_limit`.
+    pub body_limit: usize,
+    /// The most remote calls in flight for one tenant across every replica.
+    pub concurrency: u32,
+    /// The most work items waiting before the intake answers `503`.
+    pub max_pending: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            body_limit: 64 * 1024,
+            concurrency: 4,
+            max_pending: 100_000,
+        }
+    }
 }
 
 /// A header a FHIR Subscription sender authenticates with
@@ -134,7 +145,7 @@ pub struct Mllp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Document {
     /// A webhook.
-    Webhook(Webhook),
+    Webhook(Box<Webhook>),
     /// A FHIR Subscription.
     FhirSubscription(FhirSubscription),
     /// An MLLP sender.
@@ -165,7 +176,7 @@ impl Document {
             ))
         };
         let document = match kind {
-            Kind::Webhook => Self::Webhook(Webhook::deserialize(value).map_err(read)?),
+            Kind::Webhook => Self::Webhook(Box::new(Webhook::deserialize(value).map_err(read)?)),
             Kind::FhirSubscription => {
                 Self::FhirSubscription(FhirSubscription::deserialize(value).map_err(read)?)
             }
@@ -178,15 +189,7 @@ impl Document {
     /// Refuses a document that breaks a rule its shape cannot carry.
     fn check(&self) -> Result<(), Invalid> {
         match self {
-            Self::Webhook(webhook) => {
-                if webhook.verify.header.trim().is_empty() {
-                    return Err(Invalid(String::from("verify.header names no header")));
-                }
-                if webhook.verify.keys.is_empty() {
-                    return Err(Invalid(String::from("verify.keys names no key")));
-                }
-                tenants(&webhook.tenants)
-            }
+            Self::Webhook(webhook) => webhook.check(),
             Self::FhirSubscription(subscription) => {
                 if let Some(header) = &subscription.header
                     && (header.name.trim().is_empty() || header.keys.is_empty())
@@ -210,7 +213,6 @@ impl Document {
         }
         match self {
             Self::Webhook(webhook) => webhook
-                .verify
                 .keys
                 .iter()
                 .map(|key| key.secret.as_str())
@@ -244,6 +246,96 @@ impl Document {
             Self::Webhook(_) | Self::FhirSubscription(_) => &[],
         }
     }
+}
+
+impl Webhook {
+    /// Refuses a webhook whose verifier, keys, event map, tenants or limits
+    /// break a rule.
+    fn check(&self) -> Result<(), Invalid> {
+        use crate::inbound::verify::{Scheme, Verifier};
+
+        let needs_keys = match &self.verify {
+            Verifier::Hmac(hmac) => {
+                named(&hmac.header, "verify.header")?;
+                true
+            }
+            Verifier::StaticHeader(header) => {
+                named(&header.header, "verify.header")?;
+                true
+            }
+            Verifier::StandardWebhooks(standard) => {
+                if standard.schemes.is_empty() {
+                    return Err(Invalid(String::from("verify.schemes names no scheme")));
+                }
+                if standard.schemes.contains(&Scheme::V2a)
+                    && standard
+                        .endpoint_id
+                        .as_deref()
+                        .is_none_or(|id| id.is_empty() || id.contains('.'))
+                {
+                    return Err(Invalid(String::from(
+                        "the v2a scheme needs an endpoint_id without a '.'",
+                    )));
+                }
+                true
+            }
+            Verifier::Mtls(mtls) => {
+                if mtls
+                    .subjects
+                    .iter()
+                    .all(|subject| subject.trim().is_empty())
+                {
+                    return Err(Invalid(String::from("verify.subjects names no subject")));
+                }
+                false
+            }
+        };
+        if needs_keys && self.keys.is_empty() {
+            return Err(Invalid(String::from("keys names no key")));
+        }
+        if !needs_keys && !self.keys.is_empty() {
+            return Err(Invalid(String::from("an mtls verifier takes no keys")));
+        }
+        named(&self.events.entity, "events.entity")?;
+        if self.events.tenant.is_none() && self.tenants.len() > 1 {
+            return Err(Invalid(String::from(
+                "a source with more than one tenant names events.tenant",
+            )));
+        }
+        if self.events.dedupe.headers.is_empty() && self.events.dedupe.pointers.is_empty() {
+            return Err(Invalid(String::from(
+                "events.dedupe names no header and no pointer",
+            )));
+        }
+        let pointers = self
+            .events
+            .tenant
+            .iter()
+            .chain(std::iter::once(&self.events.entity))
+            .chain(self.events.stamp.iter())
+            .chain(self.events.dedupe.pointers.iter())
+            .chain(self.events.rules.iter().flat_map(|rule| rule.when.keys()));
+        for pointer in pointers {
+            if !pointer.is_empty() && !pointer.starts_with('/') {
+                return Err(Invalid(format!("{pointer} is no JSON Pointer")));
+            }
+        }
+        if self.limits.body_limit == 0
+            || self.limits.concurrency == 0
+            || self.limits.max_pending == 0
+        {
+            return Err(Invalid(String::from("a limit is zero")));
+        }
+        tenants(&self.tenants)
+    }
+}
+
+/// Refuses `value`, the value of `key`, when it is blank.
+fn named(value: &str, key: &str) -> Result<(), Invalid> {
+    if value.trim().is_empty() {
+        return Err(Invalid(format!("{key} is empty")));
+    }
+    Ok(())
 }
 
 /// Refuses an empty or repeated tenant, or one without an identifier system.
@@ -333,7 +425,9 @@ mod tests {
         let document = Document::read(
             Kind::Webhook,
             &json!({
-                "verify": {"scheme": "hmac-sha256", "header": "X-Signature", "keys": [{"secret": "b"}, {"secret": "a"}]},
+                "verify": {"kind": "hmac", "header": "X-Signature"},
+                "keys": [{"secret": "b"}, {"secret": "a"}],
+                "events": {"entity": "/id", "dedupe": {"pointers": ["/id"]}},
                 "tenants": [{"tenant": "t1", "identifier_system": "urn:oid:2.16.840.1.113883.2.4.6.3", "credentials": {"secret": "c"}}]
             }),
         )
@@ -347,23 +441,56 @@ mod tests {
 
     #[test]
     fn each_broken_rule_is_refused() {
+        let events = json!({"entity": "/id", "dedupe": {"pointers": ["/id"]}});
+        let hmac = json!({"kind": "hmac", "header": "X"});
+        let key = json!([{"secret": "a"}]);
         for (kind, value) in [
             (
                 Kind::Webhook,
-                json!({"verify": {"scheme": "md5", "header": "X", "keys": [{"secret": "a"}]}}),
+                json!({"verify": {"kind": "hmac", "algorithm": "md5", "header": "X"}, "keys": key, "events": events}),
             ),
             (
                 Kind::Webhook,
-                json!({"verify": {"scheme": "hmac-sha256", "header": "X", "keys": []}}),
+                json!({"verify": hmac, "keys": [], "events": events}),
             ),
             (
                 Kind::Webhook,
-                json!({"verify": {"scheme": "hmac-sha256", "header": "X", "keys": [{"secret": "a"}]}, "extra": 1}),
+                json!({"verify": hmac, "keys": key, "events": events, "extra": 1}),
             ),
             (
                 Kind::Webhook,
-                json!({"verify": {"scheme": "hmac-sha256", "header": "X", "keys": [{"secret": "a"}]}, "tenants": [
+                json!({"verify": hmac, "keys": key, "events": {"entity": "/id", "tenant": "/t", "dedupe": {"pointers": ["/id"]}}, "tenants": [
                 {"tenant": "t", "identifier_system": "s"}, {"tenant": "t", "identifier_system": "s"}]}),
+            ),
+            (
+                Kind::Webhook,
+                json!({"verify": hmac, "keys": key, "events": events, "tenants": [
+                {"tenant": "t", "identifier_system": "s"}, {"tenant": "u", "identifier_system": "s"}]}),
+            ),
+            (
+                Kind::Webhook,
+                json!({"verify": {"kind": "hmac", "header": " "}, "keys": key, "events": events}),
+            ),
+            (Kind::Webhook, json!({"verify": hmac, "keys": key})),
+            (
+                Kind::Webhook,
+                json!({"verify": hmac, "keys": key, "events": {"entity": "/id"}}),
+            ),
+            (
+                Kind::Webhook,
+                json!({"verify": hmac, "keys": key, "events": {"entity": "id", "dedupe": {"pointers": ["/id"]}}}),
+            ),
+            (
+                Kind::Webhook,
+                json!({"verify": hmac, "keys": key, "events": events, "limits": {"concurrency": 0}}),
+            ),
+            (
+                Kind::Webhook,
+                json!({"verify": {"kind": "standard-webhooks", "schemes": ["v2a"]}, "keys": key, "events": events}),
+            ),
+            (
+                Kind::Webhook,
+                json!({"verify": {"kind": "mtls", "subjects": ["CN=a"]}, "keys": key, "events": events}),
             ),
             (Kind::Mllp, json!({"routes": []})),
             (

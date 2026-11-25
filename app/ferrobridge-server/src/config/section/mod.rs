@@ -19,6 +19,7 @@ pub mod change_feed;
 pub mod events;
 pub mod facade;
 pub mod fhir_outbound;
+pub mod inbound;
 pub mod omop_incremental;
 pub mod shl;
 pub mod state;

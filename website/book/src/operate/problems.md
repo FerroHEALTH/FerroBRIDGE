@@ -70,6 +70,12 @@ the process is not ready.
 | [`reload-unavailable`](#reload-unavailable) | `503` | The mapping set could not be reloaded. |
 | [`run-history-unavailable`](#run-history-unavailable) | `503` | The run history could not be read. |
 | [`sources-unavailable`](#sources-unavailable) | `503` | The inbound sources could not be read or written. |
+| [`unverified`](#unverified) | `401` | An inbound request does not prove it comes from its source. |
+| [`unreadable-event`](#unreadable-event) | `400` | An inbound body is no event the source's map reads. |
+| [`unknown-source`](#unknown-source) | `404` | No enabled webhook source has the name. |
+| [`not-parked`](#not-parked) | `404` | No parked item of the source has the entity. |
+| [`inbound-busy`](#inbound-busy) | `503` | The source has as much pending work as its `max_pending` allows. |
+| [`inbound-unavailable`](#inbound-unavailable) | `503` | The inbox could not be read or written. |
 | [`authorization-unavailable`](#authorization-unavailable) | `503` | The token could not be checked. |
 
 ## invalid-request
@@ -194,6 +200,42 @@ table as it is.
 `503`. The state store could not read or write the inbound sources, or a
 secret a source names cannot be read at runtime, so the source fails closed.
 The server log names the cause, and the secret by its name alone.
+
+## unverified
+
+`401`. The inbound request failed its source's verifier: a signature that
+does not match any key, a header that is missing or does not read, a
+timestamp outside the tolerance, or a client certificate the source does
+not list. Nothing of the request is stored. The server log names the reason
+and never a value of the request.
+
+## unreadable-event
+
+`400`. The verified body is no JSON, or lacks a part the source's event map
+selects (the tenant, the entity, the stamp or a de-duplication field), or
+holds one that is no string or number. Nothing is stored.
+
+## unknown-source
+
+`404`. No source has the name in `/inbound/{source}`, or the source is
+disabled or of another kind.
+
+## not-parked
+
+`404`. The settlement names an entity that has no parked work item in the
+source.
+
+## inbound-busy
+
+`503`. The source has `max_pending` work items waiting or running, so the
+intake stores no more until the workers catch up. The answer carries
+`Retry-After`. Nothing is stored.
+
+## inbound-unavailable
+
+`503`. The state store could not store the event or read the inbox. Nothing
+is stored, so the source sends the event again. The server log names the
+cause.
 
 ## authorization-unavailable
 
