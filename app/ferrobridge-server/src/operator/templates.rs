@@ -19,8 +19,9 @@ use axum::response::IntoResponse;
 use axum::response::Response;
 use openehr_mapping_core::template::PathError;
 
+use super::refused::Refused;
 use crate::operator::Operator;
-use crate::problem::{Kind, refuse};
+use crate::problem::Kind;
 
 /// `GET /operator/templates/{id}/example`: the example composition of the
 /// template `id`; `404` for a template the running set does not hold, and
@@ -28,10 +29,11 @@ use crate::problem::{Kind, refuse};
 pub async fn example(State(operator): State<Arc<Operator>>, Path(id): Path<String>) -> Response {
     let snapshot = operator.snapshot();
     let Some(index) = snapshot.report().indexes().get(&id).cloned() else {
-        return refuse(
+        return Refused::Problem(
             Kind::NotFound,
             "the running set holds no template of this id",
-        );
+        )
+        .into_response();
     };
     match tokio::task::spawn_blocking(move || index.example_composition()).await {
         Ok(Ok(composition)) => axum::Json(composition.into_value()).into_response(),
@@ -42,11 +44,13 @@ pub async fn example(State(operator): State<Arc<Operator>>, Path(id): Path<Strin
                     "a template's example composition did not build"
                 );
             }
-            refuse(Kind::NoExample, "the template has no example composition")
+            Refused::Problem(Kind::NoExample, "the template has no example composition")
+                .into_response()
         }
         Err(error) => {
             tracing::error!(%error, "an example composition did not finish");
-            refuse(Kind::NoExample, "the template has no example composition")
+            Refused::Problem(Kind::NoExample, "the template has no example composition")
+                .into_response()
         }
     }
 }

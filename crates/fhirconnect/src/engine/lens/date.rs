@@ -21,6 +21,7 @@ use crate::engine::lens::Fallback;
 use crate::engine::lens::Lens;
 use crate::engine::lens::LensError;
 use crate::engine::lens::code_phrase::text_of;
+use crate::engine::lens::quantified;
 use crate::model::ast::keyword::Direction;
 
 /// The name the `date` cell carries in a diagnostic.
@@ -54,14 +55,10 @@ impl Lens<DvDate, Date> for DateLens {
         })?;
         // NOTE: `DV_DATE.adoc` marks `accuracy` `-`; the other attributes come
         // from the held value for the same reason (`DV_ORDERED`, RM 1.1.0).
-        Ok(DvDate {
-            normal_status: existing.and_then(|held| held.normal_status.clone()),
-            normal_range: existing.and_then(|held| held.normal_range.clone()),
-            other_reference_ranges: existing.and_then(|held| held.other_reference_ranges.clone()),
-            magnitude_status: existing.and_then(|held| held.magnitude_status.clone()),
+        Ok(quantified!(DvDate, existing, {
             accuracy: existing.and_then(|held| held.accuracy.clone()),
             value: String::from(value),
-        })
+        }))
     }
 
     fn fallbacks(&self, _view: &Date) -> Vec<Fallback> {

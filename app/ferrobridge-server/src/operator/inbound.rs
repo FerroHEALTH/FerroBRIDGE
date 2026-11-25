@@ -22,6 +22,7 @@ use ferrohealth_smart::resource::Access;
 use uuid::Uuid;
 
 use super::guard;
+use super::lane::{Lane, Optional as _};
 use super::refused::Refused;
 use super::save::subject_of;
 use crate::inbound::intake::Intake;
@@ -46,11 +47,8 @@ pub fn routes(intake: Option<Arc<Intake>>, smart: &crate::smart::Smart) -> Route
         .route_layer(guard::layer(smart))
 }
 
-/// The `404` of a bridge with the intake off.
-const NO_INTAKE: &str = "this bridge runs no inbound intake: [inbound] is not on";
-
 /// The `404` of an id no source has.
-const NO_SOURCE: &str = "no source has this id";
+const NO_SOURCE: Refused = Refused::Problem(Kind::NotFound, "no source has this id");
 
 /// The detail of a store that failed.
 const UNAVAILABLE: &str = "the inbox could not be read or written";
@@ -66,20 +64,15 @@ fn unavailable(what: &'static str) -> impl FnOnce(sqlx::Error) -> Refused {
     }
 }
 
-/// Returns the intake and the source `id` names.
-async fn source(
-    intake: Option<&Arc<Intake>>,
-    id: &str,
-) -> Result<(Arc<Intake>, Arc<Source>), Refused> {
-    let intake = intake.ok_or(Refused::Problem(Kind::NotFound, NO_INTAKE))?;
-    let id = Uuid::parse_str(id).map_err(|_text| Refused::Problem(Kind::NotFound, NO_SOURCE))?;
-    let found = intake
+/// Returns the source `id` names in the sources of `intake`.
+async fn source(intake: &Intake, id: &str) -> Result<Arc<Source>, Refused> {
+    let id = Uuid::parse_str(id).map_err(|_text| NO_SOURCE)?;
+    intake
         .sources()
         .get(id)
         .await
         .map_err(unavailable("the inbound sources could not be read"))?
-        .ok_or(Refused::Problem(Kind::NotFound, NO_SOURCE))?;
-    Ok((Arc::clone(intake), found))
+        .ok_or(NO_SOURCE)
 }
 
 /// What a recovery route acts on: the source its path names, the recovery
@@ -106,13 +99,16 @@ impl FromRequestParts<Option<Arc<Intake>>> for Recovery {
         let access = Access::from_request_parts(parts, intake)
             .await
             .map_err(IntoResponse::into_response)?;
-        let (intake, source) = source(intake.as_ref(), &id)
+        let Lane(intake) = Lane::from_request_parts(parts, intake)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let source = source(&intake, &id)
             .await
             .map_err(IntoResponse::into_response)?;
         let recoverer = intake
             .recoverer()
             .cloned()
-            .ok_or(Refused::Problem(Kind::NotFound, NO_INTAKE))
+            .ok_or(Intake::OFF)
             .map_err(IntoResponse::into_response)?;
         Ok(Self {
             recoverer,
@@ -153,7 +149,12 @@ async fn reconcile(
             tracing::warn!(%error, source = %source.name, "a reconciliation an operator asked for failed");
             Refused::Problem(Kind::RecoveryFailed, FAILED)
         })?;
-    guard::source_audited(&subject, "reconcile", source.id, StatusCode::ACCEPTED);
+    guard::audited!(
+        &subject,
+        "reconcile",
+        StatusCode::ACCEPTED,
+        source = source.id.to_string().as_str()
+    );
     Ok((StatusCode::ACCEPTED, axum::Json(Replayed { items })).into_response())
 }
 
@@ -176,13 +177,18 @@ async fn redeliver(
             "the source declares no redelivery step",
         ));
     }
-    guard::source_audited(&subject, "redeliver", source.id, StatusCode::NO_CONTENT);
+    guard::audited!(
+        &subject,
+        "redeliver",
+        StatusCode::NO_CONTENT,
+        source = source.id.to_string().as_str()
+    );
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 /// `GET /operator/sources/{id}/parked`.
-async fn parked(State(intake): Held, Path(id): Path<String>) -> Result<Response, Refused> {
-    let (intake, source) = source(intake.as_ref(), &id).await?;
+async fn parked(Lane(intake): Lane<Intake>, Path(id): Path<String>) -> Result<Response, Refused> {
+    let source = source(&intake, &id).await?;
     let items = intake
         .store()
         .parked(source.id)
@@ -211,7 +217,8 @@ async fn settle(
     access: Access,
     axum::Json(body): axum::Json<Settle>,
 ) -> Result<Response, Refused> {
-    let (intake, source) = source(intake.as_ref(), &id).await?;
+    let intake = intake.ok_or(Intake::OFF)?;
+    let source = source(&intake, &id).await?;
     let reason = Some(body.reason.trim())
         .filter(|reason| !reason.is_empty())
         .map(str::to_owned);
@@ -243,11 +250,11 @@ async fn settle(
         },
     )
     .await?;
-    guard::source_audited(
+    guard::audited!(
         subject_of(&access),
         decision.as_str(),
-        source.id,
         StatusCode::NO_CONTENT,
+        source = source.id.to_string().as_str()
     );
     Ok(StatusCode::NO_CONTENT.into_response())
 }
@@ -260,7 +267,8 @@ async fn replay(
     access: Access,
     axum::Json(body): axum::Json<Replay>,
 ) -> Result<Response, Refused> {
-    let (intake, source) = source(intake.as_ref(), &id).await?;
+    let intake = intake.ok_or(Intake::OFF)?;
+    let source = source(&intake, &id).await?;
     let replay = match body {
         Replay::Entity { tenant, entity } => store::Replay::Entity { tenant, entity },
         Replay::Received { from, to } => match (
@@ -281,11 +289,11 @@ async fn replay(
         .replay(source.id, &replay)
         .await
         .map_err(unavailable("inbound work could not be replayed"))?;
-    guard::source_audited(
+    guard::audited!(
         subject_of(&access),
         "replay",
-        source.id,
         StatusCode::ACCEPTED,
+        source = source.id.to_string().as_str()
     );
     Ok((StatusCode::ACCEPTED, axum::Json(Replayed { items })).into_response())
 }

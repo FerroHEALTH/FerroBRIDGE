@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The identity seams: what assigns the id of a resource the engine writes
-//! and of the reference it points at.
+//! and of the reference it points at, and the length-framed digest every
+//! derived id is hashed with.
 
 use super::ReferenceError;
 use core::fmt;
@@ -254,11 +255,8 @@ pub struct DerivedIdentity;
 
 impl IdentitySink for DerivedIdentity {
     fn identify(&self, request: &IdentityRequest) -> Result<String, ReferenceError> {
-        let mut hasher = sha2::Sha256::new();
-        let mut frame = |field: &[u8]| {
-            hasher.update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_be_bytes());
-            hasher.update(field);
-        };
+        let mut digest = FramedDigest::default();
+        let mut frame = |field: &[u8]| digest.frame(field);
         frame(request.resource_type.as_bytes());
         frame(request.parent_type.as_bytes());
         frame(request.parent_id.as_deref().unwrap_or_default().as_bytes());
@@ -278,11 +276,31 @@ impl IdentitySink for DerivedIdentity {
             frame(value.as_bytes());
         }
         let mut id = String::with_capacity(64);
-        for byte in hasher.finalize().as_slice() {
+        for byte in digest.finish() {
             for nibble in [byte >> 4, byte & 0x0f] {
                 id.extend(char::from_digit(u32::from(nibble), 16));
             }
         }
         Ok(id)
+    }
+}
+
+/// A SHA-256 over fields each framed with its byte length, so two different
+/// field lists never frame to the same bytes; no specification governs the
+/// framing, our own design.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct FramedDigest(sha2::Sha256);
+
+impl FramedDigest {
+    /// Adds one field, behind its byte length.
+    pub(crate) fn frame(&mut self, field: &[u8]) {
+        self.0
+            .update(u64::try_from(field.len()).unwrap_or(u64::MAX).to_be_bytes());
+        self.0.update(field);
+    }
+
+    /// Returns the digest of the fields framed so far.
+    pub(crate) fn finish(self) -> [u8; 32] {
+        self.0.finalize().into()
     }
 }
