@@ -44,7 +44,7 @@ use fhirconnect::operations::run::Settings;
 use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
-use super::support::{emit, lab};
+use super::support::{annex_iii, emit, lab};
 
 mod accounted;
 
@@ -274,6 +274,7 @@ fn received_text_of(result: &Value, report: &Value) -> Result<String, Box<dyn Er
         return Err("the synthetic report is no DiagnosticReport".into());
     };
     document.with_report(*report)?;
+    document.with_metadata(annex_iii("11502-2"));
     Ok(serde_json::to_string(&document.into_bundle()?)?)
 }
 

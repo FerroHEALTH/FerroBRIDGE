@@ -51,7 +51,7 @@ use openehr_adl::parse::Dialect;
 use openehr_mapping_core::template::TemplateSource;
 
 use super::eps_sections;
-use super::support::{emit, eps, profile_set, vendored};
+use super::support::{annex_iii, emit, eps, profile_set, vendored};
 
 /// The root context of the EPS project.
 const ROOT: &str = "ferrobridge_eu_eps.context";
@@ -732,6 +732,7 @@ fn the_summary_holds_the_medicine_and_the_vaccine_in_their_sections() -> Result<
     ] {
         document.with_section(section_of(slice, "Nothing recorded.", None)?)?;
     }
+    document.with_metadata(annex_iii("60591-5"));
     let bundle = document.into_bundle()?;
     let text = serde_json::to_string(&bundle)?;
     let received = ReceivedDocument::read(&text)?;
@@ -805,6 +806,7 @@ fn the_summary_in_the_ips_form_validates_against_bundle_uv_ips() -> Result<(), B
                 .empty_because(EmptyReason::Unavailable),
         )?;
     }
+    document.with_metadata(annex_iii("60591-5"));
     let text = serde_json::to_string(&document.into_bundle()?)?;
     let root: serde_json::Value = serde_json::from_str(&text)?;
     assert_eq!(root["meta"]["profile"][0], IPS_BUNDLE);

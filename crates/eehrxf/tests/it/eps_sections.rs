@@ -36,7 +36,7 @@ use super::eps_mapped::{
     BASE, ENTRY, call, composition, details, patient, run, section, section_entries, settings,
     summary,
 };
-use super::support::{emit, profile_set};
+use super::support::{annex_iii, emit, profile_set};
 use super::terminology::{Script, Scripted};
 
 /// The SNOMED CT system.
@@ -433,6 +433,7 @@ async fn document_of(form: &'static Form) -> Result<String, Box<dyn Error>> {
                 .empty_because(EmptyReason::NilKnown),
         )?;
     }
+    document.with_metadata(annex_iii("60591-5"));
     Ok(serde_json::to_string(&document.into_bundle()?)?)
 }
 

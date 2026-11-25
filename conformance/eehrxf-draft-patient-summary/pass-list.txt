@@ -22,6 +22,7 @@ eehrxf-eps-summary-problem-allergy-procedure:header.attestation.dateTime
 eehrxf-eps-summary-problem-allergy-procedure:header.author[x]
 eehrxf-eps-summary-problem-allergy-procedure:header.custodian
 eehrxf-eps-summary-problem-allergy-procedure:header.date
+eehrxf-eps-summary-problem-allergy-procedure:header.documentCategory
 eehrxf-eps-summary-problem-allergy-procedure:header.documentTitle
 eehrxf-eps-summary-problem-allergy-procedure:header.documentType
 eehrxf-eps-summary-problem-allergy-procedure:header.eventCategory
@@ -32,6 +33,7 @@ eehrxf-eps-summary-problem-allergy-procedure:header.legalAuthentication.dateTime
 eehrxf-eps-summary-problem-allergy-procedure:header.legalAuthentication.legalAuthenticator[x]
 eehrxf-eps-summary-problem-allergy-procedure:header.status
 eehrxf-eps-summary-problem-allergy-procedure:header.subject
+eehrxf-eps-summary-problem-allergy-procedure:header.version
 eehrxf-eps-summary-problem-allergy-procedure:immunisations
 eehrxf-eps-summary-problem-allergy-procedure:immunisations.emptyReason
 eehrxf-eps-summary-problem-allergy-procedure:immunisations.generatedNarrative
@@ -91,6 +93,7 @@ eehrxf-summary-eu-mapping:header.attestation.dateTime
 eehrxf-summary-eu-mapping:header.author[x]
 eehrxf-summary-eu-mapping:header.custodian
 eehrxf-summary-eu-mapping:header.date
+eehrxf-summary-eu-mapping:header.documentCategory
 eehrxf-summary-eu-mapping:header.documentTitle
 eehrxf-summary-eu-mapping:header.documentType
 eehrxf-summary-eu-mapping:header.eventCategory
@@ -101,6 +104,7 @@ eehrxf-summary-eu-mapping:header.legalAuthentication.dateTime
 eehrxf-summary-eu-mapping:header.legalAuthentication.legalAuthenticator[x]
 eehrxf-summary-eu-mapping:header.status
 eehrxf-summary-eu-mapping:header.subject
+eehrxf-summary-eu-mapping:header.version
 eehrxf-summary-eu-mapping:immunisations
 eehrxf-summary-eu-mapping:immunisations.emptyReason
 eehrxf-summary-eu-mapping:immunisations.generatedNarrative
@@ -160,6 +164,7 @@ eehrxf-summary-medicine-and-vaccine:header.attestation.dateTime
 eehrxf-summary-medicine-and-vaccine:header.author[x]
 eehrxf-summary-medicine-and-vaccine:header.custodian
 eehrxf-summary-medicine-and-vaccine:header.date
+eehrxf-summary-medicine-and-vaccine:header.documentCategory
 eehrxf-summary-medicine-and-vaccine:header.documentTitle
 eehrxf-summary-medicine-and-vaccine:header.documentType
 eehrxf-summary-medicine-and-vaccine:header.eventCategory
@@ -170,6 +175,7 @@ eehrxf-summary-medicine-and-vaccine:header.legalAuthentication.dateTime
 eehrxf-summary-medicine-and-vaccine:header.legalAuthentication.legalAuthenticator[x]
 eehrxf-summary-medicine-and-vaccine:header.status
 eehrxf-summary-medicine-and-vaccine:header.subject
+eehrxf-summary-medicine-and-vaccine:header.version
 eehrxf-summary-medicine-and-vaccine:immunisations
 eehrxf-summary-medicine-and-vaccine:immunisations.emptyReason
 eehrxf-summary-medicine-and-vaccine:immunisations.generatedNarrative
@@ -229,6 +235,7 @@ eehrxf-summary-two-runs:header.attestation.dateTime
 eehrxf-summary-two-runs:header.author[x]
 eehrxf-summary-two-runs:header.custodian
 eehrxf-summary-two-runs:header.date
+eehrxf-summary-two-runs:header.documentCategory
 eehrxf-summary-two-runs:header.documentTitle
 eehrxf-summary-two-runs:header.documentType
 eehrxf-summary-two-runs:header.eventCategory
@@ -239,6 +246,7 @@ eehrxf-summary-two-runs:header.legalAuthentication.dateTime
 eehrxf-summary-two-runs:header.legalAuthentication.legalAuthenticator[x]
 eehrxf-summary-two-runs:header.status
 eehrxf-summary-two-runs:header.subject
+eehrxf-summary-two-runs:header.version
 eehrxf-summary-two-runs:immunisations
 eehrxf-summary-two-runs:immunisations.emptyReason
 eehrxf-summary-two-runs:immunisations.generatedNarrative
