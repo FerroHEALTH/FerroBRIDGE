@@ -107,7 +107,7 @@ pub fn anchor(composition: &CanonicalComposition) -> Result<Anchor, Refusal> {
     })?;
     let facility = context
         .health_care_facility
-        .as_ref()
+        .as_deref()
         .and_then(|party| match party {
             PartyIdentified::PartyIdentified(data) => data.name.clone(),
             PartyIdentified::PartyRelated(related) => related.name.clone(),

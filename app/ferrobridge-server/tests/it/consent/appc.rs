@@ -115,6 +115,8 @@ fn the_example_reads_as_the_referenced_policy_narrowed_to_the_facility_and_round
         relationship: None,
         organisation_type: None,
         caller_kind: None,
+        care_roles: None,
+        care_path: None,
     }]);
     assert_eq!(imported, vec![expected]);
     assert_eq!(round_trip(&imported), imported);
@@ -132,6 +134,8 @@ fn lab() -> AccessDataScope {
         )]),
         sensitivities: list(vec![coded("2.16.840.1.113883.5.25", "R", "restricted")]),
         origins: list(vec!["urn:oid:2.999.3".to_owned()]),
+        confidentialities: None,
+        episodes: None,
         recorded: None,
     }
 }
@@ -145,6 +149,8 @@ fn directives_round_trip_through_a_privacy_consent_document() {
         relationship: None,
         organisation_type: None,
         caller_kind: None,
+        care_roles: None,
+        care_path: None,
     }]);
     permit.purposes = list(vec![coded("1.0.14265.1", "1", "clinical care")]);
     permit.operations = list(vec![term(OperationClass::Read)]);
@@ -269,6 +275,8 @@ fn export_refuses_a_scope_appc_has_no_attribute_for() {
         relationship: None,
         organisation_type: None,
         caller_kind: Some(term(CallerKind::Professional)),
+        care_roles: None,
+        care_path: None,
     }]);
     let mut templated = directive(DirectiveKind::Consent, Effect::Deny);
     let mut scope = lab();

@@ -123,10 +123,12 @@ pub enum LoadError {
         resource_type: String,
     },
     /// A context maps a type the facade serves itself: `Basic` under
-    /// `[facade.app_state]`, `Task` under `[facade.launch_task]`.
+    /// `[facade.app_state]`, `Task` under `[facade.launch_task]`, `Endpoint`
+    /// under `[facade.endpoint]`, `DocumentReference` and `List` under
+    /// `[facade.mhd]`.
     #[error(
         "the context {context} maps {resource_type}, which the facade serves itself under \
-         [facade.app_state] or [facade.launch_task]"
+         [facade.app_state], [facade.launch_task], [facade.endpoint] or [facade.mhd]"
     )]
     Owned {
         /// The context.

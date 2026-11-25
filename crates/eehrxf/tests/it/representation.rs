@@ -139,6 +139,18 @@ fn the_pdf_travels_byte_for_byte_with_its_size_and_hash() -> Result<(), Box<dyn 
     Ok(())
 }
 
+// NOTE: draft EEHRxF Art 3(1)(a): the PDF form of a laboratory report, measured by the draft
+// corpus on its embedded PDF and its Annex III metadata.
+#[test]
+fn a_pdf_laboratory_report_is_written_for_the_corpus() -> Result<(), Box<dyn Error>> {
+    let reference = described(&PdfA::new(pdf("1", "B"))?)?;
+    assert!(
+        reference.context.is_none(),
+        "R4 ele-1: a context with nothing to hold is left out"
+    );
+    crate::support::emit("eehrxf-pdf-laboratory", &serde_json::to_string(&reference)?)
+}
+
 #[test]
 #[cfg(feature = "discharge")]
 fn a_narrative_only_discharge_report_is_written() -> Result<(), Box<dyn Error>> {

@@ -100,7 +100,7 @@ pub(crate) async fn history(
         .await
         .map_err(|error| party::client_refusal(&error))?;
     let VersionedPartyRevisionHistoryOutcome::Ok { body, .. } = outcome else {
-        return Err(party::refused(&upstream));
+        return Err(party::refused(&upstream).into());
     };
     let mut entries = Vec::new();
     for item in body.items.iter().rev() {

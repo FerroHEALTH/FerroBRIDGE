@@ -21,6 +21,7 @@ mod file;
 mod hl7v2;
 mod inbound;
 mod launch_task;
+mod mhd;
 mod oauth;
 mod omop_incremental;
 mod onward;

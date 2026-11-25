@@ -14,7 +14,7 @@
 //! committer of every commit from the bound party. No specification governs
 //! the harness: our own design, after the reference CDR's quickstart.
 
-use crate::containers::{Cdr, HarnessError, cdr_request};
+use crate::containers::{CDR_POSTGRES, Cdr, HarnessError, cdr_request};
 use crate::facility_cdr::{database, serve};
 use crate::oidc::{Provider, ProviderError};
 use testcontainers::ImageExt;
@@ -213,7 +213,7 @@ enabled = false
 pub async fn bound(provider: &Provider, templates: &[(&str, &str)]) -> Result<Bound, BoundError> {
     let (password, password_hash) = password()?;
     let keys = serde_json::to_vec(&provider.jwks()).map_err(BoundError::Keys)?;
-    let (database, placement) = database().await?;
+    let (database, placement) = database(CDR_POSTGRES).await?;
     let first = serve(
         database,
         cdr_request(placement.dsn.clone(), placement.network.clone()),

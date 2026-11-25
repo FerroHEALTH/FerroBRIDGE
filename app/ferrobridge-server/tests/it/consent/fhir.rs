@@ -193,6 +193,8 @@ fn exception() -> AccessDirective {
         relationship: None,
         organisation_type: None,
         caller_kind: None,
+        care_roles: None,
+        care_path: None,
     }]);
     x.operations = list(vec![term(OperationClass::Read)]);
     x.data = list(vec![AccessDataScope {
@@ -206,6 +208,8 @@ fn exception() -> AccessDirective {
         )]),
         sensitivities: None,
         origins: None,
+        confidentialities: None,
+        episodes: None,
         recorded: None,
     }]);
     x
@@ -237,6 +241,8 @@ fn every_data() -> AccessDataScope {
             ),
         ]),
         origins: list(vec!["lab-system".to_owned()]),
+        confidentialities: None,
+        episodes: None,
         recorded: Some(interval(Some("2026-01-01T00:00:00Z".to_owned()), None)),
     }
 }
@@ -252,6 +258,8 @@ fn full(kind: DirectiveKind, effect: Effect) -> AccessDirective {
             relationship: None,
             organisation_type: None,
             caller_kind: None,
+            care_roles: None,
+            care_path: None,
         },
         AccessActorScope {
             party: None,
@@ -259,6 +267,8 @@ fn full(kind: DirectiveKind, effect: Effect) -> AccessDirective {
             relationship: Some(term(Relationship::Care)),
             organisation_type: Some(coded("local-organisation-types", "HOSP", "hospital")),
             caller_kind: Some(term(CallerKind::Professional)),
+            care_roles: None,
+            care_path: None,
         },
         AccessActorScope {
             party: None,
@@ -266,6 +276,8 @@ fn full(kind: DirectiveKind, effect: Effect) -> AccessDirective {
             relationship: None,
             organisation_type: None,
             caller_kind: None,
+            care_roles: None,
+            care_path: None,
         },
     ]);
     d.operations = list(vec![
@@ -390,6 +402,8 @@ fn export_refuses_what_a_consent_cannot_state() {
         categories: None,
         sensitivities: list(vec![coded(CONFIDENTIALITY, "R", "R")]),
         origins: None,
+        confidentialities: None,
+        episodes: None,
         recorded: None,
     }]);
     for (directive, attribute) in [

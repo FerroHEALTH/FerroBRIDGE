@@ -36,12 +36,8 @@ pub(crate) struct Started {
 }
 
 impl Started {
-    /// Logs the boot summary and the indicators readiness runs, and starts
-    /// the replica's `LISTEN` session on the inbound sources.
+    /// Logs the boot summary and the indicators readiness runs.
     pub(crate) fn announce(&self) {
-        if let (Some(store), Some(sources)) = (self.state.store(), self.state.sources()) {
-            store.listeners(&[sources.listened()]).spawn();
-        }
         startup::log(&self.lanes);
         tracing::info!(
             version = crate::build_info::VERSION,
@@ -214,8 +210,8 @@ impl StartedFeed {
     }
 }
 
-/// Spawns every change-feed follower and the inbound recovery of `state`,
-/// each on its own task until `stop` reads `true`.
+/// Spawns every change-feed follower, the inbound recovery and the link
+/// sweeper of `state`, each on its own task until `stop` reads `true`.
 pub(crate) fn spawn_followers(
     feeds: Vec<StartedFeed>,
     state: &AppState,
@@ -229,7 +225,97 @@ pub(crate) fn spawn_followers(
     ) {
         followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
     }
+    if let Some(links) = state.links() {
+        followers.push(links.spawn_sweeper(&stop.subscribe()));
+    }
     followers
+}
+
+/// One change-feed consumer section that is on, before it starts.
+#[derive(Debug, Clone, Copy)]
+enum FeedConsumer<'a> {
+    /// The events lane.
+    Events(&'a events::Settings),
+    /// The incremental OMOP load.
+    OmopIncremental(&'a config::OmopIncrementalSettings),
+    /// The outbound FHIR lane.
+    FhirOutbound(&'a crate::outbound::Settings),
+}
+
+impl<'a> FeedConsumer<'a> {
+    /// Returns every consumer section `settings` turns on, in the order they
+    /// start.
+    fn all(settings: &'a Settings) -> Vec<Self> {
+        [
+            settings.events.as_ref().map(Self::Events),
+            settings
+                .omop_incremental
+                .as_ref()
+                .map(Self::OmopIncremental),
+            settings.fhir_outbound.as_ref().map(Self::FhirOutbound),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
+    /// Returns the consumer's name, the reader it follows and its section.
+    fn named(self) -> (&'static str, &'a change_feed::ReaderName, &'static str) {
+        match self {
+            Self::Events(lane) => (events::NAME, &lane.reader, "events"),
+            Self::OmopIncremental(load) => (
+                crate::etl::incremental::NAME,
+                &load.reader,
+                "omop_incremental",
+            ),
+            Self::FhirOutbound(lane) => (crate::outbound::NAME, &lane.reader, "fhir_outbound"),
+        }
+    }
+
+    /// Starts the consumer, reporting where it stands on `following`.
+    async fn start(
+        self,
+        settings: &Settings,
+        state: &AppState,
+        client: &cdr::CdrClient,
+        following: change_feed::health::Following,
+    ) -> anyhow::Result<Arc<dyn change_feed::follow::Consumer>> {
+        use anyhow::Context;
+
+        Ok(match self {
+            Self::Events(lane) => {
+                tracing::info!(
+                    lane = events::NAME,
+                    reader = %lane.reader,
+                    exchange = %lane.exchange,
+                    queues = lane.queues.len(),
+                    "the events lane publishes the change feed to the AMQP broker"
+                );
+                Arc::new(
+                    events::Publisher::new(Arc::new(events::amqp::AmqpBroker::new(lane.clone())))
+                        .with_usage(Arc::clone(state.usage_window()))
+                        .with_following(following),
+                )
+            }
+            Self::OmopIncremental(load) => {
+                let consumer = crate::etl::incremental::Incremental::start(
+                    settings,
+                    state.store(),
+                    client.clone(),
+                )
+                .await
+                .context("starting the incremental OMOP load")?
+                .with_following(following);
+                tracing::info!(
+                    lane = crate::etl::incremental::NAME,
+                    reader = %load.reader,
+                    "the incremental OMOP load commits each changed composition to the CDM database"
+                );
+                Arc::new(consumer)
+            }
+            Self::FhirOutbound(lane) => Arc::new(start_outbound(lane, state, client, following)?),
+        })
+    }
 }
 
 /// Opens the change-feed source over the state store once, and starts every
@@ -256,86 +342,31 @@ async fn start_change_feed(
         store: dead_letters.clone(),
         max_attempts: feed_settings.max_attempts,
     };
-    let lane_of = |reader: &change_feed::ReaderName, following| {
-        follower_lane(&store, feed_settings, &parking, reader, following)
-    };
     let mut report = change_feed::report::Report::new(feed_settings.source.clone(), dead_letters);
     let mut started = Vec::new();
-    if let Some(lane) = settings.events.as_ref() {
-        let following =
-            follower(&feed, feed_settings, &lane.reader, events::NAME, "events").await?;
-        let publisher =
-            events::Publisher::new(Arc::new(events::amqp::AmqpBroker::new(lane.clone())))
-                .with_usage(Arc::clone(state.usage_window()))
-                .with_following(following.clone());
-        tracing::info!(
-            lane = events::NAME,
-            reader = %lane.reader,
-            exchange = %lane.exchange,
-            queues = lane.queues.len(),
-            "the events lane publishes the change feed to the AMQP broker"
-        );
-        report = report
-            .with_follower(change_feed::report::Follower {
-                name: events::NAME,
-                reader: lane.reader.clone(),
-                following: following.clone(),
-            })
-            .with_topology(lane.topology());
-        let (lease, follower_lane) = lane_of(&lane.reader, following)?;
-        started.push(StartedFeed {
-            feed: Arc::clone(&feed),
-            reader: lane.reader.clone(),
-            consumer: Arc::new(publisher),
-            lease,
-            lane: follower_lane,
-        });
-    }
-    if let Some(load) = settings.omop_incremental.as_ref() {
-        let name = crate::etl::incremental::NAME;
-        let following =
-            follower(&feed, feed_settings, &load.reader, name, "omop_incremental").await?;
-        let consumer =
-            crate::etl::incremental::Incremental::start(settings, state.store(), client.clone())
-                .await
-                .context("starting the incremental OMOP load")?
-                .with_following(following.clone());
-        tracing::info!(
-            lane = name,
-            reader = %load.reader,
-            "the incremental OMOP load commits each changed composition to the CDM database"
-        );
+    for consumer in FeedConsumer::all(settings) {
+        let (name, reader, section) = consumer.named();
+        let following = follower(&feed, feed_settings, reader, name, section).await?;
+        let (lease, lane) =
+            follower_lane(&store, feed_settings, &parking, reader, following.clone())?;
+        let started_consumer = consumer
+            .start(settings, state, &client, following.clone())
+            .await?;
         report = report.with_follower(change_feed::report::Follower {
             name,
-            reader: load.reader.clone(),
-            following: following.clone(),
-        });
-        let (lease, follower_lane) = lane_of(&load.reader, following)?;
-        started.push(StartedFeed {
-            feed: Arc::clone(&feed),
-            reader: load.reader.clone(),
-            consumer: Arc::new(consumer),
-            lease,
-            lane: follower_lane,
-        });
-    }
-    if let Some(outbound_lane) = settings.fhir_outbound.as_ref() {
-        let following = follower(
-            &feed,
-            feed_settings,
-            &outbound_lane.reader,
-            crate::outbound::NAME,
-            "fhir_outbound",
-        )
-        .await?;
-        let (lease, follower_lane) = lane_of(&outbound_lane.reader, following.clone())?;
-        let outbound = start_outbound(outbound_lane, state, &feed, client, lease, follower_lane)?;
-        report = report.with_follower(change_feed::report::Follower {
-            name: crate::outbound::NAME,
-            reader: outbound_lane.reader.clone(),
+            reader: reader.clone(),
             following,
         });
-        started.push(outbound);
+        if let FeedConsumer::Events(lane) = consumer {
+            report = report.with_topology(lane.topology());
+        }
+        started.push(StartedFeed {
+            feed: Arc::clone(&feed),
+            reader: reader.clone(),
+            consumer: started_consumer,
+            lease,
+            lane,
+        });
     }
     Ok((started, report))
 }
@@ -360,19 +391,16 @@ fn follower_lane(
     ))
 }
 
-/// Starts the outbound FHIR lane over `feed`, mapping through the facade of
-/// `state`, and warns that it delivers identifiable clinical data.
+/// Starts the outbound FHIR lane, mapping through the facade of `state`, and
+/// warns that it delivers identifiable clinical data.
 fn start_outbound(
     lane: &crate::outbound::Settings,
     state: &AppState,
-    feed: &Arc<dyn change_feed::ChangeFeed>,
-    client: cdr::CdrClient,
-    lease: crate::store::lease::Lease,
-    follower_lane: change_feed::follow::Lane,
-) -> anyhow::Result<StartedFeed> {
+    client: &cdr::CdrClient,
+    following: change_feed::health::Following,
+) -> anyhow::Result<crate::outbound::Outbound> {
     use anyhow::Context;
 
-    let name = crate::outbound::NAME;
     let facade = state
         .facade()
         .cloned()
@@ -380,21 +408,15 @@ fn start_outbound(
     let store = state.store().context(
         "the outbound FHIR lane keeps its delivery record in the state store, and [state] is not set",
     )?;
-    let consumer = crate::outbound::Outbound::start(lane, facade, client, store)
-        .with_following(follower_lane.following.clone());
+    let consumer = crate::outbound::Outbound::start(lane, facade, client.clone(), store)
+        .with_following(following);
     tracing::warn!(
-        lane = name,
+        lane = crate::outbound::NAME,
         reader = %lane.reader,
         endpoint = startup::host_of(lane.sink.base()).unwrap_or_default(),
         "the outbound FHIR lane delivers identifiable clinical data to this endpoint"
     );
-    Ok(StartedFeed {
-        feed: Arc::clone(feed),
-        reader: lane.reader.clone(),
-        consumer: Arc::new(consumer),
-        lease,
-        lane: follower_lane,
-    })
+    Ok(consumer)
 }
 
 /// Checks the reader `reader` of the consumer `name`, configured under
@@ -774,12 +796,14 @@ async fn build_facade(
         (lane.app_state, facade::app_state::BASIC),
         (lane.launch_task, facade::launch_task::TASK),
         (lane.endpoints.is_some(), facade::endpoint::ENDPOINT),
+        (lane.mhd, facade::mhd::DOCUMENT_REFERENCE),
+        (lane.mhd, facade::mhd::LIST),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
     .collect();
     facade::programs::check_owned(&programs, &owned)
-        .context("checking the contexts against [facade.app_state], [facade.launch_task] and [facade.endpoint]")?;
+        .context("checking the contexts against [facade.app_state], [facade.launch_task], [facade.endpoint] and [facade.mhd]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -829,6 +853,7 @@ async fn build_facade(
             .with_launch_tasks(launch_tasks)
             .with_summary(summary)
             .with_endpoints(lane.endpoints.clone())
+            .with_mhd(lane.mhd)
             .with_cors(lane.cors.clone()),
         counts,
     ))
@@ -898,7 +923,6 @@ fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState>
     )
     .context("opening the links in the state store")?;
     let links = Arc::new(links);
-    drop(links.spawn_sweeper());
     tracing::info!(
         lane = "shl",
         "the person's SMART Health Links are served under /shl"

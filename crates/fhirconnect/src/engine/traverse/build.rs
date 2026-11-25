@@ -342,11 +342,12 @@ impl<'a, T: Table + ?Sized> Run<'a, T> {
                 node: String::from(node.aql_path().as_str()),
                 source: Box::new(source),
             };
-            // NOTE: no specification governs a party context: our own design, an attribute of
-            // the party root (`rm::PARTY_ROOTS`) travels as the root's members, which no
-            // data-type cell reads whole.
+            // NOTE: no specification governs a party context: our own design, a `PARTY_REF` of a
+            // party node (`rm::PARTY_REFS`) travels as the node's members, which no data-type
+            // cell reads whole.
             if let Held::Partial(ref object) = written.value
-                && PartyClass::from_rm_type(node.rm_type()).is_some()
+                && (PartyClass::from_rm_type(node.rm_type()).is_some()
+                    || rm::holds_party_ref(node.rm_type()))
             {
                 let mut whole = serde_json::Value::Object(object.clone());
                 rm::interval::fill_flags(&mut whole, node.rm_type());
@@ -457,7 +458,7 @@ mod tests {
 
     fn party(name: Option<&str>, external_ref: Option<PartyRef>) -> PartyIdentifiedData {
         PartyIdentifiedData {
-            external_ref,
+            external_ref: external_ref.map(Box::new),
             name: name.map(String::from),
             identifiers: None,
         }

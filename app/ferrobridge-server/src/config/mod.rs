@@ -387,18 +387,13 @@ impl Config {
                     &self.change_feed,
                     self.cdr.is_some(),
                     self.state.is_some(),
-                    usize::from(self.events.enabled)
-                        + usize::from(self.omop_incremental.enabled)
-                        + usize::from(self.fhir_outbound.enabled),
+                    change_feed::Consumer::on(self),
                 )?)
             } else {
                 None
             },
             events: if self.events.enabled {
-                Some(events::resolve_events(
-                    &self.events,
-                    self.change_feed.enabled,
-                )?)
+                Some(events::resolve_events(self)?)
             } else {
                 None
             },
@@ -468,6 +463,8 @@ pub struct FacadeSettings {
     /// The endpoints served as `Endpoint` beside the FHIR base, when
     /// `Endpoint` serves them.
     pub endpoints: Option<crate::facade::endpoint::Endpoints>,
+    /// Whether the IHE MHD Document Responder is served.
+    pub mhd: bool,
 }
 
 /// The patient summary, resolved.

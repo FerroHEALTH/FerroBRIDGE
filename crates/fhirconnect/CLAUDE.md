@@ -93,9 +93,11 @@ what it refuses at load, one code each: what names a composition
 composition). The engine's composition entry points refuse a party program
 (`EngineError::PartyProgram`); it runs through `engine::traverse::party`
 (`to_party`, `from_party`), which builds through
-`WebTemplateIndex::build_party` and reads through the same `read`. One RM
-attribute of the party root that no template node holds is mappable,
-`ROLE.performer` (`engine::rm::PARTY_ROOTS`); its `PARTY_REF` travels
+`WebTemplateIndex::build_party` and reads through the same `read`. Two RM
+attributes no template node holds are mappable, `ROLE.performer` and
+`PARTY_RELATIONSHIP.target` (`engine::rm::PARTY_REFS`); the relationship's
+`source` is the party itself, which the build writes once the CDR names its
+uid (`WebTemplateIndex::source_relationships`). Each `PARTY_REF` travels
 through `engine::lens::party_ref`, the reference resolved through the
 demographics seam and its type read from the element's `targetProfile` in
 the `fhir-types` table, and a foreign, typed-otherwise or decorated
