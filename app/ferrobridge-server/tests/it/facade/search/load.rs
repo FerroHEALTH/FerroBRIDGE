@@ -250,10 +250,12 @@ async fn two_programs_over_one_template_answer_one_entry_per_composition()
     );
     let catalog = search::load(directory.path(), &compiled)?;
     let store = Arc::new(MemoryStore::default());
-    store.record_ehr(
-        &PersonId::new("http://example.org/fhir", SUBJECT)?,
-        &EhrId::new(EHR_ID)?,
-    )?;
+    store
+        .record_ehr(
+            &PersonId::new("http://example.org/fhir", SUBJECT)?,
+            &EhrId::new(EHR_ID)?,
+        )
+        .await?;
     let facade = Facade::new(compiled, handle(&store), client(&base.cdr), settings())
         .with_search(catalog, Limits::default());
     let harness = Harness {

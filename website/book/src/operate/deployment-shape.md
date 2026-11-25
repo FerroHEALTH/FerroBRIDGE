@@ -31,7 +31,7 @@ implementation the same way.
 ## What FerroBRIDGE stores
 
 Clinical data lives in the CDR and, on the OMOP side, in the CDM database.
-FerroBRIDGE stores two things of its own: the id-map, a persistent store
+FerroBRIDGE stores two things of its own: the id-map, in the `[state]` store,
 holding the patient identifier to `ehr_id` relation, the external to internal
 resource id relation and the resource id to composition relation; and, on the
 OMOP side, a side table in its own schema beside the CDM that maps each source

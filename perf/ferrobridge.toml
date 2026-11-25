@@ -27,9 +27,17 @@ enabled = false
 enabled = true
 base_url = "http://127.0.0.1:18080/fhir"
 ehr_policy = "create_on_first_write"
-identity_store = "target/perf-run/identity.redb"
 composition_language = "en"
 composition_territory = "NL"
+
+# The state store's URL is the arm's, from perf/arm.env; the keys are
+# synthetic, for a store the gate creates and removes.
+[state.seal]
+lookup_key = "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI="
+
+[[state.seal.keys]]
+id = "perf"
+key = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE="
 
 # The gate runs on a runner no other caller reaches, as the [auth] section
 # of the Operate pages allows; the request set then carries no token.

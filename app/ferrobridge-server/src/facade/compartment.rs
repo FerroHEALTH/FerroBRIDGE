@@ -95,7 +95,7 @@ pub fn admit_inbound(
 ///
 /// Returns the `403` refusal of [`admit_person`], and a `500` when the
 /// identity map cannot be read.
-pub fn admit_ehr(
+pub async fn admit_ehr(
     facade: &Facade,
     access: &Access,
     permission: Permission,
@@ -108,7 +108,7 @@ pub fn admit_ehr(
     ) {
         return Ok(());
     }
-    let person = facade.store().person_of(ehr).map_err(|error| {
+    let person = facade.store().person_of(ehr).await.map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(format!(

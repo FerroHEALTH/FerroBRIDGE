@@ -336,7 +336,7 @@ pub fn parse_id(id: &str) -> Option<(EhrId, uuid::Uuid)> {
 ///
 /// # Errors
 /// Returns a `500` when the identity map cannot be read.
-pub fn export_context(
+pub async fn export_context(
     facade: &Facade,
     ehr: &EhrId,
     policy: Option<&AccessPolicy>,
@@ -345,6 +345,7 @@ pub fn export_context(
     let person = facade
         .store()
         .person_of(ehr)
+        .await
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
     let reference = person
         .as_ref()

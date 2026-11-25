@@ -503,8 +503,6 @@ messages! {
     #[doc = "What it governs."] RowHl7v2EhrsDesc = "row-hl7v2-ehrs-desc",
     #[doc = "A setting's label."] RowIdentifierSearch = "row-identifier-search",
     #[doc = "What it governs."] RowIdentifierSearchDesc = "row-identifier-search-desc",
-    #[doc = "A setting's label."] RowIdentityStore = "row-identity-store",
-    #[doc = "What it governs."] RowIdentityStoreDesc = "row-identity-store-desc",
     #[doc = "A setting's label."] RowIssuers = "row-issuers",
     #[doc = "What it governs."] RowIssuersDesc = "row-issuers-desc",
     #[doc = "A setting's label."] RowLanguageTerritory = "row-language-territory",

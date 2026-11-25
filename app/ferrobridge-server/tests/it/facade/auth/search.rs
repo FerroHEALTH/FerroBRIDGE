@@ -38,10 +38,13 @@ async fn search_as(
     let key = ec_key("k1", Algorithm::ES256);
     let issuer = Issuer::start(&[&key]).await;
     let harness = crate::facade::search_harness(Limits::default()).await;
-    harness.store.record_ehr(
-        &PersonId::new("http://example.org/fhir", "Patient/p-1")?,
-        &EhrId::new(EHR_ID)?,
-    )?;
+    harness
+        .store
+        .record_ehr(
+            &PersonId::new("http://example.org/fhir", "Patient/p-1")?,
+            &EhrId::new(EHR_ID)?,
+        )
+        .await?;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/query/aql"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({

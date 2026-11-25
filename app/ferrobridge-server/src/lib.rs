@@ -430,12 +430,12 @@ async fn serve_command(settings: Settings) -> anyhow::Result<()> {
             .await
             .with_context(|| format!("binding {listen}"))
     };
-    boot::serve_settings(
+    Box::pin(boot::serve_settings(
         &settings,
         bind,
         boot::Backoff::default(),
         ferrohealth_server::serve::shutdown_signal(),
-    )
+    ))
     .await?;
     tracing::info!("ferrobridge stopped");
     Ok(())

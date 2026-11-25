@@ -59,6 +59,7 @@ async fn searching_with(limits: Limits) -> Harness {
     harness
         .store
         .record_ehr(&person, &EhrId::new(EHR_ID).expect("a legal ehr_id"))
+        .await
         .expect("the subject records");
     harness
 }

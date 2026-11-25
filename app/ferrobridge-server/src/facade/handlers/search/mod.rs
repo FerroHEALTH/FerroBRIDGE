@@ -145,7 +145,8 @@ async fn search(
     let client = facade.client_for(headers, access).await?;
     let mut resolved = resolve(facade, &client, resource_type, &criteria).await?;
     if let Compartment::Patient(patient) = compartment {
-        resolved.ehrs.push(compartment_ehrs(facade, &patient)?);
+        let ehrs = compartment_ehrs(facade, &patient).await?;
+        resolved.ehrs.push(ehrs);
     }
     let session = facade.translator().session();
     let plans = plans_of(facade, declarations, &criteria, &resolved, &session)?;
@@ -292,7 +293,7 @@ fn start_of(
 /// so the search is held to that patient's EHR as one more `AND`ed subject,
 /// and a patient the map does not know reaches no data (no specification
 /// governs the mapping from a compartment to an EHR: our own design).
-fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
+async fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
     // NOTE: no specification governs this: our own design, a patient id no
     // person key can hold names no EHR the map binds, so the token reaches none.
     let Ok(person) = facade.settings().subject.person_of_patient(patient) else {
@@ -301,6 +302,7 @@ fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusa
     let found = facade
         .store()
         .ehr_of(&person)
+        .await
         .map_err(|error| write::store_refusal(&error))?;
     Ok(found.into_iter().collect())
 }
@@ -331,6 +333,7 @@ async fn resolve(
                     facade
                         .store()
                         .ehr_of(&person)
+                        .await
                         .map_err(|error| write::store_refusal(&error))?
                         .into_iter()
                         .collect()
@@ -355,6 +358,7 @@ async fn resolve(
                     facade
                         .store()
                         .ehr_of(&person)
+                        .await
                         .map_err(|error| write::store_refusal(&error))?
                         .into_iter()
                         .collect()
@@ -377,7 +381,7 @@ async fn resolve(
             let Ok(internal) = FhirResourceId::new(id) else {
                 continue;
             };
-            if let Some(binding) = read::binding(facade, resource_type, &internal)? {
+            if let Some(binding) = read::binding(facade, resource_type, &internal).await? {
                 bindings.push(binding);
             }
         }
@@ -683,16 +687,19 @@ async fn render_entry(
         composition,
     } = read;
     let program = &plan.program;
-    let (id, _binding) = facade.ingest(client.clone()).bind_entry(
-        program,
-        plan.declared.resource_type(),
-        ehr_id,
-        version,
-        composition,
-        entry,
-    )?;
+    let (id, _binding) = facade
+        .ingest(client.clone())
+        .bind_entry(
+            program,
+            plan.declared.resource_type(),
+            ehr_id,
+            version,
+            composition,
+            entry,
+        )
+        .await?;
     let source = render::composition_url(client.base_url(), ehr_id, version)?;
-    let subject = render::subject_of(facade, ehr_id)?;
+    let subject = render::subject_of(facade, ehr_id).await?;
     let units = render::render_units(
         program.program(),
         program.index(),

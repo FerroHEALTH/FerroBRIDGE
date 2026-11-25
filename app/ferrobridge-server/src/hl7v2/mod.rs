@@ -478,7 +478,7 @@ impl Face {
         if ingested.contribution().is_none() {
             return Ok(());
         }
-        let person = match self.facade.store().person_of(ingested.ehr_id()) {
+        let person = match self.facade.store().person_of(ingested.ehr_id()).await {
             Ok(person) => person,
             Err(error) => return Err(ihe_atna::balp::AuditError(Box::new(error))),
         };

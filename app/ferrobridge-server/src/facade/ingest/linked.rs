@@ -224,6 +224,7 @@ impl Ingest<'_> {
             let binding = self
                 .store
                 .binding_of(&resource_type, &id)
+                .await
                 .map_err(|error| store_refusal(&error))?;
             if let Some(binding) = binding {
                 let uri =
