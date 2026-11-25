@@ -125,9 +125,9 @@ fn assert_document(bundle: &serde_json::Value, id: &str) {
         .as_array()
         .expect("the document has entries");
     assert_eq!(
-        2,
+        3,
         entries.len(),
-        "the Composition and its Condition: {bundle}"
+        "the Composition, its Condition and its custodian: {bundle}"
     );
     let composition = &entries[0];
     assert_eq!(
@@ -164,6 +164,21 @@ fn assert_document(bundle: &serde_json::Value, id: &str) {
         Some(format!("Condition/{condition_id}").as_str()),
         composition["resource"]["section"][0]["entry"][0]["reference"].as_str(),
         "the section names the Condition the document carries: {bundle}"
+    );
+    let custodian = &entries[2];
+    assert_eq!(
+        composition["resource"]["custodian"]["reference"], custodian["fullUrl"],
+        "the Composition names its custodian entry: {bundle}"
+    );
+    assert_eq!(
+        Some("Organization"),
+        custodian["resource"]["resourceType"].as_str(),
+        "{bundle}"
+    );
+    assert_eq!(
+        Some("synthetic-hospital"),
+        custodian["resource"]["identifier"][0]["value"].as_str(),
+        "the configured health data holder: {bundle}"
     );
 }
 

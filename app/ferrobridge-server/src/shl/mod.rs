@@ -39,6 +39,7 @@ use ihe_atna::balp::Reserved;
 
 use crate::audit::AccessLog;
 use crate::facade::Facade;
+use crate::store::lease::{Lane, Leader, Lease};
 
 /// The path the person's routes sit under.
 pub const BASE: &str = "/shl";
@@ -52,6 +53,14 @@ pub const FILE: &str = "/shl/f/";
 
 /// How often the store is swept for expired links and lapsed locations.
 const SWEEP: Duration = Duration::from_secs(60);
+
+/// The lane the sweep's lease names.
+const SWEEP_LANE: &str = "shl-sweep";
+
+/// How long the sweep's lease holds, renewed every third of it.
+// NOTE: no specification governs this: our own design; three sweeps long, so
+// a replica that stops leaves the sweep to another within three minutes.
+const SWEEP_LEASE: Duration = Duration::from_secs(180);
 
 /// The links lane, resolved from `[shl]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +94,8 @@ pub struct Links {
     log: Option<Arc<AccessLog>>,
     /// The address the records name the bridge by.
     endpoint: NetworkAddress,
+    /// The lease the sweep runs under, on one replica at a time.
+    sweep_lease: Lease,
 }
 
 /// Why the lane could not start.
@@ -106,6 +117,10 @@ impl Links {
         log: Option<Arc<AccessLog>>,
     ) -> Result<Self, OpenError> {
         let store = store::LinkStore::open(state).map_err(OpenError)?;
+        let sweep_lease = state.lease(
+            Lane::new(SWEEP_LANE).map_err(|error| OpenError(store::StoreError::from(error)))?,
+            SWEEP_LEASE,
+        );
         let endpoint = log.as_ref().map_or_else(
             || NetworkAddress::MachineName(settings.base_url.clone()),
             |log| log.endpoint().clone(),
@@ -116,6 +131,7 @@ impl Links {
             facade,
             log,
             endpoint,
+            sweep_lease,
         })
     }
 
@@ -136,6 +152,7 @@ impl Links {
         let links = Arc::clone(self);
         let mut stop = stop.clone();
         tokio::spawn(async move {
+            let mut leader = Leader::new(Arc::new(links.sweep_lease.clone()));
             let mut ticks = tokio::time::interval(SWEEP);
             loop {
                 tokio::select! {
@@ -143,23 +160,34 @@ impl Links {
                     () = async {
                         let _settled = stop.wait_for(|stopped| *stopped).await.is_ok();
                     } => break,
-                    _tick = ticks.tick() => links.sweep().await,
+                    _tick = ticks.tick() => links.sweep(&mut leader).await,
                 }
+            }
+            if let Err(error) = leader.release().await {
+                tracing::warn!(reason = %crate::indicators::reason(&error), "the sweep lease could not be released; it runs out on its own");
             }
         })
     }
 
-    /// Removes every expired link and lapsed location now, recording each
-    /// link that ends.
-    pub async fn sweep(&self) {
+    /// Removes every expired link and lapsed location now while this
+    /// replica leads the sweep, recording each link that ends.
+    async fn sweep(&self, leader: &mut Leader) {
+        let term = match leader.lead().await {
+            Ok(Some(term)) => term,
+            Ok(None) => return,
+            Err(error) => {
+                tracing::warn!(reason = %crate::indicators::reason(&error), "the sweep lease could not be claimed");
+                return;
+            }
+        };
         let now = jiff::Timestamp::now().as_second();
-        match self.store.sweep(now).await {
-            Ok(store::Swept::Done(ended)) => {
+        match self.store.sweep(&term, now).await {
+            Ok(ended) => {
                 for gone in ended {
                     self.ended(&gone).await;
                 }
             }
-            Ok(store::Swept::Busy) => {}
+            Err(store::StoreError::Fenced(_)) => leader.lost(),
             Err(error) => {
                 tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the link store could not be swept");
             }

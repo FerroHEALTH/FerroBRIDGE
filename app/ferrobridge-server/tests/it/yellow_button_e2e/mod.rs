@@ -21,6 +21,7 @@ use std::time::Duration;
 use ferrobridge_server::boot::serve_settings;
 use ferrobridge_server::retry::Backoff;
 use ferrobridge_testkit::containers;
+use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID;
 use http::StatusCode;
 use stack::Onward;
 use stack::Stack;
@@ -127,6 +128,42 @@ async fn ready(client: &reqwest::Client, origin: &str) -> Result<(), Box<dyn Err
     }
 }
 
+/// Commits the `audit-categories` register through the operator API, as an
+/// operator does, filing the patient summary template under the Patient
+/// Summaries category (Regulation (EU) 2025/327 Annex II 3.2(c)).
+async fn classify_summaries(client: &reqwest::Client, stack: &Stack) -> Result<(), Box<dyn Error>> {
+    let (user, password) = &stack.operator;
+    let register = format!("{}/operator/registers/audit-categories", stack.origin);
+    let read = client
+        .get(&register)
+        .basic_auth(user, Some(password))
+        .send()
+        .await?;
+    assert_eq!(StatusCode::OK, read.status(), "the register's read");
+    let version = read
+        .headers()
+        .get(http::header::ETAG)
+        .ok_or("the register's ETag")?
+        .clone();
+    let written = client
+        .put(&register)
+        .basic_auth(user, Some(password))
+        .header(http::header::IF_MATCH, version)
+        .json(&serde_json::json!({
+            "templates": { FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID: ["Patient-Summaries"] }
+        }))
+        .send()
+        .await?;
+    let status = written.status();
+    assert_eq!(
+        StatusCode::OK,
+        status,
+        "the register's write: {}",
+        written.text().await?
+    );
+    Ok(())
+}
+
 /// Asserts that `answer` is a refusal of `status` carrying an
 /// `OperationOutcome`.
 fn refused(what: &str, status: StatusCode, (got, body): &Answer) {
@@ -153,6 +190,7 @@ struct Walk {
 async fn journey(stack: &Stack) -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
     ready(&client, &stack.origin).await?;
+    classify_summaries(&client, stack).await?;
     let facade = stack.facade();
     let patient = &stack.patients.patient;
     let summary = format!("{facade}/Patient/{patient}/$summary");

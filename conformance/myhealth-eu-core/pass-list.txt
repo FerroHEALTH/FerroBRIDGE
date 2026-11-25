@@ -11,6 +11,11 @@ eehrxf-eps-summary-problem-allergy-procedure.1.Patient
 eehrxf-eps-summary-problem-allergy-procedure.3.Condition
 eehrxf-eps-summary-problem-allergy-procedure.4.AllergyIntolerance
 eehrxf-eps-summary-problem-allergy-procedure.5.Procedure
+eehrxf-euvac-vaccination-history.0.Composition
+eehrxf-euvac-vaccination-history.1.Patient
+eehrxf-euvac-vaccination-history.3.Practitioner
+eehrxf-euvac-vaccination-history.4.Location
+eehrxf-euvac-vaccination-history.5.Immunization
 eehrxf-imaging-mapped.0.Composition
 eehrxf-imaging-mapped.1.DiagnosticReport
 eehrxf-imaging-mapped.2.Patient
@@ -58,4 +63,4 @@ eehrxf-test-report-ecg.4.Organization
 eehrxf-test-report-spirometry.1.DiagnosticReport
 eehrxf-test-report-spirometry.2.Patient
 eehrxf-test-report-spirometry.4.Organization
-total 65
+total 70

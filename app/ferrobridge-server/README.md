@@ -89,8 +89,8 @@ route, so a request answers `404` rather than `403`.
 | `PUT /fhir/{type}/{id}` | Update, with `If-Match` |
 | `POST /fhir` | A `transaction` Bundle, committed as one contribution |
 
-The facade stores no clinical data. What it keeps is identity, in a `redb` file
-the lane opens at boot: a subject to its `ehr_id`, a resource id to the
+The facade stores no clinical data. What it keeps is identity, in the PostgreSQL
+state store every replica shares: a subject to its `ehr_id`, a resource id to the
 composition entry it came from, and the source identity of every resource it
 consumed, which is what makes a re-sent resource update one composition instead
 of creating a second. A CDR answer becomes a FHIR answer through one status

@@ -17,8 +17,6 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use tokio::sync::watch;
@@ -35,8 +33,8 @@ use crate::change_feed::dead_letter::DeadLetterError;
 use crate::change_feed::dead_letter::DeadLetters;
 use crate::change_feed::health::Following;
 use crate::retry::{Backoff, Failure, Waits};
+use crate::store::lease::Leader;
 use crate::store::lease::Leadership;
-use crate::store::lease::Renewed;
 use crate::store::lease::Term;
 
 /// Why a consumer did not finish one event.
@@ -480,7 +478,7 @@ pub struct Lane {
 /// reader's lane through `leadership`, until `stop` reads `true`.
 ///
 /// A replica that does not lead waits a renewal period and claims again. A
-/// leader renews its lease on its own task at the period `leadership` names,
+/// leader holds its term through [`Leader`], which renews it on its own task,
 /// and stops reading once the lease is lost or a fenced write is refused. A
 /// full page that moved a cursor is followed by the next read at once, any
 /// other pass after `lane.polling.idle`; a failed pass is logged, recorded on
@@ -498,19 +496,20 @@ pub async fn follow(
         .clone()
         .map_or_else(Cursor::default, Cursor::parking);
     let mut waits = Waits::new(lane.polling.backoff);
+    let mut leader = Leader::new(leadership);
     tracing::info!(consumer = consumer.name(), reader = %reader, "following the change feed");
     loop {
         if *stop.borrow() {
             break;
         }
-        let wait = match leadership.claim().await {
+        let wait = match leader.lead().await {
             Ok(Some(term)) => {
                 tracing::info!(consumer = consumer.name(), reader = %reader, generation = term.generation().get(), "this replica leads the change-feed reader");
                 lead(
                     feed,
                     reader,
                     consumer,
-                    &leadership,
+                    &mut leader,
                     &lane,
                     &term,
                     &mut cursor,
@@ -518,7 +517,7 @@ pub async fn follow(
                 )
                 .await;
                 if *stop.borrow() {
-                    if let Err(error) = leadership.release(&term).await {
+                    if let Err(error) = leader.release().await {
                         tracing::warn!(consumer = consumer.name(), reader = %reader, reason = %crate::indicators::reason(&error), "the lease could not be released; it runs out on its own");
                     }
                     break;
@@ -528,7 +527,7 @@ pub async fn follow(
             }
             Ok(None) => {
                 lane.following.standby();
-                leadership.renew_every()
+                leader.renew_every()
             }
             Err(error) => {
                 let reason = crate::indicators::reason(&error);
@@ -555,25 +554,6 @@ async fn pause(stop: &mut watch::Receiver<bool>, wait: Duration) -> bool {
     }
 }
 
-/// Renews `term` every renewal period until it is lost, then flags `lost`.
-async fn renew(leadership: Arc<dyn Leadership>, term: Term, lost: Arc<AtomicBool>) {
-    loop {
-        tokio::time::sleep(leadership.renew_every()).await;
-        match leadership.renew(&term).await {
-            Ok(Renewed::Held) => {}
-            Ok(Renewed::Lost) => {
-                lost.store(true, Ordering::Release);
-                return;
-            }
-            Err(error) => tracing::warn!(
-                lane = %term.lease().lane(),
-                reason = %crate::indicators::reason(&error),
-                "the lease could not be renewed; the next renewal tries again"
-            ),
-        }
-    }
-}
-
 /// Follows the feed while `term` holds, until it is lost or `stop` reads
 /// `true`.
 #[expect(
@@ -584,28 +564,21 @@ async fn lead(
     feed: &dyn ChangeFeed,
     reader: &ReaderName,
     consumer: &dyn Consumer,
-    leadership: &Arc<dyn Leadership>,
+    leader: &mut Leader,
     lane: &Lane,
     term: &Term,
     cursor: &mut Cursor,
     stop: &mut watch::Receiver<bool>,
 ) {
-    let lost = Arc::new(AtomicBool::new(false));
-    let renewer = tokio::spawn(renew(
-        Arc::clone(leadership),
-        term.clone(),
-        Arc::clone(&lost),
-    ));
     cursor.acknowledged.clear();
     let mut waits = Waits::new(lane.polling.backoff);
     let begun = feed.begin(reader, term).await;
     if let Err(error) = begun {
         lane.following.stalled(crate::indicators::reason(&error));
-        renewer.abort();
         return;
     }
     loop {
-        if *stop.borrow() || lost.load(Ordering::Acquire) {
+        if *stop.borrow() || leader.is_lost() {
             break;
         }
         let passed = pass(feed, reader, consumer, lane.polling.page_size, cursor, term).await;
@@ -628,6 +601,7 @@ async fn lead(
             }
             Err(error) if is_lost(&error) => {
                 tracing::warn!(consumer = consumer.name(), reader = %reader, "another replica took the change-feed reader; this one stops reading");
+                leader.lost();
                 break;
             }
             Err(error) => {
@@ -646,7 +620,6 @@ async fn lead(
             break;
         }
     }
-    renewer.abort();
 }
 
 /// Returns whether `error` says the lease is no longer this replica's.
