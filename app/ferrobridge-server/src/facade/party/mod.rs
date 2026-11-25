@@ -316,7 +316,7 @@ pub(crate) async fn get(
     match fetch(demographic, class, uid).await? {
         Fetched::Held(held) => Ok(held),
         Fetched::Deleted => Err(gone(resource_type, uid)),
-        Fetched::Absent(upstream) => Err(refused(&upstream).into()),
+        Fetched::Absent(upstream) => Err(refused(&upstream)),
     }
 }
 
