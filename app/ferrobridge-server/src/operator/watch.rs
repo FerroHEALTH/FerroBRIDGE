@@ -86,20 +86,17 @@ impl Operator {
     }
 }
 
-/// Listens on [`CHANNEL`] through `store` and runs every revision that
-/// becomes the running one, in a detached task that ends with the runtime,
-/// when `operator` saves revisions and both are present.
-pub fn spawn(operator: Option<&Arc<Operator>>, store: Option<&crate::store::Store>) {
-    let (Some(operator), Some(store)) = (operator, store) else {
-        return;
-    };
-    if operator.revisions().is_none() {
-        return;
-    }
+/// Starts the task that runs each revision that becomes the running one.
+///
+/// The task is detached and ends with the runtime. Returns the state of
+/// [`CHANNEL`], through which the replica's `LISTEN` session wakes it;
+/// `None` when `operator` saves no revisions.
+pub fn start(operator: &Arc<Operator>) -> Option<Arc<Listened>> {
+    operator.revisions()?;
     let wake = Arc::new(Wake::default());
     let listened = Arc::new(Listened::with_subscriber(CHANNEL, wake.clone()));
-    store.listeners(&[listened]).spawn();
     tokio::spawn(converging(Arc::clone(operator), wake));
+    Some(listened)
 }
 
 /// Why a revision did not swap in.
