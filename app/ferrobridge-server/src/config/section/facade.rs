@@ -75,6 +75,23 @@ pub struct Facade {
     /// The IHE MHD 4.2.3 Document Responder, served as `DocumentReference`
     /// and `List`.
     pub mhd: FacadeMhd,
+    /// The custodian every document the bridge writes names: the
+    /// healthcare provider that holds the records behind the CDR.
+    pub custodian: FacadeCustodian,
+}
+
+/// The healthcare provider that holds the records behind the CDR, the
+/// custodian of every document the bridge writes. An enabled facade refuses
+/// to start without each key.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeCustodian {
+    /// Its name.
+    pub name: String,
+    /// Its identifier's system.
+    pub identifier_system: String,
+    /// Its identifier's value.
+    pub identifier_value: String,
 }
 
 impl Default for Facade {
@@ -103,6 +120,7 @@ impl Default for Facade {
             cors: FacadeCors::default(),
             endpoint: FacadeEndpoint::default(),
             mhd: FacadeMhd::default(),
+            custodian: FacadeCustodian::default(),
         }
     }
 }

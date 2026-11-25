@@ -108,8 +108,6 @@ futures-util.workspace = true
 # The IHE BPPC (CDA R2) and APPC (XACML 2.0) documents the `Consent`
 # exchange reads and writes.
 quick-xml.workspace = true
-# The embedded identity store (docs/architecture.md section 9).
-redb.workspace = true
 # The HTTP engine error the CDR client's transport can refuse to build with.
 reqwest.workspace = true
 secrecy.workspace = true

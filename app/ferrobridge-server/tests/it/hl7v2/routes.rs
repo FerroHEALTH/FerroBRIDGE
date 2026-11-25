@@ -17,6 +17,7 @@ use ferrobridge_server::sources::Sources;
 use ferrobridge_server::store::Store;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::mllp_tls::Pki;
+use ferrobridge_testkit::post_quantum::Peer;
 use tokio::io::AsyncWriteExt;
 use wiremock::ResponseTemplate;
 
@@ -162,7 +163,7 @@ async fn a_rotated_client_authorities_file_is_in_force_without_a_restart()
     let new = rotated.client(NORTHLAB_SUBJECT)?;
 
     let send = async |identity, control: &str| -> Result<Option<String>, Box<dyn Error>> {
-        let connector = PKI.connector(Some(identity))?;
+        let connector = PKI.connector(Some(identity), Peer::Hybrid)?;
         let Ok(mut stream) = ferrobridge_testkit::mllp_tls::connect(address, &connector).await
         else {
             return Ok(None);
