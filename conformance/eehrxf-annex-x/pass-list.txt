@@ -1,6 +1,7 @@
 EHDSAllergyIntolerance
 EHDSCondition
 EHDSImmunisation
+EHDSLaboratoryObservation
 EHDSMedication
 EHDSMedicationUse
 EHDSObservation

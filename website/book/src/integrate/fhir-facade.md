@@ -884,7 +884,8 @@ the FHIRconnect project that serves them, `crates/eehrxf/mappings/annex-x/`
 (`eehrxf::mappings::ANNEX_X`), with a search declaration beside each
 context. Point `[mappings] directory` at a copy of it
 (`ANNEX_X.write_to(dir)` writes one) and load its two templates into the
-CDR: FerroBRIDGE's patient summary template and its EHDS record template.
+CDR: FerroBRIDGE's patient summary template, its EHDS record template and
+the published `KDS_Laborbericht`.
 
 | Annex X group | Resource | Profile | Search (IHE QEDm 3.0.0 PCC-44) |
 |---|---|---|---|
@@ -895,8 +896,15 @@ CDR: FerroBRIDGE's patient summary template and its EHDS record template.
 | EHDSImmunisation | `Immunization` | `immunization-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.6) |
 | EHDSObservation | `Observation` | FHIR R4 `bodyweight` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
 | EHDSProcedure | `Procedure` | `procedure-eu-core` | `patient`, `date` (2:3.44.4.1.2.1.7) |
+| EHDSLaboratoryObservation | `Observation` | `Observation-resultslab-eu-lab` | `patient` with `category`, `code` and `date` (2:3.44.4.1.2.1.1) |
+| (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
 
-The profiles other than `bodyweight` are HL7 Europe Base and Core 2.0.1.
+The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, and the
+others but `bodyweight` HL7 Europe Base and Core 2.0.1. A laboratory report
+carries the v2-0074 category `LAB` and each analyte the category
+`laboratory`, both `fixed`. The report's code sits under the repeating event
+of `KDS_Laborbericht`, so QEDm's `patient+category+code` is not offered for
+a `DiagnosticReport`.
 A body weight observation carries the category `vital-signs` and the LOINC
 code `29463-7` the profile fixes, so both are `fixed` tokens. The
 `conformance/eehrxf-annex-x` pass list records the groups served, and its

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the laboratory result served by the facade as an
+# individual DiagnosticReport, the IHE QEDm 3.0.0 Diagnostic Reports option
+# (#2087), with the HL7 Europe Laboratory Report 2.0.0 DiagnosticReport-eu-lab
+# profile over the published KDS_Laborbericht template. Each analyte becomes
+# an Observation-resultslab-eu-lab the report references, the draft EEHRxF
+# Annex X data group EHDSLaboratoryObservation.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_diagnostic_report.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
+    version: "2.0.0"
+  template:
+    id: "KDS_Laborbericht"
+  archetypes:
+    - "OBSERVATION.laboratory_test_result.v1"
+    - "CLUSTER.laboratory_test_analyte.v1"
+    - "CLUSTER.specimen.v1"
+  extensions:
+    - "ferrobridge_eu_laboratory_result"
+    - "ferrobridge_eu_laboratory_analyte"
+    - "ferrobridge_eu_laboratory_specimen"
+  start: "OBSERVATION.laboratory_test_result.v1"

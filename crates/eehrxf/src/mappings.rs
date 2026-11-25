@@ -481,10 +481,11 @@ pub const HDR: Project = Project {
 /// The draft `EEHRxF` Annex X project: the common data groups served as
 /// individual resources (draft act Art 7(2)).
 ///
-/// Each context maps one group over FerroBRIDGE's patient summary template
-/// or its EHDS record template, to the profile HL7 Europe Base and Core
-/// 2.0.1 gives the group (the FHIR R4 `bodyweight` profile for a simple
-/// observation), with the search declaration a FHIR facade reads beside it:
+/// Each context maps one group over FerroBRIDGE's patient summary template,
+/// its EHDS record template or the published `KDS_Laborbericht`, to the
+/// profile HL7 Europe Base and Core 2.0.1 gives the group (the FHIR R4
+/// `bodyweight` profile for a simple observation, HL7 Europe Laboratory
+/// Report 2.0.0 for a laboratory report and its analytes), with the search declaration a FHIR facade reads beside it:
 /// the IHE `QEDm` 3.0.0 PCC-44 searches of the group's option
 /// (2:3.44.4.1.2.1). Its contexts map more than one template, so a
 /// [`crate::mapping::Mapping`] compiles it one context at a time
@@ -494,7 +495,9 @@ pub const ANNEX_X: Project = Project {
     contexts: &[
         "ferrobridge_ehds_allergy_intolerance.context",
         "ferrobridge_ehds_condition.context",
+        "ferrobridge_ehds_diagnostic_report.context",
         "ferrobridge_ehds_immunisation.context",
+        "ferrobridge_ehds_laboratory_observation.context",
         "ferrobridge_ehds_medication_use.context",
         "ferrobridge_ehds_observation.context",
         "ferrobridge_ehds_procedure.context",
@@ -502,6 +505,11 @@ pub const ANNEX_X: Project = Project {
     searches: &[
         shipped!("annex-x", "ferrobridge_ehds_allergy_intolerance.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_condition.search.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_diagnostic_report.search.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_laboratory_observation.search.yml"
+        ),
         shipped!("annex-x", "ferrobridge_ehds_immunisation.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_medication_use.search.yml"),
         shipped!("annex-x", "ferrobridge_ehds_observation.search.yml"),
@@ -518,6 +526,17 @@ pub const ANNEX_X: Project = Project {
         ),
         shipped!("annex-x", "ferrobridge_ehds_condition.context.yml"),
         shipped!("annex-x", "ferrobridge_problem_diagnosis.v1.Condition.yml"),
+        shipped!("annex-x", "ferrobridge_ehds_diagnostic_report.context.yml"),
+        shipped!("annex-x", "ferrobridge_laboratory_test_result.v1.yml"),
+        shipped!("annex-x", "ferrobridge_laboratory_test_analyte.v1.yml"),
+        shipped!("annex-x", "ferrobridge_specimen.v1.yml"),
+        shipped!("annex-x", "ferrobridge_eu_laboratory_result.yml"),
+        shipped!("annex-x", "ferrobridge_eu_laboratory_analyte.yml"),
+        shipped!("annex-x", "ferrobridge_eu_laboratory_specimen.yml"),
+        shipped!(
+            "annex-x",
+            "ferrobridge_ehds_laboratory_observation.context.yml"
+        ),
         shipped!("annex-x", "ferrobridge_ehds_immunisation.context.yml"),
         shipped!("annex-x", "ferrobridge_medication.v1.Immunization.yml"),
         shipped!("annex-x", "ferrobridge_ehds_medication_use.context.yml"),

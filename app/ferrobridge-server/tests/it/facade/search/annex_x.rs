@@ -125,6 +125,17 @@ async fn annex_x() -> Result<Harness, Box<dyn Error>> {
         )?,
     )
     .await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path(
+            "/definition/template/adl1.4/KDS_Laborbericht",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("Content-Type", "application/xml")
+                .set_body_string(ferrobridge_testkit::fixtures::KDS_LABORBERICHT_OPT),
+        )
+        .mount(&cdr)
+        .await;
     let directory = Path::new(ANNEX_X);
     let set = programs::read_set(directory)?;
     let templates = programs::fetch_templates(&set, &client(&cdr)).await?;
@@ -143,13 +154,16 @@ async fn annex_x() -> Result<Harness, Box<dyn Error>> {
 struct Group {
     /// The Annex X data group.
     name: &'static str,
-    /// The context mapping that serves it.
+    /// The context mapping that maps its resource into a composition.
     context: &'static str,
+    /// The resource type the group is served as.
+    resource_type: &'static str,
     /// The archetype of the entry the context starts at.
     archetype: &'static str,
     /// The profile every resource of the group claims.
     profile: String,
-    /// A resource the context maps.
+    /// A resource the context maps, claiming the group's profile unless it
+    /// states its own.
     resource: serde_json::Value,
     /// The searches, relative to `[type]?`, each answering the resource.
     searches: &'static [&'static str],
@@ -165,6 +179,7 @@ fn group_allergy_intolerance() -> Group {
     Group {
         name: "EHDSAllergyIntolerance",
         context: "ferrobridge_ehds_allergy_intolerance.context",
+        resource_type: "AllergyIntolerance",
         archetype: "openEHR-EHR-EVALUATION.adverse_reaction_risk.v2",
         profile: format!("{BASE}/allergyIntolerance-eu-core"),
         resource: serde_json::json!({
@@ -188,6 +203,7 @@ fn group_condition() -> Group {
     Group {
         name: "EHDSCondition",
         context: "ferrobridge_ehds_condition.context",
+        resource_type: "Condition",
         archetype: "openEHR-EHR-EVALUATION.problem_diagnosis.v1",
         profile: format!("{BASE}/condition-eu-core"),
         resource: serde_json::json!({
@@ -211,6 +227,7 @@ fn group_procedure() -> Group {
     Group {
         name: "EHDSProcedure",
         context: "ferrobridge_ehds_procedure.context",
+        resource_type: "Procedure",
         archetype: "openEHR-EHR-ACTION.procedure.v1",
         profile: format!("{BASE}/procedure-eu-core"),
         resource: serde_json::json!({
@@ -235,6 +252,7 @@ fn group_medication_use() -> Group {
     Group {
         name: "EHDSMedicationUse",
         context: "ferrobridge_ehds_medication_use.context",
+        resource_type: "MedicationStatement",
         archetype: "openEHR-EHR-INSTRUCTION.medication_order.v3",
         profile: format!("{BASE}/medicationStatement-eu-core"),
         resource: serde_json::json!({
@@ -261,6 +279,7 @@ fn group_immunisation() -> Group {
     Group {
         name: "EHDSImmunisation",
         context: "ferrobridge_ehds_immunisation.context",
+        resource_type: "Immunization",
         archetype: "openEHR-EHR-ACTION.medication.v1",
         profile: format!("{BASE}/immunization-eu-core"),
         resource: serde_json::json!({
@@ -282,6 +301,7 @@ fn group_observation() -> Group {
     Group {
         name: "EHDSObservation",
         context: "ferrobridge_ehds_observation.context",
+        resource_type: "Observation",
         archetype: "openEHR-EHR-OBSERVATION.body_weight.v2",
         profile: String::from("http://hl7.org/fhir/StructureDefinition/bodyweight"),
         resource: serde_json::json!({
@@ -308,6 +328,100 @@ fn group_observation() -> Group {
     }
 }
 
+/// HL7 Europe Laboratory Report 2.0.0.
+const LAB: &str = "http://hl7.eu/fhir/laboratory/StructureDefinition";
+
+/// Returns a laboratory report whose result and specimen it contains, in
+/// the shapes HL7 Europe Laboratory Report 2.0.0 constrains.
+fn laboratory_report() -> serde_json::Value {
+    serde_json::json!({
+        "resourceType": "DiagnosticReport",
+        "meta": { "profile": [format!("{LAB}/DiagnosticReport-eu-lab")] },
+        "contained": [
+            {
+                "resourceType": "Specimen",
+                "id": "serum",
+                "meta": { "profile": [format!("{LAB}/Specimen-eu-lab")] },
+                "type": { "coding": [{
+                    "system": "http://snomed.info/sct", "code": "119364003", "display": "Serum specimen"
+                }]},
+                "subject": subject(),
+                "collection": { "collectedDateTime": "2026-03-02T07:05:00+01:00" }
+            },
+            {
+                "resourceType": "Observation",
+                "id": "cholesterol",
+                "meta": { "profile": [format!("{LAB}/Observation-resultslab-eu-lab")] },
+                "status": "final",
+                "category": [{ "coding": [{
+                    "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                    "code": "laboratory"
+                }]}],
+                "code": { "coding": [{
+                    "system": "http://loinc.org", "code": "2093-3",
+                    "display": "Cholesterol [Mass/volume] in Serum or Plasma"
+                }]},
+                "subject": subject(),
+                "effectiveDateTime": "2026-03-02T08:15:00+01:00",
+                "valueQuantity": {
+                    "value": 182, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"
+                }
+            }
+        ],
+        "identifier": [{
+            "system": "http://example.org/fhir/sid/ferrobridge-lab-reports",
+            "value": "synthetic-report-0001"
+        }],
+        "status": "final",
+        "code": { "coding": [{
+            "system": "http://loinc.org", "code": "24331-1", "display": "Lipid panel - Serum or Plasma"
+        }]},
+        "subject": subject(),
+        "effectiveDateTime": "2026-03-02T08:15:00+01:00",
+        "specimen": [{ "reference": "#serum" }],
+        "result": [{ "reference": "#cholesterol" }]
+    })
+}
+
+/// Returns the laboratory `DiagnosticReport`, the IHE `QEDm` Diagnostic
+/// Reports option, which is no Annex X group.
+fn diagnostic_report() -> Group {
+    Group {
+        name: "DiagnosticReport",
+        context: "ferrobridge_ehds_diagnostic_report.context",
+        resource_type: "DiagnosticReport",
+        archetype: "openEHR-EHR-OBSERVATION.laboratory_test_result.v1",
+        profile: format!("{LAB}/DiagnosticReport-eu-lab"),
+        resource: laboratory_report(),
+        // PCC-44 2:3.44.4.1.2.1.4.
+        searches: &[
+            "patient=Patient/p-1&category=LAB",
+            "patient=Patient/p-1&category=LAB&date=ge2026-03-01",
+            "patient=Patient/p-1&category=http://terminology.hl7.org/CodeSystem/v2-0074|LAB&date=lt2026-04-01",
+        ],
+    }
+}
+
+/// Returns the `EHDSLaboratoryObservation` group: each analyte of a
+/// laboratory report.
+fn group_laboratory_observation() -> Group {
+    Group {
+        name: "EHDSLaboratoryObservation",
+        context: "ferrobridge_ehds_diagnostic_report.context",
+        resource_type: "Observation",
+        archetype: "openEHR-EHR-CLUSTER.laboratory_test_analyte.v1",
+        profile: format!("{LAB}/Observation-resultslab-eu-lab"),
+        resource: laboratory_report(),
+        // PCC-44 2:3.44.4.1.2.1.1.
+        searches: &[
+            "patient=Patient/p-1&category=laboratory",
+            "patient=Patient/p-1&category=laboratory&code=http://loinc.org|2093-3",
+            "patient=Patient/p-1&category=laboratory&date=ge2026-03-01",
+            "patient=Patient/p-1&category=laboratory&code=2093-3&date=lt2026-04-01",
+        ],
+    }
+}
+
 /// Returns the groups this suite serves.
 fn groups() -> Vec<Group> {
     vec![
@@ -317,13 +431,16 @@ fn groups() -> Vec<Group> {
         group_medication_use(),
         group_immunisation(),
         group_observation(),
+        group_laboratory_observation(),
     ]
 }
 
 /// Returns the composition `group`'s context maps its resource to.
 fn composition_of(harness: &Harness, group: &Group) -> serde_json::Value {
     let mut resource = group.resource.clone();
-    resource["meta"] = serde_json::json!({ "profile": [group.profile] });
+    if resource.get("meta").is_none() {
+        resource["meta"] = serde_json::json!({ "profile": [group.profile] });
+    }
     harness.composition_under(group.context, &resource)
 }
 
@@ -366,8 +483,8 @@ fn entry_row(
 }
 
 /// Returns the resource type of `group`.
-fn type_of(group: &Group) -> &str {
-    group.resource["resourceType"].as_str().unwrap_or_default()
+const fn type_of(group: &Group) -> &'static str {
+    group.resource_type
 }
 
 /// The 33 data groups of draft `EEHRxF` Annex X, in the order of its tables.
@@ -587,11 +704,12 @@ async fn a_medication_statement_includes_the_medication_it_references() -> Resul
 #[tokio::test]
 async fn an_observation_of_another_category_or_code_answers_no_query() -> Result<(), Box<dyn Error>>
 {
-    // The body weight mapping writes the category and the LOINC code as
-    // constants, so any other value matches no resource of the context.
+    // Each Observation context writes its category as a constant and the body
+    // weight its LOINC code too, so a value neither carries matches no
+    // resource and queries nothing.
     let harness = annex_x().await?;
     for search in [
-        "category=laboratory",
+        "category=exam",
         "category=vital-signs&code=http://loinc.org|8302-2",
     ] {
         let (status, body) =
@@ -618,6 +736,7 @@ async fn the_statement_lists_each_group_s_searches() -> Result<(), Box<dyn Error
         ("MedicationStatement", &["patient"][..]),
         ("Immunization", &["patient", "date"][..]),
         ("Observation", &["patient", "category", "code", "date"][..]),
+        ("DiagnosticReport", &["patient", "category", "date"][..]),
     ] {
         let resource = resources
             .iter()
@@ -696,5 +815,43 @@ async fn each_date_search_compares_the_instant_the_mapping_writes() -> Result<()
             "{name}: {sent:?}"
         );
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_laboratory_report_answers_its_qedm_searches_and_includes_its_results()
+-> Result<(), Box<dyn Error>> {
+    // PCC-44 2:3.44.4.1.2.1.4; R4 search.html §3.1.1.5.4 for the include.
+    let report = diagnostic_report();
+    serve(&report).await?;
+    let harness = annex_x().await?;
+    let composition = composition_of(&harness, &report);
+    mount_rows(&harness.cdr, &[entry_row(&composition, report.archetype)?]).await;
+    let (status, body) = get(
+        &harness,
+        &format!("DiagnosticReport?patient={SUBJECT}&_include=DiagnosticReport:result"),
+    )
+    .await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let found = matches(&body);
+    assert_eq!(
+        Some("LAB"),
+        found[0]["resource"]["category"][0]["coding"][0]["code"].as_str(),
+        "{body}"
+    );
+    let included: Vec<&serde_json::Value> = body["entry"]
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|entry| entry["search"]["mode"] == "include")
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(1, included.len(), "{body}");
+    assert_eq!(
+        Some("Observation"),
+        included[0]["resource"]["resourceType"].as_str()
+    );
     Ok(())
 }
