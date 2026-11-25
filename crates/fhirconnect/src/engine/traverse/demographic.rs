@@ -13,6 +13,7 @@
 //! must name a party the endpoint minted.
 
 use fhir_types::r4::primitives;
+use fhir_types::r4::reference::Reference;
 use openehr_base::containers::NonEmptyVec;
 use openehr_base::v1_3::base_types::identification::locatable_ref::LocatableRef;
 use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
@@ -129,14 +130,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         target: &FhirTarget,
         party: &PartyRef,
     ) -> Result<FhirValue, EngineError> {
-        PartyRefLens::new(self.reference_target(mapping, target)?)
-            .get(party)
-            .map(|reference| FhirValue::Reference(Box::new(reference)))
-            .map_err(|source| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            })
+        let read = PartyRefLens::new(self.reference_target(mapping, target)?).get(party);
+        reference_cell(mapping, target, read)
     }
 
     /// Returns the reference a `LOCATABLE_REF` names, read as the one type the
@@ -147,14 +142,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         target: &FhirTarget,
         order: &LocatableRef,
     ) -> Result<FhirValue, EngineError> {
-        LocatableRefLens::new(self.reference_target(mapping, target)?)
-            .get(order)
-            .map(|reference| FhirValue::Reference(Box::new(reference)))
-            .map_err(|source| EngineError::Cell {
-                mapping: String::from(mapping.name()),
-                element: String::from(target.expression().as_str()),
-                source: Box::new(source),
-            })
+        let read = LocatableRefLens::new(self.reference_target(mapping, target)?).get(order);
+        reference_cell(mapping, target, read)
     }
 
     /// Returns the one resource type the reference of `target` admits.
@@ -250,4 +239,19 @@ fn with_identifier(party: PartyIdentifiedData, identity: &PartyIdentity) -> Part
         name: party.name,
         identifiers: NonEmptyVec::new(identifiers).ok(),
     }
+}
+
+/// Returns the reference cell a lens `read` for the element `target` of
+/// `mapping`, naming both in a refusal.
+fn reference_cell(
+    mapping: &Mapping,
+    target: &FhirTarget,
+    read: Result<Reference, LensError>,
+) -> Result<FhirValue, EngineError> {
+    read.map(|reference| FhirValue::Reference(Box::new(reference)))
+        .map_err(|source| EngineError::Cell {
+            mapping: String::from(mapping.name()),
+            element: String::from(target.expression().as_str()),
+            source: Box::new(source),
+        })
 }
