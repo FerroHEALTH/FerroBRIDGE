@@ -1532,7 +1532,8 @@ server keeps its read-only root file system. Without `[state]`, the operator
 API checks and saves nothing.
 
 **The load path compiles a tree in memory.** Every FHIRconnect, search
-declaration and OMOCL load reads a tree of file bytes by path, keeping each
+declaration, OMOCL and FHIR Mapping Language load reads a tree of file bytes
+by path, keeping each
 file's path for the source positions its diagnostics carry. A provisioned
 directory is one producer of that tree, keyed by path on disk; the running
 revision is the other, keyed by wire path. No file is staged on disk to be
@@ -2498,7 +2499,11 @@ source's own JSON as FHIR R4: a map in the R4 language
 (<https://hl7.org/fhir/R4/mapping-language.html>, grammar `mapping.g4`)
 runs over an instance of a logical model, a `StructureDefinition` of `kind =
 logical`, which `structuremap::openapi` generates from the schema a
-source's `OpenAPI` document publishes. FHIRconnect maps openEHR to FHIR and
+source's `OpenAPI` document publishes. The maps are console files of the
+mapping revision under the `structuremap` root, one `.map` file per map: a
+save or an apply parses every one, refuses a map outside the grammar or a
+URL two maps carry, and a reload on any replica swaps the parsed maps in
+with the rest of the set. FHIRconnect maps openEHR to FHIR and
 cannot describe another source, so this second language serves the inbound
 sources. The grammar leaves `fhirPath` a placeholder, so an embedded
 expression is parenthesized or runs to the next clause, as the tutorial

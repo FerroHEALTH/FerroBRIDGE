@@ -141,6 +141,7 @@ pub const fn language_name(language: Language) -> &'static str {
     match language {
         Language::Fhirconnect => "FHIRconnect",
         Language::Omocl => "OMOCL",
+        Language::Structuremap => "FHIR Mapping Language",
     }
 }
 

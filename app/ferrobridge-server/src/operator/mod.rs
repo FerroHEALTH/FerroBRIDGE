@@ -121,6 +121,15 @@ impl Operator {
         self
     }
 
+    /// Returns the FHIR Mapping Language maps of the running revision, which
+    /// every reload on this replica replaces, when saving is configured.
+    #[must_use]
+    pub fn structuremaps(&self) -> Option<&Arc<crate::structuremap::Running>> {
+        self.reloader
+            .as_ref()
+            .and_then(|reloader| reloader.structuremaps.as_ref())
+    }
+
     /// Returns the provisioned mapping directories.
     #[must_use]
     pub fn roots(&self) -> &[Root] {

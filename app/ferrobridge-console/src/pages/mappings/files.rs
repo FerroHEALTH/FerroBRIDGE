@@ -31,7 +31,11 @@ use crate::pages::parts::{
 use ferrohealth_ui::view::template::list::list_empty;
 
 /// The languages the Files tab filters by, in the order its menu lists them.
-const LANGUAGES: [Language; 2] = [Language::Fhirconnect, Language::Omocl];
+const LANGUAGES: [Language; 3] = [
+    Language::Fhirconnect,
+    Language::Omocl,
+    Language::Structuremap,
+];
 
 /// The owners the Files tab filters by, in the order its menu lists them.
 const OWNERS: [Owner; 2] = [Owner::Provisioned, Owner::Console];
@@ -131,6 +135,7 @@ const fn language_key(language: Language) -> &'static str {
     match language {
         Language::Fhirconnect => "fhirconnect",
         Language::Omocl => "omocl",
+        Language::Structuremap => "structuremap",
     }
 }
 
