@@ -4,14 +4,16 @@
 //! SMART Health Links on two replicas behind one address: a location served
 //! once, the passcode attempts and the answers counted across both, a
 //! revocation in force on both, no token or handle in clear, and the sweep on
-//! one replica at a time (SMART Health Cards and Links 1.0.0,
-//! `links-specification`).
+//! the one replica that leads its lane, fenced by the lease generation
+//! (SMART Health Cards and Links 1.0.0, `links-specification`).
 
 use std::error::Error;
+use std::time::Duration;
 
 use ferrobridge_server::shl::store::{
-    Answer, Fetched, FileEntry, Link, LinkStore, Resolution, Swept,
+    Answer, Fetched, FileEntry, Link, LinkStore, Resolution, StoreError,
 };
+use ferrobridge_server::store::lease::{Lane, Term};
 
 /// The owner of every link here.
 const OWNER: &str = "Patient/p-1";
@@ -201,7 +203,7 @@ async fn no_token_or_handle_is_stored_in_clear() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn the_sweep_runs_on_one_replica_at_a_time() -> Result<(), Box<dyn Error>> {
+async fn a_sweeper_whose_lease_was_taken_over_sweeps_nothing() -> Result<(), Box<dyn Error>> {
     let Some((_postgres, state)) = super::sealed_store().await? else {
         return Ok(());
     };
@@ -211,16 +213,36 @@ async fn the_sweep_runs_on_one_replica_at_a_time() -> Result<(), Box<dyn Error>>
     store
         .create("manifest-4", &expiring, &[String::from("jwe")])
         .await?;
-    let mut other = state.pool().begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(0x6662_7368_6c73_i64)
-        .execute(&mut *other)
-        .await?;
-    assert_eq!(Swept::Busy, store.sweep(1_000).await?);
-    other.rollback().await?;
-    let Swept::Done(ended) = store.sweep(1_000).await? else {
-        return Err("the sweep ran".into());
-    };
-    assert_eq!(1, ended.len());
+    let lane = Lane::new("shl-sweep")?;
+    let former = state.lease(lane.clone(), Duration::from_secs(30));
+    let first = former
+        .claim()
+        .await?
+        .ok_or("the first replica takes the sweep")?;
+    let other = state.lease(lane, Duration::from_secs(30));
+    assert_eq!(
+        None,
+        other.claim().await?,
+        "a live lease keeps the sweep on its holder"
+    );
+    sqlx::query(
+        "UPDATE lane_lease SET leased_until = clock_timestamp() - interval '1 second' \
+         WHERE lane = 'shl-sweep'",
+    )
+    .execute(state.pool())
+    .await?;
+    let taken = other
+        .claim()
+        .await?
+        .ok_or("the other replica takes the sweep once the lease ran out")?;
+    assert!(
+        matches!(
+            store.sweep(&Term::new(former, first), 1_000).await,
+            Err(StoreError::Fenced(_))
+        ),
+        "the former leader's sweep is refused"
+    );
+    let ended = store.sweep(&Term::new(other, taken), 1_000).await?;
+    assert_eq!(1, ended.len(), "the refused sweep removed nothing");
     Ok(())
 }

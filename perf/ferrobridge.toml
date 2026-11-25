@@ -30,6 +30,12 @@ ehr_policy = "create_on_first_write"
 composition_language = "en"
 composition_territory = "NL"
 
+# A synthetic health data holder, the custodian every written document names.
+[facade.custodian]
+name = "Synthetic Hospital"
+identifier_system = "urn:oid:2.999.1.1"
+identifier_value = "synthetic-hospital"
+
 # The state store's URL is the arm's, from perf/arm.env; the keys are
 # synthetic, for a store the gate creates and removes.
 [state.seal]
