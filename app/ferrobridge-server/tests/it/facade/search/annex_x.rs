@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::facade::Facade;
+use ferrobridge_server::facade::endpoint::Endpoints;
 use ferrobridge_server::facade::identity::PersonId;
 use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::identity::store::Store;
@@ -102,6 +103,11 @@ async fn mount_template(cdr: &MockServer, id: &str, template: String) {
 /// Returns a harness whose facade runs the Annex X project, its subject
 /// bound to the suite's EHR.
 async fn annex_x() -> Result<Harness, Box<dyn Error>> {
+    annex_x_with(Endpoints::default()).await
+}
+
+/// Returns the Annex X harness serving `endpoints` beside its FHIR base.
+async fn annex_x_with(endpoints: Endpoints) -> Result<Harness, Box<dyn Error>> {
     let cdr = MockServer::start().await;
     mount_template(
         &cdr,
@@ -143,7 +149,11 @@ async fn annex_x() -> Result<Harness, Box<dyn Error>> {
     let store = Arc::new(MemoryStore::default());
     let built = Facade::new(compiled, handle(&store), client(&cdr), settings());
     let catalog = ferrobridge_server::facade::search::load(directory, &built.programs())?;
-    let facade = Arc::new(built.with_search(catalog, Limits::default()));
+    let facade = Arc::new(
+        built
+            .with_search(catalog, Limits::default())
+            .with_endpoints(Some(endpoints)),
+    );
     let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
     store.record_ehr(&person, &EhrId::new(EHR_ID)?)?;
     Ok(Harness { cdr, store, facade })
@@ -734,8 +744,36 @@ async fn serve_embedded(embedded: &Embedded) -> Result<(), Box<dyn Error>> {
     })
 }
 
+/// Serves `EHDSEndpoint`: the facade's own FHIR base, searched by its
+/// connection type and read by its id.
+async fn serve_endpoint() -> Result<(), Box<dyn Error>> {
+    let harness = annex_x().await?;
+    let (status, body) = get(&harness, "Endpoint?connection-type=hl7-fhir-rest").await?;
+    ensure(status == StatusCode::OK, || {
+        format!("the search answered {status}: {body}")
+    })?;
+    let found = matches(&body);
+    ensure(found.len() == 1, || {
+        format!("the search answered {} matches", found.len())
+    })?;
+    let id = found[0]["resource"]["id"]
+        .as_str()
+        .ok_or("an id")?
+        .to_owned();
+    let (status, read) = get(&harness, &format!("Endpoint/{id}")).await?;
+    ensure(status == StatusCode::OK, || {
+        format!("the read answered {status}: {read}")
+    })?;
+    ensure(read["address"] == found[0]["resource"]["address"], || {
+        format!("the read answered {read}")
+    })
+}
+
 /// Returns the verdict on the Annex X group `name`.
 async fn verdict(name: &str) -> Result<(), Box<dyn Error>> {
+    if name == "EHDSEndpoint" {
+        return serve_endpoint().await;
+    }
     if let Ok(group) = group_named(name) {
         return serve(&group).await.map(drop);
     }
@@ -1030,5 +1068,53 @@ async fn a_report_code_matches_the_test_name_under_any_event() -> Result<(), Box
         ),
         "{text}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_endpoints_are_the_fhir_base_and_the_configured_wado_rs() -> Result<(), Box<dyn Error>>
+{
+    // R4 endpoint.html; the connection types of
+    // http://terminology.hl7.org/CodeSystem/endpoint-connection-type.
+    let harness = annex_x_with(Endpoints {
+        wado_rs: Some(String::from("https://pacs.example.org/dicom-web")),
+    })
+    .await?;
+    let (status, body) = get(&harness, "Endpoint").await?;
+    assert_eq!(StatusCode::OK, status, "{body}");
+    let found = matches(&body);
+    assert_eq!(2, found.len(), "{body}");
+    assert_eq!(
+        Some("hl7-fhir-rest"),
+        found[0]["resource"]["connectionType"]["code"].as_str()
+    );
+    let (status, wado) = get(&harness, "Endpoint/dicom-wado-rs").await?;
+    assert_eq!(StatusCode::OK, status, "{wado}");
+    assert_eq!(
+        Some("dicom-wado-rs"),
+        wado["connectionType"]["code"].as_str()
+    );
+    assert_eq!(
+        Some("https://pacs.example.org/dicom-web"),
+        wado["address"].as_str()
+    );
+    let (status, none) = get(&harness, "Endpoint?connection-type=dicom-wado-rs&_id=fhir").await?;
+    assert_eq!(StatusCode::OK, status, "{none}");
+    assert!(matches(&none).is_empty(), "{none}");
+    let (status, refused) = get(&harness, "Endpoint?address=x").await?;
+    assert_eq!(StatusCode::BAD_REQUEST, status, "{refused}");
+    let (status, missing) = get(&harness, "Endpoint/other").await?;
+    assert_eq!(StatusCode::NOT_FOUND, status, "{missing}");
+    let (status, statement) = get(&harness, "metadata").await?;
+    assert_eq!(StatusCode::OK, status, "{statement}");
+    assert!(
+        statement["rest"][0]["resource"]
+            .as_array()
+            .is_some_and(|resources| resources
+                .iter()
+                .any(|resource| resource["type"] == "Endpoint")),
+        "{statement}"
+    );
+    assert_eq!(0, queries(&harness).await.len());
     Ok(())
 }

@@ -3,6 +3,7 @@ EHDSCondition
 EHDSDevice
 EHDSDeviceUse
 EHDSDosage
+EHDSEndpoint
 EHDSImmunisation
 EHDSLaboratoryObservation
 EHDSMedication

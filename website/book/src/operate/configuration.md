@@ -922,6 +922,23 @@ SMART launch), served as `Task` at the facade's base (the Integrate page,
 Each key is settable as `FERROBRIDGE__FACADE__LAUNCH_TASK__<KEY>`. The store
 and its file are FerroBRIDGE's own design.
 
+### `[facade.endpoint]`
+
+The bridge's technical endpoints, the draft EEHRxF Annex X group
+EHDSEndpoint, served read-only as `Endpoint` at the facade's base. No
+openEHR content carries an endpoint, so which ones the bridge publishes is
+FerroBRIDGE's own design. Off, `Endpoint` is an ordinary resource type a
+program may map. On, `Endpoint/fhir` is the FHIR base and
+`Endpoint/dicom-wado-rs` the DICOMweb service below; a context that maps
+`Endpoint` is then a boot error.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Whether `Endpoint` serves the bridge's endpoints |
+| `dicomweb_wado_rs` | none | The absolute DICOMweb WADO-RS base the imaging studies are retrieved from; a value that is no URL is refused at boot |
+
+Each key is settable as `FERROBRIDGE__FACADE__ENDPOINT__<KEY>`.
+
 ### `[facade.summary]`
 
 The patient summary, `GET /fhir/Patient/{id}/$summary` (HL7 IPS 2.0.1,

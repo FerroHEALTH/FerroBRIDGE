@@ -11,6 +11,7 @@ mod change_feed;
 mod committer;
 mod consent;
 mod cors;
+mod endpoint;
 mod environment;
 mod etl;
 mod events;

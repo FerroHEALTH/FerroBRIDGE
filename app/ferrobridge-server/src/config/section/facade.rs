@@ -72,6 +72,8 @@ pub struct Facade {
     pub cors: FacadeCors,
     /// The patient summary, `Patient/[id]/$summary`.
     pub summary: FacadeSummary,
+    /// The bridge's technical endpoints, served as `Endpoint`.
+    pub endpoint: FacadeEndpoint,
 }
 
 impl Default for Facade {
@@ -99,6 +101,7 @@ impl Default for Facade {
             launch_task: FacadeLaunchTask::default(),
             summary: FacadeSummary::default(),
             cors: FacadeCors::default(),
+            endpoint: FacadeEndpoint::default(),
         }
     }
 }
@@ -282,6 +285,23 @@ impl Default for FacadeLaunchTask {
             store: PathBuf::from("launch-tasks.redb"),
         }
     }
+}
+
+/// The bridge's technical endpoints, the draft `EEHRxF` Annex X group
+/// `EHDSEndpoint`, served read-only as `Endpoint` at the facade's base.
+///
+/// Off, `Endpoint` is an ordinary resource type a program may map. On, it
+/// serves the FHIR base and the `DICOMweb` WADO-RS service `dicomweb_wado_rs`
+/// names (no specification governs which endpoints a bridge publishes: our own
+/// design).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct FacadeEndpoint {
+    /// Whether `Endpoint` serves the bridge's endpoints.
+    pub enabled: bool,
+    /// The absolute `DICOMweb` WADO-RS base the imaging studies are retrieved
+    /// from; empty serves none.
+    pub dicomweb_wado_rs: String,
 }
 
 /// The patient summary (HL7 IPS 2.0.1 `OperationDefinition/summary`), served

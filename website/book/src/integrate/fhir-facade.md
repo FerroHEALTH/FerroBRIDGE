@@ -901,6 +901,7 @@ the published `KDS_Laborbericht`.
 | EHDSDeviceUse | `DeviceUseStatement` | `deviceUseStatement-eu-eps` | `patient` with `_include=DeviceUseStatement:device` |
 | EHDSDevice | `Device` | `device-eu-eps` | read, and included by the statement that names it |
 | EHDSDosage | the `dosage` of a `MedicationStatement` | | as its statement |
+| EHDSEndpoint | `Endpoint` | FHIR R4 `Endpoint` | `_id`, `connection-type`, `status`; read-only from the configuration |
 | (a laboratory report) | `DiagnosticReport` | `DiagnosticReport-eu-lab` | `patient` with `category`, `code` and `date`, `_include=DiagnosticReport:result` (2:3.44.4.1.2.1.4) |
 
 The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device
@@ -912,6 +913,12 @@ carries the v2-0074 category `LAB` and each analyte the category
 repeating event of `KDS_Laborbericht`, so its `code` binds the event inside
 the result with `contains`, and a report matches when any of its events
 carries the code.
+No openEHR content carries a technical endpoint, so the facade serves
+EHDSEndpoint from its own configuration, FerroBRIDGE's own design: `fhir`,
+its FHIR base (`hl7-fhir-rest`), and `dicom-wado-rs`, the DICOMweb service
+[`[facade.endpoint]`](../operate/configuration.md#facadeendpoint) names. HL7 Europe
+gives Endpoint no profile. No patient compartment holds an `Endpoint`, so a
+`patient/` token reaches none.
 A body weight observation carries the category `vital-signs` and the LOINC
 code `29463-7` the profile fixes, so both are `fixed` tokens. The
 `conformance/eehrxf-annex-x` pass list records the groups served, and its

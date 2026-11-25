@@ -48,6 +48,7 @@ use crate::facade::app_state;
 use crate::facade::capability;
 use crate::facade::compartment;
 use crate::facade::consent;
+use crate::facade::endpoint;
 use crate::facade::guard::OperatorScope;
 use crate::facade::launch_task;
 use crate::facade::media;
@@ -117,6 +118,12 @@ pub async fn search_route(
             .await
             .unwrap_or_else(Refusal::into_response);
     }
+    if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
+        let parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+        return guard(&headers, &uri, Body::Absent)
+            .and_then(|()| endpoint::search(&facade, &access, &uri, &parameters))
+            .unwrap_or_else(Refusal::into_response);
+    }
     search::search_get(&facade, &access, &resource_type, &headers, &uri)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -132,6 +139,13 @@ pub async fn search_form_route(
     uri: Uri,
     body: Bytes,
 ) -> Response {
+    if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
+        let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+        parameters.extend(media::query_pairs(&body));
+        return guard(&headers, &uri, Body::Absent)
+            .and_then(|()| endpoint::search(&facade, &access, &uri, &parameters))
+            .unwrap_or_else(Refusal::into_response);
+    }
     search::search_post(&facade, &access, &resource_type, &headers, &uri, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -148,6 +162,10 @@ pub async fn read_route(
     if resource_type == consent::CONSENT {
         return consent::fhir::read(&facade, &access, &id, &headers)
             .await
+            .unwrap_or_else(Refusal::into_response);
+    }
+    if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
+        return endpoint::read(&facade, &access, &id, &headers, &uri)
             .unwrap_or_else(Refusal::into_response);
     }
     read(&facade, &access, (&resource_type, &id), &headers, &uri)
@@ -640,6 +658,16 @@ fn metadata(
                 ..Default::default()
             },
         );
+    }
+    if facade.endpoints().is_some()
+        && let Some(rest) = statement.rest.first_mut()
+    {
+        rest.resource
+            .retain(|entry| entry.r#type.value.as_deref() != Some(endpoint::ENDPOINT));
+        let at = rest
+            .resource
+            .partition_point(|entry| entry.r#type.value.as_deref() < Some(endpoint::ENDPOINT));
+        rest.resource.insert(at, endpoint::capability());
     }
     if facade.launch_tasks().is_some()
         && let Some(rest) = statement.rest.first_mut()

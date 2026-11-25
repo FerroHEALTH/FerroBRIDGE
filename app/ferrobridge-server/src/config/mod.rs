@@ -442,6 +442,9 @@ pub struct FacadeSettings {
     pub cors: crate::facade::cors::Cors,
     /// The patient summary, when `Patient/[id]/$summary` is served.
     pub summary: Option<SummarySettings>,
+    /// The endpoints served as `Endpoint` beside the FHIR base, when
+    /// `Endpoint` serves them.
+    pub endpoints: Option<crate::facade::endpoint::Endpoints>,
 }
 
 /// The patient summary, resolved.

@@ -106,7 +106,28 @@ pub(super) fn resolve_facade(facade: &Facade) -> Result<FacadeSettings, Error> {
             .then(|| facade.launch_task.store.clone()),
         cors: cors(facade)?,
         summary: summary(facade)?,
+        endpoints: endpoints(&facade.endpoint)?,
     })
+}
+
+/// Returns the endpoints `endpoint` configures, `None` when `Endpoint` serves
+/// none.
+fn endpoints(
+    endpoint: &crate::config::section::facade::FacadeEndpoint,
+) -> Result<Option<crate::facade::endpoint::Endpoints>, Error> {
+    if !endpoint.enabled {
+        return Ok(None);
+    }
+    let wado_rs = if endpoint.dicomweb_wado_rs.is_empty() {
+        None
+    } else {
+        url_of(
+            "facade.endpoint.dicomweb_wado_rs",
+            &endpoint.dicomweb_wado_rs,
+        )?;
+        Some(endpoint.dicomweb_wado_rs.clone())
+    };
+    Ok(Some(crate::facade::endpoint::Endpoints { wado_rs }))
 }
 
 /// Returns the patient summary `facade` configures, `None` when it is off.
