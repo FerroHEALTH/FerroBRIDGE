@@ -221,6 +221,7 @@ async fn the_party_resources_live_in_the_reference_cdrs_demographic_store()
             language: String::from("en"),
             territory: String::from("GB"),
             ehr_status_system: None,
+            custodian: crate::facade::custodian(),
         },
     ));
     for resource_type in ["Patient", "Practitioner", "Organization"] {

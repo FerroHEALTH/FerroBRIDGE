@@ -801,6 +801,19 @@ This lane reaches identifiable data, and the server says so once at start-up.
 | `search_count` | `20` | The page size of a search that names no `_count` |
 | `search_count_max` | `100` | The largest page one search answers; a larger `_count` is answered with this many |
 | `binding_identifier_issuers` | none | The `DV_IDENTIFIER.issuer` of each binding key the CDR binds a login to (the `identifier_issuer` of its issuers' party tables); the facade refuses with `403` to create, update or delete a party resource whose party carries an identifier of one of them |
+| `custodian.name` | none, required | The name of the healthcare provider that holds the records behind the CDR, the custodian every document the bridge writes names |
+| `custodian.identifier_system` | none, required | The system of that provider's identifier |
+| `custodian.identifier_value` | none, required | The value of that provider's identifier |
+
+`[facade.custodian]` names the custodian of every document the bridge
+writes, `Composition/$document`, the documents the MHD Document Responder
+describes, and `Patient/$summary`: the healthcare provider that holds the
+records behind the CDR, the health data holder of Regulation (EU) 2025/327,
+never the bridge. FHIR R4 `Composition.custodian` is the organisation
+"responsible for ongoing maintenance of and access to the
+composition/document information", and HL7 Europe EU Health Data API
+`EehrxfMhdDocumentReference` requires `DocumentReference.custodian`. An
+enabled facade refuses to start without each of the three keys.
 
 The three `subject_` keys make the facade's link between a Patient and its
 EHR match the one the CDR's owner writes, because the facade finds an EHR
@@ -1722,6 +1735,11 @@ ehr_policy = "create_on_first_write"
 subject_namespace = "https://example.org/fhir/sid/patient"
 composition_language = "en"
 composition_territory = "GB"
+
+[facade.custodian]
+name = "Example Hospital"
+identifier_system = "urn:oid:2.999.1.1"
+identifier_value = "example-hospital"
 
 [auth]
 issuer = "https://auth.example.org/realms/clinic"

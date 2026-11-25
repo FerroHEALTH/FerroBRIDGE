@@ -30,7 +30,7 @@ use super::store::{CursorError, InboxStore};
 use crate::sources::document::{Document, SecretRef, Webhook};
 use crate::sources::{Source, Sources};
 use crate::store::Store;
-use crate::store::lease::{Generation, Lane, Lease, Renewed};
+use crate::store::lease::{Generation, Lane, Leader, Lease};
 
 /// The recovery steps a webhook source declares.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
@@ -439,8 +439,9 @@ impl Recoverer {
     }
 
     /// Runs recovery for every webhook source on its own task until `stop`
-    /// reads `true`: a redelivery for each source this replica leads at
-    /// start, then reconciliation every `tick`.
+    /// reads `true`: a redelivery for each source this replica comes to lead,
+    /// then reconciliation every `tick`. Each source's lane is held through a
+    /// [`Leader`] across rounds and released on `stop`.
     #[must_use]
     pub fn spawn(
         self: &Arc<Self>,
@@ -451,18 +452,25 @@ impl Recoverer {
         let mut stop = stop.clone();
         tokio::spawn(async move {
             let mut redelivered = std::collections::BTreeSet::new();
+            let mut leaders = BTreeMap::new();
             while !*stop.borrow() {
-                recoverer.round(&mut redelivered).await;
+                recoverer.round(&mut redelivered, &mut leaders).await;
                 tokio::select! {
                     () = tokio::time::sleep(tick) => {}
                     _ = stop.changed() => {}
                 }
             }
+            release(&mut leaders).await;
         })
     }
 
-    /// Runs one round over every webhook source this replica can lead.
-    async fn round(&self, redelivered: &mut std::collections::BTreeSet<Uuid>) {
+    /// Runs one round over every webhook source this replica can lead,
+    /// giving up the lane of a source that no longer recovers.
+    async fn round(
+        &self,
+        redelivered: &mut std::collections::BTreeSet<Uuid>,
+        leaders: &mut BTreeMap<Uuid, Leader>,
+    ) {
         let sources = match self.sources.store().list().await {
             Ok(sources) => sources,
             Err(error) => {
@@ -470,6 +478,7 @@ impl Recoverer {
                 return;
             }
         };
+        let mut gone = std::mem::take(leaders);
         for source in sources.into_iter().filter(|source| source.enabled) {
             let recovers = match &source.parsed {
                 Document::Webhook(webhook) => webhook.recovery != Recovery::default(),
@@ -479,31 +488,56 @@ impl Recoverer {
             if !recovers {
                 continue;
             }
-            let Ok(lease) = self.lease_of(source.id) else {
-                continue;
+            let leader = match gone.remove(&source.id) {
+                Some(leader) => leader,
+                None => match self.lease_of(source.id) {
+                    Ok(lease) => Leader::new(Arc::new(lease)),
+                    Err(_unnamed) => continue,
+                },
             };
-            let generation = match lease.claim().await {
-                Ok(Some(generation)) => generation,
+            let leader = leaders.entry(source.id).or_insert(leader);
+            let term = match leader.lead().await {
+                Ok(Some(term)) => term,
                 Ok(None) => continue,
                 Err(error) => {
                     tracing::warn!(%error, source = %source.name, "the recovery lease could not be taken");
                     continue;
                 }
             };
+            let (lease, generation) = (term.lease(), term.generation());
             if redelivered.insert(source.id)
                 && let Err(error) = self.redeliver(&source).await
             {
                 tracing::warn!(%error, source = %source.name, "the redelivery at start failed");
             }
-            if let Err(error) = self.reconcile(&source, &lease, generation, false).await {
+            let reconciled = self.reconcile(&source, lease, generation, false).await;
+            if let Err(error) = &reconciled {
                 tracing::warn!(%error, source = %source.name, "a reconciliation poll failed");
             }
-            if let Err(error) = self.catch_up(&source, &lease, generation).await {
+            let caught_up = self.catch_up(&source, lease, generation).await;
+            if let Err(error) = &caught_up {
                 tracing::warn!(%error, source = %source.name, "a subscription gap could not be recovered");
             }
-            if matches!(lease.renew(generation).await, Ok(Renewed::Lost)) {
+            if [reconciled, caught_up].iter().any(is_fenced) {
                 tracing::info!(source = %source.name, "another replica took the recovery lease");
+                leader.lost();
             }
+        }
+        release(&mut gone).await;
+    }
+}
+
+/// Returns whether `outcome` failed on a cursor write another replica's
+/// lease fenced.
+fn is_fenced(outcome: &Result<u64, RecoverError>) -> bool {
+    matches!(outcome, Err(RecoverError::Cursor(CursorError::Fenced(_))))
+}
+
+/// Gives up the lane of every leader in `leaders`.
+async fn release(leaders: &mut BTreeMap<Uuid, Leader>) {
+    for (source, mut leader) in std::mem::take(leaders) {
+        if let Err(error) = leader.release().await {
+            tracing::warn!(%error, %source, "the recovery lease could not be released; it runs out on its own");
         }
     }
 }
