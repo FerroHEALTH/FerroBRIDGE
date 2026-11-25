@@ -96,7 +96,7 @@ fn the_r4_wide_closure_holds_the_clinical_resources() {
         "Patient",
         "Observation",
         "Condition",
-        "Provenance",
+        "Encounter",
         "MedicationRequest",
         "DiagnosticReport",
     ] {
@@ -111,6 +111,11 @@ fn the_r4_wide_closure_holds_the_clinical_resources() {
         );
         assert!(model.types.contains_key(name), "{name} is lowered");
     }
+    assert_eq!(
+        closure.scope("Provenance"),
+        Some(RootScope::Terminology),
+        "Provenance is a terminology root"
+    );
 }
 
 #[test]
@@ -231,7 +236,7 @@ fn the_closure_stops_at_the_root_set() {
             "{name} is outside the closure"
         );
     }
-    assert_eq!(closure.structures().len(), 63);
+    assert_eq!(closure.structures().len(), 64);
 }
 
 #[test]
@@ -388,6 +393,7 @@ fn the_resource_enum_covers_the_root_set() {
             "ConceptMap",
             "OperationOutcome",
             "Parameters",
+            "Provenance",
             "TerminologyCapabilities",
             "ValueSet"
         ]
@@ -431,7 +437,7 @@ fn r5_closes_over_its_own_datatypes() {
             "{name} is outside the R5 open types and the root set"
         );
     }
-    assert_eq!(closure.structures().len(), 65);
+    assert_eq!(closure.structures().len(), 66);
 }
 
 #[test]
