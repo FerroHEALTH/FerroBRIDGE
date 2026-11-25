@@ -28,8 +28,6 @@ use crate::resolve::program::target::FhirTarget;
 use crate::tree::Occurrence;
 use crate::tree::element::Table;
 use crate::tree::read::Match;
-use crate::tree::read::read;
-use crate::tree::write::write;
 
 use crate::engine::traverse::Binding;
 use crate::engine::traverse::Held;
@@ -213,14 +211,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         target: &FhirTarget,
         occurrence: &Occurrence,
     ) -> Result<Option<Value>, EngineError> {
-        let matches =
-            read(self.table, self.document_for(target), target.expression()).map_err(|source| {
-                EngineError::Read {
-                    mapping: String::from(mapping.name()),
-                    expression: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                }
-            })?;
+        let matches = self.matches_of(mapping.name(), target)?;
         Ok(matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -250,19 +241,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }
             (_, element) => element,
         };
-        let table = self.table;
-        write(
-            table,
-            self.document_for_mut(target),
-            target.expression(),
-            &binding.fhir,
-            merged,
-        )
-        .map_err(|source| EngineError::Write {
-            mapping: String::from(mapping.name()),
-            element: String::from(target.resolved().leaf()),
-            source: Box::new(source),
-        })
+        self.write_at(mapping.name(), target, &binding.fhir, merged)
     }
 }
 

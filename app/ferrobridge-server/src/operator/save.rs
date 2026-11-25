@@ -27,10 +27,11 @@ use crate::mappings::files;
 use crate::mappings::files::Draft;
 use crate::mappings::revisions::{Change, Console, Entry, Files, Recording};
 use crate::operator::Operator;
-use crate::operator::guard::AUDIT_TARGET;
+use crate::operator::guard::audited;
+use crate::operator::refused::Refused;
 use crate::operator::reload::Prepared;
 use crate::operator::reload::ReloadError;
-use crate::problem::{Kind, refuse};
+use crate::problem::Kind;
 use ferrobridge_operator_api::revisions::{Origin, Revision};
 
 /// The header a save names its reason in.
@@ -96,10 +97,10 @@ pub async fn save(
         return Failure::BadEntry.into_response();
     }
     let Some(reason) = reason(&headers) else {
-        return refuse(
+        return Refused::Problem(
             Kind::ReasonRequired,
             "a save names its reason in the Ferrobridge-Reason header, one line of at most 200 characters",
-        );
+        ).into_response();
     };
     let precondition = Precondition::of(&headers);
     let new_digest = files::sha256(&body);
@@ -133,16 +134,14 @@ pub async fn save(
             (response.status(), None, response)
         }
     };
-    tracing::info!(
-        target: AUDIT_TARGET,
-        subject = subject.as_str(),
-        action = "save",
+    audited!(
+        subject.as_str(),
+        "save",
+        status,
         file = wire.as_str(),
         old_sha256 = old_digest.as_deref().unwrap_or("-"),
         new_sha256 = new_digest.as_str(),
         reason = reason.as_str(),
-        status = status.as_u16(),
-        "operator"
     );
     response
 }
@@ -168,13 +167,7 @@ pub async fn reload(State(operator): State<Arc<Operator>>, access: Access) -> Re
         Ok(Err(error)) => unavailable(&error),
         Err(failure) => failure.into_response(),
     };
-    tracing::info!(
-        target: AUDIT_TARGET,
-        subject = subject_of(&access),
-        action = "reload",
-        status = response.status().as_u16(),
-        "operator"
-    );
+    audited!(subject_of(&access), "reload", response.status());
     response
 }
 
@@ -261,7 +254,7 @@ pub enum Saved {
 
 /// Why a set of console files did not compile into one that runs.
 #[derive(Debug)]
-pub enum Refused {
+pub enum Uncompiled {
     /// An error diagnostic, with the report by wire path.
     Rejected(ferrobridge_operator_api::operator::LoadReport),
     /// The check could not run to the end.
@@ -306,40 +299,40 @@ pub enum Failure {
 impl IntoResponse for Failure {
     fn into_response(self) -> Response {
         match self {
-            Self::PreconditionRequired => refuse(
+            Self::PreconditionRequired => Refused::Problem(
                 Kind::PreconditionRequired,
                 "send If-Match with the ETag of what the request replaces, or If-None-Match: * for a new file",
-            ),
-            Self::PreconditionFailed { .. } => refuse(
+            ).into_response(),
+            Self::PreconditionFailed { .. } => Refused::Problem(
                 Kind::PreconditionFailed,
                 "what the request replaces changed since the ETag it names",
-            ),
-            Self::Provisioned => refuse(
+            ).into_response(),
+            Self::Provisioned => Refused::Problem(
                 Kind::Provisioned,
                 "a provisioned file holds this path, and the console never writes one",
-            ),
-            Self::Unconfigured => refuse(
+            ).into_response(),
+            Self::Unconfigured => Refused::Problem(
                 Kind::NotConfigured,
                 "no [state] is configured, so the operator API checks and saves nothing",
-            ),
-            Self::UnknownRevision => refuse(Kind::NotFound, "no revision has this id"),
-            Self::BadEntry => refuse(
+            ).into_response(),
+            Self::UnknownRevision => Refused::Problem(Kind::NotFound, "no revision has this id").into_response(),
+            Self::BadEntry => Refused::Problem(
                 Kind::BadPath,
                 "the path names no FHIRconnect or OMOCL mapping file the console can write",
-            ),
-            Self::Archive(_) => refuse(
+            ).into_response(),
+            Self::Archive(_) => Refused::Problem(
                 Kind::BadArchive,
                 "the body is no mapping-set archive the bridge reads",
-            ),
+            ).into_response(),
             Self::Task(_) | Self::Store(_) => {
                 tracing::error!(
                     error = ferrohealth_server::run::chain(&self),
                     "an operator save could not reach the state store"
                 );
-                refuse(
+                Refused::Problem(
                     Kind::Unwritable,
                     "the mapping revisions could not be read or written",
-                )
+                ).into_response()
             }
         }
     }
@@ -370,17 +363,17 @@ impl Operator {
     ///
     /// # Errors
     ///
-    /// Returns [`Refused::Rejected`] with the report when a diagnostic is an
-    /// error, and [`Refused::Unavailable`] when the check could not run.
+    /// Returns [`Uncompiled::Rejected`] with the report when a diagnostic is an
+    /// error, and [`Uncompiled::Unavailable`] when the check could not run.
     pub(crate) fn compile(
         &self,
         thread: &OnBlockingThread,
         console: &Files,
-    ) -> Result<Prepared, Refused> {
+    ) -> Result<Prepared, Uncompiled> {
         self.prepare(thread, console, None)
             .map_err(|error| match error {
-                ReloadError::Rejected(report) => Refused::Rejected(self.load_report(&report)),
-                error => Refused::Unavailable(error),
+                ReloadError::Rejected(report) => Uncompiled::Rejected(self.load_report(&report)),
+                error => Uncompiled::Unavailable(error),
             })
     }
 
@@ -429,8 +422,8 @@ impl Operator {
         contents.insert(wire.to_owned(), Arc::from(body));
         let prepared = match self.compile(thread, &contents) {
             Ok(prepared) => prepared,
-            Err(Refused::Rejected(report)) => return Ok(Saved::Rejected { old, report }),
-            Err(Refused::Unavailable(error)) => return Ok(Saved::Unreloaded { old, error }),
+            Err(Uncompiled::Rejected(report)) => return Ok(Saved::Rejected { old, report }),
+            Err(Uncompiled::Unavailable(error)) => return Ok(Saved::Unreloaded { old, error }),
         };
         let entry = Entry {
             origin: Origin::Save,
@@ -534,8 +527,9 @@ pub(crate) fn unavailable(error: &ReloadError) -> Response {
         error = ferrohealth_server::run::chain(error),
         "the mapping set could not be reloaded"
     );
-    refuse(
+    Refused::Problem(
         Kind::ReloadUnavailable,
         "the mapping set could not be reloaded; the bridge log names the cause",
     )
+    .into_response()
 }

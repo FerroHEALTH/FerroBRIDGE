@@ -18,9 +18,10 @@
 //!   resource the facade committed: it is read through the identity map and
 //!   the CDR as a read answers it.
 //! - An absolute reference is fetched only from a base on the configured
-//!   allow-list (`[facade.references] fetch_bases`, empty by default), with
-//!   redirects refused, so a client cannot make the bridge call an arbitrary
-//!   URL it names.
+//!   allow-list (`[facade.references] fetch_bases`, empty by default),
+//!   through one `ferrohealth-smart` `OutboundClient` that refuses redirects
+//!   and tries each fetch once, so a client cannot make the bridge call an
+//!   arbitrary URL it names.
 //! - References are followed to `max_depth` levels, each literal at most
 //!   once, which keeps a cycle from looping.
 //! - A reference whose resource is absent (off the allow-list, no `<Type>/<id>`,
@@ -41,6 +42,11 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::time::Duration;
 
+use ferrohealth_config::tls::{TlsClientSection, TlsVersion};
+use ferrohealth_secret::secret_url::SecretUrl;
+use ferrohealth_smart::client::outbound::{OutboundClient, OutboundError, SendError};
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::{EndpointSection, RetrySection};
 use fhir_types::codec::Value;
 use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::ReferenceSource;
@@ -75,7 +81,7 @@ pub struct Policy {
     /// How many levels of references are followed.
     max_depth: u32,
     /// The client every fetch goes through, when any base is allowed.
-    http: Option<reqwest::Client>,
+    http: Option<OutboundClient>,
 }
 
 impl Default for Policy {
@@ -94,21 +100,36 @@ impl Policy {
     ///
     /// # Errors
     ///
-    /// Returns [`reqwest::Error`] when the HTTP client cannot be built.
+    /// Returns [`OutboundError`] when the HTTP client cannot be built.
     pub fn new(
         fetch_bases: Vec<Url>,
         max_depth: u32,
         timeout: Duration,
-    ) -> Result<Self, reqwest::Error> {
-        let http = if fetch_bases.is_empty() {
-            None
-        } else {
-            Some(
-                reqwest::Client::builder()
-                    .timeout(timeout)
-                    .redirect(reqwest::redirect::Policy::none())
-                    .build()?,
-            )
+    ) -> Result<Self, OutboundError> {
+        let http = match fetch_bases.first() {
+            None => None,
+            Some(base) => {
+                let endpoint = EndpointSection {
+                    url: SecretUrl::new(base.as_str()),
+                    timeout: ferrohealth_config::units::Duration::from_millis(
+                        u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+                    ),
+                    retry: RetrySection {
+                        max_attempts: 1,
+                        ..RetrySection::default()
+                    },
+                    tls: TlsClientSection {
+                        min_version: TlsVersion::Tls12,
+                        ..TlsClientSection::default()
+                    },
+                    ..EndpointSection::default()
+                };
+                Some(OutboundClient::build(
+                    &endpoint,
+                    "facade.references",
+                    &ServerTls,
+                )?)
+            }
         };
         Ok(Self {
             fetch_bases,
@@ -523,12 +544,15 @@ async fn fetch(
         } => {
             let http = policy.http.as_ref().ok_or(Reason::NotAllowed)?;
             let answered = http
-                .get(url.clone())
-                .header(http::header::ACCEPT, FHIR_JSON)
-                .send()
+                .send(&http::Method::GET, url, |request| {
+                    request.header(http::header::ACCEPT, FHIR_JSON)
+                })
                 .await
                 .map_err(|error| Reason::NoAnswer {
-                    detail: error.to_string(),
+                    detail: match error {
+                        SendError::Transport(source) => source.to_string(),
+                        other => other.to_string(),
+                    },
                 })?;
             let status = answered.status();
             tracing::info!(

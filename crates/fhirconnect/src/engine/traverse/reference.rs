@@ -21,8 +21,6 @@ use crate::resolve::program::target::FhirTarget;
 use crate::tree::Occurrence;
 
 use crate::tree::element::Table;
-use crate::tree::read::read;
-use crate::tree::write::write;
 
 use crate::engine::traverse::Binding;
 use crate::engine::traverse::Run;
@@ -259,14 +257,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let Some(target) = mapping.fhir() else {
             return Ok(None);
         };
-        let matches =
-            read(self.table, self.document_for(target), target.expression()).map_err(|source| {
-                EngineError::Read {
-                    mapping: String::from(mapping.name()),
-                    expression: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                }
-            })?;
+        let matches = self.matches_of(mapping.name(), target)?;
         Ok(matches
             .iter()
             .find(|matched| matched.occurrence() == input)
@@ -342,7 +333,6 @@ impl<T: Table + ?Sized> Run<'_, T> {
         let Some(target) = mapping.fhir() else {
             return Ok(());
         };
-        let element = String::from(target.resolved().leaf());
         let value = if FhirKind::at(target.resolved().location()) == Some(FhirKind::Reference) {
             let mut object = Object::new();
             object.insert(
@@ -359,18 +349,6 @@ impl<T: Table + ?Sized> Run<'_, T> {
         } else {
             Value::String(String::from(literal))
         };
-        let table = self.table;
-        write(
-            table,
-            self.document_for_mut(target),
-            target.expression(),
-            &binding.fhir,
-            value,
-        )
-        .map_err(|source| EngineError::Write {
-            mapping: String::from(mapping.name()),
-            element,
-            source: Box::new(source),
-        })
+        self.write_at(mapping.name(), target, &binding.fhir, value)
     }
 }

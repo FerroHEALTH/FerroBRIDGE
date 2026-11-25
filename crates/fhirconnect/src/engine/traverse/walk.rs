@@ -31,7 +31,6 @@ use crate::tree::Occurrence;
 
 use crate::tree::element::Table;
 use crate::tree::read::Selected;
-use crate::tree::read::read;
 
 use crate::engine::traverse::Binding;
 use crate::engine::traverse::INSTANCE_CEILING;
@@ -279,12 +278,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     return Ok(vec![parent.fhir.clone()]);
                 };
                 let parent = &self.scoped(Some(input), parent);
-                let matches = read(self.table, self.document_for(input), input.expression())
-                    .map_err(|source| EngineError::Read {
-                        mapping: String::from(mapping.name()),
-                        expression: String::from(input.expression().as_str()),
-                        source: Box::new(source),
-                    })?;
+                let matches = self.matches_of(mapping.name(), input)?;
                 let pinned = self
                     .pin_for(input)
                     .filter(|&(axes, _)| fhir_axes(input).starts_with(axes))
@@ -586,11 +580,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             if input.on_element() && segments == [rm::null_flavour::NULL_FLAVOUR] {
                 return rm::null_flavour::null_flavour_of(&value, node.aql_path().as_str())
                     .map(|found| found.map(|flavour| Leaf::NullFlavour(Box::new(flavour))))
-                    .map_err(|source| EngineError::Rm {
-                        mapping: String::from(mapping.name()),
-                        node: String::from(node.aql_path().as_str()),
-                        source: Box::new(source),
-                    });
+                    .map_err(EngineError::rm(mapping, node));
             }
             let elements = positions
                 .get(input.occurrences().len()..)
@@ -609,19 +599,11 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 .ok_or_else(|| unsupported_tail(mapping, input))?;
             return RmValue::from_canonical(leaf, node.aql_path().as_str(), found)
                 .map(|value| Some(Leaf::Value(Box::new(value))))
-                .map_err(|source| EngineError::Rm {
-                    mapping: String::from(mapping.name()),
-                    node: String::from(node.aql_path().as_str()),
-                    source: Box::new(source),
-                });
+                .map_err(EngineError::rm(mapping, node));
         }
         RmValue::from_canonical(node.rm_type(), node.aql_path().as_str(), &value)
             .map(|value| Some(Leaf::Value(Box::new(value))))
-            .map_err(|source| EngineError::Rm {
-                mapping: String::from(mapping.name()),
-                node: String::from(node.aql_path().as_str()),
-                source: Box::new(source),
-            })
+            .map_err(EngineError::rm(mapping, node))
     }
 
     /// Applies one mapping's method to every admitted input occurrence.
