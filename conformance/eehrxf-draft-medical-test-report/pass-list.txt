@@ -73,6 +73,7 @@ eehrxf-test-report-ecg:header.period
 eehrxf-test-report-ecg:header.serviceSpecialty
 eehrxf-test-report-ecg:header.status
 eehrxf-test-report-ecg:header.subject
+eehrxf-test-report-ecg:header.version
 eehrxf-test-report-ecg:intendedRecipient[x]
 eehrxf-test-report-ecg:presentedForm
 eehrxf-test-report-spirometry:attachment
@@ -111,6 +112,7 @@ eehrxf-test-report-spirometry:header.period
 eehrxf-test-report-spirometry:header.serviceSpecialty
 eehrxf-test-report-spirometry:header.status
 eehrxf-test-report-spirometry:header.subject
+eehrxf-test-report-spirometry:header.version
 eehrxf-test-report-spirometry:intendedRecipient[x]
 eehrxf-test-report-spirometry:presentedForm
 total 120

@@ -394,7 +394,11 @@ pub(crate) fn synthetic() -> Vec<(&'static str, String)> {
 /// `version` and `documentCategory`).
 #[cfg(all(
     feature = "openehr",
-    any(feature = "patient-summary", feature = "laboratory")
+    any(
+        feature = "patient-summary",
+        feature = "laboratory",
+        feature = "imaging"
+    )
 ))]
 pub(crate) fn annex_iii(code: &str) -> eehrxf::document::metadata::DocumentMetadata {
     eehrxf::document::metadata::DocumentMetadata::new(

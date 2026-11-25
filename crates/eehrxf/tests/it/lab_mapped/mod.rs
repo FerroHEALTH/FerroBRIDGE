@@ -274,7 +274,6 @@ fn received_text_of(result: &Value, report: &Value) -> Result<String, Box<dyn Er
         return Err("the synthetic report is no DiagnosticReport".into());
     };
     document.with_report(*report)?;
-    document.with_metadata(annex_iii("11502-2"));
     Ok(serde_json::to_string(&document.into_bundle()?)?)
 }
 
@@ -322,6 +321,7 @@ fn round_trip() -> Result<(String, String), Box<dyn Error>> {
     )?;
     let results = out.with_mapped_report(run.bundle())?;
     out.with_section(chemistry(results)?)?;
+    out.with_metadata(annex_iii("11502-2"));
     Ok((received, serde_json::to_string(&out.into_bundle()?)?))
 }
 

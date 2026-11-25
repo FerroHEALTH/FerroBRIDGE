@@ -39,6 +39,7 @@ use eehrxf::document::discharge::HDR_SLOTS;
 use eehrxf::document::form::{SLOTS, Slot};
 use eehrxf::document::imaging::IMAGING_SLOTS;
 use eehrxf::document::laboratory::LAB_SLOTS;
+use eehrxf::document::metadata::COMPOSITION_VERSION;
 use eehrxf::draft::{Annex, AnnexCrosswalk, Row, SHIPPED};
 use serde_json::{Value, json};
 
@@ -169,6 +170,14 @@ fn values<'a>(bundle: &'a Value, element: &str) -> Vec<&'a Value> {
     held
 }
 
+/// The extension URL an annex `element` carried at the extension element
+/// `eps` is written under, when the element has one: the R5
+/// `Composition.version` cross-version extension for `header.version`, so
+/// another extension of the composition is never counted as the version.
+fn extension_of(element: &str, eps: &str) -> Option<&'static str> {
+    (element == "header.version" && eps.ends_with(".extension")).then_some(COMPOSITION_VERSION)
+}
+
 /// The HL7 Europe element that carries the annex `row`, through the Xt-EHR
 /// element the draft crosswalk sets beside it, and whether that element is
 /// the one whose slices are the sections, which a single annex element
@@ -255,7 +264,10 @@ fn measure(category: &Category, dir: &Path) -> Result<Value, Box<dyn Error>> {
                 unmapped += 1;
                 continue;
             };
-            let found = values(&bundle, eps).len();
+            let found = values(&bundle, eps)
+                .into_iter()
+                .filter(|value| extension_of(element, eps).is_none_or(|url| value["url"] == url))
+                .count();
             let required = cardinality.is_required()
                 && parents(&rows, element, |parent| {
                     parent
