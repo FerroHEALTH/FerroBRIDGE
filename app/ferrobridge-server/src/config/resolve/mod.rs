@@ -103,7 +103,21 @@ pub(super) fn resolve_facade(
         cors: cors(facade)?,
         summary: summary(facade)?,
         endpoints: endpoints(&facade.endpoint)?,
+        mhd: mhd(facade)?,
     })
+}
+
+/// Returns whether the MHD Document Responder is served: ITI-66 and ITI-67
+/// SHALL process `patient.identifier` (ITI TF-2: 3.66.4.1.2.1,
+/// 3.67.4.1.2.1), which the identifier search resolves.
+fn mhd(facade: &Facade) -> Result<bool, Error> {
+    if facade.mhd.enabled && !facade.identifier_search.enabled {
+        return Err(Error::Needs {
+            key: String::from("facade.mhd.enabled"),
+            needs: String::from("facade.identifier_search.enabled"),
+        });
+    }
+    Ok(facade.mhd.enabled)
 }
 
 /// Returns the endpoints `endpoint` configures, `None` when `Endpoint` serves

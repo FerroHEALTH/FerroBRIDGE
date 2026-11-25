@@ -43,21 +43,27 @@ impl Prefer {
     /// refusing the request (<https://hl7.org/fhir/R4/http.html#return>).
     #[must_use]
     pub fn of(headers: &HeaderMap) -> Self {
-        for value in headers.get_all("prefer") {
-            let Ok(text) = value.to_str() else {
-                continue;
-            };
-            for part in text.split(',') {
-                match part.trim().to_ascii_lowercase().as_str() {
-                    "return=minimal" => return Self::Minimal,
-                    "return=representation" => return Self::Representation,
-                    "return=operationoutcome" => return Self::Outcome,
-                    _ => {}
-                }
-            }
-        }
-        Self::Representation
+        preferences(headers)
+            .find_map(|part| match part.as_str() {
+                "return=minimal" => Some(Self::Minimal),
+                "return=representation" => Some(Self::Representation),
+                "return=operationoutcome" => Some(Self::Outcome),
+                _ => None,
+            })
+            .unwrap_or(Self::Representation)
     }
+}
+
+/// Returns every preference the `Prefer` headers of `headers` carry, in
+/// order, trimmed and lowercased (RFC 7240 §2); a header value that is not
+/// text carries none.
+pub fn preferences(headers: &HeaderMap) -> impl Iterator<Item = String> + '_ {
+    headers
+        .get_all("prefer")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|text| text.split(','))
+        .map(|part| part.trim().to_ascii_lowercase())
 }
 
 /// Why a request's media types are not ones the facade speaks.
@@ -74,6 +80,13 @@ pub enum MediaError {
     #[error("this server produces {FHIR_JSON}, which {found} does not accept")]
     NotAcceptable {
         /// The `Accept` header the client sent.
+        found: String,
+    },
+    /// The `_format` or `Accept` of a resource served in both FHIR formats
+    /// names neither.
+    #[error("this resource is served as {FHIR_JSON} or {FHIR_XML}, and {found} names neither")]
+    Unformattable {
+        /// The `_format` or `Accept` value the client sent.
         found: String,
     },
 }
@@ -201,9 +214,91 @@ pub fn count(query: Option<&str>) -> Result<Option<u32>, CountError> {
         .transpose()
 }
 
+/// The FHIR XML media type (<https://hl7.org/fhir/R4/http.html#mime-type>).
+pub const FHIR_XML: &str = "application/fhir+xml";
+
+/// The format a document and the MHD resources are answered in.
+///
+/// A server SHOULD honour `_format`, which overrides `Accept`, and the
+/// values it takes are `json`, `xml` and their media types
+/// (<https://hl7.org/fhir/R4/http.html#mime-type>). MHD 4.2.3 has the
+/// Document Responder support both encodings (ITI TF-2: 3.66.4.1.2.2,
+/// 3.67.4.1.2.2) and answer the document in the media type asked for
+/// (3.68.4.1.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Format {
+    /// FHIR JSON, the default.
+    #[default]
+    Json,
+    /// FHIR XML.
+    Xml,
+}
+
+impl Format {
+    /// Returns the format `name`, a `_format` value or a media type, names.
+    fn named(name: &str) -> Option<Self> {
+        match essence(name).to_ascii_lowercase().as_str() {
+            "json" | FHIR_JSON | JSON | "application/*" | "*/*" => Some(Self::Json),
+            "xml" | FHIR_XML | "application/xml" | "text/xml" => Some(Self::Xml),
+            _ => None,
+        }
+    }
+
+    /// Returns the format the request asks for: its `_format` parameter,
+    /// else the first `Accept` entry this server produces, else JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MediaError::Unformattable`] for a `_format` that names
+    /// neither format, or an `Accept` header that names nothing this server
+    /// produces.
+    pub fn negotiate(headers: &HeaderMap, query: Option<&str>) -> Result<Self, MediaError> {
+        let pairs = query_pairs(query.unwrap_or_default().as_bytes());
+        if let Some((_, value)) = pairs.iter().find(|(name, _)| name == "_format") {
+            return Self::named(value).ok_or_else(|| MediaError::Unformattable {
+                found: value.clone(),
+            });
+        }
+        let Some(value) = headers.get(header::ACCEPT) else {
+            return Ok(Self::Json);
+        };
+        let Ok(text) = value.to_str() else {
+            return Err(MediaError::Unformattable {
+                found: String::from("an Accept header that is not text"),
+            });
+        };
+        text.split(',')
+            .filter(|entry| !refused_by_quality(entry))
+            .find_map(Self::named)
+            .ok_or_else(|| MediaError::Unformattable {
+                found: text.to_owned(),
+            })
+    }
+
+    /// Returns the media type the format is written in.
+    #[must_use]
+    pub const fn media_type(self) -> &'static str {
+        match self {
+            Self::Json => FHIR_JSON,
+            Self::Xml => FHIR_XML,
+        }
+    }
+}
+
+/// Whether one `Accept` entry carries `q=0`, "not acceptable" (RFC 9110
+/// §12.4.2).
+fn refused_by_quality(entry: &str) -> bool {
+    entry.split(';').skip(1).any(|parameter| {
+        parameter
+            .trim()
+            .strip_prefix("q=")
+            .is_some_and(|quality| quality.parse::<f32>().is_ok_and(|value| value <= 0.0))
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{CountError, MediaError, Prefer, check_accept, check_content_type, count};
+    use super::{CountError, Format, MediaError, Prefer, check_accept, check_content_type, count};
     use http::{HeaderMap, HeaderValue, header};
 
     /// Returns headers carrying `name: value`.
@@ -303,5 +398,29 @@ mod tests {
         assert_eq!(Ok(Some(5)), count(Some("_c%6Funt=5")));
         let refused: CountError = count(Some("_count=m%61ny")).expect_err("a word is no page size");
         assert_eq!("many", refused.found());
+    }
+
+    #[test]
+    fn the_format_parameter_leads_and_accept_follows() {
+        let xml = headers(header::ACCEPT, "application/fhir+xml");
+        assert_eq!(Ok(Format::Xml), Format::negotiate(&xml, None));
+        assert_eq!(
+            Ok(Format::Json),
+            Format::negotiate(&xml, Some("_format=json"))
+        );
+        assert_eq!(
+            Ok(Format::Xml),
+            Format::negotiate(&HeaderMap::new(), Some("_format=application%2Ffhir%2Bxml"))
+        );
+        assert_eq!(Ok(Format::Json), Format::negotiate(&HeaderMap::new(), None));
+        assert_eq!(
+            Ok(Format::Json),
+            Format::negotiate(
+                &headers(header::ACCEPT, "application/fhir+xml;q=0, */*"),
+                None
+            )
+        );
+        assert!(Format::negotiate(&headers(header::ACCEPT, "application/pdf"), None).is_err());
+        assert!(Format::negotiate(&HeaderMap::new(), Some("_format=turtle")).is_err());
     }
 }

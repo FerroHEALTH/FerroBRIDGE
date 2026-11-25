@@ -365,11 +365,47 @@ async fn the_per_identifier_stub_answers_each_identifier_with_its_own_pseudonym(
         let source = link.identity().source(Some(system), value)?;
         let person = link
             .identity()
-            .pseudonym(&source, &ihe_atna_next::user::OnBehalfOf::System)
+            .pseudonym(&source, &ihe_atna::user::OnBehalfOf::System)
             .await?;
         assert_eq!(crate::support::PSEUDONYM_DOMAIN, person.namespace());
         assert_eq!(crate::support::pseudonym_of(system, value), person.id());
         assert!(seen.insert(person.id().to_owned()), "{system}|{value}");
     }
+    Ok(())
+}
+
+/// A recorder that keeps every exchange it is given.
+#[derive(Default)]
+struct Kept(std::sync::Mutex<Vec<ihe_atna::balp::Exchange>>);
+
+#[async_trait::async_trait]
+impl ihe_atna::balp::AuditRecorder for Kept {
+    async fn record(
+        &self,
+        exchange: ihe_atna::balp::Exchange,
+    ) -> Result<(), ihe_atna::balp::AuditError> {
+        self.0.lock().unwrap().push(exchange);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn an_audited_identity_source_records_each_iti_83_exchange_as_its_consumer()
+-> Result<(), Box<dyn Error>> {
+    // PIXm 3.1.0 §2:3.83.5.1.1: the Consumer records every ITI-83 query.
+    let (_pix, link) = crate::support::per_identifier(&[]).await;
+    let kept = std::sync::Arc::new(Kept::default());
+    let identity = link.identity().clone().audited(kept.clone());
+    let source = identity.source(Some(crate::support::SOURCE_DOMAIN), "synthetic-a")?;
+    identity
+        .pseudonym(&source, &ihe_atna::user::OnBehalfOf::System)
+        .await?;
+    let kept = kept.0.lock().unwrap();
+    assert_eq!(1, kept.len());
+    assert_eq!(
+        ihe_iti::pixm::audit::query_consumer().profile,
+        kept[0].kind.profile
+    );
+    assert_eq!(ihe_atna::balp::Outcome::Success, kept[0].outcome);
     Ok(())
 }

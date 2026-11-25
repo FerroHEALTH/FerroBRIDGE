@@ -56,7 +56,7 @@ template_overlay
     openEHR-EHR-ADMIN_ENTRY.episode_institution_local-ferrobridge.v0.0.0
 
 specialize
-    openEHR-EHR-ADMIN_ENTRY.episode_institution_local.v0
+    openEHR-EHR-ADMIN_ENTRY.episode_institution_local.v0.0.1-alpha
 
 language
     original_language = <[ISO_639-1::en]>

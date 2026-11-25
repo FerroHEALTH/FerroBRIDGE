@@ -6,13 +6,15 @@
 //! operator, work run again, and the source's recovery run on demand.
 //!
 //! A settlement records the subject of the operator's token and the reason
-//! given. No specification governs the operator surface: our own design.
+//! given, and every write logs one line under [`guard::AUDIT_TARGET`]. No
+//! specification governs the operator surface: our own design.
 
 use std::sync::Arc;
 
 use axum::Router;
-use axum::extract::{Path, State};
+use axum::extract::{FromRequestParts, Path, State};
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use ferrobridge_operator_api::inbound::{
@@ -99,24 +101,56 @@ async fn source(
     Ok((Arc::clone(intake), found))
 }
 
-/// Returns the source `id` names and the recovery that runs it.
-async fn recovering(
-    intake: Option<&Arc<Intake>>,
-    id: &str,
-) -> Result<(Arc<Recoverer>, Arc<Source>), Refused> {
-    let (intake, found) = source(intake, id).await?;
-    let recoverer = intake
-        .recoverer()
-        .cloned()
-        .ok_or(Refused::Problem(Kind::NotFound, NO_INTAKE))?;
-    Ok((recoverer, found))
+/// What a recovery route acts on: the source its path names, the recovery
+/// that runs it, and the subject of the operator's token.
+struct Recovery {
+    /// The recovery of the intake.
+    recoverer: Arc<Recoverer>,
+    /// The source the path names.
+    source: Arc<Source>,
+    /// The subject of the operator's token.
+    subject: String,
+}
+
+impl FromRequestParts<Option<Arc<Intake>>> for Recovery {
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        intake: &Option<Arc<Intake>>,
+    ) -> Result<Self, Response> {
+        let Path(id) = Path::<String>::from_request_parts(parts, intake)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let access = Access::from_request_parts(parts, intake)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let (intake, source) = source(intake.as_ref(), &id)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let recoverer = intake
+            .recoverer()
+            .cloned()
+            .ok_or(Refused::Problem(Kind::NotFound, NO_INTAKE))
+            .map_err(IntoResponse::into_response)?;
+        Ok(Self {
+            recoverer,
+            source,
+            subject: subject_of(&access).to_owned(),
+        })
+    }
 }
 
 /// `POST /operator/sources/{id}/reconcile`: runs every poll of the source
 /// now under its recovery lease; `202` with the items marked, `409` while
 /// another replica holds the lease.
-async fn reconcile(State(intake): Held, Path(id): Path<String>) -> Result<Response, Refused> {
-    let (recoverer, source) = recovering(intake.as_ref(), &id).await?;
+async fn reconcile(
+    Recovery {
+        recoverer,
+        source,
+        subject,
+    }: Recovery,
+) -> Result<Response, Refused> {
     let lease = recoverer
         .lease_of(source.id)
         .map_err(|_lane| Refused::Problem(Kind::InboundUnavailable, UNAVAILABLE))?;
@@ -138,13 +172,19 @@ async fn reconcile(State(intake): Held, Path(id): Path<String>) -> Result<Respon
             tracing::warn!(%error, source = %source.name, "a reconciliation an operator asked for failed");
             Refused::Problem(Kind::RecoveryFailed, FAILED)
         })?;
+    guard::source_audited(&subject, "reconcile", source.id, StatusCode::ACCEPTED);
     Ok((StatusCode::ACCEPTED, axum::Json(Replayed { items })).into_response())
 }
 
 /// `POST /operator/sources/{id}/redeliver`: calls the source's redelivery
 /// step now; `204` once the source accepted it.
-async fn redeliver(State(intake): Held, Path(id): Path<String>) -> Result<Response, Refused> {
-    let (recoverer, source) = recovering(intake.as_ref(), &id).await?;
+async fn redeliver(
+    Recovery {
+        recoverer,
+        source,
+        subject,
+    }: Recovery,
+) -> Result<Response, Refused> {
     let called = recoverer.redeliver(&source).await.map_err(|error| {
         tracing::warn!(%error, source = %source.name, "a redelivery an operator asked for failed");
         Refused::Problem(Kind::RecoveryFailed, FAILED)
@@ -155,6 +195,7 @@ async fn redeliver(State(intake): Held, Path(id): Path<String>) -> Result<Respon
             "the source declares no redelivery step",
         ));
     }
+    guard::source_audited(&subject, "redeliver", source.id, StatusCode::NO_CONTENT);
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -201,9 +242,9 @@ async fn settle(
         tenant: body.tenant,
         entity: body.entity,
     };
-    let settlement = match body.settlement {
-        Settlement::Retry => store::Settlement::Retry,
-        Settlement::Discard => store::Settlement::Discard,
+    let (settlement, action) = match body.settlement {
+        Settlement::Retry => (store::Settlement::Retry, "retry"),
+        Settlement::Discard => (store::Settlement::Discard, "discard"),
     };
     let settled = intake
         .store()
@@ -216,6 +257,12 @@ async fn settle(
             "no parked item has this entity",
         ));
     }
+    guard::source_audited(
+        subject_of(&access),
+        action,
+        source.id,
+        StatusCode::NO_CONTENT,
+    );
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -224,6 +271,7 @@ async fn settle(
 async fn replay(
     State(intake): Held,
     Path(id): Path<String>,
+    access: Access,
     axum::Json(body): axum::Json<Replay>,
 ) -> Result<Response, Refused> {
     let (intake, source) = source(intake.as_ref(), &id).await?;
@@ -247,5 +295,11 @@ async fn replay(
         .replay(source.id, &replay)
         .await
         .map_err(unavailable("inbound work could not be replayed"))?;
+    guard::source_audited(
+        subject_of(&access),
+        "replay",
+        source.id,
+        StatusCode::ACCEPTED,
+    );
     Ok((StatusCode::ACCEPTED, axum::Json(Replayed { items })).into_response())
 }

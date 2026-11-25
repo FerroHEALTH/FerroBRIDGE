@@ -16,7 +16,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use fhir_types::codec::Value;
-use ihe_atna_next::user::OnBehalfOf;
+use ihe_atna::user::OnBehalfOf;
 use ihe_iti::pixm::identifier::SourceIdentifier;
 use secrecy::SecretString;
 

@@ -61,6 +61,7 @@ pub mod string;
 pub mod term_mapping;
 pub mod text;
 pub mod time;
+pub mod uid;
 pub mod uri;
 
 use core::fmt;

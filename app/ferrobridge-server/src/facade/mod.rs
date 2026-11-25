@@ -35,6 +35,7 @@ pub mod identity;
 pub mod ingest;
 pub mod launch_task;
 pub mod media;
+pub mod mhd;
 pub mod outcome;
 pub mod owned;
 pub mod party;
@@ -172,6 +173,8 @@ pub struct Facade {
     /// The endpoints served as `Endpoint` beside the FHIR base, when
     /// `Endpoint` serves them.
     endpoints: Option<endpoint::Endpoints>,
+    /// Whether the IHE MHD Document Responder is served.
+    mhd: bool,
 }
 
 /// Returns the demographics endpoint of a facade at `settings.base_url`: the
@@ -218,6 +221,7 @@ impl Facade {
             cors: cors::Cors::default(),
             summary: None,
             endpoints: None,
+            mhd: false,
         }
     }
 
@@ -273,6 +277,19 @@ impl Facade {
         self.endpoints.as_ref()
     }
 
+    /// Returns this facade serving the IHE MHD Document Responder when `on`.
+    #[must_use]
+    pub const fn with_mhd(mut self, on: bool) -> Self {
+        self.mhd = on;
+        self
+    }
+
+    /// Whether the IHE MHD Document Responder is served.
+    #[must_use]
+    pub const fn mhd(&self) -> bool {
+        self.mhd
+    }
+
     /// Returns the resource types the facade serves itself rather than
     /// through a program.
     #[must_use]
@@ -281,6 +298,8 @@ impl Facade {
             (self.app_state.is_some(), app_state::BASIC),
             (self.launch_tasks.is_some(), launch_task::TASK),
             (self.endpoints.is_some(), endpoint::ENDPOINT),
+            (self.mhd, mhd::DOCUMENT_REFERENCE),
+            (self.mhd, mhd::LIST),
         ]
         .into_iter()
         .filter_map(|(on, resource_type)| on.then_some(resource_type))

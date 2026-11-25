@@ -15,7 +15,7 @@
 //! (no specification governs this: our own design).
 
 pub(crate) mod form;
-mod identifier;
+pub(crate) mod identifier;
 mod include;
 mod party;
 mod total;
@@ -338,7 +338,7 @@ fn start_of(
 /// so the search is held to that patient's EHR as one more `AND`ed subject,
 /// and a patient that names no person reaches no data (no specification
 /// governs the mapping from a compartment to an EHR: our own design).
-async fn compartment_ehrs(
+pub(crate) async fn compartment_ehrs(
     facade: &Facade,
     patients: &crate::facade::subject::Patients<'_>,
     patient: &str,
@@ -778,6 +778,23 @@ async fn rows_of(
         .await
         .map_err(|error| match error {
             QueryPageError::Refused(upstream) => write::refuse(&refused(&upstream)),
+            QueryPageError::Call(error) => write::refuse(&status::of_client_error(&error)),
+        })
+}
+
+/// Runs `request` and returns every row of every page of `page` rows, or
+/// the refusal the status table gives its failure.
+pub(crate) async fn every_row(
+    client: &CdrClient,
+    request: openehr_its::rest::generated::query::AdhocQueryExecute,
+    page: crate::cdr::query::PageSize,
+) -> Result<Vec<ResultSetRow>, Refusal> {
+    futures_util::TryStreamExt::try_collect(client.query_aql_rows(request, page))
+        .await
+        .map_err(|error| match error {
+            QueryPageError::Refused(upstream) => {
+                write::refuse(&status::of_query_refusal(&upstream))
+            }
             QueryPageError::Call(error) => write::refuse(&status::of_client_error(&error)),
         })
 }

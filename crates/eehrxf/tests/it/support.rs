@@ -238,28 +238,50 @@ pub(crate) fn vendored_base(url: &str) -> Result<ResourceProfile, Box<dyn Error>
 /// The environment variable naming the directory a suite writes the
 /// documents it has held to the vendored profiles to, for a run of HL7's
 /// FHIR Validator over them.
-#[cfg(all(
-    feature = "openehr",
-    any(
-        feature = "patient-summary",
-        feature = "laboratory",
-        all(feature = "prescription", feature = "dispensation"),
-        feature = "imaging",
-        feature = "discharge"
+#[cfg(any(
+    all(
+        feature = "openehr",
+        any(
+            feature = "patient-summary",
+            feature = "laboratory",
+            all(feature = "prescription", feature = "dispensation"),
+            feature = "imaging",
+            feature = "discharge"
+        )
+    ),
+    all(
+        feature = "fhir-r4",
+        any(
+            feature = "patient-summary",
+            feature = "laboratory",
+            feature = "imaging",
+            feature = "discharge"
+        )
     )
 ))]
 const EMIT_DIR_VARIABLE: &str = "EEHRXF_EMIT_DIR";
 
 /// Writes `text` to `<dir>/<name>.json` when [`EMIT_DIR_VARIABLE`] names a
 /// directory, and does nothing when it is unset.
-#[cfg(all(
-    feature = "openehr",
-    any(
-        feature = "patient-summary",
-        feature = "laboratory",
-        all(feature = "prescription", feature = "dispensation"),
-        feature = "imaging",
-        feature = "discharge"
+#[cfg(any(
+    all(
+        feature = "openehr",
+        any(
+            feature = "patient-summary",
+            feature = "laboratory",
+            all(feature = "prescription", feature = "dispensation"),
+            feature = "imaging",
+            feature = "discharge"
+        )
+    ),
+    all(
+        feature = "fhir-r4",
+        any(
+            feature = "patient-summary",
+            feature = "laboratory",
+            feature = "imaging",
+            feature = "discharge"
+        )
     )
 ))]
 pub(crate) fn emit(name: &str, text: &str) -> Result<(), Box<dyn Error>> {
@@ -397,7 +419,8 @@ pub(crate) fn synthetic() -> Vec<(&'static str, String)> {
     any(
         feature = "patient-summary",
         feature = "laboratory",
-        feature = "imaging"
+        feature = "imaging",
+        feature = "discharge"
     )
 ))]
 pub(crate) fn annex_iii(code: &str) -> eehrxf::document::metadata::DocumentMetadata {

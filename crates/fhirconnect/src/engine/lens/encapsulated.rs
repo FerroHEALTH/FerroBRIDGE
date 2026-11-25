@@ -151,7 +151,7 @@ impl Lens<DvMultimedia, Attachment> for EncapsulatedLens {
         let (integrity_check, integrity_check_algorithm) = if let Some(hash) = hash {
             let algorithm = held_algorithm
                 .filter(|_held| held_sha1)
-                .unwrap_or_else(|| phrase(INTEGRITY_ALGORITHMS, SHA1));
+                .unwrap_or_else(|| Box::new(phrase(INTEGRITY_ALGORITHMS, SHA1)));
             (Some(String::from(hash)), Some(algorithm))
         } else if held_check.is_some() && held_sha1 {
             (None, None)
@@ -164,8 +164,9 @@ impl Lens<DvMultimedia, Attachment> for EncapsulatedLens {
             language: coded(
                 view.language.as_ref(),
                 LANGUAGES,
-                existing.and_then(|held| held.language.as_ref()),
-            ),
+                existing.and_then(|held| held.language.as_deref()),
+            )
+            .map(Box::new),
             alternate_text: existing.and_then(|held| held.alternate_text.clone()),
             uri: url.map(|url| uri_as(url, existing.and_then(|held| held.uri.as_ref()))),
             data: data.map(String::from),
@@ -264,8 +265,9 @@ impl Lens<DvParsable, Attachment> for EncapsulatedLens {
             language: coded(
                 view.language.as_ref(),
                 LANGUAGES,
-                existing.and_then(|held| held.language.as_ref()),
-            ),
+                existing.and_then(|held| held.language.as_deref()),
+            )
+            .map(Box::new),
             value,
             formalism: String::from(formalism),
         })
@@ -424,9 +426,10 @@ mod tests {
             DvMultimedia {
                 data: data.map(String::from),
                 uri: url.map(|value| DvUri::DvUri(DvUriData { value: String::from(value) })),
-                language: language.map(|code| phrase(LANGUAGES, code)),
+                language: language.map(|code| Box::new(phrase(LANGUAGES, code))),
                 integrity_check: check.map(String::from),
-                integrity_check_algorithm: algorithm.map(|code| phrase(INTEGRITY_ALGORITHMS, code)),
+                integrity_check_algorithm: algorithm
+                    .map(|code| Box::new(phrase(INTEGRITY_ALGORITHMS, code))),
                 alternate_text: alternate.map(String::from),
                 ..multimedia(media, size)
             }
@@ -456,7 +459,7 @@ mod tests {
             language in option::of(select(vec!["en", "nl"])),
         ) {
             let source = DvParsable {
-                language: language.map(|code| phrase(LANGUAGES, code)),
+                language: language.map(|code| Box::new(phrase(LANGUAGES, code))),
                 ..parsable(&value, formalism)
             };
             let view: Attachment = EncapsulatedLens.get(&source).expect("the value travels");
@@ -472,7 +475,7 @@ mod tests {
     fn a_compressed_value_is_refused_going_out() {
         // DV_MULTIMEDIA.adoc: "The compression algorithm has no field in FHIR".
         let source = DvMultimedia {
-            compression_algorithm: Some(phrase("openehr_compression_algorithms", "gzip")),
+            compression_algorithm: Some(Box::new(phrase("openehr_compression_algorithms", "gzip"))),
             ..multimedia("image/png", 4)
         };
         let error = Lens::<DvMultimedia, Attachment>::get(&EncapsulatedLens, &source)
@@ -487,7 +490,7 @@ mod tests {
     fn a_hash_is_written_only_for_a_sha1_check() {
         let source = DvMultimedia {
             integrity_check: Some(String::from("AAAA")),
-            integrity_check_algorithm: Some(phrase(INTEGRITY_ALGORITHMS, "SHA-256")),
+            integrity_check_algorithm: Some(Box::new(phrase(INTEGRITY_ALGORITHMS, "SHA-256"))),
             ..multimedia("image/png", 4)
         };
         let view: Attachment = EncapsulatedLens.get(&source).expect("the value travels");

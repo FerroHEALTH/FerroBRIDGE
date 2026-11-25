@@ -38,14 +38,8 @@ pub(crate) struct Started {
 }
 
 impl Started {
-    /// Logs the boot summary and the indicators readiness runs, and starts
-    /// the replica's `LISTEN` session on the inbound sources.
+    /// Logs the boot summary and the indicators readiness runs.
     pub(crate) fn announce(&self) {
-        if let (Some(store), Some(sources)) = (self.state.store(), self.state.sources()) {
-            let mut listened = vec![sources.listened()];
-            listened.extend(self.workers.as_ref().map(|workers| workers.listened()));
-            store.listeners(&listened).spawn();
-        }
         startup::log(&self.lanes);
         tracing::info!(
             version = crate::build_info::VERSION,
@@ -86,17 +80,22 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     state = open_sources(settings, state)?;
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
+        let mut lane = lane.clone();
+        if let Some(audit) = settings.audit.as_ref() {
+            let log = start_audit(audit, settings, &lane, &state).await?;
+            let identity = lane.settings.subject.identity().clone();
+            lane.settings.subject = facade::subject::SubjectLink::new(Arc::new(
+                identity.audited(Arc::clone(log.recorder())),
+            ));
+            state = state.with_access_log(Arc::new(log));
+        }
         let (mounted, counts) =
-            build_facade(settings, lane, state.terminology().cloned(), state.store())
+            build_facade(settings, &lane, state.terminology().cloned(), state.store())
                 .await
                 .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
-    }
-    if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
-        let log = start_audit(audit, mounted, &state).await?;
-        state = state.with_access_log(Arc::new(log));
     }
     state = start_links(settings, state)?;
     if settings.operator.is_some() {
@@ -251,8 +250,9 @@ impl StartedFeed {
     }
 }
 
-/// Spawns every change-feed follower, the inbound recovery of `state` and
-/// the inbound `workers`, each on its own task until `stop` reads `true`.
+/// Spawns every change-feed follower, the inbound recovery and the link
+/// sweeper of `state`, and the inbound `workers`, each on its own task until
+/// `stop` reads `true`.
 pub(crate) fn spawn_followers(
     (feeds, workers): (Vec<StartedFeed>, Option<Arc<crate::inbound::worker::Pool>>),
     state: &AppState,
@@ -268,6 +268,9 @@ pub(crate) fn spawn_followers(
         settings.inbound,
     ) {
         followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
+    }
+    if let Some(links) = state.links() {
+        followers.push(links.spawn_sweeper(&stop.subscribe()));
     }
     followers
 }
@@ -643,31 +646,32 @@ fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::
     }
 }
 
-/// Opens the access-record lane `audit` describes for the facade `mounted`,
-/// its outbox and its category register in the state store of `state`.
+/// Opens the access-record lane `audit` describes for the facade `lane` over
+/// the CDR of `settings`, its outbox and its category register in the state
+/// store of `state`.
 async fn start_audit(
     audit: &crate::audit::Settings,
-    mounted: &facade::Facade,
+    settings: &Settings,
+    lane: &config::FacadeSettings,
     state: &AppState,
 ) -> anyhow::Result<crate::audit::AccessLog> {
     use anyhow::Context;
 
-    let base = url::Url::parse(&mounted.settings().base_url)
+    let base = url::Url::parse(&lane.settings.base_url)
         .context("reading [facade] base_url as the address the access records name")?;
+    let cdr = settings
+        .cdr
+        .as_ref()
+        .context("the facade needs a [cdr] section: it maps every request onto CDR operations")?;
     let store = state.store().context(
         "the access-record lane keeps its outbox in the state store, and [state] is not set",
     )?;
     let registers = state.registers().cloned().context(
         "the access records are classified by a settings register, and [state] is not set",
     )?;
-    let log = crate::audit::AccessLog::open(
-        audit,
-        (&base, mounted.client().base_url()),
-        store,
-        registers,
-    )
-    .await
-    .context("reading the audit-categories register the access records are classified by")?;
+    let log = crate::audit::AccessLog::open(audit, (&base, &cdr.base_url), store, registers)
+        .await
+        .context("reading the audit-categories register the access records are classified by")?;
     tracing::info!(
         lane = "audit",
         repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),
@@ -814,12 +818,14 @@ async fn build_facade(
         (lane.app_state, facade::app_state::BASIC),
         (lane.launch_task, facade::launch_task::TASK),
         (lane.endpoints.is_some(), facade::endpoint::ENDPOINT),
+        (lane.mhd, facade::mhd::DOCUMENT_REFERENCE),
+        (lane.mhd, facade::mhd::LIST),
     ]
     .into_iter()
     .filter_map(|(on, resource_type)| on.then_some(resource_type))
     .collect();
     facade::programs::check_owned(&programs, &owned)
-        .context("checking the contexts against [facade.app_state], [facade.launch_task] and [facade.endpoint]")?;
+        .context("checking the contexts against [facade.app_state], [facade.launch_task], [facade.endpoint] and [facade.mhd]")?;
     tracing::info!(
         lane = "facade",
         types = programs
@@ -869,6 +875,7 @@ async fn build_facade(
             .with_launch_tasks(launch_tasks)
             .with_summary(summary)
             .with_endpoints(lane.endpoints.clone())
+            .with_mhd(lane.mhd)
             .with_cors(lane.cors.clone()),
         counts,
     ))
@@ -938,7 +945,6 @@ fn start_links(settings: &Settings, state: AppState) -> anyhow::Result<AppState>
     )
     .context("opening the links in the state store")?;
     let links = Arc::new(links);
-    drop(links.spawn_sweeper());
     tracing::info!(
         lane = "shl",
         "the person's SMART Health Links are served under /shl"

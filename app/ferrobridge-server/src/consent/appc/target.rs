@@ -257,6 +257,8 @@ pub(super) fn read(target: Option<&Node>, element: &str) -> Result<Scope, Refuse
             relationship: None,
             organisation_type: None,
             caller_kind: None,
+            care_roles: None,
+            care_path: None,
         };
         for Match { attribute, value } in matches(subject, "Subject", &at)? {
             let at = format!("{at}/SubjectMatch");
@@ -331,7 +333,9 @@ fn blank_data() -> AccessDataScope {
         archetypes: None,
         categories: None,
         sensitivities: None,
+        confidentialities: None,
         origins: None,
+        episodes: None,
         recorded: None,
     }
 }

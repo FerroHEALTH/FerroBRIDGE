@@ -280,7 +280,7 @@ impl Reader<'_> {
             [] => Ok(None),
             [one] => Ok(Some(PartyProxy::PartyIdentified(
                 PartyIdentified::PartyIdentified(PartyIdentifiedData {
-                    external_ref: party_of(one),
+                    external_ref: party_of(one).map(Box::new),
                     name: one.display.clone(),
                     identifiers: None,
                 }),

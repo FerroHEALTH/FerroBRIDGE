@@ -251,9 +251,14 @@ carries.
 The README shows each badge through
 `https://img.shields.io/endpoint?url=<raw URL of the badge JSON on main>`, the
 shields.io endpoint schema (<https://shields.io/badges/endpoint-badge>):
-`schemaVersion` 1, a label, the message `k / n`, and a colour by share. No
-specification governs the gate: our own design, following the sibling
-terminology server's pass lists.
+`schemaVersion` 1, a label, the message `k / n`, a colour by share, and a
+logo. A badge measured against an EU act shows the EU emblem (`namedLogo`
+`europeanunion`) on an EU blue label; every other badge shows a pictogram
+from the FerroHEALTH badge set under `scripts/checks/badge-logos/` as
+`logoSvg`, whose master copy lives in FerroSMART. Every static badge in the
+README carries a `logo=` parameter, and `--check` fails a badge without a
+logo. No specification governs the gate: our own design, following the
+sibling terminology server's pass lists.
 
 ## The sqlx query metadata
 

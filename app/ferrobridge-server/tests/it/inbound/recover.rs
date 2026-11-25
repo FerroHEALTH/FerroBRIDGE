@@ -26,7 +26,7 @@ use super::store::{create, replica, sources};
 
 /// A webhook source whose recovery calls `stub`: a redelivery after two
 /// `503` answers, and the updates and deletes polls every hour.
-fn recovering(name: &str, stub: &str) -> Write {
+pub(crate) fn recovering(name: &str, stub: &str) -> Write {
     Write {
         name: name.to_owned(),
         kind: Kind::Webhook,
@@ -55,7 +55,7 @@ fn recovering(name: &str, stub: &str) -> Write {
 }
 
 /// Answers the two polls of [`recovering`] on `stub`, each once.
-async fn polls(stub: &MockServer, updated: &[u32], deleted: &[u32]) {
+pub(crate) async fn polls(stub: &MockServer, updated: &[u32], deleted: &[u32]) {
     for (route, ids) in [
         ("/v0/xstream/clients/updates", updated),
         ("/v0/xstream/clients/deletes", deleted),

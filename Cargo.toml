@@ -45,10 +45,10 @@ rust_decimal = { version = "1.43.0", default-features = false, features = ["std"
 regex = "1.13.1"
 # The openEHR RM model and the BASE path parser: the code conforms to RM
 # Release 1.1.0 and compiles against the `v1_2` generation (docs/VERSIONS.md).
-openehr-rm = "0.3.0"
+openehr-rm = "0.5.0"
 # The BASE identification types the RM leaves to it: TERMINOLOGY_ID is a
 # CODE_PHRASE field, so a lens that builds one names this crate.
-openehr-base = "0.3.0"
+openehr-base = "0.5.0"
 # anyhow is a binary-only error type (.claude/rules/rust-style.md).
 anyhow = "1.0.104"
 # The forwarder ratchet parses the hand-written Rust (tools/forwarders).
@@ -72,7 +72,7 @@ socket2 = "0.6.5"
 # version: cargo resolves the path locally and the version on crates.io.
 fhir-types = { path = "crates/fhir-types", version = "=0.2.0", default-features = false }
 hl7v2-types = { path = "crates/hl7v2-types", version = "=0.1.129" }
-openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "=0.6.0" }
+openehr-mapping-core = { path = "crates/openehr-mapping-core", version = "=0.8.0" }
 # The health and operator documents the server writes and the console reads.
 ferrobridge-operator-api = { path = "crates/ferrobridge-operator-api", version = "=0.0.0" }
 # The OMOP CDM layer, taken metadata-only by default: a consumer that writes
@@ -100,12 +100,12 @@ fhir-search = { path = "crates/fhir-search", version = "=0.1.131" }
 # The HL7 v2 face's crate (MLLP, MSH-18 decoding, parsing, the ACK and the
 # v2-to-FHIR ConceptMap interpreter): published from this workspace, so the
 # requirement carries both a path and a version.
-ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "=0.30.0" }
+ferrobridge-hl7v2 = { path = "crates/ferrobridge-hl7v2", version = "=0.33.0" }
 # The FHIRconnect language crate: the facade, the operations surface and the
 # published ferrobridge-hl7v2 consume it, so the requirement carries both a
 # path and a version. Its `mapping` feature is off here: each consumer of the
 # language names it, and ferrobridge-hl7v2 takes the FHIR path model alone.
-fhirconnect = { path = "crates/fhirconnect", version = "=0.9.0", default-features = false }
+fhirconnect = { path = "crates/fhirconnect", version = "=0.12.0", default-features = false }
 # The European interoperability component: the server's `Patient/$summary`
 # is its one in-process consumer, so the requirement is path-only.
 eehrxf = { path = "crates/eehrxf" }
@@ -121,19 +121,19 @@ omocl = { path = "crates/omocl" }
 # .claude/rules/codegen.md forbids. From 0.0.69 the Simplified Data Template
 # engines (FLAT, STRUCTURED, Web Template, TDD, RM-instance validation) live in
 # openehr-sdt, taken without its `cache` feature (`moka`).
-openehr-its = { version = "0.3.0", default-features = false, features = ["opt14", "json"] }
-openehr-sdt = { version = "0.3.0", default-features = false, features = ["flat"] }
-openehr-am = "0.3.0"
+openehr-its = { version = "0.5.0", default-features = false, features = ["opt14", "json"] }
+openehr-sdt = { version = "0.5.0", default-features = false, features = ["flat"] }
+openehr-am = "0.5.0"
 # The AQL 1.1.0 parser: the ETL checks its configured queries at load
 # (docs/architecture.md section 5.4).
-openehr-query = "0.3.0"
+openehr-query = "0.5.0"
 # The ADL 2 parser: openehr-mapping-core compiles its ADL 2 test fixtures from
 # their .adls sources with it, and the server reads the archetype HRID an adl2
 # template ETag carries with its `hrid::parse_hrid`.
-openehr-adl = "0.3.0"
+openehr-adl = "0.5.0"
 # The openEHR terminology: the `audit_change_type` and
 # `version_lifecycle_state` concepts a commit codes (`codes`).
-openehr-term = "0.3.0"
+openehr-term = "0.5.0"
 # The HTTP client for the CDR wire. reqwest 0.13 spells the rustls selection
 # "rustls"; it carries its own platform verifier and aws-lc-rs provider.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "http2"] }
@@ -182,12 +182,11 @@ ferrohealth-usage-report = { version = "=0.5.0", default-features = false }
 # Feed (`feed`) through a `FeedClient` the server writes over its own
 # ferrohealth-smart `OutboundClient`, so the two requirements move apart. Pinned exactly, as a product pins every shared crate;
 # only the server links them.
-ehds-logging = { version = "=0.23.0", default-features = false }
-ihe-atna = { version = "=0.23.0", default-features = false }
+ehds-logging = { version = "=0.27.0", default-features = false }
+ihe-atna = { version = "=0.27.0", default-features = false }
 # The IHE ITI identity profiles (FerroPIX): the PIXm Consumer that asks the
 # identity source for a patient's pseudonym (ITI-83). Pinned exactly.
-ihe-iti = { version = "=0.21.1", default-features = false }
-ihe-atna-next = { package = "ihe-atna", version = "=0.25.0", default-features = false }
+ihe-iti = { version = "=0.22.0", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
@@ -424,10 +423,11 @@ deref_by_slicing = "warn"
 # A clean 500 relies on catch_unwind, which only catches unwinding panics, and
 # tests ignore the panic setting, so abort would be untestable
 # (https://doc.rust-lang.org/cargo/reference/profiles.html#panic).
-# `ihe-atna` writes its BALP `AuditEvent` through the published `fhir-types`,
-# which this workspace builds from source: one model, so the spool's record
-# check and the facade's resources are one crate.
+# `ihe-atna` and `ihe-iti` build on the published `fhir-types` and
+# `fhir-search`, which this workspace builds from source: one copy of each, so
+# the spool's record check and the facade's resources are one model.
 [patch.crates-io]
+fhir-search = { path = "crates/fhir-search" }
 fhir-types = { path = "crates/fhir-types" }
 
 [profile.release]

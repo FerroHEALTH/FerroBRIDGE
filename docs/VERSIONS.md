@@ -122,14 +122,14 @@ carries the exact patch.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `openehr-base` | 0.3.0 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-rm` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-its` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-sdt` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
-| `openehr-query` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-am` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
-| `openehr-adl` | 0.3.0 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
-| `openehr-term` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
+| `openehr-base` | 0.5.0 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-rm` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-its` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-sdt` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
+| `openehr-query` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-am` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
+| `openehr-adl` | 0.5.0 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
+| `openehr-term` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
 
 ## Third-party crates
 
@@ -188,7 +188,10 @@ in code is the matching constant in
 | RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.7.0@sha256:44c9268cb8a154df118a10ffe84329633f22923ea2cc54261ff0cea57a2ee7e7` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.7.0@sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroEHR main CDR image | `ghcr.io/ferrohealth/ferroehr:main@sha256:482c3f3cbcef8dfc213330e1bc50d33a83cec5cfe246f79e0a1cdd8553ec7a22` | the `CDR_MAIN` constant in `tools/ferrobridge-testkit/src/containers.rs`, the Yellow Button journey's CDR until FerroEHR 6.0.0 is released (#2018) |
+| FerroEHR main CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:main@sha256:7d71098414533dadb712d01a4ca5846a1b1a88b11dfcbffec6e6a8a2bcd59fd2` | the `CDR_MAIN_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 | FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.7@sha256:52411e76ea664f9470fda0a7a08202a0ad6f7c39069322f42a754d971cf37a82` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
+| FerroSMART authorization server image | `ghcr.io/ferrohealth/ferrosmart:0.7.0@sha256:dddde7e14fcdd85ce50dad9040ae3a83fefb7a358d37e33e1d09be9a22403dbb` | the `FERROSMART` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 
 The CDR runs against its own published database image rather than the plain
 PostgreSQL above: that image is built from `postgres:18.6` and carries the

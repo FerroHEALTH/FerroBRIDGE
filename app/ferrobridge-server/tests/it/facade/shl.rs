@@ -209,7 +209,7 @@ fn path_of(url: &str) -> Result<String, Box<dyn Error>> {
 }
 
 /// Decodes a `shlink:/` URI into its payload.
-fn decode(shlink: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+pub(crate) fn decode(shlink: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let encoded = shlink
         .strip_prefix("shlink:/")
         .ok_or("the shlink:/ prefix")?;
@@ -218,7 +218,10 @@ fn decode(shlink: &str) -> Result<serde_json::Value, Box<dyn Error>> {
 
 /// Opens the compact JWE `jwe` under the payload's `key`, returning its
 /// protected header and its plaintext.
-fn open(key: &str, jwe: &str) -> Result<(serde_json::Value, serde_json::Value), Box<dyn Error>> {
+pub(crate) fn open(
+    key: &str,
+    jwe: &str,
+) -> Result<(serde_json::Value, serde_json::Value), Box<dyn Error>> {
     let parts: Vec<&str> = jwe.split('.').collect();
     let [protected, encrypted_key, iv, ciphertext, tag] = parts.as_slice() else {
         return Err(format!("{} JWE parts", parts.len()).into());
@@ -239,7 +242,7 @@ fn open(key: &str, jwe: &str) -> Result<(serde_json::Value, serde_json::Value), 
 }
 
 /// The resource types of `bundle`'s entries, in order.
-fn kinds(bundle: &serde_json::Value) -> Vec<String> {
+pub(crate) fn kinds(bundle: &serde_json::Value) -> Vec<String> {
     bundle["entry"]
         .as_array()
         .into_iter()
@@ -771,5 +774,27 @@ fn a_passcode_hash_is_argon2id_and_matches_only_its_passcode() -> Result<(), Box
     assert!(stored.starts_with("$argon2id$"), "{stored}");
     assert!(passcode::matches("1234", &stored)?);
     assert!(!passcode::matches("4321", &stored)?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_sweeper_ends_on_the_stop_signal() -> Result<(), Box<dyn Error>> {
+    let Some(stored) = crate::store::sealed_store().await? else {
+        return Ok(());
+    };
+    let term = MockServer::start().await;
+    let Some(harness) = harness(&term).await? else {
+        return Ok(());
+    };
+    let links = Arc::new(Links::open(
+        &stored.1,
+        settings(),
+        Arc::clone(&harness.facade),
+        None,
+    )?);
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    let sweeper = links.spawn_sweeper(&stopped);
+    stop.send_replace(true);
+    tokio::time::timeout(std::time::Duration::from_secs(10), sweeper).await??;
     Ok(())
 }
