@@ -47,6 +47,7 @@ use crate::cdr::demographic::Demographic;
 use crate::cdr::error::Upstream;
 use crate::facade::Facade;
 use crate::facade::handlers::write::refuse;
+use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
@@ -132,22 +133,22 @@ pub(crate) fn party_id(resource_type: &str, id: &str) -> Result<HierObjectId, Re
 
 /// Returns the refusal a CDR answer outside the documented successes renders
 /// as: its row in the Demographic table, or the undocumented row.
-pub(crate) fn refused(upstream: &Upstream) -> Refusal {
-    match status::demographic::of_demographic_refusal(upstream) {
-        Some(answer) => refuse(&answer),
-        None => refuse(&status::Answer::new(
+pub(crate) fn refused(upstream: &Upstream) -> Refused {
+    let answer = status::demographic::of_demographic_refusal(upstream).unwrap_or_else(|| {
+        status::Answer::new(
             status::UNDOCUMENTED,
             format!(
                 "the {LABEL} answered {} outside the operation's documented answers",
                 upstream.status()
             ),
-        )),
-    }
+        )
+    });
+    Refused::of_answer(&answer)
 }
 
 /// Returns the refusal a call that reached no documented answer renders as.
-pub(crate) fn client_refusal(error: &crate::cdr::error::CdrError) -> Refusal {
-    refuse(&status::of_client_error(error))
+pub(crate) fn client_refusal(error: &crate::cdr::error::CdrError) -> Refused {
+    Refused::of_answer(&status::of_client_error(error))
 }
 
 /// Returns the version the `ETag` of a successful answer names.
@@ -155,7 +156,7 @@ pub(crate) fn version_of(
     operation: &'static str,
     upstream: &Upstream,
     etag: Option<&str>,
-) -> Result<ObjectVersionId, Refusal> {
+) -> Result<ObjectVersionId, Refused> {
     crate::cdr::version_from_etag(operation, upstream.status(), etag)
         .map_err(|error| client_refusal(&error))
 }
@@ -184,7 +185,7 @@ pub(crate) async fn get(
                     version: version_of(stringify!($call), &upstream, headers.etag.as_deref())?,
                 },
                 $outcome::NoContent => return Err(gone(resource_type, uid)),
-                _ => return Err(refused(&upstream)),
+                _ => return Err(refused(&upstream).into()),
             }
         }};
     }

@@ -1697,7 +1697,7 @@ mapping rooted at a party: a context binds a composition template, and
   "the Version container of Actor playing the role" (RM Demographic IM, the
   `ROLE` class), and no template node holds it (#911). A party context maps
   it as `$archetype/performer`; the compiler admits that one tail on the
-  party root (`rm::PARTY_ROOTS`) and the party build places the value on the
+  party root (`rm::PARTY_REFS`) and the party build places the value on the
   root. `PractitionerRole.practitioner` carries it through the
   `PARTY_REF`-against-`Reference` cell: the reference resolves through the
   demographics endpoint, must be a party of this facade of the one resource
@@ -1708,6 +1708,19 @@ mapping rooted at a party: a context binds a composition template, and
   and a `ROLE` with no `performer`, built or served, is refused
   (`PartyError::RoleWithoutPerformer`). An element whose reference admits no
   single type is refused at load (`fc-party-ref-target`).
+- **`PARTY_RELATIONSHIP`.** A relationship's `target` is a `PARTY_REF` no
+  template node holds, mapped as `$archetype/relationships[idN]/target` and
+  written through the same cell. Its `source` is always the party that holds
+  it (RM Demographic IM, the `PARTY` class, invariant
+  `Relationships_validity`), so no mapping writes it: the party build holds
+  every relationship aside, and `WebTemplateIndex::source_relationships`
+  writes it in once the party's uid is known. A facade create commits the
+  party, then commits a second version with its relationships sourced at
+  the uid the CDR assigned; when that second write fails, the facade
+  deletes the party again (ITS-REST 1.1.0 Demographic API, `person_delete`)
+  and answers the CDR's refusal, and when the deletion fails too it answers
+  a `500` naming the party's version and both refusals. An update sources
+  them before its one write.
 - **The draft archetypes.** Every `openEHR-DEMOGRAPHIC-*` archetype in the
   international CKM is a v0 draft
   (<https://ckm.openehr.org/ckm/archetypes/1013.1.479>). The tests run against

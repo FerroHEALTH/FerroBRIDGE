@@ -65,6 +65,18 @@ async fn waiting(store: &Store) -> Result<i64, Box<dyn Error>> {
         .await?)
 }
 
+/// Waits until the outbox of `store` holds no record, since the forwarder
+/// deletes a sent row only once the repository has answered.
+async fn emptied(store: &Store) -> Result<(), Box<dyn Error>> {
+    for _ in 0..200 {
+        if waiting(store).await? == 0 {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    Err("the outbox still holds a delivered record".into())
+}
+
 #[tokio::test]
 async fn two_replicas_forwarding_together_send_each_record_once() -> Result<(), Box<dyn Error>> {
     let Some((postgres, first)) = super::state().await? else {
@@ -135,7 +147,7 @@ async fn a_record_a_stopped_replica_claimed_is_sent_by_another_once_its_lease_ru
     let log = super::access_log(&arr, &survivor, &CDR.parse()?, None).await?;
     let seen = received(&arr, 1).await?;
     assert_eq!(Some(&1), seen.get("synthetic-2"));
-    assert_eq!(0, waiting(&survivor).await?);
+    emptied(&survivor).await?;
     log.stop();
     Ok(())
 }
