@@ -32,10 +32,12 @@
 
 pub mod guard;
 pub mod inbound;
+mod refused;
 pub mod registers;
 pub mod reload;
 pub mod revisions;
 pub mod save;
+mod settle;
 pub mod snapshot;
 pub mod sources;
 pub mod templates;
@@ -63,6 +65,7 @@ use crate::mappings::files::Root;
 use crate::mappings::revisions::Revisions;
 use crate::operator::snapshot::Snapshot;
 use crate::problem::{Kind, refuse};
+use refused::Refused;
 
 /// The media type a mapping file is served with.
 const YAML: &str = "application/yaml";
@@ -274,7 +277,7 @@ async fn events_lane(
     };
     match report.document().await {
         Ok(document) => axum::Json(document).into_response(),
-        Err(error) => dead_letters_unavailable(&error),
+        Err(error) => dead_letters_unavailable(&error).into_response(),
     }
 }
 
@@ -290,51 +293,51 @@ async fn settle_parked(
     headers: HeaderMap,
     access: ferrohealth_smart::resource::Access,
 ) -> Response {
-    use crate::change_feed::dead_letter::Decision;
-    use crate::change_feed::report::Settlement;
+    use crate::change_feed::report::Ruled;
+    use crate::retry::Decision;
 
     let (Some(report), Ok(id), Some(decision)) =
         (report, id.parse::<u64>(), Decision::parse(&decision))
     else {
         return refuse(Kind::NotFound, "no parked event has this number");
     };
-    let Some(reason) = save::reason(&headers) else {
-        return refuse(
-            Kind::ReasonRequired,
-            "a settlement names its reason in one short line of the ferrobridge-reason header",
-        );
-    };
-    let decided = crate::change_feed::dead_letter::Decided {
+    let settled = settle::settle(
+        &access,
         decision,
-        by: save::subject_of(&access).to_owned(),
-        reason,
+        save::reason(&headers),
+        "a settlement names its reason in one short line of the ferrobridge-reason header",
+        async |decided| match report.settle(&consumer, id, decided).await {
+            Ok(Ruled::Recorded) => Ok(()),
+            Ok(Ruled::UnknownConsumer) => Err(Refused::Problem(
+                Kind::NotFound,
+                "no change-feed consumer runs under this name",
+            )),
+            Ok(Ruled::UnknownEvent) => Err(Refused::Problem(
+                Kind::NotFound,
+                "no open parked event has this number",
+            )),
+            Err(error) => Err(dead_letters_unavailable(&error)),
+        },
+    )
+    .await;
+    let decided = match settled {
+        Ok(decided) => decided,
+        Err(refused) => return refused.into_response(),
     };
-    match report.settle(&consumer, id, &decided).await {
-        Ok(Settlement::Recorded) => {
-            let status = match decision {
-                Decision::Retry => StatusCode::ACCEPTED,
-                Decision::Discard => StatusCode::NO_CONTENT,
-            };
-            tracing::info!(
-                target: guard::AUDIT_TARGET,
-                subject = decided.by.as_str(),
-                action = decision.as_str(),
-                consumer = consumer.as_str(),
-                parked = id,
-                status = status.as_u16(),
-                "operator"
-            );
-            status.into_response()
-        }
-        Ok(Settlement::UnknownConsumer) => refuse(
-            Kind::NotFound,
-            "no change-feed consumer runs under this name",
-        ),
-        Ok(Settlement::UnknownEvent) => {
-            refuse(Kind::NotFound, "no open parked event has this number")
-        }
-        Err(error) => dead_letters_unavailable(&error),
-    }
+    let status = match decision {
+        Decision::Retry => StatusCode::ACCEPTED,
+        Decision::Discard => StatusCode::NO_CONTENT,
+    };
+    tracing::info!(
+        target: guard::AUDIT_TARGET,
+        subject = decided.by.as_str(),
+        action = decision.as_str(),
+        consumer = consumer.as_str(),
+        parked = id,
+        status = status.as_u16(),
+        "operator"
+    );
+    status.into_response()
 }
 
 /// `GET /operator/etl/runs`: the newest OMOP ETL runs the bridge schema
@@ -399,9 +402,9 @@ async fn concept_map_directory(
 }
 
 /// Returns the `500` of a dead-letter store that refused, its cause logged.
-fn dead_letters_unavailable(error: &crate::change_feed::dead_letter::DeadLetterError) -> Response {
+fn dead_letters_unavailable(error: &crate::change_feed::dead_letter::DeadLetterError) -> Refused {
     tracing::error!(reason = %crate::indicators::reason(error), "the dead-letter store refused the call");
-    refuse(
+    Refused::Problem(
         Kind::DeadLettersUnavailable,
         "the dead-letter store could not be read or written",
     )

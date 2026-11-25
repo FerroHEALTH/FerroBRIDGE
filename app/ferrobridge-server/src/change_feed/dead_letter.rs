@@ -14,8 +14,8 @@
 //! clinical content. No specification governs this: our own design.
 
 use std::collections::BTreeSet;
-use std::fmt;
 
+use crate::retry::{Decided, Decision};
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::postgres::PgPool;
@@ -60,53 +60,6 @@ pub enum DeadLetterError {
 /// Returns the row error `source` is.
 const fn row(source: serde_json::Error) -> DeadLetterError {
     DeadLetterError::Row { source }
-}
-
-/// How an operator settles a parked event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Decision {
-    /// Offer it to its consumer again before the next page.
-    Retry,
-    /// Settle it without offering it again.
-    Discard,
-}
-
-impl Decision {
-    /// Returns the decision as the store and the operator API write it.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Retry => "retry",
-            Self::Discard => "discard",
-        }
-    }
-
-    /// Returns the decision `text` names, `None` for any other text.
-    #[must_use]
-    pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "retry" => Some(Self::Retry),
-            "discard" => Some(Self::Discard),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for Decision {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-/// An operator's settlement of a parked event.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Decided {
-    /// Retry or discard.
-    pub decision: Decision,
-    /// Who decided: the subject of the operator's token.
-    pub by: String,
-    /// Why, in the operator's words.
-    pub reason: String,
 }
 
 /// One parked event.
