@@ -10,7 +10,7 @@ use fhir_types::codec::Value;
 
 use crate::map::convert;
 use crate::map::maps::{Assignment, Kind, Map, MappedVia, Row};
-use crate::map::notation::{Step, Target};
+use crate::map::notation::{Label, Step, Target};
 use crate::map::run::datum::Datum;
 use crate::map::run::write::resolve_path;
 use crate::map::run::{
@@ -30,22 +30,35 @@ impl<'a> Run<'a> {
         repetition: usize,
         base: &Base,
     ) -> Result<(), MapError> {
-        let (instance, steps) = match &row.target {
-            Ok(Target::Path { instance, steps }) => (instance.clone(), steps.as_slice()),
-            Ok(Target::Value { instance }) => (instance.clone(), &[][..]),
+        let Some((instance, steps)) = self.target(scope, row, reference) else {
+            return Ok(());
+        };
+        let Some(base) = self.instance(base, instance, &scope.at, reference) else {
+            return Ok(());
+        };
+        self.steps(scope, row, reference, datum, repetition, &base, steps)
+    }
+
+    /// Returns the instance and the steps `row` targets, or records the
+    /// target it cannot read and answers `None`.
+    pub(super) fn target<'r>(
+        &mut self,
+        scope: &Scope<'a>,
+        row: &'r Row,
+        reference: &RowRef,
+    ) -> Option<(Option<&'r Label>, &'r [Step])> {
+        match &row.target {
+            Ok(Target::Path { instance, steps }) => Some((instance.as_ref(), steps.as_slice())),
+            Ok(Target::Value { instance }) => Some((instance.as_ref(), &[][..])),
             Err(error) => {
                 self.outcomes.push(Outcome::UnsupportedTarget {
                     at: scope.at.clone(),
                     row: reference.clone(),
                     error: error.clone(),
                 });
-                return Ok(());
+                None
             }
-        };
-        let Some(base) = self.instance(base, instance.as_ref(), &scope.at, reference) else {
-            return Ok(());
-        };
-        self.steps(scope, row, reference, datum, repetition, &base, steps)
+        }
     }
 
     /// Follows the steps of a target, through a `(Type)` reference when one

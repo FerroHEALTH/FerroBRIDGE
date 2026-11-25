@@ -67,6 +67,21 @@ use crate::facade::reply::Refusal;
 use crate::facade::request::Inbound;
 use crate::facade::status;
 
+/// Returns the ingest over `client` that writes for the caller `access`
+/// names, resolving references through `references`.
+pub(crate) fn ingest_for<'a>(
+    facade: &'a Facade,
+    access: &Access,
+    client: CdrClient,
+    references: &'a dyn fhirconnect::engine::seam::ReferenceSource,
+) -> Ingest<'a> {
+    facade
+        .ingest(client)
+        .with_references(references)
+        .with_originating_system(crate::facade::commit::originating_system(access))
+        .with_on_behalf(crate::facade::subject::on_behalf(access))
+}
+
 /// `POST [base]/{type}`.
 pub(crate) async fn create(
     facade: &Facade,
@@ -89,11 +104,7 @@ pub(crate) async fn create(
     .await?;
     let program = &select_program(facade, &inbound, headers)?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
-    let ingest = facade
-        .ingest(client)
-        .with_references(&resolved)
-        .with_originating_system(crate::facade::commit::originating_system(access))
-        .with_on_behalf(crate::facade::subject::on_behalf(access));
+    let ingest = ingest_for(facade, access, client, &resolved);
     let claim = ingest.claim_resource(&inbound)?;
 
     match ingest
@@ -199,11 +210,7 @@ pub(crate) async fn update(
     .await?;
     let program = &select_program(facade, &inbound, headers)?;
     let resolved = references::resolve(facade, &client, inbound.document()).await;
-    let ingest = facade
-        .ingest(client)
-        .with_references(&resolved)
-        .with_originating_system(crate::facade::commit::originating_system(access))
-        .with_on_behalf(crate::facade::subject::on_behalf(access));
+    let ingest = ingest_for(facade, access, client, &resolved);
     resend(
         facade,
         &ingest,

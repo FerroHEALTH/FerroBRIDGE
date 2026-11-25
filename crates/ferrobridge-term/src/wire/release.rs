@@ -588,14 +588,22 @@ macro_rules! per_release {
                 })
             }
 
-            /// Returns the `Bundle.total` of the `searchset` `body` carries.
+            /// Returns the `Bundle` `body` carries, refused unless it is a
+            /// `searchset`.
             #[cfg(feature = "client")]
-            pub(crate) fn search_total(body: &str) -> Result<u32, BodyError> {
+            fn searchset(body: &str) -> Result<Bundle, BodyError> {
                 let bundle = serde_json::from_str::<Bundle>(body)?;
                 let kind = bundle.r#type.value.clone().unwrap_or_default();
                 if kind != super::SEARCHSET {
                     return Err(BodyError::SearchType { found: kind });
                 }
+                Ok(bundle)
+            }
+
+            /// Returns the `Bundle.total` of the `searchset` `body` carries.
+            #[cfg(feature = "client")]
+            pub(crate) fn search_total(body: &str) -> Result<u32, BodyError> {
+                let bundle = searchset(body)?;
                 bundle
                     .total
                     .as_ref()
@@ -608,11 +616,7 @@ macro_rules! per_release {
             /// unique id equal to `value`, each once, in entry order.
             #[cfg(feature = "naming-system")]
             pub(crate) fn identifier_systems(body: &str, value: &str) -> Result<Vec<String>, BodyError> {
-                let bundle = serde_json::from_str::<Bundle>(body)?;
-                let kind = bundle.r#type.value.clone().unwrap_or_default();
-                if kind != super::SEARCHSET {
-                    return Err(BodyError::SearchType { found: kind });
-                }
+                let bundle = searchset(body)?;
                 let mut systems: Vec<String> = Vec::new();
                 for entry in &bundle.entry {
                     let Some(Resource::NamingSystem(naming)) = entry.resource.as_ref() else {

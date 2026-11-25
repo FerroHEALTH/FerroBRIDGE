@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's party context for the draft EEHRxF Annex X data group
+# EHDSRelatedPerson: the FHIR R4 RelatedPerson profile over FerroBRIDGE's
+# related person PERSON definition, through the Demographic API. HL7 Europe
+# publishes no RelatedPerson profile beyond the HDR 1.0.0 obligation profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_related_person.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.org/fhir/StructureDefinition/RelatedPerson"
+  template:
+    id: "openEHR-DEMOGRAPHIC-PERSON.ferrobridge_related_person.v1.0.0"
+  archetypes:
+    - "ferrobridge_ehds_related_person"
+  start: "ferrobridge_ehds_related_person"

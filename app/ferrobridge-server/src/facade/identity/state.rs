@@ -101,6 +101,39 @@ impl StateStore {
         format!("party_person\u{1f}{party}").into_bytes()
     }
 
+    /// Returns the person `row` seals under `context`, its `key_id` and
+    /// `person_sealed` columns, read for `key`; `None` without a row.
+    fn opened_person(
+        &self,
+        row: Option<sqlx::postgres::PgRow>,
+        key: &str,
+        context: &[u8],
+    ) -> Result<Option<PersonId>, StoreError> {
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let key_id: String = row.try_get("key_id").map_err(database)?;
+        let sealed: Vec<u8> = row.try_get("person_sealed").map_err(database)?;
+        let key_id = checked(key, "sealing key id", key_id, KeyId::new)?;
+        let plain = self
+            .keys
+            .open(&key_id, context, &sealed)
+            .map_err(|source| StoreError::Seal { source })?;
+        let subject: EhrSubject =
+            serde_json::from_slice(&plain).map_err(|source| StoreError::Record {
+                key: key.to_owned(),
+                source: Box::new(source),
+            })?;
+        PersonId::new(&subject.namespace, &subject.id)
+            .map(Some)
+            .map_err(|source| StoreError::Identifier {
+                key: key.to_owned(),
+                kind: "person id",
+                value: subject.namespace,
+                source: Box::new(source),
+            })
+    }
+
     /// Returns the associated data an EHR's sealed person is bound to.
     fn subject_context(ehr: &str) -> Vec<u8> {
         format!("ehr_subject\u{1f}{ehr}").into_bytes()
@@ -205,29 +238,7 @@ impl Store for StateStore {
             .fetch_optional(&self.pool)
             .await
             .map_err(database)?;
-        let Some(row) = row else {
-            return Ok(None);
-        };
-        let key_id: String = row.try_get("key_id").map_err(database)?;
-        let sealed: Vec<u8> = row.try_get("person_sealed").map_err(database)?;
-        let key_id = checked(ehr.as_str(), "sealing key id", key_id, KeyId::new)?;
-        let plain = self
-            .keys
-            .open(&key_id, &Self::subject_context(ehr.as_str()), &sealed)
-            .map_err(|source| StoreError::Seal { source })?;
-        let subject: EhrSubject =
-            serde_json::from_slice(&plain).map_err(|source| StoreError::Record {
-                key: ehr.as_str().to_owned(),
-                source: Box::new(source),
-            })?;
-        PersonId::new(&subject.namespace, &subject.id)
-            .map(Some)
-            .map_err(|source| StoreError::Identifier {
-                key: ehr.as_str().to_owned(),
-                kind: "person id",
-                value: subject.namespace,
-                source: Box::new(source),
-            })
+        self.opened_person(row, ehr.as_str(), &Self::subject_context(ehr.as_str()))
     }
 
     async fn person_of_party(&self, party: &str) -> Result<Option<PersonId>, StoreError> {
@@ -237,29 +248,7 @@ impl Store for StateStore {
                 .fetch_optional(&self.pool)
                 .await
                 .map_err(database)?;
-        let Some(row) = row else {
-            return Ok(None);
-        };
-        let key_id: String = row.try_get("key_id").map_err(database)?;
-        let sealed: Vec<u8> = row.try_get("person_sealed").map_err(database)?;
-        let key_id = checked(party, "sealing key id", key_id, KeyId::new)?;
-        let plain = self
-            .keys
-            .open(&key_id, &Self::party_context(party), &sealed)
-            .map_err(|source| StoreError::Seal { source })?;
-        let subject: EhrSubject =
-            serde_json::from_slice(&plain).map_err(|source| StoreError::Record {
-                key: party.to_owned(),
-                source: Box::new(source),
-            })?;
-        PersonId::new(&subject.namespace, &subject.id)
-            .map(Some)
-            .map_err(|source| StoreError::Identifier {
-                key: party.to_owned(),
-                kind: "person id",
-                value: subject.namespace,
-                source: Box::new(source),
-            })
+        self.opened_person(row, party, &Self::party_context(party))
     }
 
     async fn party_of(&self, person: &PersonId) -> Result<Option<String>, StoreError> {
