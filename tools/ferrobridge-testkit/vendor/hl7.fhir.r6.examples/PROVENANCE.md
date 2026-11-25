@@ -10,19 +10,19 @@ edit one: change the pin in docs/VERSIONS.md, run the script with
 `--build-time --stamp`, and record the count and digest it prints.
 
 - Package: hl7.fhir.r6.examples
-- Version: 6.0.0-ballot5
+- Version: 6.0.0-snapshot1
 - Source: the FHIR package registry, https://packages2.fhir.org/packages/hl7.fhir.r6.examples
-- Tarball: https://packages2.fhir.org/web/hl7.fhir.r6.examples-6.0.0-ballot5.tgz
-- SHA-1 (registry shasum): 213e6e7e2193b5973a7c0623936c3afd353948fd
-- SHA-256 (tarball): 03e6a7ac71026efd2636560a1fc461d897fe9f6afe318de976b2f2f37d02ba1e
+- Tarball: https://packages-cdn.fhir.org/web/hl7.fhir.r6.examples-6.0.0-snapshot1.tgz
+- SHA-1 (registry shasum): ade2e483ee9e91b596ce0a6fa97b694840781545
+- SHA-256 (tarball): d615c89f3ceb80943bb026be33147dac70c6d8bd12678cf0a5572b8aa990c843
 - Upstream license: CC0-1.0 (the `license` field of `package/package.json`)
 - Layout: the tarball's `package/` directory, extracted unchanged
-- Files: 2488
+- Files: 2323
 - Tree digest (sha256 over the sorted per-file `sha256  path` listing,
-  `PROVENANCE.md` excluded): `4654c0fa42180b2ef3abec208458482cb1092fe3c63ef4ec4661a3feb50a7b3f`
-- Contents: 2486 resources of 126 resource types, one JSON file each,
+  `PROVENANCE.md` excluded): `cde674bd7b53b7030c8d4d7f012ed66f7f934e82a7e41f6aea8d8a705a19636a`
+- Contents: 2321 resources of 119 resource types, one JSON file each,
   beside `package.json` and `.index.json`
-- Stamped: 2026-09-26
+- Stamped: 2026-11-24
 
 ## Why build time
 

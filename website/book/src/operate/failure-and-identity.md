@@ -49,7 +49,8 @@ On the FHIR side an exported resource id is derived deterministically, as the
 specification recommends, from the composition's stable `versioned_object_uid`,
 the entry path and the split occurrence, so it stays the same across
 composition versions, which FHIR requires of a logical id; `meta.versionId`
-carries the openEHR version. FerroBRIDGE also keeps a persistent id-map: the
+carries the openEHR version. FerroBRIDGE also keeps a persistent id-map in the state store, which every
+replica shares: the
 patient identifier to `ehr_id` relation, the external to internal resource id
 relation, and the resource id to composition relation, so a `PUT` resolves and
 a re-sent Bundle is recognised. It also records each `Resource.identifier` a
@@ -66,14 +67,11 @@ references it as `<Type>/<id>`, and `GET [base]/<Type>/<id>` answers it on
 its own: the facade maps the parent's entry again and returns the created
 resource of that id. The binding holds identifiers only, never content.
 
-The id-map file records the schema it was written in. This build writes
-schema 3 and reads schemas 1 to 3; a file with no schema row was written by
-0.0.6 or earlier and reads as schema 1. Schema 3 adds the binding of a
-created resource, so a file of schema 1 or 2 reads unchanged. Opening the
-store checks the schema and stamps the file with schema 3. A file in any
-other schema, for example one a later build wrote, stops the start with an
-error that names the file, the schema it found and the schemas this build
-reads, and the file is left unchanged.
+The id-map records the identity derivation that wrote it and the
+fingerprint of the `[state.seal] lookup_key` its digests were taken under.
+Opening the map checks both, and a map of another derivation or another
+lookup key stops the start with an error that names which one differs; the
+map is left unchanged.
 
 Every openEHR identifier the id map holds is checked again when a request
 reads it: an `ehr_id` must not carry a character that would change the
@@ -194,8 +192,9 @@ single create of a resource with an `id`, and a single create also claims the
 `resourceType` and `id` alone, so two creates of one `id` at different
 versions do not run at once. Retry after the first delivery has
 answered: the retry is then recognised as a re-sent Bundle or resource, as
-described above. The claims live in the server process, one set per identity
-store, so they order deliveries that reach the same FerroBRIDGE instance.
+described above. The claims live in the server process, so they order deliveries that reach
+the same FerroBRIDGE instance; across replicas the identity map records each
+binding once and every replica keeps the one that stands.
 
 On the OMOP side every CDM v5.4 primary key is a 32-bit integer, so ids come
 from database sequences and a bridge-owned side table maps each source record

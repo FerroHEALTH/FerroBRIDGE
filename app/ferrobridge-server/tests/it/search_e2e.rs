@@ -177,7 +177,8 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
         created["id"].as_str().ok_or("the create carries an id")?,
     )?;
     let binding = memory
-        .binding_of("Condition", &id)?
+        .binding_of("Condition", &id)
+        .await?
         .ok_or("the create recorded its binding")?;
     let ehr_id = ferrobridge_server::cdr::ids::EhrId::new(&binding.ehr_id)?;
     let (system_one, code_one) =

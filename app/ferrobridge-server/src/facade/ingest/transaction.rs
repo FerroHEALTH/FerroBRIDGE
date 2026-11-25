@@ -331,7 +331,7 @@ impl Ingest<'_> {
         let mut revised = Vec::with_capacity(sources.len());
         for source in &sources {
             let recorded = match source {
-                Some(source) => self.recorded(source, provenance)?,
+                Some(source) => self.recorded(source, provenance).await?,
                 None => Recorded::default(),
             };
             known.push(recorded.consumed);
@@ -372,7 +372,8 @@ impl Ingest<'_> {
         let (contribution, returned) = self
             .commit_all(&ehr_id, &partition.mapped, &preceding)
             .await?;
-        self.record_commitment(&sources, &ehr_id, &contribution)?;
+        self.record_commitment(&sources, &ehr_id, &contribution)
+            .await?;
         let versions = self
             .committed_versions(
                 &ehr_id,
@@ -382,7 +383,9 @@ impl Ingest<'_> {
                 Scope::Whole,
             )
             .await?;
-        let mut placed = self.place(&partition.mapped, &sources, &ehr_id, versions)?;
+        let mut placed = self
+            .place(&partition.mapped, &sources, &ehr_id, versions)
+            .await?;
         for (place, prior) in placed.iter_mut().zip(&preceding) {
             place.change = Some(change_of(prior.as_ref()));
         }

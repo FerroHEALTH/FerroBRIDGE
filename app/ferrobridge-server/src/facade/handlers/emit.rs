@@ -80,7 +80,7 @@ pub(crate) async fn resources_of(
     };
     let canonical = read::version::canonical(facade, ehr_id, composition, &template_id)?;
     let source = render::composition_url(client.base_url(), ehr_id, version)?;
-    let subject = render::subject_of(facade, ehr_id)?;
+    let subject = render::subject_of(facade, ehr_id).await?;
     let programs = facade.programs();
     let session = facade.translator().session();
     let mut resources = Vec::new();
@@ -94,14 +94,10 @@ pub(crate) async fn resources_of(
         let entries = engine::entry::entries_of(program, loaded.index(), &canonical)
             .map_err(|error| Refusal::from(Refused::from(error)))?;
         for entry in entries {
-            let (id, _binding) = facade.ingest(client.clone()).bind_entry(
-                loaded,
-                resource_type,
-                ehr_id,
-                version,
-                &canonical,
-                &entry,
-            )?;
+            let (id, _binding) = facade
+                .ingest(client.clone())
+                .bind_entry(loaded, resource_type, ehr_id, version, &canonical, &entry)
+                .await?;
             let (own, created) = render::render_document(
                 program,
                 loaded.index(),

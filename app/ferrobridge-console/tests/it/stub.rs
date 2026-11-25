@@ -198,7 +198,6 @@ pub(crate) fn running_configuration() -> serde_json::Value {
             entry("facade.ehr_policy", &text("existing"), "default"),
             entry("facade.enabled", &switch(true), "file"),
             entry("facade.identifier_search.enabled", &switch(false), "default"),
-            entry("facade.identity_store", &text("identity.redb"), "default"),
             entry("facade.references.fetch_bases", &json!({"kind": "list", "value": []}), "default"),
             entry("facade.references.max_depth", &number(2), "default"),
             entry("facade.search_count", &number(20), "default"),

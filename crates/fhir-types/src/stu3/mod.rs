@@ -244,7 +244,7 @@ pub mod procedure_request;
 pub mod process_request;
 #[cfg(any(feature = "resources", feature = "stu3-resources"))]
 pub mod process_response;
-#[cfg(any(feature = "resources", feature = "stu3-resources"))]
+#[cfg(feature = "terminology")]
 pub mod provenance;
 #[cfg(feature = "terminology")]
 pub mod quantity;

@@ -53,7 +53,10 @@ pub(crate) async fn if_none_exist(
             Issue::error(IssueType::Invalid).diagnosing("the If-None-Exist header is not text"),
         )
     })?;
-    let matches: Vec<FhirResourceId> = search(facade, resource_type, query)?.into_iter().collect();
+    let matches: Vec<FhirResourceId> = search(facade, resource_type, query)
+        .await?
+        .into_iter()
+        .collect();
     match matches.as_slice() {
         [] => Ok(None),
         [only] => read::read(
@@ -77,7 +80,7 @@ pub(crate) async fn if_none_exist(
 }
 
 /// Returns the logical ids `query` matches, in order.
-fn search(
+async fn search(
     facade: &Facade,
     resource_type: &str,
     query: &str,
@@ -92,7 +95,7 @@ fn search(
         }
         seen_parameter = true;
         for value in raw.split(',').filter(|value| !value.is_empty()) {
-            found.extend(resolve(facade, resource_type, &name, value)?);
+            found.extend(resolve(facade, resource_type, &name, value).await?);
         }
     }
     if !seen_parameter {
@@ -106,7 +109,7 @@ fn search(
 }
 
 /// Returns the logical ids one parameter value resolves to.
-fn resolve(
+async fn resolve(
     facade: &Facade,
     resource_type: &str,
     name: &str,
@@ -119,7 +122,8 @@ fn resolve(
             // (<https://hl7.org/fhir/R4/resource.html>).
             return Ok(Vec::new());
         };
-        return Ok(read::binding(facade, resource_type, &id)?
+        return Ok(read::binding(facade, resource_type, &id)
+            .await?
             .map(|_held| id)
             .into_iter()
             .collect());
@@ -127,6 +131,7 @@ fn resolve(
     facade
         .store()
         .identified(resource_type, &token(value)?)
+        .await
         .map_err(|error| write::store_refusal(&error))
 }
 

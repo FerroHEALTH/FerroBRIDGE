@@ -26,9 +26,9 @@ Copyright (c) 2011+, HL7, Inc
  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  POSSIBILITY OF SUCH DAMAGE.
 
- Generated on Fri, Jul 17, 2026 17:22+1000 for FHIR v6.0.0-ballot5
+ Generated on Thu, Sep 10, 2026 16:50+1000 for FHIR v6.0.0-snapshot1
 -->
-<xs:schema xmlns="http://hl7.org/fhir" xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://hl7.org/fhir" elementFormDefault="qualified" version="6.0.0-ballot5">
+<xs:schema xmlns="http://hl7.org/fhir" xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://hl7.org/fhir" elementFormDefault="qualified" version="6.0.0-snapshot1">
   <xs:include schemaLocation="account.xsd"/>
   <xs:include schemaLocation="activitydefinition.xsd"/>
   <xs:include schemaLocation="actordefinition.xsd"/>

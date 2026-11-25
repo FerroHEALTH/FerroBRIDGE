@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSMedicationUse (Table 23), served by the facade as an individual resource
+# (draft act Art 7(2), #2087): each
+# INSTRUCTION.medication_order.v3.MedicationStatement entry of the template
+# becomes one MedicationStatement with the
+# http://hl7.eu/fhir/base/StructureDefinition/medicationStatement-eu-core
+# profile.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_medication_use.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/base/StructureDefinition/medicationStatement-eu-core"
+    version: "2.0.1"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_patient_summary.v1.0.0"
+  archetypes:
+    - "INSTRUCTION.medication_order.v3.MedicationStatement"
+  start: "INSTRUCTION.medication_order.v3.MedicationStatement"

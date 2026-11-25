@@ -94,7 +94,7 @@ mappings:
 "#;
 
 /// Which lanes the bridge runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum Lanes {
     /// Every lane: the facade, the operations and the operator API.
     All,
@@ -110,6 +110,12 @@ pub(crate) enum Lanes {
     WithEtl,
 }
 
+/// The base64 of the synthetic lookup key of the stack's state store.
+const LOOKUP_KEY: &str = "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=";
+
+/// The base64 of the synthetic sealing key of the stack's state store.
+const SEAL_KEY: &str = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=";
+
 /// The run the history of a [`Lanes::WithEtl`] stack holds with one refused
 /// record.
 pub(crate) const RUN_ID: &str = "0b6c5a3e-1d3f-4c7e-9a43-000000000001";
@@ -119,14 +125,15 @@ const COMPOSITIONS: &str = "SELECT e/ehr_id/value AS ehr_id, v/uid/value AS vers
     c AS composition FROM EHR e CONTAINS VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c \
     ORDER BY c/context/start_time/value, v/uid/value";
 
-/// Starts the PostgreSQL of a [`Lanes::WithEtl`] stack, creates its bridge
-/// schema and records two synthetic runs in its history.
-async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box<dyn Error>> {
+/// Initialises the CDM of a [`Lanes::WithEtl`] stack in `postgres`, creates
+/// its bridge schema and records two synthetic runs in its history.
+async fn etl_database(
+    postgres: &ferrobridge_testkit::containers::Postgres,
+) -> Result<(), Box<dyn Error>> {
     use ferrobridge_operator_api::etl::RunKind;
     use ferrobridge_server::etl::history;
     use ferrobridge_server::etl::report::{RefusalEntry, RunReport};
 
-    let postgres = ferrobridge_testkit::containers::postgres().await?;
     let mut writer = omop_cdm::writer::CdmWriter::connect(
         postgres.url(),
         omop_cdm::ddl::SchemaName::new("cdm")?,
@@ -182,7 +189,7 @@ async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box
         let run = history::document(report, kind, started.parse()?, finished.parse()?);
         history::record(&writer, &run).await?;
     }
-    Ok(postgres)
+    Ok(())
 }
 
 /// The running stack.
@@ -190,7 +197,7 @@ async fn etl_database() -> Result<ferrobridge_testkit::containers::Postgres, Box
 pub(crate) struct Stack {
     /// The CDR, kept so it outlives the bridge.
     _cdr: MockServer,
-    /// The mapping tree, the templates and the identity store.
+    /// The mapping tree and the templates.
     tree: tempfile::TempDir,
     /// The test OpenID Provider.
     provider: Provider,
@@ -202,8 +209,8 @@ pub(crate) struct Stack {
     access_token: String,
     /// The bridge's own thread and the sender that stops it.
     bridge: Running,
-    /// The PostgreSQL of the state store and, for a [`Lanes::WithEtl`]
-    /// stack, of the CDM, kept so it outlives the bridge.
+    /// The PostgreSQL of the bridge's state store, and of the CDM of a
+    /// [`Lanes::WithEtl`] stack, kept so it outlives the bridge.
     _postgres: ferrobridge_testkit::containers::Postgres,
 }
 
@@ -248,14 +255,22 @@ impl Stack {
             fixed => Provider::start_on(listen(fixed)?).await?,
         };
         provider.publish_metadata().await;
-        let postgres = match lanes {
-            Lanes::WithEtl => etl_database().await?,
-            Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => {
-                ferrobridge_testkit::containers::postgres().await?
+        let postgres = ferrobridge_testkit::containers::postgres().await?;
+        let cdm = match lanes {
+            Lanes::WithEtl => {
+                etl_database(&postgres).await?;
+                Some(postgres.url())
             }
+            Lanes::All | Lanes::WithoutOperations | Lanes::WithEvents => None,
         };
-        let (bridge, running) =
-            bridge(tree.path(), &cdr, &provider, (lanes, postgres.url()), port).await?;
+        let (bridge, running) = bridge(
+            tree.path(),
+            &cdr,
+            &provider,
+            (lanes, cdm, postgres.url()),
+            port,
+        )
+        .await?;
 
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let console = format!("http://{}", listener.local_addr()?);
@@ -450,16 +465,15 @@ async fn bridge(
     tree: &Path,
     cdr: &MockServer,
     provider: &Provider,
-    (lanes, database): (Lanes, &str),
+    (lanes, cdm, state): (Lanes, Option<&str>, &str),
     port: u16,
 ) -> Result<(String, Running), Box<dyn Error>> {
     let listener = listen(port)?;
     listener.set_nonblocking(true)?;
     let bridge = format!("http://{}", listener.local_addr()?);
-    let [mappings, templates, identity, console] = [
+    let [mappings, templates, console] = [
         tree.join("mappings"),
         tree.join("templates"),
-        tree.join("identity.redb"),
         tree.join("console"),
     ]
     .map(|file| toml::Value::String(file.display().to_string()));
@@ -469,7 +483,6 @@ async fn bridge(
         Lanes::WithEvents => events_lane(cdr, tree).await?,
         Lanes::All | Lanes::WithoutOperations | Lanes::WithEtl => String::new(),
     };
-    let cdm = (lanes == Lanes::WithEtl).then_some(database);
     let etl = cdm.map_or_else(String::new, |cdm| {
         format!(
             "\n[cdm]\nurl = \"{cdm}\"\n\n\
@@ -481,12 +494,13 @@ async fn bridge(
         "[cdr]\nendpoint.url = \"{cdr}/\"\nendpoint.timeout = \"2s\"\n\n[cdr.endpoint.retry]\nmax_attempts = 1\n\n\
          [mappings]\ndirectory = {mappings}\ntemplates = {templates}\n\n\
          [operations]\nenabled = {operations}\ncomposition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
-         [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\nidentity_store = {identity}\n\
+         [state]\nurl = \"{state}\"\n\n[state.seal]\nlookup_key = \"{LOOKUP_KEY}\"\n\n\
+         [[state.seal.keys]]\nid = \"journey\"\nkey = \"{SEAL_KEY}\"\n\n\
+         [facade]\nenabled = true\nbase_url = \"{bridge}/fhir\"\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
          [auth.issuer.ferro]\nissuer = \"{issuer}\"\n\n\
          [operator]\nenabled = true\nmapping_dir = {console}\n\n\
          [hl7v2]\nenabled = true\nlisten = \"127.0.0.1:{mllp}\"\n{mllp_tls}\n\
-         [state]\nurl = \"{database}\"\n\n\
          [usage_report]\nenabled = false\n{events}{etl}",
         cdr = cdr.uri(),
         issuer = provider.issuer(),

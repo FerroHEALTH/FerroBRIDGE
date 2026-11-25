@@ -158,7 +158,7 @@ pub(crate) async fn validate(
             ))
             .detailing(VALIDATOR),
         Issue::information(IssueType::Informational)
-            .diagnosing(disposition(facade, &person)?)
+            .diagnosing(disposition(facade, &person).await?)
             .detailing(VALIDATOR),
     ];
     // NOTE: `engine/rest-api.adoc` §Reporting partial results with `OperationOutcome`;
@@ -199,8 +199,8 @@ fn unresolved(
 /// CDR, so an EHR the map does not know yet is reported by the policy that
 /// would decide it rather than looked up. No specification governs this: our
 /// own design.
-fn disposition(facade: &Facade, person: &PersonId) -> Result<String, Refusal> {
-    let known = facade.store().ehr_of(person).map_err(|error| {
+async fn disposition(facade: &Facade, person: &PersonId) -> Result<String, Refusal> {
+    let known = facade.store().ehr_of(person).await.map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),

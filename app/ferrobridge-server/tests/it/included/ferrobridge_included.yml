@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping for the include and fixed-token cases:
+# the problem name, the problem-list-item category every Condition carries,
+# and an evidence Observation the run creates from the problem-diagnosis
+# comment (types-of-mappings/concept-type/Reference.adoc).
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_included
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.problem_diagnosis.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Condition
+
+mappings:
+  - name: "problemName"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+      type: "CODEABLECONCEPT"
+
+  - name: "category"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "problemListItem"
+        fhir:
+          - path: "category.coding.system"
+            value: "http://terminology.hl7.org/CodeSystem/condition-category"
+          - path: "category.coding.code"
+            value: "problem-list-item"
+
+  - name: "evidence"
+    with:
+      fhir: "$resource.evidence.detail"
+      openehr: "$reference"
+    reference:
+      resourceType: "Observation"
+      mappings:
+        - name: "evidenceCode"
+          with:
+            fhir: "$fhirRoot.code"
+            openehr: "$archetype/data[at0001]/items[at0069]"
+            type: "CODEABLECONCEPT"
+        - name: "evidenceStatus"
+          unidirectional: "openehr->fhir"
+          with:
+            fhir: "$fhirRoot"
+          manual:
+            - name: "status"
+              fhir:
+                - path: "status"
+                  value: "final"

@@ -447,9 +447,9 @@ acknowledged, and the connection closes, within the same
 
 ## Limits
 
-- The face runs in one process. The claims that hold a message in flight and
-  the identity map that recognises a resent one live in that process, so run
-  one process per identity store and point every sender of a feed at it.
+- The claims that hold a message in flight live in one process, so point
+  every sender of a feed at one replica. The identity map that recognises a
+  resent message is shared through the state store.
 - MLLP Release 2's commit acknowledgment is not spoken, and enhanced-mode
   acknowledgments are not sent.
 - The allow list matches MSH-4, tied to the client certificate of the

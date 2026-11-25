@@ -9,9 +9,11 @@ use std::path::Path;
 use openehr_mapping_core::index::WebTemplateIndex;
 
 use crate::facade::search::declaration::DeclarationError;
+use crate::facade::search::declaration::FixedToken;
 use crate::facade::search::declaration::Node;
 use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
+use crate::facade::search::declaration::Source;
 use crate::facade::search::declaration::file::ParameterFile;
 
 /// The names R4 reserves for the parameters every resource and every search
@@ -64,33 +66,84 @@ pub(super) fn check_parameter(
             reason: "only a token translates code systems through `systems`",
         });
     }
+    let source = match (&written.fixed, &written.path) {
+        (Some(fixed), None) if kind == ParameterType::Token => {
+            if written.node.is_some() || !written.systems.is_empty() {
+                return Err(shape(
+                    file,
+                    name,
+                    kind,
+                    "a fixed token is read under no node and translates no system",
+                ));
+            }
+            Source::Fixed(FixedToken {
+                system: fixed.system.clone(),
+                code: fixed.code.clone(),
+            })
+        }
+        (Some(_), None) => {
+            return Err(shape(file, name, kind, "only a token takes a fixed coding"));
+        }
+        (Some(_), Some(_)) => {
+            return Err(shape(
+                file,
+                name,
+                kind,
+                "a parameter takes either a path or a fixed coding",
+            ));
+        }
+        (None, None) => {
+            return Err(shape(file, name, kind, "a parameter names its path"));
+        }
+        (None, Some(written_path)) => read_path(file, name, kind, written, written_path, index)?,
+    };
+    Ok(Parameter {
+        kind,
+        source,
+        systems: written.systems.clone(),
+    })
+}
+
+/// Returns a [`DeclarationError::Shape`] for `name`.
+fn shape(file: &Path, name: &str, kind: ParameterType, reason: &'static str) -> DeclarationError {
+    DeclarationError::Shape {
+        file: file.to_path_buf(),
+        name: name.to_owned(),
+        kind: kind.as_str(),
+        reason,
+    }
+}
+
+/// Places the path of one parameter in the template and parses it.
+fn read_path(
+    file: &Path,
+    name: &str,
+    kind: ParameterType,
+    written: &ParameterFile,
+    written_path: &str,
+    index: &WebTemplateIndex,
+) -> Result<Source, DeclarationError> {
     let node = written.node.as_ref().map(|node| Node {
         class: node.class.clone(),
         archetype: node.archetype.clone(),
     });
-    let coded = crate::facade::search::template::locate(index, node.as_ref(), &written.path, kind)
+    let coded = crate::facade::search::template::locate(index, node.as_ref(), written_path, kind)
         .map_err(|reason| DeclarationError::Template {
-            file: file.to_path_buf(),
-            name: name.to_owned(),
-            reason,
-        })?;
+        file: file.to_path_buf(),
+        name: name.to_owned(),
+        reason,
+    })?;
     let refuse = |reason: String| DeclarationError::Path {
         file: file.to_path_buf(),
         name: name.to_owned(),
-        path: written.path.clone(),
+        path: written_path.to_owned(),
         reason,
     };
-    let path = crate::facade::search::aql::check_path(&format!("c/{}", written.path))
+    let path = crate::facade::search::aql::check_path(&format!("c/{written_path}"))
         .map_err(refuse)?
         .path
         .ok_or_else(|| refuse(String::from("it names no attribute below its node")))?;
-    Ok(Parameter {
-        kind,
-        node,
-        path,
-        coded,
-        systems: written.systems.clone(),
-    })
+    Ok(Source::Path { node, path, coded })
 }
 
 #[cfg(test)]
@@ -99,6 +152,7 @@ mod tests {
     use crate::facade::search::declaration::DeclarationError;
     use crate::facade::search::declaration::Parameter;
     use crate::facade::search::declaration::ParameterType;
+    use crate::facade::search::declaration::Source;
     use crate::facade::search::declaration::check_parameters;
     use crate::facade::search::declaration::check_standard;
     use crate::facade::search::declaration::file::parse;
@@ -131,10 +185,23 @@ mod tests {
         ))
         .expect("the token checks");
         assert_eq!(ParameterType::Token, token.kind());
-        assert_eq!(Some(Coded::Text), token.coded);
+        assert!(
+            matches!(
+                token.source,
+                Source::Path {
+                    coded: Some(Coded::Text),
+                    ..
+                }
+            ),
+            "{token:?}"
+        );
         assert_eq!(
-            "n0/data[at0001]/items[at0002]/value/defining_code/code_string",
-            token.value_path("n0").column_path_with_variable()
+            Some(String::from(
+                "n0/data[at0001]/items[at0002]/value/defining_code/code_string"
+            )),
+            token
+                .value_path("n0")
+                .map(|path| path.column_path_with_variable())
         );
         assert_eq!(
             Some(String::from(
@@ -153,8 +220,9 @@ mod tests {
             .expect("a composition-level date checks");
         assert!(date.sortable());
         assert_eq!(
-            "c/context/start_time/value",
-            date.value_path("c").column_path_with_variable()
+            Some(String::from("c/context/start_time/value")),
+            date.value_path("c")
+                .map(|path| path.column_path_with_variable())
         );
     }
 
@@ -282,6 +350,79 @@ mod tests {
             assert!(
                 check_standard(Path::new(FILE), "Condition", name, kind).is_ok(),
                 "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_fixed_token_reads_no_path_and_matches_its_coding() {
+        let token = check(
+            "context: c\nparameters:\n  category:\n    type: token\n    fixed: { system: 'http://terminology.hl7.org/CodeSystem/observation-category', code: vital-signs }\n",
+        )
+        .expect("the fixed token checks");
+        let fixed = token.fixed().expect("a fixed coding");
+        assert_eq!(
+            Vec::<openehr_query::ast::IdentifiedPath>::new(),
+            token.paths("n0")
+        );
+        assert!(token.node().is_none());
+        assert!(!token.sortable());
+        for (text, matches) in [
+            ("vital-signs", true),
+            (
+                "http://terminology.hl7.org/CodeSystem/observation-category|vital-signs",
+                true,
+            ),
+            (
+                "http://terminology.hl7.org/CodeSystem/observation-category|",
+                true,
+            ),
+            ("laboratory", false),
+            ("|vital-signs", false),
+            ("http://example.org|vital-signs", false),
+        ] {
+            let value = fhir_search::token::Token::parse(text).expect("a token value");
+            assert_eq!(matches, fixed.matches(&value), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_fixed_coding_with_a_path_a_node_or_another_type_is_refused() {
+        for text in [
+            "context: c\nparameters:\n  category:\n    type: token\n    path: context/start_time/value\n    fixed: { system: s, code: c }\n".to_owned(),
+            format!("context: c\nparameters:\n  category:\n    type: token\n{NODE}    fixed: {{ system: s, code: c }}\n"),
+            "context: c\nparameters:\n  category:\n    type: string\n    fixed: { system: s, code: c }\n".to_owned(),
+            "context: c\nparameters:\n  category:\n    type: token\n".to_owned(),
+        ] {
+            let error = check(&text).expect_err("the shape is refused");
+            assert!(matches!(error, DeclarationError::Shape { .. }), "{error:?}");
+        }
+    }
+
+    #[test]
+    fn an_include_keeps_the_branches_of_its_own_type() {
+        let includes = crate::facade::search::declaration::check_includes(
+            Path::new(FILE),
+            "MedicationStatement",
+            &[String::from("medication")],
+        )
+        .expect("the include checks");
+        assert_eq!(
+            Some("(MedicationStatement.medication as Reference)"),
+            includes
+                .get("medication")
+                .map(|include| include.expression.as_str())
+        );
+        for (resource_type, code) in [("Condition", "code"), ("Condition", "nothing")] {
+            let error = crate::facade::search::declaration::check_includes(
+                Path::new(FILE),
+                resource_type,
+                &[String::from(code)],
+            )
+            .expect_err("no reference parameter of that code");
+            assert!(
+                matches!(error, DeclarationError::Include { .. }),
+                "{error:?}"
             );
         }
     }

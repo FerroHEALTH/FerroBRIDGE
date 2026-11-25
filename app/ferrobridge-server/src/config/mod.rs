@@ -425,8 +425,6 @@ impl Config {
 pub struct FacadeSettings {
     /// What the facade itself was configured with.
     pub settings: crate::facade::Settings,
-    /// The file the identity map is kept in.
-    pub identity_store: PathBuf,
     /// The page sizes a search answers with.
     pub search: crate::facade::search::Limits,
     /// What may be fetched to resolve a reference the request does not carry.

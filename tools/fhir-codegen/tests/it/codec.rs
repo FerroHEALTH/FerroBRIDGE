@@ -74,14 +74,6 @@ pub(crate) fn expected_rejections(package: &str) -> Vec<(&'static str, &'static 
                 "Resource.status: required property is missing",
             ),
         ],
-        // The ballot example writes `codeSystem.version` as `[null]`; a null
-        // array entry is legal only in a primitive array paired with its
-        // `_element` (<https://hl7.org/fhir/R6/json.html#primitive>), and
-        // `version` is a BackboneElement.
-        "hl7.fhir.r6.core" => vec![(
-            "TerminologyCapabilities-example-terminology-server.json",
-            "Resource.codeSystem[1].version[0]: expected an object",
-        )],
         _ => Vec::new(),
     }
 }

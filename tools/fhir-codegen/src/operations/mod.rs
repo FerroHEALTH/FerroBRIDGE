@@ -284,7 +284,7 @@ pub enum ParameterUse {
 pub enum ParameterSource {
     /// The version's own `OperationDefinition`.
     Version,
-    /// Pre-adopted from the FHIR R6 ballot for the terminology ecosystem.
+    /// Pre-adopted from FHIR R6 for the terminology ecosystem.
     PreAdopted,
     /// Defined by the terminology ecosystem alone.
     Ecosystem,
