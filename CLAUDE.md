@@ -93,7 +93,8 @@ the testkit tool crate. Beside it:
   is the outbound FHIR lane behind `[fhir_outbound]` (#1374): a change-feed
   consumer that maps each changed composition through the facade's programs
   (`facade::handlers::emit`) and posts one transaction Bundle per event, with
-  the `redb` record of what it delivered that a deletion or an erasure
+  the record of what it delivered (`outbound_delivered` in the state store,
+  committed with the lane's watermark) that a deletion or an erasure
   retracts. `src/facade/`
   is the FHIR R4 facade (#85), mounted under `/fhir` behind `[facade]`: the
   six interactions over the CDR and search over the AQL projections a
@@ -131,7 +132,8 @@ the testkit tool crate. Beside it:
   the access-record lane, whose layer inside the guard (`facade::audit`) writes one Regulation (EU) 2025/327 Annex
   II 3.2 record per facade access through `ehds-logging`, the `reach` every
   CDR read and write adds its template ids to, the HL7 v2 face's system
-  import record, and the `ihe-atna` spool and forwarder that send each BALP
+  import record, and the audit outbox in the state store (`audit::outbox`)
+  with the `ihe-atna` forwarder that send each BALP
   `AuditEvent` over the ITI-20 ATX: FHIR Feed, failing closed.
   `src/operator/` is the
   read-only operator API behind `[operator]` and `[auth]` (#596): the guard

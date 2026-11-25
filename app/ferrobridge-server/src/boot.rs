@@ -322,7 +322,7 @@ where
     if let (Some(log), Some(delivery)) = (state.access_log(), delivery) {
         log.stop();
         // NOTE: no specification governs this: our own design; a record not yet delivered
-        // stays in the spool on disk and is delivered by the next start.
+        // stays in the state store's outbox for any replica's forwarder.
         if tokio::time::timeout(settings.server.shutdown_timeout.get(), delivery)
             .await
             .is_err()

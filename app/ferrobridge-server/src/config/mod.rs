@@ -396,6 +396,7 @@ impl Config {
                     &self.audit,
                     self.facade.enabled,
                     self.auth.enabled,
+                    self.state.is_some(),
                     &self.facade.system_id,
                 )?)
             } else {
