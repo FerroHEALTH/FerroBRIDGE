@@ -7,8 +7,8 @@
 //! No specification governs the lane: our own design.
 
 use super::Config;
+use super::change_feed::Consumer;
 use super::error::Error;
-use crate::change_feed::ReaderName;
 use crate::outbound::Settings;
 use crate::outbound::sink::Sink;
 use ferrohealth_smart::client::outbound::OutboundClient;
@@ -34,31 +34,7 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             });
         }
     }
-    if section.reader.is_empty() {
-        return Err(Error::Missing {
-            key: String::from("fhir_outbound.reader"),
-        });
-    }
-    let reader = ReaderName::new(&section.reader).map_err(|source| Error::ReaderName {
-        key: String::from("fhir_outbound.reader"),
-        source,
-    })?;
-    let taken = [
-        (config.events.enabled, config.events.reader.as_str()),
-        (
-            config.omop_incremental.enabled,
-            config.omop_incremental.reader.as_str(),
-        ),
-    ];
-    if taken
-        .iter()
-        .any(|(on, other)| *on && *other == section.reader)
-    {
-        return Err(Error::Duplicate {
-            key: String::from("fhir_outbound.reader"),
-            value: section.reader.clone(),
-        });
-    }
+    let reader = Consumer::FhirOutbound.reader(config)?;
     let client = OutboundClient::build(&section.endpoint, "fhir_outbound.endpoint", &ServerTls)
         .map_err(|source| Error::Client {
             upstream: "fhir_outbound",
