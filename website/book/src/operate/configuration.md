@@ -1183,6 +1183,27 @@ The `[auth.issuer.<name>.profile]` table sets the profile keys:
 | `required_claims` | `iss`, `exp`, `aud`, `sub`, `client_id`, `iat`, `jti`, `scope` | The claims every token must carry |
 | `max_actor_chain` | `1` | The deepest `act` chain a token may carry |
 
+#### `[auth.issuer.<name>.assurance]`
+
+What the issuer's tokens say about the authentication behind them. The
+issuer writes the authentication context class as a claim (`acr`, OpenID
+Connect Core 1.0 §2), and the table maps each value to an eIDAS level of
+assurance (Regulation (EU) No 910/2014 Art 8(2)). A token with no mapped
+value carries no level, and so does a Basic credential. The
+[`[assurance]`](#assurance) section names the level each route class
+requires.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `claim` | `acr` | The claim the value is read from, a dotted path |
+| `levels` | `{}` | A table of each value the issuer writes to `low`, `substantial` or `high`. A value with a space, a quote or a backslash refuses the start, since the step-up challenge cannot carry it |
+| `minimum` | none | The level every token of this issuer must carry on every guarded route, beside the route class minimum; a minimum no value of `levels` reaches refuses the start |
+
+```toml
+[auth.issuer.ferrosmart.assurance]
+levels = { "http://eidas.europa.eu/LoA/low" = "low", "http://eidas.europa.eu/LoA/substantial" = "substantial", "http://eidas.europa.eu/LoA/high" = "high" }
+```
+
 #### The described issuer
 
 The discovery document and the `CapabilityStatement` describe one
@@ -1313,6 +1334,45 @@ holds no secret.
 ```toml
 [basic_grants.clinician]
 scopes = ["user/Condition.rs", "user/Observation.rs"]
+```
+
+### `[assurance]`
+
+The eIDAS level of assurance each guarded route class requires of a caller,
+read from the token as its issuer's
+[`[auth.issuer.<name>.assurance]`](#authissuernameassurance) table maps it.
+Both keys are off by default.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `fhir` | none | The level every request under `/fhir` requires, `Patient/$summary` included: `low`, `substantial` or `high`. `GET /fhir/metadata` and the discovery document stay open |
+| `shl` | none | The level the person's SMART Health Link routes under `/shl` require. The receiver's manifest and file requests carry no token and are not held to it |
+
+A request below the level answers `401` with an `OperationOutcome` and the
+RFC 9470 §3 step-up challenge, which names the values of the caller's
+issuer that meet it, so the client can ask the authorization server for a
+stronger login:
+
+```http
+WWW-Authenticate: Bearer error="insufficient_user_authentication", error_description="assurance-below-minimum", acr_values="http://eidas.europa.eu/LoA/high http://eidas.europa.eu/LoA/substantial"
+```
+
+A token with no `acr`, a value its issuer's `levels` does not name, and a
+Basic credential carry no level, so each is refused whenever a minimum is
+set. An issuer's own `minimum` holds beside the route class, and the higher
+of the two decides. A minimum no issuer's `levels` reaches refuses the
+start, and so does a minimum while `[auth]` is off. The facade's access
+record carries the level each admitted caller reached. Which routes need
+which level is the deployment's: RFC 9470 §3 leaves it to the resource
+server. The xShare Yellow Button deployment sets `substantial` on both:
+Implementing Regulation (EU) 2026/2099 Art 6(3) holds a health professional
+to that level in cross-border exchange, and the bridge holds the person to
+the same.
+
+```toml
+[assurance]
+fhir = "substantial"
+shl = "substantial"
 ```
 
 ### `[hl7v2]`

@@ -4,12 +4,13 @@
 //! The target transforms of FHIR R4 §7.7.0.7.2: how a target value is made
 //! from literals and variables.
 //!
-//! `translate` calls a terminology operation and `dateOp` and `escape` are
-//! left undocumented by R4, so each answers a typed refusal.
+//! `translate` runs through the terminology server (`translate.rs`), and
+//! `dateOp` and `escape` are left undocumented by R4, so each answers a
+//! typed refusal.
 
 use fhir_types::codec::{Number, Object, Value};
 
-use super::{Bound, MapError, Run, Scope};
+use super::{Bound, MapError, Run, Scope, translate};
 use crate::structuremap::syntax::{Invocation, Literal, Param, Transform};
 
 /// Returns the value `literal` writes.
@@ -173,8 +174,11 @@ pub(super) fn invoke(
         ("evaluate", [focus, Value::String(expression)]) => {
             return single(run.evaluate(expression, Some(focus), scope)?);
         }
-        // TODO(#2118): translate through the terminology server's ConceptMap/$translate.
-        ("translate" | "dateOp" | "escape", _) => {
+        ("translate", [source, map, output]) => {
+            return translate::translate(run.engine.translator.as_deref(), source, map, output)
+                .map(Some);
+        }
+        ("dateOp" | "escape", _) => {
             return Err(refused(name, "is not run by this engine"));
         }
         _ => return Err(refused(name, "is unknown or takes other parameters")),
