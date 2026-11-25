@@ -40,15 +40,7 @@ pub(crate) async fn cdm_init_command(
             ca = cdm.connection.has_ca(),
             "connecting to the CDM database"
         );
-        let pool = database::CdmPool::connect(
-            sqlx::postgres::PgPoolOptions::new().max_connections(1),
-            cdm.connection
-                .pool_options()
-                .context("preparing the connection to the CDM database")?,
-            cdm.schema.clone(),
-        )
-        .await
-        .context("connecting to the CDM database")?;
+        let pool = cdm_pool(cdm, cdm.schema.clone()).await?;
         let outcome = database::init(&pool)
             .await
             .with_context(|| format!("applying the CDM DDL to schema {}", cdm.schema))?;
@@ -144,15 +136,7 @@ pub(crate) async fn vocab_load_command(
             ssl_mode = %cdm.connection.ssl_mode(),
             "connecting to the CDM database"
         );
-        let pool = omop_cdm::database::CdmPool::connect(
-            sqlx::postgres::PgPoolOptions::new().max_connections(1),
-            cdm.connection
-                .pool_options()
-                .context("preparing the connection to the CDM database")?,
-            schema.clone(),
-        )
-        .await
-        .context("connecting to the CDM database")?;
+        let pool = cdm_pool(cdm, schema.clone()).await?;
         let loaded = athena::load(&pool, &export)
             .await
             .with_context(|| format!("loading the vocabulary into schema {schema}"))?;
@@ -224,15 +208,7 @@ pub(crate) async fn dq_check_command(
 
     let plan = crate::quality::plan(None).context("planning the checks")?;
     async {
-        let pool = omop_cdm::database::CdmPool::connect(
-            sqlx::postgres::PgPoolOptions::new().max_connections(1),
-            cdm.connection
-                .pool_options()
-                .context("preparing the connection to the CDM database")?,
-            cdm.schema.clone(),
-        )
-        .await
-        .context("connecting to the CDM database")?;
+        let pool = cdm_pool(cdm, cdm.schema.clone()).await?;
         let run = crate::quality::run(&pool, &plan).await;
         pool.pool().close().await;
         match format {
@@ -257,6 +233,25 @@ pub(crate) async fn etl_fhir_command(
     shown(etl::job::run_fhir(settings, input).await)
 }
 
+/// Opens the one-connection pool a job reads the CDM database `schema`
+/// through, over the TLS `[cdm]` settles.
+async fn cdm_pool(
+    cdm: &config::CdmSettings,
+    schema: omop_cdm::ddl::SchemaName,
+) -> anyhow::Result<omop_cdm::database::CdmPool> {
+    use anyhow::Context;
+
+    omop_cdm::database::CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new().max_connections(1),
+        cdm.connection
+            .pool_options()
+            .context("preparing the connection to the CDM database")?,
+        schema,
+    )
+    .await
+    .context("connecting to the CDM database")
+}
+
 /// Checks the OMOCL literals of `files` against the vocabulary of the `cdm`
 /// database.
 async fn vocabulary_diagnostics(
@@ -265,15 +260,7 @@ async fn vocabulary_diagnostics(
 ) -> anyhow::Result<Vec<openehr_mapping_core::diagnostic::Diagnostic>> {
     use anyhow::Context;
 
-    let pool = omop_cdm::database::CdmPool::connect(
-        sqlx::postgres::PgPoolOptions::new().max_connections(1),
-        cdm.connection
-            .pool_options()
-            .context("preparing the connection to the CDM database")?,
-        cdm.schema.clone(),
-    )
-    .await
-    .context("connecting to the CDM database")?;
+    let pool = cdm_pool(cdm, cdm.schema.clone()).await?;
     let resolver = omop_cdm::vocabulary::ConceptResolver::new(pool.clone());
     let diagnostics = crate::check::concept_domains(files, &resolver)
         .await

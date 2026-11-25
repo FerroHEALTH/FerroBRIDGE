@@ -190,6 +190,29 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     let set = omocl_set(settings, None).await?;
     let client = crate::cdr::CdrClient::new(cdr).map_err(JobError::Client)?;
     let (mapper, pool) = mapper(etl, cdm, set).await?;
+    let (mut writer, run_id, started) = open_run(cdm).await?;
+    let report = crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
+        .await
+        .map_err(JobError::Run)?;
+    close_run(
+        &writer,
+        (etl, &pool),
+        report,
+        (RunKind::Compositions, started),
+    )
+    .await
+}
+
+/// Opens the CDM writer a run writes through, pseudonymising when `[cdm]`
+/// names a pseudonymiser, and returns it with the run's id and start.
+///
+/// # Errors
+///
+/// Returns [`JobError::Writer`] when the writer cannot connect, and
+/// [`JobError::RunId`] when the run id is refused.
+async fn open_run(
+    cdm: &crate::config::CdmSettings,
+) -> Result<(CdmWriter, RunId, jiff::Timestamp), JobError> {
     let mut writer = CdmWriter::connect_with(
         &cdm.connection,
         cdm.schema.clone(),
@@ -203,12 +226,25 @@ pub async fn run(settings: &Settings, options: &RunOptions) -> Result<RunReport,
     }
     let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
     let started = jiff::Timestamp::now();
-    let mut report = crate::etl::run(etl, options, &client, &mut writer, &mapper, &run_id)
-        .await
-        .map_err(JobError::Run)?;
-    foreign_step(&writer, &mut report).await?;
-    quality_step(etl, &pool, &mut report).await?;
-    keep(&writer, report, RunKind::Compositions, started).await
+    Ok((writer, run_id, started))
+}
+
+/// Finishes a run: counts the foreign rows, runs the quality checks `etl`
+/// asks for over `pool` and records the report of `kind` started at
+/// `started`.
+///
+/// # Errors
+///
+/// Returns the [`JobError`] of the step that failed.
+async fn close_run(
+    writer: &CdmWriter,
+    (etl, pool): (&crate::config::EtlSettings, &CdmPool),
+    mut report: RunReport,
+    (kind, started): (RunKind, jiff::Timestamp),
+) -> Result<RunReport, JobError> {
+    foreign_step(writer, &mut report).await?;
+    quality_step(etl, pool, &mut report).await?;
+    keep(writer, report, kind, started).await
 }
 
 /// Records the finished run `report`, of `kind` and started at `started`,
@@ -346,19 +382,7 @@ pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<Ru
     let set = omocl_set(settings, None).await?;
     let resources = crate::etl::fhir::read_input(input).map_err(JobError::Input)?;
     let (mapper, pool) = mapper(etl, cdm, set).await?;
-    let mut writer = CdmWriter::connect_with(
-        &cdm.connection,
-        cdm.schema.clone(),
-        cdm.bridge_schema.clone(),
-        cdm.person_policy,
-    )
-    .await
-    .map_err(JobError::Writer)?;
-    if let Some(ref pseudonymiser) = cdm.pseudonymiser {
-        writer = writer.pseudonymise(pseudonymiser.clone());
-    }
-    let run_id = RunId::new(uuid::Uuid::new_v4().to_string()).map_err(JobError::RunId)?;
-    let started = jiff::Timestamp::now();
+    let (mut writer, run_id, started) = open_run(cdm).await?;
     let operations = &settings.operations;
     let now = jiff::Timestamp::now().to_string();
     let side = crate::etl::fhir::FhirSide {
@@ -369,10 +393,8 @@ pub async fn run_fhir(settings: &Settings, input: &std::path::Path) -> Result<Ru
         territory: operations.composition_territory.as_deref(),
         now: &now,
     };
-    let mut report = crate::etl::fhir::run(&resources, &side, etl, &mut writer, &mapper, &run_id)
+    let report = crate::etl::fhir::run(&resources, &side, etl, &mut writer, &mapper, &run_id)
         .await
         .map_err(JobError::Run)?;
-    foreign_step(&writer, &mut report).await?;
-    quality_step(etl, &pool, &mut report).await?;
-    keep(&writer, report, RunKind::Fhir, started).await
+    close_run(&writer, (etl, &pool), report, (RunKind::Fhir, started)).await
 }

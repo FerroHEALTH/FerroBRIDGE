@@ -173,8 +173,7 @@ async fn by_query(
     let mut found = uids(&rows)?;
     found.truncate(page);
     found.retain(|uid| keep(uid));
-    let demographic = party::demographic(client)?;
-    let class = party::read::class_of(loaded)?;
+    let (demographic, class) = party::reach(client, loaded)?;
     let mut matches = Vec::with_capacity(found.len());
     for uid in &found {
         let held = party::get(demographic, class, resource_type, uid).await?;
@@ -201,8 +200,7 @@ async fn by_id(
 ) -> Result<Found, Refusal> {
     let mut held = None;
     if request.offset == 0 && keep(id) && HierObjectId::new(id).is_ok() {
-        let demographic = party::demographic(client)?;
-        let class = party::read::class_of(loaded)?;
+        let (demographic, class) = party::reach(client, loaded)?;
         held = party::find(demographic, class, id)
             .await?
             .filter(|found| party::of_template(loaded, found));

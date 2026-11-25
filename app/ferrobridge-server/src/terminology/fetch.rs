@@ -20,13 +20,16 @@ use fhir_types::r4::operations::concept_map_translate::{
 use fhir_types::r4::primitives;
 use fhir_types::r4::primitives::{Boolean, Canonical, Code, Uri};
 
-/// What the server answered for one `$translate`, shared across the repeated
-/// runs.
-pub(super) type Answer = Result<ConceptMapTranslateResponse, Arc<dyn Error + Send + Sync>>;
+/// What the server answered for one question, shared across the repeated
+/// runs: its response, or the failure it answered with.
+pub(super) type Stored<R> = Result<R, Arc<dyn Error + Send + Sync>>;
+
+/// What the server answered for one `$translate`.
+pub(super) type Answer = Stored<ConceptMapTranslateResponse>;
 
 /// What the server answered for one `$lookup`: the details, `None` for a
 /// code it does not know.
-pub(super) type Displayed = Result<Option<CodeSystemLookupResponse>, Arc<dyn Error + Send + Sync>>;
+pub(super) type Displayed = Stored<Option<CodeSystemLookupResponse>>;
 
 /// One `$lookup` question: the system, the code and the version.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
