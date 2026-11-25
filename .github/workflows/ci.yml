@@ -1040,9 +1040,10 @@ jobs:
           fi
           exit "$status"
       # The same documents against the MyHealth@EU CI guides (#2083), one
-      # corpus per guide, held to the pass lists under conformance/.
+      # corpus per guide, held to the pass lists under conformance/. Only the
+      # eehrxf suites write the documents those corpora measure.
       - name: The MyHealth@EU corpora hold their pass lists
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && contains(needs.detect.outputs.test-matrix, 'eehrxf') }}
         run: |
           set -euo pipefail
           bash scripts/checks/fhir-validator.sh --myhealth-eu \
