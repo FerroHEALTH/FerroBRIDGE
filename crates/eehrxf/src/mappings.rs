@@ -478,6 +478,32 @@ pub const HDR: Project = Project {
     followed: &[],
 };
 
+/// FerroBRIDGE's medical test report project, the non-laboratory reports of
+/// draft `EEHRxF` Annex VIII.
+///
+/// It maps over FerroBRIDGE's medical test report template: a spirometry
+/// result or an electrocardiogram result to an R4 `DiagnosticReport`. No
+/// HL7 Europe guide profiles such a report, so the report claims no profile.
+/// Both contexts map the one template, so a caller narrows the project to
+/// the context of the report it maps ([`Project::with_context`]).
+#[cfg(feature = "laboratory")]
+pub const TEST_REPORT: Project = Project {
+    directory: "test-report",
+    contexts: &[
+        "ferrobridge_spirometry_report.context",
+        "ferrobridge_ecg_report.context",
+    ],
+    searches: &[],
+    files: &[
+        shipped!("test-report", "ferrobridge_spirometry_report.context.yml"),
+        shipped!("test-report", "ferrobridge_spirometry_result.v2.yml"),
+        shipped!("test-report", "ferrobridge_ecg_report.context.yml"),
+        shipped!("test-report", "ferrobridge_ecg_result.v1.yml"),
+    ],
+    accounted: &[],
+    followed: &[],
+};
+
 /// The draft `EEHRxF` Annex X project: the common data groups served as
 /// individual resources (draft act Art 7(2)).
 ///
@@ -663,6 +689,8 @@ const SHIPPED: &[Project] = &[
     IMAGING,
     #[cfg(feature = "laboratory")]
     LABORATORY,
+    #[cfg(feature = "laboratory")]
+    TEST_REPORT,
     #[cfg(feature = "patient-summary")]
     EPS,
     #[cfg(feature = "discharge")]

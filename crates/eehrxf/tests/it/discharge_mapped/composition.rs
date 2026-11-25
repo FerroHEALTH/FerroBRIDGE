@@ -171,7 +171,7 @@ fn the_report_maps_its_procedure_and_discharge_medication() -> Result<(), Box<dy
     assert_eq!(procedure["status"], "completed");
     assert_eq!(procedure["code"]["coding"][0]["code"], PROCEDURE);
     assert_eq!(procedure["performedDateTime"], PERFORMED);
-    assert_eq!(procedure["bodySite"][0]["text"], "Synthetic body site");
+    assert_eq!(procedure["bodySite"][0]["text"], "Appendix structure");
     assert_eq!(
         procedure["note"][0]["text"],
         "A synthetic procedure comment."

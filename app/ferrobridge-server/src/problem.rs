@@ -35,6 +35,9 @@ pub enum Kind {
     BadPath,
     /// `400`: an import's body is no mapping-set archive the bridge reads.
     BadArchive,
+    /// `400`: a register document is not the register's shape, or its rules
+    /// do not hold.
+    BadRegister,
     /// `401`: the request carries no valid credential.
     Unauthenticated,
     /// `403`: the access token does not carry the operator scope.
@@ -67,19 +70,38 @@ pub enum Kind {
     ReloadUnavailable,
     /// `503`: the run history of the bridge schema could not be read.
     RunHistoryUnavailable,
+    /// `503`: a settings register could not be read or written.
+    RegistersUnavailable,
     /// `503`: the inbound sources could not be read or written.
     SourcesUnavailable,
+    /// `401`: an inbound request does not prove it comes from its source.
+    Unverified,
+    /// `400`: an inbound body is no event the source's map reads.
+    UnreadableEvent,
+    /// `404`: no enabled webhook source has the name.
+    UnknownSource,
+    /// `404`: no parked item has the entity.
+    NotParked,
+    /// `503`: the intake holds as much pending work as the source allows.
+    InboundBusy,
+    /// `503`: the inbox could not be read or written.
+    InboundUnavailable,
+    /// `409`: another replica runs the source's recovery.
+    RecoveryLeased,
+    /// `502`: the source refused or failed a recovery call.
+    RecoveryFailed,
     /// `503`: the access token could not be checked.
     AuthorizationUnavailable,
 }
 
 impl Kind {
     /// Every kind, in the order the book lists them.
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 31] = [
         Self::InvalidRequest,
         Self::ReasonRequired,
         Self::BadPath,
         Self::BadArchive,
+        Self::BadRegister,
         Self::Unauthenticated,
         Self::NotPermitted,
         Self::NotFound,
@@ -95,7 +117,16 @@ impl Kind {
         Self::DeadLettersUnavailable,
         Self::ReloadUnavailable,
         Self::RunHistoryUnavailable,
+        Self::RegistersUnavailable,
         Self::SourcesUnavailable,
+        Self::Unverified,
+        Self::UnreadableEvent,
+        Self::UnknownSource,
+        Self::NotParked,
+        Self::InboundBusy,
+        Self::InboundUnavailable,
+        Self::RecoveryLeased,
+        Self::RecoveryFailed,
         Self::AuthorizationUnavailable,
     ];
 
@@ -123,6 +154,11 @@ impl Kind {
             Self::BadArchive => (
                 "bad-archive",
                 "The body is no mapping-set archive the bridge reads",
+                StatusCode::BAD_REQUEST,
+            ),
+            Self::BadRegister => (
+                "bad-register",
+                "The document does not hold for the register",
                 StatusCode::BAD_REQUEST,
             ),
             Self::Unauthenticated => (
@@ -200,10 +236,55 @@ impl Kind {
                 "The run history could not be read",
                 StatusCode::SERVICE_UNAVAILABLE,
             ),
+            Self::RegistersUnavailable => (
+                "registers-unavailable",
+                "The settings register could not be read or written",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
             Self::SourcesUnavailable => (
                 "sources-unavailable",
                 "The inbound sources could not be read or written",
                 StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::Unverified => (
+                "unverified",
+                "The request does not prove it comes from the source",
+                StatusCode::UNAUTHORIZED,
+            ),
+            Self::UnreadableEvent => (
+                "unreadable-event",
+                "The body is no event the source reads",
+                StatusCode::BAD_REQUEST,
+            ),
+            Self::UnknownSource => (
+                "unknown-source",
+                "No enabled webhook source has this name",
+                StatusCode::NOT_FOUND,
+            ),
+            Self::NotParked => (
+                "not-parked",
+                "No parked item has this entity",
+                StatusCode::NOT_FOUND,
+            ),
+            Self::InboundBusy => (
+                "inbound-busy",
+                "The source has as much pending work as it may",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::InboundUnavailable => (
+                "inbound-unavailable",
+                "The inbox could not be read or written",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
+            Self::RecoveryLeased => (
+                "recovery-leased",
+                "Another replica runs the source's recovery",
+                StatusCode::CONFLICT,
+            ),
+            Self::RecoveryFailed => (
+                "recovery-failed",
+                "The source refused or failed the recovery call",
+                StatusCode::BAD_GATEWAY,
             ),
             Self::AuthorizationUnavailable => (
                 "authorization-unavailable",

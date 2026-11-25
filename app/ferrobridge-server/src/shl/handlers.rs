@@ -276,12 +276,12 @@ async fn created(
     };
     let now = jiff::Timestamp::now().as_second();
     let rules = rules(links, &asked, now)?;
-    let form = match asked.profile.as_deref() {
-        Some(profile) => summary::form_named(profile)?,
-        None => summary::default_form(),
+    let requested = match asked.profile.as_deref() {
+        Some(profile) => summary::profile_named(profile)?,
+        None => summary::default_profile(),
     };
     let place = links.reserve().await.map_err(|error| unrecorded(&error))?;
-    let document = summary::document(&links.facade, access, &owner, headers, form).await?;
+    let document = summary::document(&links.facade, access, &owner, headers, requested).await?;
     let plaintext = serde_json::to_vec(&document).map_err(|_error| unsealed())?;
     let key = seal::LinkKey::generate().map_err(|_error| unsealed())?;
     let jwe = key

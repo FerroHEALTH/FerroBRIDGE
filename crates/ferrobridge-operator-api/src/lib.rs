@@ -30,6 +30,7 @@ pub mod etl;
 pub mod events;
 pub mod health;
 pub mod hl7v2;
+pub mod inbound;
 pub mod operator;
 pub mod problem;
 pub mod revisions;
