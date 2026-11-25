@@ -31,6 +31,7 @@ use crate::engine::rm::carried::Carried;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::manual::Manual;
 use crate::resolve::program::manual::ManualValue;
+use crate::resolve::program::mapping::Alternative;
 use crate::resolve::program::mapping::Derived;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::target::FhirTarget;
@@ -169,6 +170,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok((view, dropped))
     }
 
+    /// Returns the kind of the FHIR alternative a choice or polymorphic
+    /// mapping writes.
+    fn written_kind(mapping: &Mapping, written: &Alternative) -> Result<FhirKind, EngineError> {
+        FhirKind::of_code(written.code()).ok_or_else(|| EngineError::UnknownElement {
+            mapping: String::from(mapping.name()),
+            element: String::from(written.target().resolved().leaf()),
+        })
+    }
+
     /// Runs one occurrence of a mapping through its data-type cell.
     fn convert(
         &mut self,
@@ -182,9 +192,12 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 Direction::OpenehrToFhir => self.event_out(mapping, event, input, binding),
             };
         }
+        let Some(target) = mapping.fhir() else {
+            return Ok(());
+        };
         match self.direction {
-            Direction::FhirToOpenehr => self.convert_in(mapping, input, binding),
-            Direction::OpenehrToFhir => self.convert_out(mapping, input, binding),
+            Direction::FhirToOpenehr => self.convert_in(mapping, target, input, binding),
+            Direction::OpenehrToFhir => self.convert_out(mapping, target, input, binding),
         }
     }
 
@@ -192,12 +205,10 @@ impl<T: Table + ?Sized> Run<'_, T> {
     fn convert_in(
         &mut self,
         mapping: &Mapping,
+        target: &FhirTarget,
         input: &Occurrence,
         binding: &Binding,
     ) -> Result<(), EngineError> {
-        let Some(target) = mapping.fhir() else {
-            return Ok(());
-        };
         let found = match mapping.derived() {
             Some(Derived::Polymorphic { read, pairings }) => {
                 self.polymorphic_in(mapping, read, pairings, input)?
@@ -227,16 +238,9 @@ impl<T: Table + ?Sized> Run<'_, T> {
             self.binding_of(node).as_deref(),
             self.index.ordinal_options(node).unwrap_or_default(),
         )
-        .map_err(|source| EngineError::Cell {
-            mapping: String::from(mapping.name()),
-            element: String::from(target.expression().as_str()),
-            source: Box::new(source),
-        })?;
+        .map_err(EngineError::cell(mapping, target))?;
         self.resolve_display(mapping, &view, &mut produced)?;
-        for taken in &produced.fallbacks {
-            self.warnings
-                .push(Warning::fallback(taken, self.locate(mapping, input)));
-        }
+        self.warn_fallbacks(mapping, input, &produced.fallbacks);
         let value = self.identified(mapping, &view, produced.value, Shape::at(node))?;
         self.put_openehr_at(openehr, binding, value);
         Ok(())
@@ -246,21 +250,15 @@ impl<T: Table + ?Sized> Run<'_, T> {
     fn convert_out(
         &mut self,
         mapping: &Mapping,
+        target: &FhirTarget,
         input: &Occurrence,
         binding: &Binding,
     ) -> Result<(), EngineError> {
-        let Some(target) = mapping.fhir() else {
-            return Ok(());
-        };
         let Some((openehr, source, target, kind)) = self.output_source(mapping, target, input)?
         else {
             return Ok(());
         };
-        let refuse = |source: LensError| EngineError::Cell {
-            mapping: String::from(mapping.name()),
-            element: String::from(target.expression().as_str()),
-            source: Box::new(source),
-        };
+        let refuse = EngineError::cell(mapping, target);
         let (view, dropped) = match source {
             Leaf::Value(ref value) if let RmValue::PartyRef(ref party) = **value => (
                 self.reference_of_party(mapping, target, party)?,
@@ -324,12 +322,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                     continue;
                 };
                 let written = pairing.alternative();
-                let kind = FhirKind::of_code(written.code()).ok_or_else(|| {
-                    EngineError::UnknownElement {
-                        mapping: String::from(mapping.name()),
-                        element: String::from(written.target().resolved().leaf()),
-                    }
-                })?;
+                let kind = Self::written_kind(mapping, written)?;
                 return Ok(Some((openehr, source, written.target(), kind)));
             }
             if self.node_held(mapping.name(), first.target(), &positions)? {
@@ -361,11 +354,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         kind: FhirKind,
         text: &str,
     ) -> Result<FhirValue, EngineError> {
-        let refuse = |source: LensError| EngineError::Cell {
-            mapping: String::from(mapping.name()),
-            element: String::from(target.expression().as_str()),
-            source: Box::new(source),
-        };
+        let refuse = EngineError::cell(mapping, target);
         // NOTE: a scalar leaf carries text, so only an element that travels as
         // text, or one `String.adoc` writes as text, takes it; no specification
         // governs the rest: our own design.
@@ -492,12 +481,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 write: Some(written),
                 ..
             }) => {
-                let kind = FhirKind::of_code(written.code()).ok_or_else(|| {
-                    EngineError::UnknownElement {
-                        mapping: String::from(mapping.name()),
-                        element: String::from(written.target().resolved().leaf()),
-                    }
-                })?;
+                let kind = Self::written_kind(mapping, written)?;
                 Ok((written.target(), kind))
             }
             Some(Derived::Declared(declared)) => {

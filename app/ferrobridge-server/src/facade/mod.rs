@@ -35,6 +35,7 @@ pub mod identity;
 pub mod ingest;
 pub mod launch_task;
 pub mod media;
+pub mod mhd;
 pub mod outcome;
 pub mod owned;
 pub mod party;
@@ -65,6 +66,39 @@ use crate::facade::programs::Programs;
 use crate::mount::BASE_PATH;
 use crate::terminology::Translator;
 use ferrohealth_usage_report::window::Window;
+
+/// The custodian of the documents the bridge writes: the healthcare
+/// provider that holds the records behind the CDR.
+///
+/// FHIR R4 `Composition.custodian` is the organisation "responsible for
+/// ongoing maintenance of and access to the composition/document
+/// information", and HL7 Europe EU Health Data API
+/// `EehrxfMhdDocumentReference` requires `DocumentReference.custodian`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Custodian {
+    /// Its name.
+    pub name: String,
+    /// Its identifier's system.
+    pub system: String,
+    /// Its identifier's value.
+    pub value: String,
+}
+
+impl Custodian {
+    /// The `Organization` that names the custodian.
+    #[must_use]
+    pub fn organization(&self) -> fhir_types::r4::organization::Organization {
+        fhir_types::r4::organization::Organization {
+            identifier: vec![fhir_types::r4::identifier::Identifier {
+                system: Some(self.system.as_str().into()),
+                value: Some(self.value.as_str().into()),
+                ..fhir_types::r4::identifier::Identifier::default()
+            }],
+            name: Some(self.name.as_str().into()),
+            ..fhir_types::r4::organization::Organization::default()
+        }
+    }
+}
 
 /// What one facade deployment was configured with.
 #[derive(Debug, Clone)]
@@ -99,6 +133,10 @@ pub struct Settings {
     /// demographic or identity service" (openEHR RM EHR IM Release 1.1.0, the
     /// `EHR_STATUS` class).
     pub ehr_status_system: Option<String>,
+    /// The custodian every document the bridge writes names: the healthcare
+    /// provider that holds the records behind the CDR, the health data
+    /// holder of Regulation (EU) 2025/327, never the bridge.
+    pub custodian: Custodian,
 }
 
 /// The programs and search declarations of one load, which a reload swaps
@@ -172,6 +210,8 @@ pub struct Facade {
     /// The endpoints served as `Endpoint` beside the FHIR base, when
     /// `Endpoint` serves them.
     endpoints: Option<endpoint::Endpoints>,
+    /// Whether the IHE MHD Document Responder is served.
+    mhd: bool,
 }
 
 /// Returns the demographics endpoint of a facade at `settings.base_url`: the
@@ -218,6 +258,7 @@ impl Facade {
             cors: cors::Cors::default(),
             summary: None,
             endpoints: None,
+            mhd: false,
         }
     }
 
@@ -273,6 +314,19 @@ impl Facade {
         self.endpoints.as_ref()
     }
 
+    /// Returns this facade serving the IHE MHD Document Responder when `on`.
+    #[must_use]
+    pub const fn with_mhd(mut self, on: bool) -> Self {
+        self.mhd = on;
+        self
+    }
+
+    /// Whether the IHE MHD Document Responder is served.
+    #[must_use]
+    pub const fn mhd(&self) -> bool {
+        self.mhd
+    }
+
     /// Returns the resource types the facade serves itself rather than
     /// through a program.
     #[must_use]
@@ -281,6 +335,8 @@ impl Facade {
             (self.app_state.is_some(), app_state::BASIC),
             (self.launch_tasks.is_some(), launch_task::TASK),
             (self.endpoints.is_some(), endpoint::ENDPOINT),
+            (self.mhd, mhd::DOCUMENT_REFERENCE),
+            (self.mhd, mhd::LIST),
         ]
         .into_iter()
         .filter_map(|(on, resource_type)| on.then_some(resource_type))
@@ -655,11 +711,11 @@ pub fn routes(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}"),
             get(handlers::read_route)
                 .put(handlers::update_route)
-                .delete(handlers::delete_route),
+                .delete(handlers::party_only_route),
         )
         .route(
             &format!("{BASE_PATH}/{{resource_type}}/{{id}}/_history"),
-            get(handlers::history_route),
+            get(handlers::party_only_route),
         )
         .layer(axum::Extension(operator));
     let router = if facade.app_state().is_some() {

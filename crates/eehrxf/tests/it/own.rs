@@ -70,7 +70,7 @@ fn the_summary_the_component_writes_maps_back_to_openehr() -> Result<(), Box<dyn
         .feeder_audit
         .and_then(|audit| audit.original_content)
         .ok_or("the composition keeps the original content")?;
-    let DvEncapsulated::DvParsable(parsable) = original else {
+    let DvEncapsulated::DvParsable(parsable) = original.as_ref() else {
         return Err(format!("the original is no DV_PARSABLE: {original:?}").into());
     };
     assert_eq!(parsable.value, text, "the summary is kept byte for byte");

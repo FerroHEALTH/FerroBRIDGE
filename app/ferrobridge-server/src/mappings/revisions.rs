@@ -7,7 +7,7 @@
 //! A revision names each console file by its wire path and the SHA-256 of
 //! its bytes, kept once per digest. A change holds the `mapping_running` row
 //! for its whole transaction, so changes from every replica run one at a
-//! time, and one that moves the running revision notifies [`CHANNEL`] before
+//! time, and one that moves the running revision notifies [`MAPPINGS`] before
 //! it commits; each replica then compiles that revision
 //! (`crate::operator::watch`). No specification governs the store: our own
 //! design.
@@ -20,9 +20,7 @@ use sqlx::postgres::{PgPool, PgRow};
 use sqlx::{PgConnection, Postgres, Row as _, Transaction};
 
 use crate::mappings::files;
-
-/// The channel a change of the running revision is notified on.
-pub const CHANNEL: &str = "ferrobridge_mappings";
+use crate::store::listen::MAPPINGS;
 
 /// The console files of one revision, by wire path.
 pub type Files = BTreeMap<String, Arc<[u8]>>;
@@ -58,9 +56,10 @@ pub enum RevisionError {
     },
 }
 
-/// Returns the error a database failure is.
-fn database(source: sqlx::Error) -> RevisionError {
-    RevisionError::Database(Box::new(source))
+impl From<sqlx::Error> for RevisionError {
+    fn from(source: sqlx::Error) -> Self {
+        Self::Database(Box::new(source))
+    }
 }
 
 /// The console files the bridge runs, and the revision they came from.
@@ -128,7 +127,7 @@ impl Revisions {
     /// Returns [`RevisionError::Database`] when a statement fails and
     /// [`RevisionError::Record`] for a revision this version cannot read.
     pub async fn list(&self) -> Result<(Option<String>, Vec<Revision>), RevisionError> {
-        let mut connection = self.pool.acquire().await.map_err(database)?;
+        let mut connection = self.pool.acquire().await?;
         let running = running_id(&mut connection).await?;
         let rows = sqlx::query(concat!(
             "SELECT ",
@@ -136,8 +135,7 @@ impl Revisions {
             " FROM mapping_revision ORDER BY id"
         ))
         .fetch_all(&mut *connection)
-        .await
-        .map_err(database)?;
+        .await?;
         let revisions = rows.iter().map(revision).collect::<Result<_, _>>()?;
         Ok((running.map(|id| id.to_string()), revisions))
     }
@@ -148,7 +146,7 @@ impl Revisions {
     ///
     /// Returns what [`Self::list`] returns.
     pub async fn get(&self, id: &str) -> Result<Option<Revision>, RevisionError> {
-        let mut connection = self.pool.acquire().await.map_err(database)?;
+        let mut connection = self.pool.acquire().await?;
         get(&mut connection, id).await
     }
 
@@ -158,7 +156,7 @@ impl Revisions {
     ///
     /// Returns what [`Self::list`] returns.
     pub async fn running(&self) -> Result<Option<Revision>, RevisionError> {
-        let mut connection = self.pool.acquire().await.map_err(database)?;
+        let mut connection = self.pool.acquire().await?;
         match running_id(&mut connection).await? {
             Some(id) => get(&mut connection, &id.to_string()).await,
             None => Ok(None),
@@ -173,7 +171,7 @@ impl Revisions {
     /// [`RevisionError::Corrupt`] for a file whose bytes are missing or have
     /// another digest.
     pub async fn contents(&self, revision: &Revision) -> Result<Files, RevisionError> {
-        let mut connection = self.pool.acquire().await.map_err(database)?;
+        let mut connection = self.pool.acquire().await?;
         contents(&mut connection, revision).await
     }
 
@@ -183,7 +181,7 @@ impl Revisions {
     ///
     /// Returns what [`Self::running`] and [`Self::contents`] return.
     pub async fn console(&self) -> Result<Console, RevisionError> {
-        let mut connection = self.pool.acquire().await.map_err(database)?;
+        let mut connection = self.pool.acquire().await?;
         let Some(id) = running_id(&mut connection).await? else {
             return Ok(Console::default());
         };
@@ -201,12 +199,11 @@ impl Revisions {
     ///
     /// Returns what [`Self::list`] returns.
     pub async fn change(&self) -> Result<Change, RevisionError> {
-        let mut transaction = self.pool.begin().await.map_err(database)?;
+        let mut transaction = self.pool.begin().await?;
         let running: Option<i64> =
             sqlx::query_scalar("SELECT revision FROM mapping_running WHERE singleton FOR UPDATE")
                 .fetch_one(&mut *transaction)
-                .await
-                .map_err(database)?;
+                .await?;
         let running = match running {
             Some(id) => get(&mut transaction, &id.to_string()).await?,
             None => None,
@@ -232,8 +229,7 @@ impl Revisions {
         let mut change = self.change().await?;
         let recorded: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM mapping_revision)")
             .fetch_one(&mut *change.transaction)
-            .await
-            .map_err(database)?;
+            .await?;
         if recorded {
             return Ok(None);
         }
@@ -334,8 +330,7 @@ impl Change {
             .bind(&digest)
             .bind(bytes.as_ref())
             .execute(&mut *self.transaction)
-            .await
-            .map_err(database)?;
+            .await?;
             digests.insert(wire.clone(), digest);
         }
         let manifest = serde_json::Value::Object(
@@ -364,23 +359,17 @@ impl Change {
         .bind(&manifest)
         .fetch_one(&mut *self.transaction)
         .await
-        .map_err(database)?;
+        ?;
         let recorded = revision(&row)?;
         if applied {
             let id = number(&recorded.id).unwrap_or_default();
             sqlx::query("UPDATE mapping_running SET revision = $1 WHERE singleton")
                 .bind(id)
                 .execute(&mut *self.transaction)
-                .await
-                .map_err(database)?;
-            sqlx::query("SELECT pg_notify($1, $2)")
-                .bind(CHANNEL)
-                .bind(&recorded.id)
-                .execute(&mut *self.transaction)
-                .await
-                .map_err(database)?;
+                .await?;
+            MAPPINGS.notify(&mut self.transaction, &recorded.id).await?;
         }
-        self.transaction.commit().await.map_err(database)?;
+        self.transaction.commit().await?;
         Ok(recorded)
     }
 }
@@ -390,7 +379,7 @@ async fn running_id(connection: &mut PgConnection) -> Result<Option<i64>, Revisi
     sqlx::query_scalar("SELECT revision FROM mapping_running WHERE singleton")
         .fetch_one(connection)
         .await
-        .map_err(database)
+        .map_err(RevisionError::from)
 }
 
 /// Returns the revision `id` names on `connection`.
@@ -405,8 +394,7 @@ async fn get(connection: &mut PgConnection, id: &str) -> Result<Option<Revision>
     ))
     .bind(id)
     .fetch_optional(connection)
-    .await
-    .map_err(database)?
+    .await?
     .as_ref()
     .map(revision)
     .transpose()
@@ -425,12 +413,11 @@ async fn contents(
     )
     .bind(&digests)
     .fetch_all(connection)
-    .await
-    .map_err(database)?;
+    .await?;
     let mut blobs: BTreeMap<String, Arc<[u8]>> = BTreeMap::new();
     for row in &rows {
-        let digest: String = row.try_get("digest").map_err(database)?;
-        let bytes: Vec<u8> = row.try_get("bytes").map_err(database)?;
+        let digest: String = row.try_get("digest")?;
+        let bytes: Vec<u8> = row.try_get("bytes")?;
         if files::sha256(&bytes) != digest {
             return Err(RevisionError::Corrupt { digest });
         }
@@ -452,36 +439,30 @@ async fn contents(
 
 /// Returns the revision a `mapping_revision` row holds.
 fn revision(row: &PgRow) -> Result<Revision, RevisionError> {
-    let id: i64 = row.try_get("id").map_err(database)?;
+    let id: i64 = row.try_get("id")?;
     let unreadable = || RevisionError::Record { id };
-    let origin = match row
-        .try_get::<String, _>("origin")
-        .map_err(database)?
-        .as_str()
-    {
+    let origin = match row.try_get::<String, _>("origin")?.as_str() {
         "baseline" => Origin::Baseline,
         "save" => Origin::Save,
         "apply" => Origin::Apply,
         "import" => Origin::Import,
         _ => return Err(unreadable()),
     };
-    let files: String = row.try_get("files").map_err(database)?;
+    let files: String = row.try_get("files")?;
     let files: BTreeMap<String, String> =
         serde_json::from_str(&files).map_err(|_unreadable| unreadable())?;
     Ok(Revision {
         id: id.to_string(),
         parent: row
-            .try_get::<Option<i64>, _>("parent")
-            .map_err(database)?
+            .try_get::<Option<i64>, _>("parent")?
             .map(|parent| parent.to_string()),
-        author: row.try_get("author").map_err(database)?,
-        time: row.try_get("time").map_err(database)?,
-        reason: row.try_get("reason").map_err(database)?,
+        author: row.try_get("author")?,
+        time: row.try_get("time")?,
+        reason: row.try_get("reason")?,
         origin,
-        applied: row.try_get("applied").map_err(database)?,
+        applied: row.try_get("applied")?,
         source: row
-            .try_get::<Option<i64>, _>("source")
-            .map_err(database)?
+            .try_get::<Option<i64>, _>("source")?
             .map(|source| source.to_string()),
         files,
     })

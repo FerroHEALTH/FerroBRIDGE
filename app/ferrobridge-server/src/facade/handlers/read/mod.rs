@@ -74,23 +74,53 @@ pub(crate) async fn read(
     Ok(answer(&rendered, &version, modified))
 }
 
-/// `GET [base]/Composition/[id]/$document`: the document Bundle of one
-/// mapped Composition (<https://hl7.org/fhir/R4/composition-operation-document.html>).
+/// The document Bundle of one mapped Composition, with what it was
+/// assembled from.
+#[derive(Debug)]
+pub(crate) struct Assembled {
+    /// The document Bundle.
+    pub(crate) bundle: fhir_types::codec::Object,
+    /// The composition the document carries, canonical.
+    pub(crate) composition: CanonicalComposition,
+}
+
+/// One bound Composition, at the version a document is assembled from.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Located<'a> {
+    /// The program of the Composition context.
+    pub(crate) program: &'a Loaded,
+    /// The EHR the composition is in.
+    pub(crate) ehr_id: &'a EhrId,
+    /// The logical id of the Composition.
+    pub(crate) id: &'a FhirResourceId,
+    /// What the identity map binds to the id.
+    pub(crate) binding: &'a CompositionBinding,
+    /// The composition version.
+    pub(crate) version: &'a ObjectVersionId,
+    /// The composition at that version, canonical.
+    pub(crate) composition: &'a CanonicalComposition,
+}
+
+/// Returns the document of `Composition/[id]`, the latest version of the
+/// composition the identity map binds to `id`
+/// (<https://hl7.org/fhir/R4/composition-operation-document.html>).
 ///
 /// The Composition is read as an instance read reads it, and every resource
 /// its context's outbound run creates follows it in the Bundle
-/// [`crate::facade::document`] assembles. The caller needs read on every
-/// type the Bundle carries, as a read of each would. A Composition that
-/// another resource's mapping creates has no context of its own to run, so it
-/// is refused (no specification governs either rule: our own design).
-pub(crate) async fn document(
+/// [`crate::facade::document`] assembles. A Composition that another
+/// resource's mapping creates has no context of its own to run, so it is
+/// refused (no specification governs this: our own design).
+pub(crate) async fn assembled(
     facade: &Facade,
     access: &ferrohealth_smart::resource::Access,
     client: &CdrClient,
-    (headers, uri): (&HeaderMap, &Uri),
     id: &str,
-) -> Result<axum::response::Response, Refusal> {
-    let (internal, binding) = bound(facade, (headers, uri), (COMPOSITION, id), supported).await?;
+) -> Result<Assembled, Refusal> {
+    supported(facade, COMPOSITION)?;
+    let internal = internal_id(id)?;
+    let binding = binding(facade, COMPOSITION, &internal)
+        .await?
+        .ok_or_else(|| unknown(COMPOSITION, id))?;
     if binding.created.is_some() {
         return Err(reply::refusal(
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -100,16 +130,53 @@ pub(crate) async fn document(
         ));
     }
     let placed = Placed::of(facade, &binding, &internal)?;
-    let (program, ehr_id) = (&placed.program, &placed.ehr_id);
     let (version, composition) = placed.fetch(facade, client, &binding).await?;
-    let composition = entry_view(program, &composition, &binding, &internal)?;
-    let source = render::composition_url(client.base_url(), ehr_id, &version)?;
+    let bundle = assemble(
+        facade,
+        access,
+        client,
+        Located {
+            program: &placed.program,
+            ehr_id: &placed.ehr_id,
+            id: &internal,
+            binding: &binding,
+            version: &version,
+            composition: &composition,
+        },
+    )
+    .await?;
+    Ok(Assembled {
+        bundle,
+        composition,
+    })
+}
+
+/// Returns the document Bundle of the Composition `located` names.
+///
+/// The caller needs read on every type the Bundle carries, as a read of
+/// each would (no specification governs this: our own design).
+pub(crate) async fn assemble(
+    facade: &Facade,
+    access: &ferrohealth_smart::resource::Access,
+    client: &CdrClient,
+    located: Located<'_>,
+) -> Result<fhir_types::codec::Object, Refusal> {
+    let Located {
+        program,
+        ehr_id,
+        id,
+        binding,
+        version,
+        composition,
+    } = located;
+    let composition = entry_view(program, composition, binding, id)?;
+    let source = render::composition_url(client.base_url(), ehr_id, version)?;
     let subject = render::subject_of(facade, ehr_id).await?;
     let (own, created) = render::render_document(
         program.program(),
         program.index(),
         &composition,
-        render::Origin::new(facade, &internal, &version, &source, subject.as_ref()),
+        render::Origin::new(facade, id, version, &source, subject.as_ref()),
         &facade.translator().session(),
     )
     .await?;
@@ -128,6 +195,14 @@ pub(crate) async fn document(
         )
         .await?;
     }
+    let custodian = fhir_types::codec::Json::to_json(&facade.settings().custodian.organization())
+        .map_err(|error| {
+        reply::refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception)
+                .diagnosing(format!("the custodian does not encode: {error}")),
+        )
+    })?;
     let base = url::Url::parse(&facade.settings().base_url).map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -135,14 +210,16 @@ pub(crate) async fn document(
                 .diagnosing(format!("the facade base URL does not parse: {error}")),
         )
     })?;
-    let bundle = crate::facade::document::assemble(crate::facade::document::Parts {
-        composition: own.body,
-        created: created.into_iter().map(|rendered| rendered.body).collect(),
-        base: &base,
-        source: &source,
-        timestamp: &jiff::Timestamp::now().to_string(),
-    });
-    Ok(reply::resource(StatusCode::OK, &bundle, &[]))
+    Ok(crate::facade::document::assemble(
+        crate::facade::document::Parts {
+            composition: own.body,
+            created: created.into_iter().map(|rendered| rendered.body).collect(),
+            base: &base,
+            source: &source,
+            timestamp: &jiff::Timestamp::now().to_string(),
+            custodian: &custodian,
+        },
+    ))
 }
 
 /// The one type `$document` is defined on.

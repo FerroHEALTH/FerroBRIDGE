@@ -385,6 +385,11 @@ jobs:
         with:
           persist-credentials: false
       - run: bash scripts/checks/versions.sh
+      # The post-quantum inventory: every row well formed and every location
+      # in the tree, and the table in docs/post-quantum.md and the README badge
+      # counted from it (#2177).
+      - run: bash scripts/checks/post-quantum.sh --self-test
+      - run: bash scripts/checks/post-quantum.sh
       # Every released changelog section against its text at its tag, which
       # it fetches from origin when the shallow checkout lacks it.
       - run: bash scripts/checks/changelog-released.sh
@@ -1049,7 +1054,7 @@ jobs:
           bash scripts/checks/fhir-validator.sh --myhealth-eu \
             "$RUNNER_TEMP/eehrxf-documents" target/fhir-validation/myhealth-eu
           status=0
-          for corpus in myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc; do
+          for corpus in myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac; do
             bash scripts/checks/conformance.sh --check "$corpus" || status=1
           done
           exit "$status"

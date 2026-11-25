@@ -25,6 +25,7 @@ use ferrobridge_server::change_feed::follow::Lane;
 use ferrobridge_server::change_feed::follow::Polling;
 use ferrobridge_server::change_feed::follow::follow;
 use ferrobridge_server::change_feed::health::Following;
+use ferrobridge_server::retry::Backoff;
 use ferrohealth_health::document::State;
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
@@ -46,8 +47,10 @@ fn quick() -> Polling {
     Polling {
         page_size: PageSize::new(10).expect("a page size in range"),
         idle: Duration::from_millis(1),
-        backoff: Duration::from_millis(1),
-        max_backoff: Duration::from_millis(2),
+        backoff: Backoff {
+            initial: Duration::from_millis(1),
+            max: Duration::from_millis(2),
+        },
     }
 }
 

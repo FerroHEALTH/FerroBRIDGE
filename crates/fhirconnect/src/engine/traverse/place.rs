@@ -29,8 +29,6 @@ use crate::tree::Occurrence;
 
 use crate::tree::element::Move;
 use crate::tree::element::Table;
-use crate::tree::read::read;
-use crate::tree::write::write;
 
 use crate::engine::traverse::Binding;
 use crate::engine::traverse::Held;
@@ -71,13 +69,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         openehr: &OpenehrTarget,
         occurrence: &Occurrence,
     ) -> Result<Option<FhirValue>, EngineError> {
-        let matches = read(self.table, self.document_for(read_at), read_at.expression()).map_err(
-            |source| EngineError::Read {
-                mapping: String::from(mapping.name()),
-                expression: String::from(read_at.expression().as_str()),
-                source: Box::new(source),
-            },
-        )?;
+        let matches = self.matches_of(mapping.name(), read_at)?;
         let Some(found) = matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -120,13 +112,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         pairings: &'mapping [Pairing],
         occurrence: &Occurrence,
     ) -> Result<Option<(&'mapping OpenehrTarget, FhirValue)>, EngineError> {
-        let matches = read(self.table, self.document_for(read_at), read_at.expression()).map_err(
-            |source| EngineError::Read {
-                mapping: String::from(mapping.name()),
-                expression: String::from(read_at.expression().as_str()),
-                source: Box::new(source),
-            },
-        )?;
+        let matches = self.matches_of(mapping.name(), read_at)?;
         let Some(found) = matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -170,14 +156,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         occurrence: &Occurrence,
         kind: FhirKind,
     ) -> Result<Option<FhirValue>, EngineError> {
-        let matches =
-            read(self.table, self.document_for(target), target.expression()).map_err(|source| {
-                EngineError::Read {
-                    mapping: String::from(mapping.name()),
-                    expression: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                }
-            })?;
+        let matches = self.matches_of(mapping.name(), target)?;
         let Some(found) = matches
             .iter()
             .find(|matched| matched.occurrence() == occurrence)
@@ -247,19 +226,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             element: element.clone(),
             source: Box::new(source),
         })?;
-        let table = self.table;
-        write(
-            table,
-            self.document_for_mut(target),
-            target.expression(),
-            &binding.fhir,
-            value,
-        )
-        .map_err(|source| EngineError::Write {
-            mapping: String::from(mapping.name()),
-            element,
-            source: Box::new(source),
-        })
+        self.write_at(mapping.name(), target, &binding.fhir, value)
     }
 
     /// Returns the instance of each repeating node of `target` that `bound`

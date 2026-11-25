@@ -31,7 +31,7 @@ const CDR: &str = concat!(
 /// the CDR lane `cdr`.
 fn with_cdr(cdr: &str, consent: &str) -> String {
     format!(
-        "{cdr}[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[facade.consent]\n{consent}"
+        "{cdr}[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[facade.consent]\n{consent}"
     )
 }
 

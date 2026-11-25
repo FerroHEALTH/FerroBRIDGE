@@ -17,8 +17,6 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use tokio::sync::watch;
@@ -34,31 +32,10 @@ use crate::change_feed::Stream;
 use crate::change_feed::dead_letter::DeadLetterError;
 use crate::change_feed::dead_letter::DeadLetters;
 use crate::change_feed::health::Following;
+use crate::retry::{Backoff, Failure, Waits};
+use crate::store::lease::Leader;
 use crate::store::lease::Leadership;
-use crate::store::lease::Renewed;
 use crate::store::lease::Term;
-
-/// Whether a failed event may succeed when it is offered again unchanged.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Failure {
-    /// A failure of something the event depends on (an unreachable sink, a
-    /// timeout): the event is offered again on the next pass.
-    Transient,
-    /// A failure of the event itself (content no mapping admits): offering it
-    /// again fails the same way.
-    Poisoned,
-}
-
-impl Failure {
-    /// Returns the failure as one word of a sentence.
-    #[must_use]
-    pub const fn word(self) -> &'static str {
-        match self {
-            Self::Transient => "transient",
-            Self::Poisoned => "poisoned",
-        }
-    }
-}
 
 /// Why a consumer did not finish one event.
 #[derive(Debug, thiserror::Error)]
@@ -142,10 +119,8 @@ pub struct Polling {
     pub page_size: PageSize,
     /// How long to wait after a page that was not full.
     pub idle: Duration,
-    /// How long to wait after the first failed pass, doubled per failure.
-    pub backoff: Duration,
-    /// The longest wait after a failed pass.
-    pub max_backoff: Duration,
+    /// How long to wait after a failed pass.
+    pub backoff: Backoff,
 }
 
 impl Default for Polling {
@@ -153,8 +128,10 @@ impl Default for Polling {
         Self {
             page_size: PageSize::default(),
             idle: Duration::from_secs(1),
-            backoff: Duration::from_secs(1),
-            max_backoff: Duration::from_secs(60),
+            backoff: Backoff {
+                initial: Duration::from_secs(1),
+                max: Duration::from_secs(60),
+            },
         }
     }
 }
@@ -501,12 +478,11 @@ pub struct Lane {
 /// reader's lane through `leadership`, until `stop` reads `true`.
 ///
 /// A replica that does not lead waits a renewal period and claims again. A
-/// leader renews its lease on its own task at the period `leadership` names,
+/// leader holds its term through [`Leader`], which renews it on its own task,
 /// and stops reading once the lease is lost or a fenced write is refused. A
 /// full page that moved a cursor is followed by the next read at once, any
 /// other pass after `lane.polling.idle`; a failed pass is logged, recorded on
-/// `lane.following` and retried after a backoff that doubles up to
-/// `lane.polling.max_backoff`. On `stop` the leader releases the lane.
+/// `lane.following` and retried after `lane.polling.backoff`. On `stop` the leader releases the lane.
 pub async fn follow(
     feed: &dyn ChangeFeed,
     reader: &ReaderName,
@@ -519,20 +495,21 @@ pub async fn follow(
         .parking
         .clone()
         .map_or_else(Cursor::default, Cursor::parking);
-    let mut backoff = lane.polling.backoff;
+    let mut waits = Waits::new(lane.polling.backoff);
+    let mut leader = Leader::new(leadership);
     tracing::info!(consumer = consumer.name(), reader = %reader, "following the change feed");
     loop {
         if *stop.borrow() {
             break;
         }
-        let wait = match leadership.claim().await {
+        let wait = match leader.lead().await {
             Ok(Some(term)) => {
                 tracing::info!(consumer = consumer.name(), reader = %reader, generation = term.generation().get(), "this replica leads the change-feed reader");
                 lead(
                     feed,
                     reader,
                     consumer,
-                    &leadership,
+                    &mut leader,
                     &lane,
                     &term,
                     &mut cursor,
@@ -540,25 +517,23 @@ pub async fn follow(
                 )
                 .await;
                 if *stop.borrow() {
-                    if let Err(error) = leadership.release(&term).await {
+                    if let Err(error) = leader.release().await {
                         tracing::warn!(consumer = consumer.name(), reader = %reader, reason = %crate::indicators::reason(&error), "the lease could not be released; it runs out on its own");
                     }
                     break;
                 }
-                backoff = lane.polling.backoff;
-                lane.polling.backoff
+                waits.reset();
+                lane.polling.backoff.initial
             }
             Ok(None) => {
                 lane.following.standby();
-                leadership.renew_every()
+                leader.renew_every()
             }
             Err(error) => {
                 let reason = crate::indicators::reason(&error);
                 tracing::warn!(consumer = consumer.name(), reader = %reader, reason = %reason, "the lease of the change-feed reader could not be claimed");
                 lane.following.stalled(reason);
-                let wait = backoff;
-                backoff = backoff.saturating_mul(2).min(lane.polling.max_backoff);
-                wait
+                waits.failed()
             }
         };
         if !pause(&mut stop, wait).await {
@@ -579,25 +554,6 @@ async fn pause(stop: &mut watch::Receiver<bool>, wait: Duration) -> bool {
     }
 }
 
-/// Renews `term` every renewal period until it is lost, then flags `lost`.
-async fn renew(leadership: Arc<dyn Leadership>, term: Term, lost: Arc<AtomicBool>) {
-    loop {
-        tokio::time::sleep(leadership.renew_every()).await;
-        match leadership.renew(&term).await {
-            Ok(Renewed::Held) => {}
-            Ok(Renewed::Lost) => {
-                lost.store(true, Ordering::Release);
-                return;
-            }
-            Err(error) => tracing::warn!(
-                lane = %term.lease().lane(),
-                reason = %crate::indicators::reason(&error),
-                "the lease could not be renewed; the next renewal tries again"
-            ),
-        }
-    }
-}
-
 /// Follows the feed while `term` holds, until it is lost or `stop` reads
 /// `true`.
 #[expect(
@@ -608,28 +564,21 @@ async fn lead(
     feed: &dyn ChangeFeed,
     reader: &ReaderName,
     consumer: &dyn Consumer,
-    leadership: &Arc<dyn Leadership>,
+    leader: &mut Leader,
     lane: &Lane,
     term: &Term,
     cursor: &mut Cursor,
     stop: &mut watch::Receiver<bool>,
 ) {
-    let lost = Arc::new(AtomicBool::new(false));
-    let renewer = tokio::spawn(renew(
-        Arc::clone(leadership),
-        term.clone(),
-        Arc::clone(&lost),
-    ));
     cursor.acknowledged.clear();
-    let mut backoff = lane.polling.backoff;
+    let mut waits = Waits::new(lane.polling.backoff);
     let begun = feed.begin(reader, term).await;
     if let Err(error) = begun {
         lane.following.stalled(crate::indicators::reason(&error));
-        renewer.abort();
         return;
     }
     loop {
-        if *stop.borrow() || lost.load(Ordering::Acquire) {
+        if *stop.borrow() || leader.is_lost() {
             break;
         }
         let passed = pass(feed, reader, consumer, lane.polling.page_size, cursor, term).await;
@@ -638,7 +587,7 @@ async fn lead(
         let wait = match passed {
             Ok(done) => {
                 lane.following.followed();
-                backoff = lane.polling.backoff;
+                waits.reset();
                 if done.read > 0 {
                     tracing::debug!(
                         consumer = consumer.name(),
@@ -652,6 +601,7 @@ async fn lead(
             }
             Err(error) if is_lost(&error) => {
                 tracing::warn!(consumer = consumer.name(), reader = %reader, "another replica took the change-feed reader; this one stops reading");
+                leader.lost();
                 break;
             }
             Err(error) => {
@@ -663,16 +613,13 @@ async fn lead(
                     "a change-feed pass failed; the cursor stays where it was"
                 );
                 lane.following.stalled(reason);
-                let wait = backoff;
-                backoff = backoff.saturating_mul(2).min(lane.polling.max_backoff);
-                wait
+                waits.failed()
             }
         };
         if !pause(stop, wait).await {
             break;
         }
     }
-    renewer.abort();
 }
 
 /// Returns whether `error` says the lease is no longer this replica's.

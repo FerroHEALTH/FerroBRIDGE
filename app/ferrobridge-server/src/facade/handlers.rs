@@ -23,7 +23,7 @@ mod complete;
 mod conditional;
 pub(crate) mod emit;
 pub(crate) mod read;
-mod render;
+pub(crate) mod render;
 pub(crate) mod search;
 mod transaction;
 mod validate;
@@ -52,10 +52,12 @@ use crate::facade::endpoint;
 use crate::facade::guard::OperatorScope;
 use crate::facade::launch_task;
 use crate::facade::media;
+use crate::facade::mhd;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
+use crate::facade::request::Inbound;
 
 /// `GET [base]/metadata`: the `CapabilityStatement` of the loaded programs.
 ///
@@ -89,12 +91,8 @@ pub async fn create_route(
     }
     if let Some(loaded) = facade.programs().party(&resource_type) {
         return crate::facade::party::write::create(
-            &facade,
-            &access,
-            loaded,
+            crate::facade::party::Call::new(&facade, &access, loaded, (&headers, &uri)),
             &resource_type,
-            &headers,
-            &uri,
             &body,
         )
         .await
@@ -122,6 +120,11 @@ pub async fn search_route(
         return endpoint::search(&facade, &access, &headers, &uri, &[])
             .unwrap_or_else(Refusal::into_response);
     }
+    if mhd::serves(&facade, &resource_type) {
+        return mhd::search(&facade, &access, &resource_type, &headers, &uri, &[])
+            .await
+            .unwrap_or_else(Refusal::into_response);
+    }
     search::search_get(&facade, &access, &resource_type, &headers, &uri)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -139,6 +142,11 @@ pub async fn search_form_route(
 ) -> Response {
     if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
         return endpoint::search(&facade, &access, &headers, &uri, &body)
+            .unwrap_or_else(Refusal::into_response);
+    }
+    if mhd::serves(&facade, &resource_type) {
+        return mhd::search(&facade, &access, &resource_type, &headers, &uri, &body)
+            .await
             .unwrap_or_else(Refusal::into_response);
     }
     if resource_type == consent::CONSENT
@@ -196,6 +204,11 @@ pub async fn read_route(
         return endpoint::read(&facade, &access, &id, &headers, &uri)
             .unwrap_or_else(Refusal::into_response);
     }
+    if mhd::serves(&facade, &resource_type) {
+        return mhd::read(&facade, &access, (&resource_type, &id), &headers, &uri)
+            .await
+            .unwrap_or_else(Refusal::into_response);
+    }
     read(&facade, &access, (&resource_type, &id), &headers, &uri)
         .await
         .unwrap_or_else(Refusal::into_response)
@@ -235,7 +248,10 @@ pub async fn document_type_route(
 /// and `graph`. This server stores no document and reads no `GraphDefinition`,
 /// so `persist=true` and any `graph` are refused rather than ignored, and a
 /// Composition on another server is refused; `persist=false` is honoured
-/// (no specification governs refusing them: our own design).
+/// (no specification governs refusing them: our own design). The document
+/// is the one MHD 4.2.3 Retrieve Document [ITI-68] retrieves, so it answers
+/// in FHIR JSON or XML as the request asks, and `406` for any other media
+/// type (ITI TF-2: 3.68.4.1.3).
 async fn document(
     facade: &Facade,
     access: &Access,
@@ -252,6 +268,7 @@ async fn document(
             )),
         ));
     }
+    let format = format_of(headers, uri)?;
     let invalid = |code: IssueType, text: String| {
         reply::refusal(StatusCode::BAD_REQUEST, Issue::error(code).diagnosing(text))
     };
@@ -315,14 +332,26 @@ async fn document(
         }
     };
     admit_existing(facade, access, Permission::Read, read::COMPOSITION, &id).await?;
-    read::document(
-        facade,
-        access,
-        &facade.client_for(headers, access).await?,
-        (headers, uri),
-        &id,
-    )
-    .await
+    let client = facade.client_for(headers, access).await?;
+    let assembled = read::assembled(facade, access, &client, &id).await?;
+    Ok(reply::formatted(
+        StatusCode::OK,
+        &assembled.bundle,
+        format,
+        &[],
+    ))
+}
+
+/// Returns the format a resource served in both FHIR formats answers in, or
+/// the `406` of a request that asks for neither
+/// (<https://hl7.org/fhir/R4/http.html#mime-type>).
+pub(crate) fn format_of(headers: &HeaderMap, uri: &Uri) -> Result<media::Format, Refusal> {
+    media::Format::negotiate(headers, uri.query()).map_err(|refusal| {
+        reply::refusal(
+            StatusCode::NOT_ACCEPTABLE,
+            Issue::error(IssueType::NotSupported).diagnosing(refusal.to_string()),
+        )
+    })
 }
 
 /// Returns the logical id an `id` parameter names on this server: a bare id,
@@ -382,16 +411,18 @@ pub async fn update_route(
     .unwrap_or_else(Refusal::into_response)
 }
 
-/// `DELETE [base]/{type}/{id}`: delete a party resource, ITS-REST 1.1.0
-/// Demographic API, DEVELOPMENT.
+/// `DELETE [base]/{type}/{id}` and `GET [base]/{type}/{id}/_history`, the
+/// two interactions only a party type serves, ITS-REST 1.1.0 Demographic API,
+/// DEVELOPMENT; the method tells them apart.
 ///
 /// A type no party program serves is `not-supported`, and a party program
 /// loads only with `[cdr] demographic` on (no specification governs this: our
 /// own design).
-pub async fn delete_route(
+pub async fn party_only_route(
     State(facade): State<Arc<Facade>>,
     access: Access,
     Path((resource_type, id)): Path<(String, String)>,
+    method: http::Method,
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
@@ -399,42 +430,13 @@ pub async fn delete_route(
     let Some(loaded) = programs.party(&resource_type) else {
         return not_supported(&resource_type).into_response();
     };
-    crate::facade::party::write::delete(
-        &facade,
-        &access,
-        loaded,
-        (&resource_type, &id),
-        &headers,
-        &uri,
-    )
-    .await
-    .unwrap_or_else(Refusal::into_response)
-}
-
-/// `GET [base]/{type}/{id}/_history`: the history of a party resource,
-/// ITS-REST 1.1.0 Demographic API, DEVELOPMENT.
-///
-/// A type no party program serves is `not-supported`, as for [`delete_route`].
-pub async fn history_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    Path((resource_type, id)): Path<(String, String)>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
-    let programs = facade.programs();
-    let Some(loaded) = programs.party(&resource_type) else {
-        return not_supported(&resource_type).into_response();
-    };
-    crate::facade::party::read::history(
-        &facade,
-        &access,
-        loaded,
-        (&resource_type, &id),
-        &headers,
-        &uri,
-    )
-    .await
+    let call = crate::facade::party::Call::new(&facade, &access, loaded, (&headers, &uri));
+    let instance = (resource_type.as_str(), id.as_str());
+    if method == http::Method::DELETE {
+        crate::facade::party::write::delete(call, instance).await
+    } else {
+        crate::facade::party::read::history(call, instance).await
+    }
     .unwrap_or_else(Refusal::into_response)
 }
 
@@ -484,12 +486,8 @@ pub(crate) async fn read(
 ) -> Result<Response, Refusal> {
     if let Some(loaded) = facade.programs().party(resource_type) {
         return crate::facade::party::read::read(
-            facade,
-            access,
-            loaded,
+            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
             (resource_type, id),
-            headers,
-            uri,
         )
         .await;
     }
@@ -515,12 +513,8 @@ pub(crate) async fn vread(
 ) -> Result<Response, Refusal> {
     if let Some(loaded) = facade.programs().party(resource_type) {
         return crate::facade::party::read::vread(
-            facade,
-            access,
-            loaded,
+            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
             (resource_type, id, vid),
-            headers,
-            uri,
         )
         .await;
     }
@@ -546,12 +540,8 @@ pub(crate) async fn update(
 ) -> Result<Response, Refusal> {
     if let Some(loaded) = facade.programs().party(resource_type) {
         return crate::facade::party::write::update(
-            facade,
-            access,
-            loaded,
+            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
             (resource_type, id),
-            headers,
-            uri,
             body,
         )
         .await;
@@ -696,6 +686,23 @@ fn metadata(
             .partition_point(|entry| entry.r#type.value.as_deref() < Some(endpoint::ENDPOINT));
         rest.resource.insert(at, endpoint::capability());
     }
+    if facade.mhd() {
+        statement.instantiates.push(mhd::RESPONDER.into());
+        if let Some(rest) = statement.rest.first_mut() {
+            rest.resource.retain(|entry| {
+                !matches!(
+                    entry.r#type.value.as_deref(),
+                    Some(mhd::DOCUMENT_REFERENCE | mhd::LIST)
+                )
+            });
+            for resource in mhd::capability() {
+                let at = rest.resource.partition_point(|entry| {
+                    entry.r#type.value.as_deref() < resource.r#type.value.as_deref()
+                });
+                rest.resource.insert(at, resource);
+            }
+        }
+    }
     if facade.launch_tasks().is_some()
         && let Some(rest) = statement.rest.first_mut()
     {
@@ -770,6 +777,24 @@ pub(crate) fn supported(facade: &Facade, resource_type: &str) -> Result<(), Refu
         return Ok(());
     }
     Err(not_supported(resource_type))
+}
+
+/// Admits a request whose body is a resource of `resource_type`: the
+/// request's media types, a type some program maps, and the body read as
+/// that type.
+///
+/// # Errors
+///
+/// Returns the [`Refusal`] of the first check that fails.
+pub(crate) fn inbound(
+    facade: &Facade,
+    resource_type: &str,
+    (headers, uri): (&HeaderMap, &Uri),
+    body: &[u8],
+) -> Result<Inbound, Refusal> {
+    guard(headers, uri, Body::Present)?;
+    supported(facade, resource_type)?;
+    read::parse(body, resource_type)
 }
 
 /// Checks that some loaded program maps or creates `resource_type`, as read

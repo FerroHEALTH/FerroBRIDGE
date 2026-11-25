@@ -10,31 +10,22 @@ use std::collections::BTreeSet;
 use secrecy::ExposeSecret;
 use secrecy::SecretString;
 
-use super::credentials::secret;
-use super::error::Error;
-use super::section::events::Events;
-use crate::change_feed::ReaderName;
+use super::change_feed::Consumer;
+use crate::config::Config;
+use crate::config::credentials::secret;
+use crate::config::error::Error;
 use crate::events::Queue;
 use crate::events::Settings;
 
 /// Returns the lane `events` describes, refused without the change feed it
 /// follows, a reader name, an AMQP broker URL or an exchange.
-pub(super) fn resolve_events(events: &Events, change_feed: bool) -> Result<Settings, Error> {
-    if !change_feed {
-        return Err(Error::Needs {
-            key: String::from("events.enabled"),
-            needs: String::from("change_feed.enabled"),
-        });
-    }
-    if events.reader.is_empty() {
-        return Err(Error::Missing {
-            key: String::from("events.reader"),
-        });
-    }
-    let reader = ReaderName::new(&events.reader).map_err(|source| Error::ReaderName {
-        key: String::from("events.reader"),
-        source,
-    })?;
+fn settings(config: &Config) -> Result<Settings, Error> {
+    let events = &config.events;
+    super::needs(
+        "events.enabled",
+        &[(config.change_feed.enabled, "change_feed.enabled")],
+    )?;
+    let reader = Consumer::Events.reader(config)?;
     let url = secret(
         "events.url",
         events.url.as_ref(),
@@ -107,4 +98,16 @@ fn broker_url(url: &SecretString, tls: bool) -> Result<SecretString, Error> {
     } else {
         Err(refused())
     }
+}
+
+/// Returns the commit-event publisher of `[events]`, when it is on.
+///
+/// # Errors
+///
+/// Returns the [`Error`] of the section's first fault.
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
+    if !config.events.enabled {
+        return Ok(None);
+    }
+    settings(config).map(Some)
 }

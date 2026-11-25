@@ -15,7 +15,7 @@
 //! (no specification governs this: our own design).
 
 pub(crate) mod form;
-mod identifier;
+pub(crate) mod identifier;
 mod include;
 mod party;
 mod total;
@@ -337,7 +337,10 @@ fn start_of(
 /// so the search is held to that patient's EHR as one more `AND`ed subject,
 /// and a patient the map does not know reaches no data (no specification
 /// governs the mapping from a compartment to an EHR: our own design).
-async fn compartment_ehrs(facade: &Facade, patient: &str) -> Result<Vec<EhrId>, Refusal> {
+pub(crate) async fn compartment_ehrs(
+    facade: &Facade,
+    patient: &str,
+) -> Result<Vec<EhrId>, Refusal> {
     // NOTE: no specification governs this: our own design, a patient id no
     // person key can hold names no EHR the map binds, so the token reaches none.
     let Ok(person) = facade.settings().subject.person_of_patient(patient) else {
@@ -767,6 +770,23 @@ async fn rows_of(
         })
 }
 
+/// Runs `request` and returns every row of every page of `page` rows, or
+/// the refusal the status table gives its failure.
+pub(crate) async fn every_row(
+    client: &CdrClient,
+    request: openehr_its::rest::generated::query::AdhocQueryExecute,
+    page: crate::cdr::query::PageSize,
+) -> Result<Vec<ResultSetRow>, Refusal> {
+    futures_util::TryStreamExt::try_collect(client.query_aql_rows(request, page))
+        .await
+        .map_err(|error| match error {
+            QueryPageError::Refused(upstream) => {
+                write::refuse(&status::of_query_refusal(&upstream))
+            }
+            QueryPageError::Call(error) => write::refuse(&status::of_client_error(&error)),
+        })
+}
+
 /// Maps one entry of a row back to the resources it answers, with the ids
 /// the identity map holds: the entry's own resource and every resource of
 /// the searched type its mapping creates ([`render::render_units`]), each
@@ -801,7 +821,7 @@ async fn render_entry(
         program.program(),
         program.index(),
         &entry.isolate(composition),
-        render::Origin::of(facade, &id, version, &source, subject.as_ref()),
+        render::Origin::new(facade, &id, version, &source, subject.as_ref()),
         plan.session,
     )
     .await?;

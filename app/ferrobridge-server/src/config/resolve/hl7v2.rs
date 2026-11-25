@@ -11,11 +11,11 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use super::super::Config;
-use super::super::Hl7v2Settings;
-use super::super::error::Error;
-use super::super::hl7v2;
-use super::super::section::Hl7v2Tls;
+use crate::config::Config;
+use crate::config::Hl7v2Settings;
+use crate::config::error::Error;
+use crate::config::hl7v2;
+use crate::config::section::hl7v2::Hl7v2Tls;
 
 /// Returns whether listeners at `one` and `other` would take one port: the
 /// same port on the same address, or on an address one of them binds as
@@ -40,10 +40,8 @@ fn tls_of(tls: &Hl7v2Tls) -> Result<Option<hl7v2::Tls>, Error> {
         return Ok(None);
     }
     let named = |key: &str, path: Option<&std::path::PathBuf>| {
-        path.cloned().ok_or_else(|| Error::Needs {
-            key: String::from("hl7v2.tls"),
-            needs: key.to_owned(),
-        })
+        path.cloned()
+            .ok_or_else(|| super::needed_by("hl7v2.tls", key))
     };
     let read = |key: &str, path: &std::path::Path| {
         std::fs::read(path).map_err(|source| Error::TlsFile {
@@ -73,22 +71,18 @@ fn timeout_of(span: ferrohealth_config::units::Duration) -> Option<Duration> {
 /// Returns the HL7 v2 face `config` turns on, refused without the facade it
 /// writes through, without the state store its senders are routed from, and
 /// without a listener; `None` while it is off.
-pub(in crate::config) fn resolve_hl7v2(config: &Config) -> Result<Option<Hl7v2Settings>, Error> {
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Hl7v2Settings>, Error> {
     let hl7v2 = &config.hl7v2;
     if !hl7v2.enabled {
         return Ok(None);
     }
-    for (present, needs) in [
-        (config.facade.enabled, "facade.enabled"),
-        (config.state.is_some(), "[state]"),
-    ] {
-        if !present {
-            return Err(Error::Needs {
-                key: String::from("hl7v2.enabled"),
-                needs: String::from(needs),
-            });
-        }
-    }
+    super::needs(
+        "hl7v2.enabled",
+        &[
+            (config.facade.enabled, "facade.enabled"),
+            (config.state.is_some(), "[state]"),
+        ],
+    )?;
     let listen = hl7v2
         .listen
         .parse::<SocketAddr>()
@@ -128,10 +122,10 @@ pub(in crate::config) fn resolve_hl7v2(config: &Config) -> Result<Option<Hl7v2Se
         });
     }
     if tls.is_none() && plain.is_none() {
-        return Err(Error::Needs {
-            key: String::from("hl7v2.enabled"),
-            needs: String::from("[hl7v2.tls] or [hl7v2.plain]"),
-        });
+        return Err(super::needed_by(
+            "hl7v2.enabled",
+            "[hl7v2.tls] or [hl7v2.plain]",
+        ));
     }
     Ok(Some(Hl7v2Settings {
         listen,

@@ -221,13 +221,13 @@ default branch.
 | openEHR RM | 1.1.0 (Release 1.1.0, <https://specifications.openehr.org/releases/RM/Release-1.1.0/>; the code compiles against the `openehr_rm::v1_2` development generation) | the newest published RM release and the conformance target; ITS-REST 1.1.0 links its RM types to `releases/RM/latest`. openEHR has published no Release 1.2.0, and `openehr-rm` documents `v1_2` as specification version 1.2.0, the development baseline (<https://specifications.openehr.org/releases/RM/development/>). The code compiles against `v1_2` because `openehr-sdt` builds only against it and the canonical codecs and ITS-REST types of `openehr-its` are generated over it; `scripts/checks/versions.sh` fails a hand-written `openehr_rm::v1_N` path that names another generation. Against Release 1.1.0, `v1_2` adds `EHR.tags`, widens `GENERIC_ENTRY.data` from `ITEM_TREE` to `ITEM` (SPECRM-18), and removes `PARTY.reverse_relationships` (SPECRM-124), so a Release 1.1.0 `PARTY` carrying that attribute is refused by the strict reader (#845). The `ARCHETYPED.rm_version` stamp names Release 1.1.0 wherever the object conforms to it (section 3, #844) |
 | Standard Webhooks | v1.3.0 (<https://github.com/standard-webhooks/standard-webhooks/blob/v1.3.0/spec/standard-webhooks.md>) | the newest release; the inbound intake verifies its `v1` (HMAC-SHA-256) and `v1a` (Ed25519) schemes over `msg_id.timestamp.payload` by this text |
 | Standard Webhooks v2a | `main` at `4a8ee40c5bcb6157f856905cc8871040d41a78ce`, whose specification text is unchanged since `3d65b1824` introduced `v2a` | `v2a` (Ed25519 over the SHA-256 of `endpoint_id.msg_id.timestamp.payload`) is on `main` only and deprecates `v1a`; the intake accepts it where a source declares its endpoint id, and pin freshness reports a release that changes it |
-| `openehr-base` | 0.3.0 (minor line 0.3; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, to 0.0.84 on 2026-10-05, to 0.0.86 on 2026-10-15, to 0.0.87 on 2026-10-16, the line the federation gateway pins, and to 0.0.89 on 2026-10-19, which adds the `v1_3` generation with its `Hrid` and the BASE 1.3.0 `ARCHETYPE_ID` grammar, and to 0.0.90 on 2026-10-20, and to 0.0.99 on 2026-10-25, and to 0.0.100 on 2026-10-26, and to 0.0.109 on 2026-10-27, and to 0.0.116 on 2026-11-02, and to 0.0.128 on 2026-11-04, and to 0.0.129 on 2026-11-05, and to 0.0.130 on 2026-11-08, and to 0.0.133 and 0.0.135 the same day, and to 0.0.136 on 2026-11-09, and to 0.1.0 on 2026-11-11, the first release FerroEHR cuts under the Cargo SemVer rules, and to 0.1.1 on 2026-11-12, and to 0.2.0 on 2026-11-14, whose `openehr-rm` carries the draft access control package behind its `draft` feature, and to 0.3.0, whose `openehr-sdt` publishes the `ARCHETYPE_SLOT` admission matcher `openehr-mapping-core` takes and whose draft access terminology moves to `openehr_access` |
-| `openehr-rm` | 0.3.0 (Apache-2.0) | the RM model in two generations, `v1_1` (Release 1.1.0) and `v1_2` (the development baseline the bridge compiles against, see the openEHR RM row), its canonical JSON codec and the BASE path parser |
-| `openehr-its` | 0.3.0 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
-| `openehr-sdt` | 0.3.0 (BUSL-1.1) | the Simplified Data Template engines split out of `openehr-its` at 0.0.68: the Web Template builder, the FLAT and STRUCTURED codecs, the composition builder (`flat::build`) and the RM-instance validation (`rm_instance`); the bridge takes `default-features = false` with `flat`, leaving the `moka` cache out |
-| `openehr-query` | 0.3.0 (Apache-2.0 from 0.0.116) | the AQL 1.1.0 parser and canonical printer. `openehr-lang` arrives transitively |
-| `openehr-term` | 0.3.0 (Apache-2.0 AND CC-BY-SA-3.0) | the openEHR terminology; the server names its `audit_change_type` and `version_lifecycle_state` concepts (`codes`) for the `change_type` and `lifecycle_state` a commit carries |
-| `openehr-am` | 0.3.0 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
+| `openehr-base` | 0.5.0 (minor line 0.5; Apache-2.0) | the RM foundation types, including partial ISO 8601 dates (section 3); the line moved from 0.0.61 to 0.0.64 between passes, to 0.0.69 on 2026-09-24, to 0.0.71 on 2026-09-25 and to 0.0.72 the same day, to 0.0.84 on 2026-10-05, to 0.0.86 on 2026-10-15, to 0.0.87 on 2026-10-16, the line the federation gateway pins, and to 0.0.89 on 2026-10-19, which adds the `v1_3` generation with its `Hrid` and the BASE 1.3.0 `ARCHETYPE_ID` grammar, and to 0.0.90 on 2026-10-20, and to 0.0.99 on 2026-10-25, and to 0.0.100 on 2026-10-26, and to 0.0.109 on 2026-10-27, and to 0.0.116 on 2026-11-02, and to 0.0.128 on 2026-11-04, and to 0.0.129 on 2026-11-05, and to 0.0.130 on 2026-11-08, and to 0.0.133 and 0.0.135 the same day, and to 0.0.136 on 2026-11-09, and to 0.1.0 on 2026-11-11, the first release FerroEHR cuts under the Cargo SemVer rules, and to 0.1.1 on 2026-11-12, and to 0.2.0 on 2026-11-14, whose `openehr-rm` carries the draft access control package behind its `draft` feature, and to 0.3.0, whose `openehr-sdt` publishes the `ARCHETYPE_SLOT` admission matcher `openehr-mapping-core` takes and whose draft access terminology moves to `openehr_access`, and to 0.5.0 on 2026-11-25, whose `openehr-adl` resolves an ADL 1.4 archetype by its full identifier (BASE `master07-referencing` §Referencing) and keeps its at-codes through the ADL 2 conversion, and whose RM boxes its single-valued complex attributes |
+| `openehr-rm` | 0.5.0 (Apache-2.0) | the RM model in two generations, `v1_1` (Release 1.1.0) and `v1_2` (the development baseline the bridge compiles against, see the openEHR RM row), its canonical JSON codec and the BASE path parser |
+| `openehr-its` | 0.5.0 (Apache-2.0) | the ITS wire layer: the OPT 1.4 codec, the canonical JSON and XML codecs, the ITS-REST 1.1.0 data types; the bridge takes `default-features = false` with `opt14`, `json` and `rest` (the DTOs without axum), and #285 adds `rest-client`, whose 0.0.72 commit headers, `4xx` error bodies and `SecretString` credentials the CDR client takes as they stand (#293) |
+| `openehr-sdt` | 0.5.0 (BUSL-1.1) | the Simplified Data Template engines split out of `openehr-its` at 0.0.68: the Web Template builder, the FLAT and STRUCTURED codecs, the composition builder (`flat::build`) and the RM-instance validation (`rm_instance`); the bridge takes `default-features = false` with `flat`, leaving the `moka` cache out |
+| `openehr-query` | 0.5.0 (Apache-2.0 from 0.0.116) | the AQL 1.1.0 parser and canonical printer. `openehr-lang` arrives transitively |
+| `openehr-term` | 0.5.0 (Apache-2.0 AND CC-BY-SA-3.0) | the openEHR terminology; the server names its `audit_change_type` and `version_lifecycle_state` concepts (`codes`) for the `change_type` and `lifecycle_state` a commit carries |
+| `openehr-am` | 0.5.0 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
 | `openehr-adl` | not taken in the first cut (0.1.1, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
 | `fhir-types` | 0.2.0 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
@@ -1039,8 +1039,9 @@ expression is a load error: the reference CDR's connector let `where()` and
   identity map and the CDR; an absolute one is fetched only from a base on
   the `[facade.references] fetch_bases` allow-list (empty by default, so by
   default nothing is fetched and no client can make the bridge call a URL it
-  names), with redirects refused, a timeout, `max_depth` levels and each
-  literal resolved once, every fetch logged by type, id, base and upstream
+  names), through one `ferrohealth-smart` `OutboundClient` with redirects
+  refused, a timeout and one try, `max_depth` levels and each literal
+  resolved once, every fetch logged by type, id, base and upstream
   status. No specification governs that policy: our own design.
 - **A read-side Bundle is well formed.** One entry per composition per
   resource type (two programs over one template do not double an entry), a
@@ -1062,7 +1063,21 @@ expression is a load error: the reference CDR's connector let `where()` and
   each with its read URL as `fullUrl`. The assembly is our own design
   (`facade::document`); `persist=true` and `graph` are refused, never
   ignored. A context whose start is a composition model binds the composition
-  itself as its one entry, under the path `/`.
+  itself as its one entry, under the path `/`. The document answers in FHIR
+  XML when asked, as MHD Retrieve Document [ITI-68] requires (ITI TF-2:
+  3.68.4.1.3).
+- **The facade is the IHE MHD 4.2.3 Document Responder behind `[facade.mhd]`.**
+  ITI-66, ITI-67 and ITI-68 are each Required (ITI TF-1: Table 33.1-1). A
+  `DocumentReference` is the `eehrxf` Annex III description of the document
+  `$document` assembles from the latest version of a composition of a
+  Composition context, under the Composition's id, its
+  `content.attachment.url` the `$document` URL. A `List` is a SubmissionSet,
+  one per CONTRIBUTION that committed such a version, our own design. Every
+  parameter the Responder SHALL process matches the element the description
+  fills, an empty element matching nothing; an unsupported parameter is
+  ignored (ITI TF-2: 3.66.4.1.2, 3.67.4.1.2) and named in the searchset, and
+  refused under `Prefer: handling=strict` (R4 `search.html`). Both answer in
+  FHIR JSON or XML (`facade::mhd`).
 - **`Patient/$summary` answers the patient summary, validated before it is
   served.** `GET [base]/Patient/[id]/$summary` (HL7 IPS 2.0.1,
   `OperationDefinition/summary`) reads the patient through the `Patient`
@@ -1683,7 +1698,7 @@ mapping rooted at a party: a context binds a composition template, and
   "the Version container of Actor playing the role" (RM Demographic IM, the
   `ROLE` class), and no template node holds it (#911). A party context maps
   it as `$archetype/performer`; the compiler admits that one tail on the
-  party root (`rm::PARTY_ROOTS`) and the party build places the value on the
+  party root (`rm::PARTY_REFS`) and the party build places the value on the
   root. `PractitionerRole.practitioner` carries it through the
   `PARTY_REF`-against-`Reference` cell: the reference resolves through the
   demographics endpoint, must be a party of this facade of the one resource
@@ -1694,6 +1709,19 @@ mapping rooted at a party: a context binds a composition template, and
   and a `ROLE` with no `performer`, built or served, is refused
   (`PartyError::RoleWithoutPerformer`). An element whose reference admits no
   single type is refused at load (`fc-party-ref-target`).
+- **`PARTY_RELATIONSHIP`.** A relationship's `target` is a `PARTY_REF` no
+  template node holds, mapped as `$archetype/relationships[idN]/target` and
+  written through the same cell. Its `source` is always the party that holds
+  it (RM Demographic IM, the `PARTY` class, invariant
+  `Relationships_validity`), so no mapping writes it: the party build holds
+  every relationship aside, and `WebTemplateIndex::source_relationships`
+  writes it in once the party's uid is known. A facade create commits the
+  party, then commits a second version with its relationships sourced at
+  the uid the CDR assigned; when that second write fails, the facade
+  deletes the party again (ITS-REST 1.1.0 Demographic API, `person_delete`)
+  and answers the CDR's refusal, and when the deletion fails too it answers
+  a `500` naming the party's version and both refusals. An update sources
+  them before its one write.
 - **The draft archetypes.** Every `openEHR-DEMOGRAPHIC-*` archetype in the
   international CKM is a v0 draft
   (<https://ckm.openehr.org/ckm/archetypes/1013.1.479>). The tests run against
@@ -2484,8 +2512,8 @@ revision field are our own design. `[state.seal]`
 lists the keys stored bodies are sealed under, each named by the id a sealed
 row carries, the first one sealing, and the lookup key identifier values are
 stored as an HMAC under. The identity map (section 9), the SMART Health Links
-and the facade's own App State and launch `Task`s live there; the change-feed
-and outbound records keep their `redb` files until they move. No specification governs where the bridge keeps its state: our
+and the facade's own App State and launch `Task`s live there, with the
+change-feed and outbound records. No specification governs where the bridge keeps its state: our
 own design on family precedent.
 
 **The inbound intake.** No specification governs an inbound patient-event
@@ -2522,7 +2550,11 @@ in two short statements. Idempotence is the inbox key and the generation; the
 failure policy is ours: a network failure, `5xx`, `429` or `423` retries
 after `backoff·2^(n-1)`, capped at `max_backoff`, with jitter, until
 `max_attempts`, and every other refusal parks at once with a fixed reason
-that names no value. An operator settles a parked item (retry or discard,
+that names no value. One module, `retry`, owns the backoff, the
+transient-or-poisoned verdict and the status tables of every loop of the
+bridge's own (the start, the change-feed follower, the inbound workers and
+the outbound sink), each lane keeping its numbers and its park rule. An
+operator settles a parked item (retry or discard,
 recorded with the token's subject and the reason) and replays work by
 entity or by received range through `/operator/sources/{id}/…`.
 Recovery is the receiver's job for a webhook source that retries nothing on
@@ -2531,8 +2563,11 @@ leads the source and after a run of `503` answers, and `reconcile` polls
 that read the entities changed since a cursor per tenant and mark each one
 due. One replica runs a source's recovery under the lane lease
 `inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
-a transaction that fences the generation that read it. The schedule is our
-own design, since no specification governs it.
+a transaction that fences the generation that read it. Every recovery call
+goes through a `ferrohealth-smart` `OutboundClient`, one per source version
+and credential, which presents the credential's client certificate, gives a
+call 30 seconds and one try, and follows no redirect. The schedule and these
+limits are our own design, since no specification governs them.
 A `fhir-subscription` source receives R4 notifications of the Subscriptions
 R5 Backport IG STU 1.1.0
 (<https://hl7.org/fhir/uv/subscriptions-backport/notifications.html>) on the
@@ -2542,16 +2577,15 @@ event number, `fhir_subscription_state` keeps each subscription's status,
 highest event and gap, and the recovery leader recovers a gap through
 `$events` (errors.html).
 
-**Dependencies, verified against crates.io on 2026-09-12**, with `redb` and
-`jiff` re-verified on 2026-09-15 when the facade added them, and recorded in
+**Dependencies, verified against crates.io on 2026-09-12**, with `jiff`
+re-verified on 2026-09-15 when the facade added it, and recorded in
 `docs/VERSIONS.md`: `openehr-base`, `openehr-rm`, `openehr-its`,
 `openehr-sdt`, `openehr-query`, `openehr-term` 0.0.134 (re-verified on 2026-11-08); `serde-saphyr` 2.0.0 (the
 maintained serde YAML with anchors, aliases, merge keys and spans;
 `serde_yaml` is archived, `serde-yaml-ng` and `serde_yml` unmaintained);
 `jsonschema` 0.61.0 with `default-features = false`; `axum` 0.8.9, `tower-http`
 0.7.1, `reqwest` 0.13.5 with rustls, `backon` 1.6.0; `sqlx` 0.9.0 for checked
-queries and the state store, `tokio-postgres` 0.7.18 for binary `COPY`; `redb` 4.3.0 for the
-stores that have not yet moved to the state store; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
+queries and the state store, `tokio-postgres` 0.7.18 for binary `COPY`; `jiff` 0.2.37 for the bridge's own timestamps (openEHR partial
 dates stay in their lexical form in `openehr-base`; FHIR primitives keep theirs
 in `fhir-types`); `sha2` 0.11.0; `insta`, `proptest`, `wiremock`,
 `testcontainers` 0.28.0 for tests. Consuming `openehr-its` with

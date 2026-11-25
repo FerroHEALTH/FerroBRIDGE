@@ -103,6 +103,7 @@ fails when it names a different commit, tag or pin-set digest.
 | HL7 Europe Hospital Discharge Report | package `hl7.fhir.eu.hdr` 1.0.0, pin-set digest `8193d59700b891ed87e1e0da87bc62517dba751a449c9c65e7b7c8eb1982fba8`, tarball sha256 `eedf9af9f66b68cd66f7d6c678a36dfba86b0920df4ef15e8d2da900c4134879` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-hdr/PROVENANCE.md` |
 | HL7 Europe EU Health Data API | package `hl7.fhir.eu.health-data-api` 1.0.0-ballot, pin-set digest `253ebbce321fc294ae582c3c3abb67274ad53de6578c3eb3360e1566697691ac`, tarball sha256 `5204af60bf7f74f301a627e641a34683d392014f53d5df8ba3651c964e92977b` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-health-data-api/PROVENANCE.md` |
 | MyHealth@EU Master Value Sets Catalogue | package `myhealth.eu.fhir.mvc-package` 9.1.0, pin-set digest `06f68a58f7382db396f029b1c0a420fcac6cbf53d8a948df47594937b0886749`, tarball sha256 `3f99350f36a2a1ea17b7fde37c39ff766bd5c3bc9a29c6183af1acfd07b78ce1` | `scripts/vendor/eehrxf.sh`, `docs/specs/ehdsi-mvc/PROVENANCE.md` |
+| MyHealth@EU Vaccination | package `myhealth.eu.fhir.euvac` 10.0.0-preview, a preview and not a release, pin-set digest `c4ad39ad2bdbcd4f4061ca49be293dee7a5064403758d031d7d075d5f2d605e5`, tarball sha256 `96bf16bc13cf01b1c9a7642aef20704cb210c4900d83ae4ec6511081535fe3f6` | `scripts/vendor/eehrxf.sh`, `docs/specs/ehdsi-euvac/PROVENANCE.md` |
 | HL7 France FR Core | package `hl7.fhir.fr.core` 2.2.0, pin-set digest `a2806a8c83c2b0b85a4b8c2cfd12effc5d37c3c2c0c2670406b840532698510a`, tarball sha256 `085e61bf579829a6d5520c6f388d763d27ba400f9f6ca548bc88da5545ba13f9` | `scripts/vendor/eehrxf.sh`, `docs/specs/fr-ans/PROVENANCE.md` |
 | FHIR R4 core specification pages | `hl7.org/fhir/R4/` 4.0.1, pin-set digest `f83b3f5adeb29f74a8c465292689bbdbbf7c6b609b9d5a643ab6954b483244a7`, the Extensibility (2.5.0), Defining Extensions (2.5.1), StructureDefinition and License and Legal Terms (2.20) pages | `scripts/vendor/eehrxf.sh`, `docs/specs/fhir-r4/PROVENANCE.md` |
 | EHDS draft EEHRxF implementing act | `090166e5374c0181` (act) and `090166e5374c0182` (Annexes I to X), Have your say initiative 17512, Ares(2026)10884928, published 2026-11-23, a draft for feedback until 2026-12-21 and not adopted, pin-set digest `1703a4ae9eab9f4d5759ba14c6e2c2b9335c127f99214b979dc12ba42125470f`, act sha256 `58bcf64645fda2cf0e0914d3035afbbc27af4e98dee0ebe73f42c436eb85954a`, annexes sha256 `7e3db6da13c7760b122691f466423dd57c5eb519457e3ca0dcae60f3565c00fb` | `scripts/vendor/ehds-drafts.sh`, `docs/specs/ehds-eehrxf-draft/PROVENANCE.md`, `scripts/checks/pin-freshness.sh` |
@@ -122,14 +123,14 @@ carries the exact patch.
 
 | Item | Pin | Repeated in |
 |---|---|---|
-| `openehr-base` | 0.3.0 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-rm` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-its` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-sdt` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
-| `openehr-query` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
-| `openehr-am` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
-| `openehr-adl` | 0.3.0 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
-| `openehr-term` | 0.3.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
+| `openehr-base` | 0.5.0 | `docs/architecture.md`, later the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-rm` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-its` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-sdt` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the Simplified Data Template engines, split out of `openehr-its` at 0.0.68) |
+| `openehr-query` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` |
+| `openehr-am` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the AOM2 OPT2 types an ADL 2 template decodes into) |
+| `openehr-adl` | 0.5.0 | the root `Cargo.toml` `[workspace.dependencies]`, test-only: the ADL 2 test fixtures of `openehr-mapping-core` are compiled from their `.adls` sources |
+| `openehr-term` | 0.5.0 | `docs/architecture.md`, the root `Cargo.toml` `[workspace.dependencies]` (the `audit_change_type` and `version_lifecycle_state` concepts a commit codes) |
 
 ## Third-party crates
 
@@ -154,7 +155,6 @@ dependency pins below.
 | `tower` | 0.5.3 | the root `Cargo.toml` `[workspace.dependencies]` |
 | `toml` | 1.1.6 | the root `Cargo.toml` `[workspace.dependencies]` (the server configuration file) |
 | `uuid` | 1.26.1 | the root `Cargo.toml` `[workspace.dependencies]` (the minted request id) |
-| `redb` | 4.3.0 | `docs/architecture.md` §7, the root `Cargo.toml` `[workspace.dependencies]` (the facade identity store) |
 | `jiff` | 0.2.37 | `docs/architecture.md` §7, the root `Cargo.toml` `[workspace.dependencies]` (the bridge's own timestamps) |
 | `futures-core`, `futures-util` | 0.3.34 | the root `Cargo.toml` `[workspace.dependencies]` |
 | `tokio` | 1.53.1 | the root `Cargo.toml` `[workspace.dependencies]` |
@@ -188,10 +188,10 @@ in code is the matching constant in
 | RabbitMQ image | `rabbitmq:4.3.7@sha256:bd88985187aa73cd598fa0d8b31d49b2f814a6d9e58f6d5a89bae588669d946a` | the `RABBITMQ` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR image | `ghcr.io/ferrohealth/ferroehr:5.7.0@sha256:44c9268cb8a154df118a10ffe84329633f22923ea2cc54261ff0cea57a2ee7e7` | the `CDR` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroEHR CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:5.7.0@sha256:3b7dbfce603b4ff3c8a29366655f195baf2bfeaf903a1bf1be851ba69293743a` | the `CDR_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
-| FerroEHR main CDR image | `ghcr.io/ferrohealth/ferroehr:main@sha256:482c3f3cbcef8dfc213330e1bc50d33a83cec5cfe246f79e0a1cdd8553ec7a22` | the `CDR_MAIN` constant in `tools/ferrobridge-testkit/src/containers.rs`, the Yellow Button journey's CDR until FerroEHR 6.0.0 is released (#2018) |
+| FerroEHR main CDR image | `ghcr.io/ferrohealth/ferroehr:main@sha256:90d3e18d22da2e055edc0880bcf32cdc38668d3af0a37c1786d4ecc16fd05159` | the build of FerroEHR `main` commit `f79725f` (Containers run 45642706571), in the `CDR_MAIN` constant in `tools/ferrobridge-testkit/src/containers.rs`, the Yellow Button journey's CDR until FerroEHR 6.0.0 is released (#2018) |
 | FerroEHR main CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:main@sha256:7d71098414533dadb712d01a4ca5846a1b1a88b11dfcbffec6e6a8a2bcd59fd2` | the `CDR_MAIN_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 | FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.7@sha256:52411e76ea664f9470fda0a7a08202a0ad6f7c39069322f42a754d971cf37a82` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
-| FerroSMART authorization server image | `ghcr.io/ferrohealth/ferrosmart:0.6.0@sha256:28ca6593c5055390c5cb9796f9b183519e1323ffe1fb70d7cf260316db6467cc` | the `FERROSMART` constant in `tools/ferrobridge-testkit/src/containers.rs` |
+| FerroSMART authorization server image | `ghcr.io/ferrohealth/ferrosmart:0.7.0@sha256:dddde7e14fcdd85ce50dad9040ae3a83fefb7a358d37e33e1d09be9a22403dbb` | the `FERROSMART` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 
 The CDR runs against its own published database image rather than the plain
 PostgreSQL above: that image is built from `postgres:18.6` and carries the
@@ -286,7 +286,7 @@ names its `tarball` and `sha256`, from the guide's canonical site, by
 `docs/specs/fhir-packages/<package>#<version>/package/`, which reads its pins
 from this table (#435). At about 970 MB unpacked they are never committed;
 only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
-`scripts/vendor/profile-packages.sh --cache-key`. The twelve roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
+`scripts/vendor/profile-packages.sh --cache-key`. The thirteen roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
 one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.1,
 the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
 2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
@@ -301,7 +301,9 @@ line (Core 1.0.1, Laboratory 9.2.0, Hospital Discharge Report 9.2.0 and the
 Master Value Sets Catalogue 10.1.0, #2083), each a CI build, not a release,
 fetched from `build-fhir.ehdsi.eu`, which overwrites a build in place, so
 the sha256 is the pin and `scripts/checks/pin-freshness.sh` reports a
-moved build;
+moved build, and `myhealth.eu.fhir.euvac` 10.0.0-preview, the MyHealth@EU
+Vaccination guide a written vaccination history is validated against
+(#2168), a preview on the registry and not a release;
 every other row is in the set because a vendored package's `package.json`
 `dependencies` names it at that version. A package two dependents name at
 different versions has a row per version: EPS 1.0.0-ballot depends on EU Base
@@ -395,6 +397,9 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `myhealth.eu.fhir.hdr` | 9.2.0 files `68` digest `30746090501bf692188da5f5d6cb4b2287d74ea1a15fb62bf9829da69dba05b7` tarball `https://build-fhir.ehdsi.eu/hdr/package.tgz` sha256 `f41a42d80ea01be9d89e8a4582f741e1dee14641fdd3b9fbb3d26e6b5905f8b0` | `docs/specs/fhir-packages/myhealth.eu.fhir.hdr#9.2.0/PROVENANCE.md` (a root, a CI build of 2026-11-25 from build-fhir.ehdsi.eu, not a release) |
 | `myhealth.eu.fhir.mvc-package` | 10.1.0 files `103` digest `28134b577e017781e483d2f275a256010301e449ca3a005ae1041951068a0a55` tarball `https://build-fhir.ehdsi.eu/mvc-package/package.tgz` sha256 `8f42b6d0e3a5bad3517a7fe01025b1112d80b12503a66fa8495f9806a81de0e4` | `docs/specs/fhir-packages/myhealth.eu.fhir.mvc-package#10.1.0/PROVENANCE.md` (a root, a CI build of 2026-10-29 from build-fhir.ehdsi.eu, not a release) |
 | `myhealth.eu.fhir.mvc-package` | 9.1.0 files `101` digest `c507c7eab66d570ea763a954feb8c55e0ccd255d4895454b42a3f65f9ae0aad3` | `docs/specs/fhir-packages/myhealth.eu.fhir.mvc-package#9.1.0/PROVENANCE.md` |
+| `myhealth.eu.fhir.euvac` | 10.0.0-preview files `28` digest `e49726139bce7a8120eee801905ba45c8394839e44758097b5da26994a9c521e` | `docs/specs/fhir-packages/myhealth.eu.fhir.euvac#10.0.0-preview/PROVENANCE.md` (a root, a preview and not a release, CC-BY-4.0) |
+| `myhealth.eu.fhir.core` | 1.0.0 files `128` digest `e39cf821244120cf6b54133c7e86ce3f5076c0a2d0568b3d12c569bd2a3b7512` | `docs/specs/fhir-packages/myhealth.eu.fhir.core#1.0.0/PROVENANCE.md` |
+| `xtehr.eu.ehds.models` | 0.3.0 files `49` digest `c9ca078a854e0777f4a4d02afe826556b8cfeb3591ec83819c6a1d99a556597c` | `docs/specs/fhir-packages/xtehr.eu.ehds.models#0.3.0/PROVENANCE.md` (FHIR 5.0.0, held and never read) |
 | `hl7.fhir.eu.laboratory` | 2.1.0 files `110` digest `bffb6f7bb6972965d22e53f4b80be1f626f739dc42b116eb24c204b31230a9f9` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.1.0/PROVENANCE.md` |
 | `hl7.fhir.uv.ips` | 1.1.0 files `191` digest `20aaad2ef11eb0323cdb932d23c90ec3a563c65a705a5e434f9ef33bf76140a1` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#1.1.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 7.5.0 files `4235` digest `d6e3916c8eee0ff581a50cc19ca1183a847d1891dbc2f96ad172fc884d4bf298` | `docs/specs/fhir-packages/hl7.terminology.r4#7.5.0/PROVENANCE.md` |
@@ -425,6 +430,7 @@ No build reads anything here.
 | `hl7.terminology` | 7.5.0 sha256 `c54ebe534cd3f2474459eaed68e54c34f09b003766605b19e5552db376f2cc42` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.extensions` | 5.3.0 sha256 `6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.terminology.r5` | 7.1.0 sha256 `473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe` | read by `scripts/vendor/hl7-validator-agreement.sh` |
+| `hl7.terminology.r5` | 7.0.1 sha256 `f2de7264bd4a9c6771f211ee96b9952d32ab866e8b5d657884f8c375a34ffb87` | read by `scripts/vendor/hl7-validator-agreement.sh` (a dependency of `xtehr.eu.ehds.models` 0.3.0, which the MyHealth@EU Vaccination closure holds) |
 | `hl7.fhir.uv.extensions.r5` | 5.2.0 sha256 `e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.fhir.uv.ips` | 1.1.0 sha256 `403c4141101810e924f2928287985084819d8a5cc3a62e2b3840a557129840ef` | read by `scripts/vendor/hl7-validator-agreement.sh` |
 | `hl7.terminology.r4` | 5.0.0 sha256 `c863bef14eddb01d2884d8f14826b9b152f9fcef6b99e107025136af69ce2c18` | read by `scripts/vendor/hl7-validator-agreement.sh` |

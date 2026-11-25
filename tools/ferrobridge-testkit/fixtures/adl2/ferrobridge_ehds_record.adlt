@@ -39,10 +39,10 @@ definition
             use_archetype EVALUATION[at0000.5, openEHR-EHR-EVALUATION.precaution.v1] occurrences matches {0..*}
             use_archetype EVALUATION[at0000.6, openEHR-EHR-EVALUATION.advance_care_directive-ferrobridge.v2] occurrences matches {0..*}
             use_archetype EVALUATION[at0000.7, openEHR-EHR-EVALUATION.problem_diagnosis-ferrobridge_body_site.v1] occurrences matches {0..*}
-            use_archetype INSTRUCTION[at0000.8, openEHR-EHR-INSTRUCTION.care_plan_request.v0] occurrences matches {0..*}
-            use_archetype OBSERVATION[at0000.9, openEHR-EHR-OBSERVATION.pregnancy_assertion.v0] occurrences matches {0..*}
+            use_archetype INSTRUCTION[at0000.8, openEHR-EHR-INSTRUCTION.care_plan_request.v0.0.1-alpha] occurrences matches {0..*}
+            use_archetype OBSERVATION[at0000.9, openEHR-EHR-OBSERVATION.pregnancy_assertion.v0.0.1-alpha] occurrences matches {0..*}
             use_archetype EVALUATION[at0000.10, openEHR-EHR-EVALUATION.obstetric_summary.v1] occurrences matches {0..*}
-            use_archetype ADMIN_ENTRY[at0000.11, openEHR-EHR-ADMIN_ENTRY.travel_event.v0] occurrences matches {0..*}
+            use_archetype ADMIN_ENTRY[at0000.11, openEHR-EHR-ADMIN_ENTRY.travel_event.v0.0.1-alpha] occurrences matches {0..*}
         }
     }
 

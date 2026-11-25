@@ -21,7 +21,6 @@ use crate::resolve::program::target::Target;
 use crate::tree::Occurrence;
 
 use crate::tree::element::Table;
-use crate::tree::read::read;
 
 use crate::engine::traverse::Binding;
 use crate::engine::traverse::Run;
@@ -82,15 +81,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         model: &str,
         parent: &Binding,
     ) -> Result<(), EngineError> {
-        let refuse = |reason: SplitRefusal| EngineError::Split {
-            model: String::from(model),
-            reason,
-        };
-        match split.create() {
-            Some(Create::Resource) => {}
-            Some(create) => return Err(refuse(SplitRefusal::WrongSide { create })),
-            None => return Err(refuse(SplitRefusal::NoCreate)),
-        }
+        let refuse = split_refusal(model);
+        creates(split, &[Create::Resource], refuse)?;
         if split.path().is_some() {
             return Err(refuse(SplitRefusal::ResourcePath));
         }
@@ -178,15 +170,8 @@ impl<T: Table + ?Sized> Run<'_, T> {
         model: &str,
         parent: &Binding,
     ) -> Result<(), EngineError> {
-        let refuse = |reason: SplitRefusal| EngineError::Split {
-            model: String::from(model),
-            reason,
-        };
-        match split.create() {
-            Some(Create::Event | Create::Archetype) => {}
-            Some(create) => return Err(refuse(SplitRefusal::WrongSide { create })),
-            None => return Err(refuse(SplitRefusal::NoCreate)),
-        }
+        let refuse = split_refusal(model);
+        creates(split, &[Create::Event, Create::Archetype], refuse)?;
         let with = hierarchy
             .fhir()
             .ok_or_else(|| refuse(SplitRefusal::NoWith))?;
@@ -203,14 +188,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
             }));
         }
         let parent_scope = self.scoped(Some(with), parent);
-        let matches =
-            read(self.table, self.document_for(with), with.expression()).map_err(|source| {
-                EngineError::Read {
-                    mapping: String::from(model),
-                    expression: String::from(with.expression().as_str()),
-                    source: Box::new(source),
-                }
-            })?;
+        let matches = self.matches_of(model, with)?;
         let mut groups: Vec<(Vec<String>, Vec<Occurrence>)> = Vec::new();
         for matched in matches {
             if !matched
@@ -348,12 +326,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
                 tuple.push(String::new());
                 continue;
             };
-            let matches = read(self.table, self.document_for(target), target.expression())
-                .map_err(|source| EngineError::Read {
-                    mapping: String::from(model),
-                    expression: String::from(target.expression().as_str()),
-                    source: Box::new(source),
-                })?;
+            let matches = self.matches_of(model, target)?;
             let mut texts = Vec::new();
             for matched in &matches {
                 if !matched
@@ -407,6 +380,28 @@ fn settle(warnings: &mut Vec<Warning>, start: usize) {
             continue;
         }
         warnings.push(warning);
+    }
+}
+
+/// Returns the refusal of the split in `model`.
+fn split_refusal(model: &str) -> impl Fn(SplitRefusal) -> EngineError + Copy + '_ {
+    move |reason| EngineError::Split {
+        model: String::from(model),
+        reason,
+    }
+}
+
+/// Refuses a split whose `create` is absent or none of `side`, the kinds the
+/// split's side creates.
+fn creates(
+    split: &Split,
+    side: &[Create],
+    refuse: impl Fn(SplitRefusal) -> EngineError,
+) -> Result<(), EngineError> {
+    match split.create() {
+        Some(create) if side.contains(&create) => Ok(()),
+        Some(create) => Err(refuse(SplitRefusal::WrongSide { create })),
+        None => Err(refuse(SplitRefusal::NoCreate)),
     }
 }
 

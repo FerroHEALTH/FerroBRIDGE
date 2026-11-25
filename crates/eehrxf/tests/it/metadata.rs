@@ -12,10 +12,16 @@
 
 use std::error::Error;
 
+use eehrxf::category::{Category, PRIORITY_SYSTEM};
+#[cfg(feature = "laboratory")]
+use eehrxf::document::metadata::Header;
 use eehrxf::document::metadata::{
-    Attestation, COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, DocumentMetadata, FHIR_JSON,
+    Attestation, COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, DocumentMetadata,
+    EEHRXF_MHD_DOCUMENT_REFERENCE, FHIR_JSON,
 };
 use eehrxf::document::{Document, DocumentError, LOINC};
+#[cfg(feature = "laboratory")]
+use fhir_types::r4::attachment::Attachment;
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
@@ -37,6 +43,19 @@ fn category(code: &str) -> CodeableConcept {
     }
 }
 
+/// The Art 14(1) priority category of the LOINC document category `code`.
+fn priority(code: &str) -> Option<Category> {
+    match code {
+        #[cfg(feature = "laboratory")]
+        "11502-2" => Some(Category::Laboratory),
+        #[cfg(feature = "imaging")]
+        "18748-4" => Some(Category::Imaging),
+        #[cfg(feature = "discharge")]
+        "34105-7" => Some(Category::Discharge),
+        _ => None,
+    }
+}
+
 /// The metadata of a synthetic composition in the category `code`.
 fn metadata(code: &str) -> Result<DocumentMetadata, DocumentError> {
     let composition = json!({
@@ -48,7 +67,7 @@ fn metadata(code: &str) -> Result<DocumentMetadata, DocumentError> {
         }
     });
     Ok(
-        DocumentMetadata::from_composition(&composition, category(code))?
+        DocumentMetadata::from_composition(&composition, category(code), priority(code))?
             .with_event_category(category("26436-6"))
             .with_service_specialty(category("394915009"))
             .with_attestation(Attestation::new(
@@ -85,16 +104,41 @@ fn holds_table_1(metadata: &DocumentMetadata, bundle: &Bundle) -> Result<(), Box
     // DocumentReference-minimal: masterIdentifier, type, subject, date and
     // description, 1..1 each.
     assert_eq!(reference["resourceType"], "DocumentReference");
-    assert_eq!(reference["masterIdentifier"], bundle["identifier"]);
+    assert_eq!(
+        reference["masterIdentifier"]["system"],
+        bundle["identifier"]["system"]
+    );
+    assert_eq!(
+        reference["masterIdentifier"]["value"],
+        bundle["identifier"]["value"]
+    );
     assert_eq!(reference["type"], composition["type"]);
     assert_eq!(reference["subject"], composition["subject"]);
     assert_eq!(reference["date"], bundle["timestamp"]);
     assert_eq!(reference["description"], composition["title"]);
     assert_eq!(reference["status"], "current");
-    assert_eq!(reference["docStatus"], composition["status"]);
+    // EehrxfMhdDocumentReference, on IHE MHD 4.2.2 Minimal: masterIdentifier.use is
+    // `usual`, and docStatus is held to 0.
+    assert_eq!(reference["masterIdentifier"]["use"], "usual");
+    assert!(reference.get("docStatus").is_none());
+    // EehrxfMhdDocumentReference: the claim, one category holding the Annex III
+    // documentCategory and the Art 14(1) priority category, a custodian and the format.
     assert_eq!(
-        reference["category"][0],
-        serde_json::to_value(metadata.category())?
+        reference["meta"]["profile"][0],
+        EEHRXF_MHD_DOCUMENT_REFERENCE
+    );
+    assert_eq!(reference["category"].as_array().map(Vec::len), Some(1));
+    let codings = &reference["category"][0]["coding"];
+    assert_eq!(
+        codings[0],
+        serde_json::to_value(&metadata.category().coding[0])?
+    );
+    assert_eq!(codings[1]["system"], PRIORITY_SYSTEM);
+    assert!(codings[1]["code"].is_string());
+    assert_eq!(reference["custodian"], composition["custodian"]);
+    assert_eq!(
+        reference["content"][0]["format"]["code"],
+        bundle["meta"]["profile"][0]
     );
     assert_eq!(extension(&reference, DOCUMENT_REFERENCE_VERSION), Some("2"));
     assert_eq!(
@@ -122,13 +166,19 @@ fn extension<'a>(resource: &'a Value, url: &str) -> Option<&'a str> {
         .as_str()
 }
 
-/// Adds a synthetic organization as an author of `document`.
+/// Adds a synthetic organization as an author and the custodian of
+/// `document`.
 fn authored(mut document: Document) -> Result<Document, DocumentError> {
     document.with_author(&Resource::Organization(Box::new(Organization {
         id: Some(String::from("hospital")),
         name: Some("Synthetic hospital".into()),
         ..Organization::default()
     })))?;
+    document.with_custodian(Organization {
+        id: Some(String::from("record-keeper")),
+        name: Some("Synthetic record keeper".into()),
+        ..Organization::default()
+    })?;
     Ok(document)
 }
 
@@ -201,10 +251,39 @@ fn the_discharge_report_carries_the_annex_iii_document_metadata() -> Result<(), 
 }
 
 #[test]
+#[cfg(feature = "laboratory")]
+fn a_header_describes_the_document_before_it_is_written() -> Result<(), Box<dyn Error>> {
+    let (bundle, metadata) = written(super::lab_document::document()?, "11502-2")?;
+    let described = serde_json::to_value(metadata.describe(&bundle, "description")?)?;
+    let header = Header::of_document(&bundle)?;
+    let attachment = Attachment {
+        content_type: Some(FHIR_JSON.into()),
+        url: Some("Binary/synthetic-token".into()),
+        title: Some("Synthetic laboratory report".into()),
+        ..Attachment::default()
+    };
+    let mut listed =
+        serde_json::to_value(metadata.describe_at(&header, "description", attachment)?)?;
+    assert_eq!(
+        listed["content"][0]["attachment"],
+        json!({
+            "contentType": FHIR_JSON,
+            "language": "en",
+            "title": "Synthetic laboratory report",
+            "url": "Binary/synthetic-token"
+        })
+    );
+    // DocumentReference-minimal: everything but the attachment is what describe writes.
+    listed["content"] = described["content"].clone();
+    assert_eq!(listed, described);
+    Ok(())
+}
+
+#[test]
 fn a_composition_without_a_version_is_refused() {
     let composition = json!({"language": {"code_string": "en"}});
     assert!(matches!(
-        DocumentMetadata::from_composition(&composition, category("11502-2")),
+        DocumentMetadata::from_composition(&composition, category("11502-2"), None),
         Err(DocumentError::MissingMetadata { element: "version" })
     ));
 }

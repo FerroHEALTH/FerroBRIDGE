@@ -144,6 +144,7 @@ async fn facade_over(cdr: &Cdr, search: PartySearch) -> Result<Arc<Facade>, Box<
         language: String::from("en"),
         territory: String::from("GB"),
         ehr_status_system: None,
+        custodian: crate::facade::custodian(),
     };
     Ok(Arc::new(
         Facade::new(compiled, store, client, settings).with_party_search(Some(search)),

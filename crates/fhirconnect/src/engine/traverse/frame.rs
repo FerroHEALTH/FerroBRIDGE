@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The frames of one run: where a loss is located, which document and pin a
-//! target reads and writes, and the scope a nested mapping binds in.
+//! target reads and writes, the read and write of a target in that document,
+//! and the scope a nested mapping binds in.
 
 use super::{Binding, Frame, Run, openehr_path};
+use crate::engine::lens::Fallback;
 use crate::engine::outcome::Location;
+use crate::engine::outcome::Warning;
+use crate::engine::traverse::error::EngineError;
 use crate::model::ast::keyword::Direction;
 use crate::resolve::program::mapping::Mapping;
 use crate::resolve::program::target::FhirTarget;
@@ -13,6 +17,9 @@ use crate::resolve::program::target::OpenehrTarget;
 use crate::tree::Occurrence;
 use crate::tree::element::Table;
 use crate::tree::locate::locate;
+use crate::tree::read::Match;
+use crate::tree::read::read;
+use crate::tree::write::write;
 use fhir_types::codec::Value;
 use std::collections::BTreeMap;
 
@@ -25,6 +32,19 @@ impl<T: Table + ?Sized> Run<'_, T> {
     /// rule locates the element the loss concerns in both directions.
     pub(super) fn locate(&self, mapping: &Mapping, occurrence: &Occurrence) -> Location {
         self.locate_targets(mapping.fhir(), occurrence, mapping.openehr())
+    }
+
+    /// Warns of each one-way row a cell took for `mapping` at `occurrence`.
+    pub(super) fn warn_fallbacks(
+        &mut self,
+        mapping: &Mapping,
+        occurrence: &Occurrence,
+        fallbacks: &[Fallback],
+    ) {
+        for taken in fallbacks {
+            self.warnings
+                .push(Warning::fallback(taken, self.locate(mapping, occurrence)));
+        }
     }
 
     /// Returns the location of a FHIR and an openEHR target, either absent.
@@ -54,6 +74,46 @@ impl<T: Table + ?Sized> Run<'_, T> {
         self.frames
             .get(target.level())
             .map_or(&self.fhir, |frame| &frame.document)
+    }
+
+    /// Returns every match of `target` in the document it is rooted in, a
+    /// refusal naming `mapping`, the mapping or model that reads it.
+    pub(super) fn matches_of(
+        &self,
+        mapping: &str,
+        target: &FhirTarget,
+    ) -> Result<Vec<Match<'_>>, EngineError> {
+        read(self.table, self.document_for(target), target.expression()).map_err(|source| {
+            EngineError::Read {
+                mapping: String::from(mapping),
+                expression: String::from(target.expression().as_str()),
+                source: Box::new(source),
+            }
+        })
+    }
+
+    /// Writes `value` at `occurrence` of `target` in the document it is
+    /// rooted in, a refusal naming `mapping`, the mapping that writes it.
+    pub(super) fn write_at(
+        &mut self,
+        mapping: &str,
+        target: &FhirTarget,
+        occurrence: &Occurrence,
+        value: Value,
+    ) -> Result<(), EngineError> {
+        let table = self.table;
+        write(
+            table,
+            self.document_for_mut(target),
+            target.expression(),
+            occurrence,
+            value,
+        )
+        .map_err(|source| EngineError::Write {
+            mapping: String::from(mapping),
+            element: String::from(target.resolved().leaf()),
+            source: Box::new(source),
+        })
     }
 
     /// Returns the FHIR document a condition's `targetRoot` is rooted in.

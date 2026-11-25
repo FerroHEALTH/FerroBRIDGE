@@ -1,0 +1,1 @@
+- The SMART Health Links sweeper ends on the drain's stop signal, between two sweeps, and the drain waits for it within `server.shutdown_timeout` as it waits for the change-feed followers and the inbound recovery. A sweep no longer runs on while the process stops.

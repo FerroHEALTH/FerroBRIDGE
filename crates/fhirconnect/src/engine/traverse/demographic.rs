@@ -91,11 +91,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         target: &FhirTarget,
         view: &FhirValue,
     ) -> Result<RmValue, EngineError> {
-        let refuse = |source: LensError| EngineError::Cell {
-            mapping: String::from(mapping.name()),
-            element: String::from(target.expression().as_str()),
-            source: Box::new(source),
-        };
+        let refuse = EngineError::cell(mapping, target);
         let FhirValue::Reference(reference) = view else {
             return Err(refuse(LensError::NoCell {
                 rm_type: String::from("PARTY_REF"),
@@ -180,7 +176,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         Ok(RmValue::Party(match shape {
             Shape::Identifier => with_identifier(party, &identity),
             Shape::ExternalRef => PartyIdentifiedData {
-                external_ref: Some(identity.to_party_ref()),
+                external_ref: Some(Box::new(identity.to_party_ref())),
                 ..party
             },
         }))
@@ -211,7 +207,7 @@ impl<T: Table + ?Sized> Run<'_, T> {
         if reference.is_none()
             && let Some(found) = named(
                 external_ref
-                    .as_ref()
+                    .as_deref()
                     .and_then(PartyIdentity::from_party_ref),
             )
         {
@@ -249,9 +245,5 @@ fn reference_cell(
     read: Result<Reference, LensError>,
 ) -> Result<FhirValue, EngineError> {
     read.map(|reference| FhirValue::Reference(Box::new(reference)))
-        .map_err(|source| EngineError::Cell {
-            mapping: String::from(mapping.name()),
-            element: String::from(target.expression().as_str()),
-            source: Box::new(source),
-        })
+        .map_err(EngineError::cell(mapping, target))
 }

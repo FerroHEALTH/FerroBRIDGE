@@ -27,7 +27,7 @@ use ferrobridge_server::shl::store::FileEntry;
 use ferrobridge_server::shl::store::Link;
 use ferrobridge_server::shl::store::LinkStore;
 use ferrobridge_server::shl::store::Resolution;
-use ferrobridge_server::shl::store::Swept;
+use ferrobridge_server::store::lease::{Lane, Term};
 use http::Request;
 use http::StatusCode;
 use wiremock::MockServer;
@@ -705,11 +705,16 @@ async fn an_expired_link_and_a_lapsed_location_answer_inactive() -> Result<(), B
     store
         .create("by-location", &answered, &[String::from("jwe")])
         .await?;
-    let swept = store.sweep(9_999).await?;
-    assert_eq!(Swept::Done(Vec::new()), swept);
-    let Swept::Done(swept) = store.sweep(10_000).await? else {
-        return Err("the sweep ran".into());
-    };
+    let lease = state.lease(Lane::new("shl-sweep")?, std::time::Duration::from_secs(30));
+    let term = Term::new(
+        lease.clone(),
+        lease.claim().await?.ok_or("the sweep's lease is free")?,
+    );
+    assert_eq!(
+        Vec::<ferrobridge_server::shl::store::Gone>::new(),
+        store.sweep(&term, 9_999).await?
+    );
+    let swept = store.sweep(&term, 10_000).await?;
     assert_eq!(1, swept.len());
     assert_eq!(Ending::Expired, swept[0].ending);
     assert_eq!(
@@ -774,5 +779,27 @@ fn a_passcode_hash_is_argon2id_and_matches_only_its_passcode() -> Result<(), Box
     assert!(stored.starts_with("$argon2id$"), "{stored}");
     assert!(passcode::matches("1234", &stored)?);
     assert!(!passcode::matches("4321", &stored)?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_sweeper_ends_on_the_stop_signal() -> Result<(), Box<dyn Error>> {
+    let Some(stored) = crate::store::sealed_store().await? else {
+        return Ok(());
+    };
+    let term = MockServer::start().await;
+    let Some(harness) = harness(&term).await? else {
+        return Ok(());
+    };
+    let links = Arc::new(Links::open(
+        &stored.1,
+        settings(),
+        Arc::clone(&harness.facade),
+        None,
+    )?);
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    let sweeper = links.spawn_sweeper(&stopped);
+    stop.send_replace(true);
+    tokio::time::timeout(std::time::Duration::from_secs(10), sweeper).await??;
     Ok(())
 }

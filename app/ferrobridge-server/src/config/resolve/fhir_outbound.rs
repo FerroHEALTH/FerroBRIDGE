@@ -6,9 +6,9 @@
 //!
 //! No specification governs the lane: our own design.
 
-use super::Config;
-use super::error::Error;
-use crate::change_feed::ReaderName;
+use super::change_feed::Consumer;
+use crate::config::Config;
+use crate::config::error::Error;
 use crate::outbound::Settings;
 use crate::outbound::sink::Sink;
 use ferrohealth_smart::client::outbound::OutboundClient;
@@ -18,47 +18,19 @@ use ferrohealth_smart::config::ServerTls;
 /// the facade whose programs it maps with, without a reader name, an
 /// endpoint or a delivery record, under another consumer's reader, or with
 /// an endpoint that is the facade itself; `None` while it is off.
-pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
+pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
     let section = &config.fhir_outbound;
     if !section.enabled {
         return Ok(None);
     }
-    for (on, needed) in [
-        (config.change_feed.enabled, "change_feed.enabled"),
-        (config.facade.enabled, "facade.enabled"),
-    ] {
-        if !on {
-            return Err(Error::Needs {
-                key: String::from("fhir_outbound.enabled"),
-                needs: String::from(needed),
-            });
-        }
-    }
-    if section.reader.is_empty() {
-        return Err(Error::Missing {
-            key: String::from("fhir_outbound.reader"),
-        });
-    }
-    let reader = ReaderName::new(&section.reader).map_err(|source| Error::ReaderName {
-        key: String::from("fhir_outbound.reader"),
-        source,
-    })?;
-    let taken = [
-        (config.events.enabled, config.events.reader.as_str()),
-        (
-            config.omop_incremental.enabled,
-            config.omop_incremental.reader.as_str(),
-        ),
-    ];
-    if taken
-        .iter()
-        .any(|(on, other)| *on && *other == section.reader)
-    {
-        return Err(Error::Duplicate {
-            key: String::from("fhir_outbound.reader"),
-            value: section.reader.clone(),
-        });
-    }
+    super::needs(
+        "fhir_outbound.enabled",
+        &[
+            (config.change_feed.enabled, "change_feed.enabled"),
+            (config.facade.enabled, "facade.enabled"),
+        ],
+    )?;
+    let reader = Consumer::FhirOutbound.reader(config)?;
     let client = OutboundClient::build(&section.endpoint, "fhir_outbound.endpoint", &ServerTls)
         .map_err(|source| Error::Client {
             upstream: "fhir_outbound",

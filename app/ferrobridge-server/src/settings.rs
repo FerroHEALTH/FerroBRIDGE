@@ -7,7 +7,7 @@
 //! Every write appends one version naming the version it replaces, under a
 //! transaction-level advisory lock on the register, so a writer that read an
 //! older version is refused (RFC 9110 §13.1.1). The write notifies
-//! [`CHANNEL`] before it commits; each replica keeps the newest version of
+//! [`SETTINGS`] before it commits; each replica keeps the newest version of
 //! each register in memory, drops a register its listener hears of, and
 //! reads the store on every request while the listener is down. A register
 //! with no version holds its default. No specification governs the register
@@ -20,11 +20,7 @@ use std::sync::{Arc, PoisonError, RwLock};
 use sqlx::Row as _;
 use sqlx::postgres::{PgPool, PgRow};
 
-use crate::store::listen::{Dropping, Listened, Subscriber};
-
-/// The channel a register write is notified on, its payload the register's
-/// name.
-pub const CHANNEL: &str = "ferrobridge_settings";
+use crate::store::listen::{Dropping, Listened, SETTINGS, Subscriber};
 
 /// A runtime settings register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -213,9 +209,10 @@ pub enum RegisterError {
     },
 }
 
-/// Returns the error a database failure is.
-fn database(source: sqlx::Error) -> RegisterError {
-    RegisterError::Database(Box::new(source))
+impl From<sqlx::Error> for RegisterError {
+    fn from(source: sqlx::Error) -> Self {
+        Self::Database(Box::new(source))
+    }
 }
 
 /// The registers of one state store, with this replica's copy of each.
@@ -223,7 +220,7 @@ fn database(source: sqlx::Error) -> RegisterError {
 pub struct Registers {
     /// The store's pool.
     pool: PgPool,
-    /// The listener state of [`CHANNEL`].
+    /// The listener state of [`SETTINGS`].
     listened: Arc<Listened>,
     /// The copy of the newest version of each register.
     copy: Arc<Copy>,
@@ -276,12 +273,12 @@ impl Registers {
         let copy = Arc::new(Copy::default());
         Self {
             pool: store.pool().clone(),
-            listened: Arc::new(Listened::with_subscriber(CHANNEL, copy.clone())),
+            listened: Arc::new(Listened::with_subscriber(SETTINGS.name(), copy.clone())),
             copy,
         }
     }
 
-    /// Returns the listener state of [`CHANNEL`], for the replica's `LISTEN`
+    /// Returns the listener state of [`SETTINGS`], for the replica's `LISTEN`
     /// session.
     #[must_use]
     pub fn listened(&self) -> Arc<Listened> {
@@ -333,7 +330,7 @@ impl Registers {
         .bind(register.name())
         .fetch_optional(&self.pool)
         .await
-        .map_err(database)?;
+        ?;
         row.map_or_else(
             || Ok(Version::default_of(register)),
             |row| version(register, &row),
@@ -354,7 +351,7 @@ impl Registers {
         .bind(register.name())
         .fetch_all(&self.pool)
         .await
-        .map_err(database)?;
+        ?;
         rows.iter().map(|row| version(register, row)).collect()
     }
 
@@ -374,19 +371,17 @@ impl Registers {
         committer: &str,
     ) -> Result<Written, RegisterError> {
         register.check(document)?;
-        let mut transaction = self.pool.begin().await.map_err(database)?;
+        let mut transaction = self.pool.begin().await?;
         sqlx::query("SELECT pg_advisory_xact_lock(hashtext('ferrobridge_settings:' || $1))")
             .bind(register.name())
             .execute(&mut *transaction)
-            .await
-            .map_err(database)?;
+            .await?;
         let current: i64 = sqlx::query_scalar(
             "SELECT coalesce(max(version), 0) FROM settings_register WHERE register = $1",
         )
         .bind(register.name())
         .fetch_one(&mut *transaction)
-        .await
-        .map_err(database)?;
+        .await?;
         if current != replaces {
             return Ok(Written::Stale { current });
         }
@@ -402,14 +397,9 @@ impl Registers {
         .bind(committer)
         .fetch_one(&mut *transaction)
         .await
-        .map_err(database)?;
-        sqlx::query("SELECT pg_notify($1, $2)")
-            .bind(CHANNEL)
-            .bind(register.name())
-            .execute(&mut *transaction)
-            .await
-            .map_err(database)?;
-        transaction.commit().await.map_err(database)?;
+        ?;
+        SETTINGS.notify(&mut transaction, register.name()).await?;
+        transaction.commit().await?;
         let recorded = version(register, &row)?;
         self.copy.drop_register(Some(register));
         Ok(Written::Committed(recorded))
@@ -418,16 +408,16 @@ impl Registers {
 
 /// Returns the version of `register` a `settings_register` row holds.
 fn version(register: Register, row: &PgRow) -> Result<Version, RegisterError> {
-    let number: i64 = row.try_get("version").map_err(database)?;
-    let document: String = row.try_get("document").map_err(database)?;
+    let number: i64 = row.try_get("version")?;
+    let document: String = row.try_get("document")?;
     Ok(Version {
         number,
         document: serde_json::from_str(&document).map_err(|_unreadable| RegisterError::Record {
             register: register.name(),
             version: number,
         })?,
-        committer: Some(row.try_get("committer").map_err(database)?),
-        committed_at: Some(row.try_get("committed_at").map_err(database)?),
+        committer: Some(row.try_get("committer")?),
+        committed_at: Some(row.try_get("committed_at")?),
     })
 }
 

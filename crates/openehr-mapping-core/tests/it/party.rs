@@ -98,7 +98,11 @@ fn the_composition_build_refuses_a_party_template() {
     ];
     let refused = index.build_composition(&values, NOW);
     assert!(
-        matches!(refused, Err(PathError::InvalidComposition { .. })),
+        matches!(
+            &refused,
+            Err(PathError::CompositionBuild { source, .. })
+                if matches!(**source, openehr_sdt::flat::error::FlatError::Rm(_))
+        ),
         "a party template built as a composition: {refused:?}"
     );
 }

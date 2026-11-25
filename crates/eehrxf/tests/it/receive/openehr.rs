@@ -80,7 +80,7 @@ fn a_document_maps_to_one_composition_that_keeps_the_original() -> Result<(), Bo
     );
     let original = audit
         .original_content
-        .as_ref()
+        .as_deref()
         .ok_or("the composition keeps the original content")?;
     let DvEncapsulated::DvParsable(parsable) = original else {
         return Err(format!("the original is no DV_PARSABLE: {original:?}").into());
@@ -193,7 +193,7 @@ fn a_provenance_entry_is_kept_only_in_the_original() -> Result<(), Box<dyn Error
         .original_content
         .take()
         .ok_or("the composition keeps the original content")?;
-    let DvEncapsulated::DvParsable(parsable) = original else {
+    let DvEncapsulated::DvParsable(parsable) = original.as_ref() else {
         return Err(format!("the original is no DV_PARSABLE: {original:?}").into());
     };
     assert_eq!(parsable.value, text, "the original is kept byte for byte");
@@ -225,11 +225,11 @@ fn providers(items: &[ContentItem]) -> Vec<Option<PartyProxy>> {
             ContentItem::Section(section) => {
                 section.items.as_deref().map(providers).unwrap_or_default()
             }
-            ContentItem::Action(entry) => vec![entry.provider.clone()],
-            ContentItem::AdminEntry(entry) => vec![entry.provider.clone()],
-            ContentItem::Evaluation(entry) => vec![entry.provider.clone()],
-            ContentItem::Instruction(entry) => vec![entry.provider.clone()],
-            ContentItem::Observation(entry) => vec![entry.provider.clone()],
+            ContentItem::Action(entry) => vec![entry.provider.as_deref().cloned()],
+            ContentItem::AdminEntry(entry) => vec![entry.provider.as_deref().cloned()],
+            ContentItem::Evaluation(entry) => vec![entry.provider.as_deref().cloned()],
+            ContentItem::Instruction(entry) => vec![entry.provider.as_deref().cloned()],
+            ContentItem::Observation(entry) => vec![entry.provider.as_deref().cloned()],
             ContentItem::GenericEntry(_) => vec![None],
         })
         .collect()

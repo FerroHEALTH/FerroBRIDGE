@@ -47,6 +47,7 @@
 [![HL7 v2 smoke corpora (NIST, AIRA)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2-smoke.json)](conformance/hl7v2-smoke/pass-list.txt)
 <br>
 [![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
+[![Post-quantum](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fpost-quantum.json)](docs/post-quantum.md)
 
 **EHDS and EEHRxF**<br>
 [![EEHRxF draft 2026-11-23, Patient Summary](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Feehrxf-draft-patient-summary.json)](conformance/eehrxf-draft-patient-summary/pass-list.txt)
@@ -60,6 +61,7 @@
 [![MyHealth@EU Laboratory 9.2.0 (CI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-laboratory.json)](conformance/myhealth-eu-laboratory/pass-list.txt)
 [![MyHealth@EU HDR 9.2.0 (CI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-hdr.json)](conformance/myhealth-eu-hdr/pass-list.txt)
 [![MyHealth@EU MVC 10.1.0 (CI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-mvc.json)](conformance/myhealth-eu-mvc/pass-list.txt)
+[![MyHealth@EU EuVAC 10.0.0-preview](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fmyhealth-eu-euvac.json)](conformance/myhealth-eu-euvac/pass-list.txt)
 
 <details>
 <summary>HL7 v2 by message family and by version, across both corpora</summary>

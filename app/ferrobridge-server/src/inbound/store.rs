@@ -4,24 +4,25 @@
 //! The inbox, the work items and the slot pool in the state store.
 //!
 //! An event is stored, its entity's work item moved to a new generation and
-//! `ferrobridge_inbound` notified in one transaction, before the source is
+//! [`INBOUND`] notified in one transaction, before the source is
 //! answered. Workers on every replica claim due items with `FOR UPDATE SKIP
-//! LOCKED` under a lease (PostgreSQL 19, "The Locking Clause"), make their
+//! LOCKED` under a lease through [`crate::store::claim`], make their
 //! remote calls outside any transaction, and finish at the generation they
 //! saw, so an event that arrived during the work runs the item again. A slot
 //! is a leased row taken and given back in two short statements, so no
 //! connection is held across a remote call. No specification governs an
 //! inbound intake: our own design.
 
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use sqlx::postgres::PgPool;
 use uuid::Uuid;
 
 use super::event::{Change, Event};
-
-/// The channel an accepted event notifies, with its source id as payload.
-pub const CHANNEL: &str = "ferrobridge_inbound";
+use crate::retry::{Decided, Decision};
+use crate::store::claim::{Claim, millis};
+use crate::store::listen::INBOUND;
 
 /// The entity one work item is about.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -94,15 +95,6 @@ pub struct Parked {
     pub since: String,
 }
 
-/// How an operator settles a parked item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Settlement {
-    /// Run it again.
-    Retry,
-    /// Leave it unapplied for good.
-    Discard,
-}
-
 /// What a replay runs again.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Replay {
@@ -129,10 +121,38 @@ pub struct InboxStore {
     pool: PgPool,
 }
 
-/// Returns `duration` in whole milliseconds, saturating.
-fn millis(duration: Duration) -> i64 {
-    i64::try_from(duration.as_millis()).unwrap_or(i64::MAX)
-}
+/// The claim of due work items: pending items whose time has come, and
+/// running items whose lease ran out.
+static WORK: LazyLock<String> = LazyLock::new(|| {
+    Claim {
+        table: "inbound_work",
+        keys: &["source_id", "tenant", "entity_key"],
+        due: "(state = 'pending' AND next_at <= now()) \
+              OR (state = 'running' AND leased_until < now())",
+        order: "next_at",
+        limit: "$3",
+        mark: "state = 'running', holder = $1, \
+               leased_until = now() + $2 * interval '1 millisecond', updated_at = now()",
+        returning: "claimed.source_id, claimed.tenant, claimed.entity_key, \
+                    claimed.generation, claimed.change, claimed.attempts",
+    }
+    .statement()
+});
+
+/// The claim of a free slot of one source and tenant among the first `$3`.
+static SLOT: LazyLock<String> = LazyLock::new(|| {
+    Claim {
+        table: "inbound_slot",
+        keys: &["source_id", "tenant", "slot"],
+        due: "source_id = $1 AND tenant = $2 AND slot < $3 \
+              AND (holder IS NULL OR leased_until < now())",
+        order: "slot",
+        limit: "1",
+        mark: "holder = $4, leased_until = now() + $5 * interval '1 millisecond'",
+        returning: "claimed.slot",
+    }
+    .statement()
+});
 
 /// Returns the column text of `change`.
 const fn change_text(change: Change) -> &'static str {
@@ -174,7 +194,7 @@ impl InboxStore {
     }
 
     /// Stores `event` of `source_id` for `tenant`, moves its entity's work item to a new
-    /// generation and notifies [`CHANNEL`], in one transaction.
+    /// generation and notifies [`INBOUND`], in one transaction.
     ///
     /// # Errors
     /// Returns [`sqlx::Error`] when a statement or the commit fails; nothing
@@ -211,24 +231,12 @@ impl InboxStore {
         lease: Duration,
         limit: u32,
     ) -> Result<Vec<Claimed>, sqlx::Error> {
-        let rows: Vec<ClaimedRow> = sqlx::query_as(
-            "WITH due AS MATERIALIZED ( \
-               SELECT source_id, tenant, entity_key FROM inbound_work \
-               WHERE (state = 'pending' AND next_at <= now()) \
-                  OR (state = 'running' AND leased_until < now()) \
-               ORDER BY next_at LIMIT $3 FOR UPDATE SKIP LOCKED) \
-             UPDATE inbound_work w SET state = 'running', holder = $1, \
-               leased_until = now() + $2 * interval '1 millisecond', updated_at = now() \
-             FROM due \
-             WHERE w.source_id = due.source_id AND w.tenant = due.tenant \
-               AND w.entity_key = due.entity_key \
-             RETURNING w.source_id, w.tenant, w.entity_key, w.generation, w.change, w.attempts",
-        )
-        .bind(holder)
-        .bind(millis(lease))
-        .bind(i64::from(limit))
-        .fetch_all(&self.pool)
-        .await?;
+        let rows: Vec<ClaimedRow> = sqlx::query_as(WORK.as_str())
+            .bind(holder)
+            .bind(millis(lease))
+            .bind(i64::from(limit))
+            .fetch_all(&self.pool)
+            .await?;
         Ok(rows
             .into_iter()
             .map(
@@ -330,25 +338,14 @@ impl InboxStore {
         .bind(bound)
         .execute(&self.pool)
         .await?;
-        sqlx::query_scalar(
-            "WITH free AS MATERIALIZED ( \
-               SELECT slot FROM inbound_slot \
-               WHERE source_id = $1 AND tenant = $2 AND slot < $3 \
-                 AND (holder IS NULL OR leased_until < now()) \
-               ORDER BY slot LIMIT 1 FOR UPDATE SKIP LOCKED) \
-             UPDATE inbound_slot s SET holder = $4, \
-               leased_until = now() + $5 * interval '1 millisecond' \
-             FROM free \
-             WHERE s.source_id = $1 AND s.tenant = $2 AND s.slot = free.slot \
-             RETURNING s.slot",
-        )
-        .bind(source_id)
-        .bind(tenant)
-        .bind(bound)
-        .bind(holder)
-        .bind(millis(lease))
-        .fetch_optional(&self.pool)
-        .await
+        sqlx::query_scalar(SLOT.as_str())
+            .bind(source_id)
+            .bind(tenant)
+            .bind(bound)
+            .bind(holder)
+            .bind(millis(lease))
+            .fetch_optional(&self.pool)
+            .await
     }
 
     /// Gives back the slot `slot` of `source_id` and `tenant` that `holder`
@@ -405,21 +402,15 @@ impl InboxStore {
             .collect())
     }
 
-    /// Settles the parked item `key` as `settlement` says, recording `by`
-    /// and `reason`; `false` when no parked item has the key.
+    /// Settles the parked item `key` as `decided` says, recording who
+    /// decided and why; `false` when no parked item has the key.
     ///
     /// # Errors
     /// Returns [`sqlx::Error`] when a statement fails.
-    pub async fn settle(
-        &self,
-        key: &WorkKey,
-        settlement: Settlement,
-        by: &str,
-        reason: &str,
-    ) -> Result<bool, sqlx::Error> {
-        let state = match settlement {
-            Settlement::Retry => "pending",
-            Settlement::Discard => "discarded",
+    pub async fn settle(&self, key: &WorkKey, decided: &Decided) -> Result<bool, sqlx::Error> {
+        let state = match decided.decision {
+            Decision::Retry => "pending",
+            Decision::Discard => "discarded",
         };
         let mut tx = self.pool.begin().await?;
         let settled = sqlx::query(
@@ -431,14 +422,14 @@ impl InboxStore {
         .bind(&key.tenant)
         .bind(&key.entity)
         .bind(state)
-        .bind(by)
-        .bind(reason)
+        .bind(&decided.by)
+        .bind(&decided.reason)
         .execute(&mut *tx)
         .await?
         .rows_affected()
             > 0;
-        if settled && settlement == Settlement::Retry {
-            notify(&mut tx, key.source_id).await?;
+        if settled && decided.decision == Decision::Retry {
+            INBOUND.notify(&mut tx, &key.source_id.to_string()).await?;
         }
         tx.commit().await?;
         Ok(settled)
@@ -481,7 +472,7 @@ impl InboxStore {
         .await?
         .rows_affected();
         if replayed > 0 {
-            notify(&mut tx, source_id).await?;
+            INBOUND.notify(&mut tx, &source_id.to_string()).await?;
         }
         tx.commit().await?;
         Ok(replayed)
@@ -597,7 +588,7 @@ impl InboxStore {
 }
 
 /// Stores `event` of `source_id` for `tenant` in `tx` and moves its entity's
-/// work item to a new generation, notifying [`CHANNEL`] when `tx` commits;
+/// work item to a new generation, notifying [`INBOUND`] when `tx` commits;
 /// a stored repeat changes nothing.
 ///
 /// # Errors
@@ -637,7 +628,7 @@ pub async fn store_event(
 
 /// Moves the work items of `entities` of `source_id` and `tenant` to a new
 /// generation due with `change`, inserting the missing ones, and notifies
-/// [`CHANNEL`] when `tx` commits; a running item keeps running and reruns
+/// [`INBOUND`] when `tx` commits; a running item keeps running and reruns
 /// when its worker gives it back.
 async fn bump(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -664,19 +655,6 @@ async fn bump(
     .execute(&mut **tx)
     .await?
     .rows_affected();
-    notify(tx, source_id).await?;
+    INBOUND.notify(tx, &source_id.to_string()).await?;
     Ok(bumped)
-}
-
-/// Notifies [`CHANNEL`] that `source_id` has due work when `tx` commits.
-async fn notify(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    source_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT pg_notify($1, $2)")
-        .bind(CHANNEL)
-        .bind(source_id.to_string())
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
 }

@@ -39,8 +39,11 @@ fn an_intake_takes_its_defaults() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(1024 * 1024, inbound.body_limit);
     assert_eq!(4, inbound.workers.workers);
     assert_eq!(Duration::from_secs(60), inbound.workers.lease);
-    assert_eq!(Duration::from_secs(2), inbound.workers.policy.backoff);
-    assert_eq!(Duration::from_secs(600), inbound.workers.policy.max_backoff);
+    assert_eq!(
+        Duration::from_secs(2),
+        inbound.workers.policy.backoff.initial
+    );
+    assert_eq!(Duration::from_secs(600), inbound.workers.policy.backoff.max);
     assert_eq!(10, inbound.workers.policy.max_attempts);
     assert_eq!(Duration::from_secs(5), inbound.workers.idle);
     assert_eq!(Duration::from_secs(30), inbound.recovery_tick);
@@ -57,8 +60,11 @@ fn every_key_is_read() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(2048, inbound.body_limit);
     assert_eq!(2, inbound.workers.workers);
     assert_eq!(Duration::from_secs(30), inbound.workers.lease);
-    assert_eq!(Duration::from_secs(1), inbound.workers.policy.backoff);
-    assert_eq!(Duration::from_secs(10), inbound.workers.policy.max_backoff);
+    assert_eq!(
+        Duration::from_secs(1),
+        inbound.workers.policy.backoff.initial
+    );
+    assert_eq!(Duration::from_secs(10), inbound.workers.policy.backoff.max);
     assert_eq!(3, inbound.workers.policy.max_attempts);
     assert_eq!(Duration::from_secs(1), inbound.workers.idle);
     assert_eq!(Duration::from_secs(10), inbound.recovery_tick);

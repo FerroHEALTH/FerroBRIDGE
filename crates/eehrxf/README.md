@@ -39,6 +39,10 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   `Composition-eu-lab` with its `DiagnosticReport-eu-lab` companion
   (`Crosswalk::check_with`), and the discharge report against the HL7
   Europe Hospital Discharge Report 1.0.0 `composition-eu-hdr` profile.
+  Outside the categories, the feature `vaccination` carries
+  `crosswalk::vaccination`, the Xt-EHR `EHDSImmunisation` model against the
+  MyHealth@EU Vaccination 10.0.0-preview `vaccination-myhealtheu-euvac`
+  profile.
 - `fhir-r4`: the FHIR R4 serialisation of the exchange format. It compiles
   the R4 resources and no openEHR crate.
 - `mapping` (feature `openehr`, which turns on `fhir-r4`): FHIRconnect 1.0.0
@@ -54,7 +58,11 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   results and specimens over the published `KDS_Laborbericht` template, and
   `HDR` (feature `discharge`), the HL7 Europe Hospital Discharge Report
   1.0.0 composition, encounter, diagnostic summary, significant procedures
-  and discharge medications over FerroBRIDGE's discharge report template. `Mapping::compile_project`
+  and discharge medications over FerroBRIDGE's discharge report template, and
+  `EUVAC` (feature `vaccination`), the MyHealth@EU vaccination history over
+  the immunisations of FerroBRIDGE's patient summary template, which
+  `document::vaccination::VACCINATION_HISTORY_FORM` writes as a
+  `bundle-euvac-myhealtheu`. `Mapping::compile_project`
   compiles a project from its embedded text with no file written, and
   `Project::write_to` writes its files where a system keeps its mappings,
   the paths `Mapping::compile` takes. Three model mappings of the laboratory project are
@@ -128,10 +136,10 @@ uses it:
 
 ```toml
 [dependencies]
-eehrxf = "0.31"
+eehrxf = "0.40"
 ```
 
-Name a patch (`"0.31.N"`) when you need the first release that carries what
+Name a patch (`"0.40.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## Licence
