@@ -192,8 +192,9 @@ impl Assertion {
 }
 
 /// Returns FerroSMART's run on `port`: the facade and the CDR as its
-/// resources, the upstream provider with `client_secret_basic` and its
-/// assurance levels, the app and the bridge as clients.
+/// resources, its own Backend Services client, the upstream provider with
+/// `client_secret_basic` and its assurance levels, the app and the bridge as
+/// clients.
 fn smart_launch(
     port: u16,
     database: &Postgres,
@@ -207,6 +208,8 @@ fn smart_launch(
     let config = format!(
         "[ferrosmart]\nissuer = {issuer:?}\n\n\
          [ferrosmart.keys]\nprivate_key_files = [\"/etc/ferrosmart/signing.pem\"]\n\n\
+         [ferrosmart.backend]\nalgorithm = \"ES384\"\n\n\
+         [ferrosmart.backend.keys]\nprivate_key_file = \"/etc/ferrosmart/backend.pem\"\n\n\
          [[ferrosmart.resource]]\nbase = {facade:?}\nkind = \"fhir\"\n\n\
          [[ferrosmart.resource]]\nbase = {openehr:?}\nkind = \"openehr\"\n\
          subject_namespace = {NAMESPACE:?}\nfhir_base = {facade:?}\nsubject_system = {SUBJECT_SYSTEM:?}\n\n\
@@ -243,6 +246,10 @@ fn smart_launch(
             (
                 String::from("signing.pem"),
                 ferrosmart::signing_key_pem()?.into_bytes(),
+            ),
+            (
+                String::from("backend.pem"),
+                ferrosmart::backend_key_pem()?.into_bytes(),
             ),
             (String::from("upstream-secret"), secret.into_bytes()),
         ],
