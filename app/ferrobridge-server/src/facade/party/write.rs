@@ -4,10 +4,11 @@
 //! Create, update and delete of a party resource.
 //!
 //! A create maps the resource to a party and commits its first version, and
-//! a party holding relationships a second version that sources them at the
-//! uid the CDR assigned; an update commits a new version over the one `If-Match` names, or over the
-//! latest when the request names none, so a concurrent writer still meets the
-//! `412` the CDR answers; a delete removes the latest version
+//! for a party holding relationships a second version that sources them at
+//! the uid the CDR assigned; an update commits a new version over the one
+//! `If-Match` names, or over the latest when the request names none, so a
+//! concurrent writer still meets the `412` the CDR answers; a delete removes
+//! the latest version
 //! (<https://hl7.org/fhir/R4/http.html>). Each answers from the party it sent,
 //! under the version the CDR's `ETag` names, and writes no identity-map entry.
 //! ITS-REST 1.1.0 Demographic API, DEVELOPMENT. No specification governs the
