@@ -32,7 +32,9 @@ use crate::operator::Operator;
 use crate::operator::guard::AUDIT_TARGET;
 use crate::operator::reload::ReloadError;
 use crate::operator::revisions::archive;
-use crate::operator::save::{Failure, OnBlockingThread, blocking, reason, subject_of, unavailable};
+use crate::operator::save::{
+    Failure, OnBlockingThread, Refused, blocking, reason, subject_of, unavailable,
+};
 use crate::problem::{Kind, refuse};
 
 /// The media type of a mapping-set archive.
@@ -179,14 +181,10 @@ impl Operator {
     ) -> Result<Imported, Failure> {
         let store = self.revisions().ok_or(Failure::Unconfigured)?;
         let contents = archive::import(archive).map_err(Failure::Archive)?;
-        let report = match self.prepare(thread, &contents, None) {
+        let report = match self.compile(thread, &contents) {
             Ok(prepared) => self.load_report(prepared.report()),
-            Err(ReloadError::Rejected(report)) => {
-                return Ok(Imported::Rejected {
-                    report: self.load_report(&report),
-                });
-            }
-            Err(error) => return Ok(Imported::Unavailable { error }),
+            Err(Refused::Rejected(report)) => return Ok(Imported::Rejected { report }),
+            Err(Refused::Unavailable(error)) => return Ok(Imported::Unavailable { error }),
         };
         let change = thread.wait(store.change()).map_err(Failure::Store)?;
         let entry = Entry {

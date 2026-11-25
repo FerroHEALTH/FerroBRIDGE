@@ -25,13 +25,13 @@ use http::header;
 
 use crate::mappings::files;
 use crate::mappings::files::Draft;
-use crate::mappings::revisions::{Console, Entry, Files, Recording};
+use crate::mappings::revisions::{Change, Console, Entry, Files, Recording};
 use crate::operator::Operator;
 use crate::operator::guard::AUDIT_TARGET;
 use crate::operator::reload::Prepared;
 use crate::operator::reload::ReloadError;
 use crate::problem::{Kind, refuse};
-use ferrobridge_operator_api::revisions::Origin;
+use ferrobridge_operator_api::revisions::{Origin, Revision};
 
 /// The header a save names its reason in.
 pub const REASON: &str = "ferrobridge-reason";
@@ -259,6 +259,15 @@ pub enum Saved {
     },
 }
 
+/// Why a set of console files did not compile into one that runs.
+#[derive(Debug)]
+pub enum Refused {
+    /// An error diagnostic, with the report by wire path.
+    Rejected(ferrobridge_operator_api::operator::LoadReport),
+    /// The check could not run to the end.
+    Unavailable(ReloadError),
+}
+
 /// Why a check or a save stopped before it compiled.
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
@@ -356,6 +365,25 @@ impl Operator {
         thread.wait(reloader.prepare(&sources))
     }
 
+    /// Checks and compiles the provisioned files with the console files
+    /// `console`, a rejection's report already shown by wire path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refused::Rejected`] with the report when a diagnostic is an
+    /// error, and [`Refused::Unavailable`] when the check could not run.
+    pub(crate) fn compile(
+        &self,
+        thread: &OnBlockingThread,
+        console: &Files,
+    ) -> Result<Prepared, Refused> {
+        self.prepare(thread, console, None)
+            .map_err(|error| match error {
+                ReloadError::Rejected(report) => Refused::Rejected(self.load_report(&report)),
+                error => Refused::Unavailable(error),
+            })
+    }
+
     /// Swaps `prepared`, compiled with `console`, in and returns the report
     /// of the new set, or `None` when this surface reloads nothing.
     pub fn apply(
@@ -399,15 +427,10 @@ impl Operator {
             return Err(Failure::PreconditionFailed { old });
         }
         contents.insert(wire.to_owned(), Arc::from(body));
-        let prepared = match self.prepare(thread, &contents, None) {
+        let prepared = match self.compile(thread, &contents) {
             Ok(prepared) => prepared,
-            Err(ReloadError::Rejected(report)) => {
-                return Ok(Saved::Rejected {
-                    old,
-                    report: self.load_report(&report),
-                });
-            }
-            Err(error) => return Ok(Saved::Unreloaded { old, error }),
+            Err(Refused::Rejected(report)) => return Ok(Saved::Rejected { old, report }),
+            Err(Refused::Unavailable(error)) => return Ok(Saved::Unreloaded { old, error }),
         };
         let entry = Entry {
             origin: Origin::Save,
@@ -415,11 +438,31 @@ impl Operator {
             reason: reason.clone(),
             source: None,
         };
+        let (_revision, report) = self.run(thread, (change, entry), prepared, contents)?;
+        Ok(Saved::Done { old, report })
+    }
+
+    /// Records `contents` under `entry` as the running revision through
+    /// `change`, then swaps `prepared`, compiled with them, in; returns the
+    /// revision and the report of the new set.
+    pub(crate) fn run(
+        &self,
+        thread: &OnBlockingThread,
+        (change, entry): (Change, Entry),
+        prepared: Prepared,
+        contents: Files,
+    ) -> Result<
+        (
+            Revision,
+            Option<ferrobridge_operator_api::operator::LoadReport>,
+        ),
+        Failure,
+    > {
         let revision = thread
             .wait(change.record(entry, &contents, Recording::Run))
             .map_err(Failure::Store)?;
-        let report = self.apply(prepared, Console::new(Some(revision.id), contents));
-        Ok(Saved::Done { old, report })
+        let report = self.apply(prepared, Console::new(Some(revision.id.clone()), contents));
+        Ok((revision, report))
     }
 }
 

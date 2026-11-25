@@ -12,10 +12,10 @@
 use ferrobridge_operator_api::operator::LoadReport;
 use ferrobridge_operator_api::revisions::{Origin, Revision};
 
-use crate::mappings::revisions::{Console, Entry, Recording};
+use crate::mappings::revisions::Entry;
 use crate::operator::Operator;
 use crate::operator::reload::ReloadError;
-use crate::operator::save::{Failure, OnBlockingThread, Precondition};
+use crate::operator::save::{Failure, OnBlockingThread, Precondition, Refused};
 
 /// How an apply ended, short of a failure to reach the store.
 #[derive(Debug)]
@@ -68,17 +68,12 @@ impl Operator {
         let contents = thread
             .wait(change.contents(&target))
             .map_err(Failure::Store)?;
-        let prepared = match self.prepare(thread, &contents, None) {
+        let prepared = match self.compile(thread, &contents) {
             Ok(prepared) => prepared,
-            Err(ReloadError::Rejected(report)) => {
-                return Ok((
-                    running,
-                    Applied::Rejected {
-                        report: self.load_report(&report),
-                    },
-                ));
+            Err(Refused::Rejected(report)) => return Ok((running, Applied::Rejected { report })),
+            Err(Refused::Unavailable(error)) => {
+                return Ok((running, Applied::Unreloaded { error }));
             }
-            Err(error) => return Ok((running, Applied::Unreloaded { error })),
         };
         let entry = Entry {
             origin: Origin::Apply,
@@ -86,10 +81,7 @@ impl Operator {
             reason: reason.to_owned(),
             source: Some(target.id),
         };
-        let revision = thread
-            .wait(change.record(entry, &contents, Recording::Run))
-            .map_err(Failure::Store)?;
-        let report = self.apply(prepared, Console::new(Some(revision.id.clone()), contents));
+        let (revision, report) = self.run(thread, (change, entry), prepared, contents)?;
         Ok((running, Applied::Done { revision, report }))
     }
 }
