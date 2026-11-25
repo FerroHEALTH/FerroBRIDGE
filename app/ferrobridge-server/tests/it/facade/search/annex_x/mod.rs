@@ -235,7 +235,7 @@ async fn annex_x_over(
             .with_consent(consent),
     );
     let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
-    store.record_ehr(&person, &EhrId::new(EHR_ID)?)?;
+    store.record_ehr(&person, &EhrId::new(EHR_ID)?).await?;
     Ok(Harness { cdr, store, facade })
 }
 
