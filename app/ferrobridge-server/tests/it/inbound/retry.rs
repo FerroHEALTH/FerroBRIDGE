@@ -6,12 +6,15 @@
 
 use std::time::Duration;
 
-use ferrobridge_server::inbound::retry::{Failure, Next, Policy};
+use ferrobridge_server::inbound::STATUSES;
+use ferrobridge_server::retry::{Backoff, Failure, Next, Policy};
 use http::StatusCode;
 
 const POLICY: Policy = Policy {
-    backoff: Duration::from_secs(2),
-    max_backoff: Duration::from_secs(60),
+    backoff: Backoff {
+        initial: Duration::from_secs(2),
+        max: Duration::from_secs(60),
+    },
     max_attempts: 5,
 };
 
@@ -25,7 +28,7 @@ fn the_failure_statuses_split_into_transient_and_refusal() {
         StatusCode::TOO_MANY_REQUESTS,
         StatusCode::LOCKED,
     ] {
-        assert_eq!(Failure::Transient, Failure::of(status), "{status}");
+        assert_eq!(Failure::Transient, STATUSES.failure(status), "{status}");
     }
     for status in [
         StatusCode::BAD_REQUEST,
@@ -35,7 +38,7 @@ fn the_failure_statuses_split_into_transient_and_refusal() {
         StatusCode::CONFLICT,
         StatusCode::UNPROCESSABLE_ENTITY,
     ] {
-        assert_eq!(Failure::Refusal, Failure::of(status), "{status}");
+        assert_eq!(Failure::Poisoned, STATUSES.failure(status), "{status}");
     }
 }
 
@@ -74,7 +77,7 @@ fn the_delay_stops_at_its_cap() {
 
 #[test]
 fn a_refusal_parks_at_once_and_the_last_attempt_parks() {
-    assert_eq!(Next::Park, POLICY.next(Failure::Refusal, 1, 0));
+    assert_eq!(Next::Park, POLICY.next(Failure::Poisoned, 1, 0));
     assert_eq!(Next::Park, POLICY.next(Failure::Transient, 5, 0));
     assert!(matches!(
         POLICY.next(Failure::Transient, 4, 0),

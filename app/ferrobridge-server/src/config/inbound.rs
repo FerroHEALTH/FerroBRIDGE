@@ -6,7 +6,7 @@
 use super::Config;
 use super::error::Error;
 use crate::inbound::Settings;
-use crate::inbound::retry::Policy;
+use crate::retry::{Backoff, Policy};
 
 /// Returns the intake `config` turns on, refused without the state store or
 /// with a zero bound or a backoff above its cap; `None` while it is off.
@@ -51,8 +51,10 @@ pub(super) fn resolve(config: &Config) -> Result<Option<Settings>, Error> {
             workers: section.workers,
             lease: section.lease.get(),
             policy: Policy {
-                backoff: section.backoff.get(),
-                max_backoff: section.max_backoff.get(),
+                backoff: Backoff {
+                    initial: section.backoff.get(),
+                    max: section.max_backoff.get(),
+                },
                 max_attempts: section.max_attempts,
             },
             idle: section.idle.get(),

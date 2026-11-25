@@ -17,8 +17,8 @@ use std::time::Duration;
 use tokio::sync::{Notify, watch};
 use uuid::Uuid;
 
-use super::retry::{Failure, Next, Policy};
 use super::store::{CHANNEL, Claimed, InboxStore, Outcome, Returned};
+use crate::retry::{Failure, Next, Policy};
 use crate::sources::{Source, Sources};
 use crate::store::listen::{Dropping, Listened, Subscriber};
 
@@ -146,7 +146,7 @@ impl Pool {
     async fn attempt(&self, item: &Claimed) -> Result<Returned, sqlx::Error> {
         let source = self.sources.get(item.key.source_id).await?;
         let Some(source) = source.filter(|source| source.enabled) else {
-            return Ok(Returned::Defer(self.settings.policy.max_backoff));
+            return Ok(Returned::Defer(self.settings.policy.backoff.max));
         };
         let concurrency = match &source.parsed {
             crate::sources::document::Document::Webhook(webhook) => webhook.limits.concurrency,
@@ -164,7 +164,7 @@ impl Pool {
             )
             .await?
         else {
-            return Ok(Returned::Defer(self.settings.policy.backoff));
+            return Ok(Returned::Defer(self.settings.policy.backoff.initial));
         };
         let applied = self.handler.apply(&source, item).await;
         self.store
@@ -174,7 +174,7 @@ impl Pool {
             Ok(()) => Returned::Done,
             Err(failed) => {
                 // NOTE: our own design; a failed random source keeps the whole delay, never a shorter one.
-                let random = super::retry::random().unwrap_or(u32::MAX);
+                let random = crate::retry::random().unwrap_or(u32::MAX);
                 match self.settings.policy.next(
                     failed.failure,
                     item.attempts.saturating_add(1),

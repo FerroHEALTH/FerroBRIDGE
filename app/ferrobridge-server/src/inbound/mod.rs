@@ -14,11 +14,23 @@ pub mod event;
 pub mod intake;
 pub mod keeper;
 pub mod recover;
-pub mod retry;
 pub mod store;
 pub mod subscription;
 pub mod verify;
 pub mod worker;
+
+/// How a failed call of the inbound engine reads its answer.
+///
+/// A `5xx` (RFC 9110 §15.6), `429 Too Many Requests` (RFC 6585 §4) and `423
+/// Locked` (RFC 4918 §11.3) are transient, and every other failure status is
+/// poisoned, so the work parks at once.
+pub const STATUSES: crate::retry::Statuses = crate::retry::Statuses {
+    transient: &[
+        http::StatusCode::TOO_MANY_REQUESTS,
+        http::StatusCode::LOCKED,
+    ],
+    other: crate::retry::Failure::Poisoned,
+};
 
 /// The `[inbound]` section, resolved.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

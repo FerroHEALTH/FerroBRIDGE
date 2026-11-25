@@ -22,10 +22,12 @@
 //! - [`crosswalk`]: per category, the crosswalk from the Xt-EHR element
 //!   paths to the eHealth Network element ids and to the elements and slices
 //!   of the HL7 Europe profile, with the FHIRconnect contexts admitted to
-//!   feed each, checked against the packages it names;
-//! - `document` (features `patient-summary` and `fhir-r4`): the patient
-//!   summary document, a FHIR R4 `Bundle` of the HL7 Europe Patient Summary
-//!   profiles, assembled from the resources and sections a caller gives;
+//!   feed each, checked against the packages it names, and with
+//!   `vaccination` the crosswalk to the MyHealth@EU vaccination profile;
+//! - `document` (feature `fhir-r4` with a category or `vaccination`): the
+//!   documents of the categories, FHIR R4 `Bundle`s of the HL7 Europe
+//!   profiles, and the MyHealth@EU vaccination history, assembled from the
+//!   resources and sections a caller gives;
 //! - `mapping` (feature `openehr`, which turns on `fhir-r4`): a FHIRconnect
 //!   1.0.0 mapping, compiled once against an operational template and run in
 //!   process over a canonical-JSON composition, answering FHIR R4 resources
@@ -83,7 +85,8 @@ pub mod dataset;
         feature = "patient-summary",
         feature = "laboratory",
         feature = "discharge",
-        feature = "imaging"
+        feature = "imaging",
+        feature = "vaccination"
     )
 ))]
 pub mod document;

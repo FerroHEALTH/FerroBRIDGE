@@ -17,9 +17,10 @@ use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
 
-use ferrobridge_server::boot::{Backoff, serve_settings};
+use ferrobridge_server::boot::serve_settings;
 use ferrobridge_server::change_feed::{ChangedVersion, Domain, Event, Position, ReaderName, Seq};
 use ferrobridge_server::config::Process;
+use ferrobridge_server::retry::Backoff;
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
