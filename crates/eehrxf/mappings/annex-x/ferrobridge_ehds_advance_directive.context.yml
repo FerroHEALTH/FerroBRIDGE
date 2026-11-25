@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's context for the draft EEHRxF Annex X data group
+# EHDSAdvanceDirective (Table 3), served by the facade as an individual
+# Consent (draft act Art 7(2), #2087): each EVALUATION.advance_care_directive.v2
+# entry of the EHDS record template becomes one Consent with the HL7 Europe
+# Patient Summary consent-eu-eps profile, its digital representation the
+# EHDSAttachment (Table 6) in sourceAttachment.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_ehds_advance_directive.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://hl7.eu/fhir/eps/StructureDefinition/consent-eu-eps"
+    version: "1.0.0-ballot"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_ehds_record.v1.0.0"
+  archetypes:
+    - "EVALUATION.advance_care_directive.v2.Consent"
+    - "CLUSTER.media_file.v1.Attachment"
+  start: "EVALUATION.advance_care_directive.v2.Consent"

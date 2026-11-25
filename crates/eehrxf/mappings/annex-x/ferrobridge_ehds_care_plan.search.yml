@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The search of the EHDSCarePlan resources: the R4 CarePlan `patient`
+# parameter and the date of onset as the R4 `date`.
+context: ferrobridge_ehds_care_plan.context
+patient:
+  parameters: [patient]
+parameters:
+  date:
+    type: date
+    node: { class: INSTRUCTION, archetype: openEHR-EHR-INSTRUCTION.care_plan_request.v0 }
+    path: activities[at0001]/description[at0004]/items[at0018]/value/value

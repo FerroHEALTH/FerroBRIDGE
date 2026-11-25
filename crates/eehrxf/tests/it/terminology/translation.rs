@@ -4,8 +4,9 @@
 //! The concepts of a mapped resource in no preferred system, translated
 //! through a scripted terminology server: an `equivalent` or `equal` match
 //! added after the original coding, a concept in a preferred system left
-//! alone, no server leaving the code as recorded (eHN PS Art 10(7)), and a
-//! refusal failing the translation.
+//! alone, no server leaving the code as recorded (eHN PS Art 10(7)), a
+//! refusal failing the translation, and a concept at an element a target
+//! profile binds asked for the binding's system.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -18,6 +19,8 @@ use std::sync::Arc;
 use eehrxf::terminology::Operation;
 use eehrxf::terminology::Terminology;
 use eehrxf::terminology::TerminologyError;
+use eehrxf::terminology::ehn;
+use eehrxf::terminology::translation::MYHEALTH_EU_CORE;
 use eehrxf::terminology::translation::TranslationError;
 use eehrxf::terminology::translation::Translator;
 use fhir_types::r4::allergy_intolerance::AllergyIntolerance;
@@ -144,6 +147,155 @@ async fn a_refused_translation_fails_and_is_never_no_translation() {
     let mut translator = Translator::new(&terminology, &TARGETS);
     let refused = translator
         .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await;
+    assert!(
+        matches!(
+            refused,
+            Err(TranslationError::Terminology(TerminologyError::Status {
+                operation: Operation::Translate,
+                status: StatusCode::SERVICE_UNAVAILABLE,
+            }))
+        ),
+        "{refused:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_translation_records_its_original_equivalence_and_map() -> TestResult {
+    // NOTE: draft EEHRxF Art 6(2) and (3): the original and the mapped coding both travel,
+    // and the mapping rule names its equivalence and provenance.
+    let terminology = Terminology::server(Arc::new(Scripted(Script::Translate(vec![(
+        "equivalent",
+        PREFERRED,
+        "P-1",
+    )]))));
+    let mut translator = Translator::new(&terminology, &TARGETS);
+    let translated = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await?;
+    assert_eq!(
+        codes(&translated),
+        [pair(LOCAL, "L-1"), pair(PREFERRED, "P-1")]
+    );
+    let [mapping] = translator.mapped() else {
+        return Err("one mapping".into());
+    };
+    assert_eq!(mapping.original, pair(LOCAL, "L-1"));
+    assert_eq!(mapping.translated.equivalence, "equivalent");
+    assert_eq!(mapping.translated.map.as_deref(), Some(super::MAP));
+    assert_eq!(translator.unmapped().len(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_unmapped_national_code_carries_its_english_designation_and_is_counted() -> TestResult {
+    // NOTE: draft EEHRxF Art 6(3): with no mapping, the national code goes out with its
+    // textual designation in English.
+    let terminology = Terminology::server(Arc::new(Scripted(Script::Unmapped("Peanut allergy"))));
+    let mut national = coding(LOCAL, "L-1");
+    national.display = Some("Pinda-allergie".into());
+    let mut translator = Translator::new(&terminology, &TARGETS).for_non_english();
+    let translated = translator
+        .translate(&allergy(vec![national]), preferred)
+        .await?;
+    assert_eq!(codes(&translated), [pair(LOCAL, "L-1")]);
+    assert_eq!(translator.unmapped(), [pair(LOCAL, "L-1")]);
+    let json = serde_json::to_value(&translated)?;
+    let coding = &json["code"]["coding"][0];
+    assert_eq!(coding["display"], "Pinda-allergie");
+    let translation = &coding["_display"]["extension"][0];
+    assert_eq!(
+        translation["url"],
+        "http://hl7.org/fhir/StructureDefinition/translation"
+    );
+    assert_eq!(translation["extension"][0]["valueCode"], "en");
+    assert_eq!(translation["extension"][1]["valueString"], "Peanut allergy");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_unmapped_code_with_no_display_takes_the_english_designation() -> TestResult {
+    let terminology = Terminology::server(Arc::new(Scripted(Script::Unmapped("Peanut allergy"))));
+    let mut translator = Translator::new(&terminology, &TARGETS).for_non_english();
+    let translated = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await?;
+    let json = serde_json::to_value(&translated)?;
+    assert_eq!(json["code"]["coding"][0]["display"], "Peanut allergy");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_terminology_call_fails_the_translation() -> TestResult {
+    let terminology = Terminology::server(Arc::new(Scripted(Script::Refuse(
+        StatusCode::SERVICE_UNAVAILABLE,
+    ))));
+    let mut translator = Translator::new(&terminology, &TARGETS).for_non_english();
+    let found = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await;
+    assert!(matches!(found, Err(TranslationError::Terminology { .. })));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_bound_concept_in_a_preferred_system_gains_the_binding_system() -> TestResult {
+    // NOTE: MyHealth@EU Core 1.0.1 binds AllergyIntolerance.code required to
+    // eHDSIAllergenWithExceptions, whose drug members are ATC codes.
+    let terminology = scripted(Script::Translate(vec![("equivalent", ehn::ATC, "J01CE")]));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let translated = translator
+        .translate(&allergy(vec![coding(PREFERRED, "P-1")]), preferred)
+        .await?;
+    assert_eq!(
+        codes(&translated),
+        [pair(PREFERRED, "P-1"), pair(ehn::ATC, "J01CE")],
+        "draft EEHRxF Art 6(2): the original stays and the mapped coding follows it"
+    );
+    let [mapping] = translator.mapped() else {
+        return Err("one mapping".into());
+    };
+    assert_eq!(mapping.original, pair(PREFERRED, "P-1"));
+    assert_eq!(mapping.translated.map.as_deref(), Some(super::MAP));
+    assert_eq!(translator.unbound().len(), 0);
+    assert_eq!(translator.unmapped().len(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_bound_concept_no_translation_reaches_is_unbound() -> TestResult {
+    let terminology = scripted(Script::Translate(vec![("wider", ehn::ATC, "J01C")]));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let recorded = allergy(vec![coding(PREFERRED, "P-1")]);
+    let translated = translator.translate(&recorded, preferred).await?;
+    assert_eq!(translated, recorded, "no code is invented");
+    let [unbound] = translator.unbound() else {
+        return Err("one unbound concept".into());
+    };
+    assert_eq!(unbound.binding.element, "AllergyIntolerance.code");
+    assert_eq!(unbound.originals, [pair(PREFERRED, "P-1")]);
+    assert_eq!(unbound.location, "AllergyIntolerance.code");
+    assert_eq!(translator.unmapped().len(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_bound_concept_already_in_the_binding_system_is_not_asked() -> TestResult {
+    let terminology = scripted(Script::Refuse(StatusCode::INTERNAL_SERVER_ERROR));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let recorded = allergy(vec![coding(PREFERRED, "P-1"), coding(ehn::ATC, "J01CE")]);
+    let translated = translator.translate(&recorded, preferred).await?;
+    assert_eq!(translated, recorded);
+    assert_eq!(translator.unbound().len(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_translation_of_a_bound_concept_fails() {
+    let terminology = scripted(Script::Refuse(StatusCode::SERVICE_UNAVAILABLE));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let refused = translator
+        .translate(&allergy(vec![coding(PREFERRED, "P-1")]), preferred)
         .await;
     assert!(
         matches!(

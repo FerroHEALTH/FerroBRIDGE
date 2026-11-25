@@ -445,8 +445,8 @@ A source carries a `name` (`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, at most
 
 | Kind | Document |
 |---|---|
-| `webhook` | `verify`: `scheme` (`hmac-sha256`), `header` and `keys`, a list of secrets any of which verifies, newest first; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled` |
-| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; `tenants` as above |
+| `webhook` | `verify`: the verifier, by `kind` (`hmac` with `algorithm`, `header`, `encoding` and `prefix`; `standard-webhooks` with `schemes`, `tolerance` and `endpoint_id`; `static-header` with `header`; `mtls` with `subjects`); `keys`: the secrets the verifier checks with, any of which verifies, newest first, none for `mtls`; `events`: the event map (`tenant`, `entity`, `rules`, `otherwise`, `dedupe` and `stamp`); `recovery`: the optional `redeliver` and `reconcile` steps; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled`; `limits`: `body_limit` (`65536`), `concurrency` (`4`) and `max_pending` (`100000`). [The inbound intake](../integrate/inbound.md) describes each part |
+| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; optional `mtls`: the `subjects` its client certificate must carry, at least one of the two; `subscriptions`: the tenant of each subscription reference; optional `base`: the FHIR base a relative reference resolves against; `tenants` as above ([FHIR Subscription notifications](../integrate/inbound.md#fhir-subscription-notifications)) |
 | `mllp` | `routes`: each `sending_application` (MSH-3) and `sending_facility` (MSH-4), bound to a `certificate_subject`, to `source_cidrs`, or to both |
 
 A secret is named, never written: `{"secret": "<name>"}` resolves through
@@ -499,6 +499,43 @@ and a missing one `428`. Disabling is a `PUT` with `"enabled": false`.
 
 Deletes a source under `If-Match`, recording the deletion as its last
 version; `204`.
+
+### `GET /operator/sources/{id}/parked`
+
+The parked inbound work items of one source, oldest first, each with its
+`tenant`, `entity`, fixed `reason`, `attempts` and `since`
+([The inbound intake](../integrate/inbound.md#retry-park-and-replay)). With
+`[inbound]` off it answers `404` [`not-found`](problems.md#not-found).
+
+### `POST /operator/sources/{id}/settle`
+
+Settles one parked item from `{"tenant", "entity", "settlement", "reason"}`,
+`settlement` being `retry` or `discard`; `204`. The subject of the
+operator's token and the reason are recorded with it. A blank reason answers
+`400` [`reason-required`](problems.md#reason-required), and an entity with no
+parked item `404` [`not-parked`](problems.md#not-parked).
+
+### `POST /operator/sources/{id}/replay`
+
+Runs inbound work again at a new generation, for one entity
+(`{"tenant", "entity"}`) or for every entity an event received in a range
+named (`{"from", "to"}`, RFC 3339, `to` exclusive); `202` with
+`{"items": <n>}`. A range whose `from` is not before its `to` answers `400`.
+
+### `POST /operator/sources/{id}/reconcile`
+
+Runs every reconciliation poll of the source now, whatever its cursors'
+schedule, under the source's recovery lease; `202` with `{"items": <n>}`,
+the entities marked due. While another replica holds the lease it answers
+`409` [`recovery-leased`](problems.md#recovery-leased), and a poll the
+source refuses or fails answers `502` [`recovery-failed`](problems.md#recovery-failed).
+
+### `POST /operator/sources/{id}/redeliver`
+
+Calls the source's redelivery step now; `204` once the source accepted it,
+`404` when the source declares none, and `502`
+[`recovery-failed`](problems.md#recovery-failed) when the source refused or
+failed the call.
 
 ## What the log records
 

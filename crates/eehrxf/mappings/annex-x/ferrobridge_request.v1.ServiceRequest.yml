@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: Apache-2.0
+# A modified copy of model/composition/org.openehr/request.v1.ServiceRequest.yml,
+# a derivative of it under its licence.
+# Source: SevKohler/FHIRconnect-mapping-lib at commit 6bd4c19a (vendored
+# under docs/specs/fhirconnect-mapping-lib), Apache License 2.0; the source
+# file carries no copyright line to keep.
+# Changed: the published line 10 names the archetype
+# openEHR-EHR-COMPOSITION.ServiceRequest.v1, and KDS_Laborauftrag carries
+# openEHR-EHR-COMPOSITION.request.v1, the archetype the file's name and
+# metadata name. The published lines 22 to 43 and 50 to 68 write
+# `null_flavour` below a DV_DATE_TIME and a PARTY_PROXY, which carry none, so
+# those methods are left out; the `composer` method duplicates the service
+# request model's and is left out with them.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: COMPOSITION.request.v1.ServiceRequest
+  version: 0.0.1-alpha
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-COMPOSITION.request.v1
+    revision: 1.0.6
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/ServiceRequest
+
+mappings: []

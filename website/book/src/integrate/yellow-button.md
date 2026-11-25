@@ -47,7 +47,9 @@ Accept: application/fhir+json
 `{patient}` is the `patient` of the token. The answer is the person's patient
 summary, an HL7 IPS 2.0.1 document `Bundle`, validated before it is served.
 Pass `profile=http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps`
-for the HL7 Europe Patient Summary form. Save the body as a
+for the HL7 Europe Patient Summary form, or
+`profile=http://fhir.ehdsi.eu/core/StructureDefinition/composition-myhealtheu-core`
+for that form with the MyHealth@EU Core codings. Save the body as a
 `application/fhir+json` file to offer it as a download.
 
 ## Share once

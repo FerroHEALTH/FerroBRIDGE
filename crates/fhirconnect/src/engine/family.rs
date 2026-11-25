@@ -46,6 +46,7 @@ use crate::engine::origin::Origin;
 use crate::engine::origin::Party;
 use crate::engine::origin::UNKNOWN_SOURCE;
 use crate::engine::rm::RAW;
+use crate::engine::rm::RmError;
 use crate::engine::traverse::defaults::ComposerId;
 
 /// The `feeder_system_item_ids` type every defaulted field is recorded under.
@@ -405,13 +406,65 @@ pub fn provider(
     ]
 }
 
-/// Returns the family of one `DV_DATE_TIME` written under `family` on
-/// `node`, the `_end_time` of an `EVENT_CONTEXT`.
+/// The family a structural node's name travels under.
 ///
-/// Simplified Formats writes the family as the date-time text itself, with
-/// no attribute suffix (the `EVENT_CONTEXT` table, `/_end_time`).
+/// No FLAT key names a node's `LOCATABLE.name`, so `openehr-mapping-core`
+/// writes it into the built instance (no specification governs the family:
+/// our own design).
+pub const NAME: &str = "_name";
+
+/// Returns the `_name` family of the structural `node` that `object` holds.
+///
+/// The name is a whole `DV_CODED_TEXT` when it carries a `defining_code` and
+/// a `DV_TEXT` otherwise (RM common, the `LOCATABLE` class).
+///
+/// # Errors
+///
+/// Returns [`RmError`] when the name is no valid text of its class.
+pub fn name(
+    node: &ResolvedNode,
+    positions: &[RmPosition],
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Result<NodeValue, RmError> {
+    let mut name = object
+        .get(crate::engine::rm::carried::NAME)
+        .cloned()
+        .unwrap_or_default();
+    let class = if name.get("defining_code").is_some() {
+        stamp(&mut name, "/defining_code", "CODE_PHRASE");
+        stamp(&mut name, "/defining_code/terminology_id", "TERMINOLOGY_ID");
+        "DV_CODED_TEXT"
+    } else {
+        "DV_TEXT"
+    };
+    stamp(&mut name, "", class);
+    let canonical =
+        crate::engine::rm::RmValue::from_canonical(class, node.aql_path().as_str(), &name)?
+            .to_canonical()?;
+    Ok(NodeValue::new(node, canonical)
+        .with_occurrences(positions.to_vec())
+        .under(vec![plain(NAME)])
+        .with_datum(RAW))
+}
+
+/// Sets the `_type` of the object at `pointer` in `value` to `class`.
+fn stamp(value: &mut serde_json::Value, pointer: &str, class: &str) {
+    if let Some(serde_json::Value::Object(members)) = value.pointer_mut(pointer) {
+        members.insert(
+            String::from("_type"),
+            serde_json::Value::String(String::from(class)),
+        );
+    }
+}
+
+/// Returns the family of one text written under `family` on `node`: the
+/// `_end_time` of an `EVENT_CONTEXT`, a `DV_DATE_TIME`, or its `_location`,
+/// a `String`.
+///
+/// Simplified Formats writes each family as the text itself, with no
+/// attribute suffix (the `EVENT_CONTEXT` table, `/_end_time`, `/_location`).
 #[must_use]
-pub fn end_time(
+pub fn text(
     node: &ResolvedNode,
     positions: &[RmPosition],
     family: &[Segment],

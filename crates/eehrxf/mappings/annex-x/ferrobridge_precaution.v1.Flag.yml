@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM EVALUATION.precaution.v1 (revision
+# 1.1.0) to a FHIR R4 Flag, the draft EEHRxF Annex X data group EHDSAlert:
+# the condition to heed as the code, its status and its valid period. An
+# active precaution is an `active` Flag; a resolved or refuted one is
+# `inactive`, which goes back in as resolved.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: EVALUATION.precaution.v1.Flag
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-EVALUATION.precaution.v1
+    revision: 1.1.0
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/Flag
+
+mappings:
+  - name: "code"
+    with:
+      fhir: "$resource.code"
+      openehr: "$archetype/data[at0001]/items[at0002]"
+
+  - name: "status"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/items[at0014]/value"
+    manual:
+      - name: "active"
+        fhir:
+          - path: "status"
+            value: "active"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "active"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at0015"
+          - path: "value"
+            value: "Active"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0015"
+      - name: "inactive"
+        fhir:
+          - path: "status"
+            value: "inactive"
+        fhirCondition:
+          targetRoot: "$fhirRoot"
+          targetAttribute: "status"
+          operator: "one of"
+          criteria: "inactive"
+        openehr:
+          - path: "defining_code/terminology_id/value"
+            value: "local"
+          - path: "defining_code/code_string"
+            value: "at0018"
+          - path: "value"
+            value: "Resolved"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0018"
+
+  - name: "statusRefuted"
+    unidirectional: "openehr->fhir"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/items[at0014]/value"
+    manual:
+      - name: "refuted"
+        fhir:
+          - path: "status"
+            value: "inactive"
+        openehrCondition:
+          targetRoot: "$openehrRoot"
+          targetAttribute: "defining_code/code_string"
+          operator: "one of"
+          criteria: "at0019"
+
+  - name: "period"
+    with:
+      fhir: "$resource.period"
+      openehr: "$archetype/protocol[at0006]"
+      type: "NONE"
+    followedBy:
+      mappings:
+        - name: "start"
+          with:
+            fhir: "start"
+            openehr: "items[at0022]"
+        - name: "end"
+          with:
+            fhir: "end"
+            openehr: "items[at0024]"

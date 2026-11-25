@@ -11,10 +11,11 @@ FerroFED with #1314 (FerroFED commit
 and never published); every component change is made here, and FerroFED
 depends on the published crate by exact version.
 
-The oracles are the Regulation, the published proxies of the Art 15
-exchange format until its implementing act is adopted (the Xt-EHR EHDS
-Logical Information Models and the HL7 Europe guides vendored under
-`docs/specs/eu-*`), FHIR R4 and openEHR. Cite the section for every
+The oracles are the Regulation, the draft Art 15 implementing act of
+2026-11-23 (`docs/specs/ehds-eehrxf-draft/`), which leads for the data sets
+and their metadata, the published proxies it builds on (the Xt-EHR EHDS
+Logical Information Models, crosswalked to the draft by `draft`, and the
+HL7 Europe guides vendored under `docs/specs/eu-*`), FHIR R4 and openEHR. Cite the section for every
 conformance-relevant decision.
 
 ## Boundaries

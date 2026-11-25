@@ -94,8 +94,10 @@ fn a_hospital_course_and_a_severity_are_declared_not_carried() -> Result<(), Box
             format!("Composition.section[{course}]").as_str(),
             "Condition.verificationStatus",
             "Condition.severity",
+            "Condition.recordedDate",
             "MedicationRequest.status",
             "MedicationRequest.intent",
+            "MedicationRequest.authoredOn",
         ],
         "the hospital course once, each entry element the project does not read, and nothing \
          the project carries: {issues:?}"
@@ -130,7 +132,11 @@ fn a_section_whose_entries_are_carried_is_not_declared() -> Result<(), Box<dyn E
     let issues = issues(&text)?;
     assert_eq!(
         not_carried(&issues),
-        [format!("Composition.section[{course}]").as_str()],
+        [
+            format!("Composition.section[{course}]").as_str(),
+            "Condition.recordedDate",
+            "Condition.recordedDate"
+        ],
         "{issues:?}"
     );
     Ok(())

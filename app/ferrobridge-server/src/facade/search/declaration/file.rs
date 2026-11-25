@@ -44,6 +44,19 @@ pub struct NodeFile {
     pub class: String,
     /// The archetype id of the root.
     pub archetype: String,
+    /// The node inside the archetype the path is read under, when it is not
+    /// the root itself.
+    pub contains: Option<StepFile>,
+}
+
+/// A node inside an archetype, as written: an RM class and its at-code.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepFile {
+    /// The RM class of the node.
+    pub class: String,
+    /// The node's at-code.
+    pub node: String,
 }
 
 /// The coding a `fixed` token compares, as written.
