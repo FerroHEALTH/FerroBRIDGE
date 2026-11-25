@@ -42,6 +42,7 @@ async fn including() -> Harness {
             &person,
             &EhrId::new(super::super::EHR_ID).expect("a legal ehr_id"),
         )
+        .await
         .expect("the subject records");
     harness
 }

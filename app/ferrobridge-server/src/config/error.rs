@@ -377,6 +377,20 @@ pub enum Error {
         /// The key that switches the feed on.
         key: String,
     },
+    /// A count or a duration is zero where at least one is needed.
+    #[error("{key} is 0; it needs at least 1")]
+    Zero {
+        /// The key that holds it.
+        key: String,
+    },
+    /// A value lies below another it bounds from above.
+    #[error("{key} is less than {bound}")]
+    Below {
+        /// The key that holds it.
+        key: String,
+        /// The key it may not be less than.
+        bound: String,
+    },
     /// A lane is switched on and a lane it needs is not.
     #[error("{key} is set, and it needs {needs}")]
     Needs {
@@ -440,15 +454,6 @@ pub enum Error {
         /// Why it is refused.
         #[source]
         source: ihe_atna::atna::feed::FeedConfigError,
-    },
-    /// A category map `ehds-logging` refuses.
-    #[error("{key} is no category map")]
-    Categories {
-        /// The table that holds it.
-        key: String,
-        /// Every defect of the map.
-        #[source]
-        source: ehds_logging::map::MapErrors,
     },
     /// A span of time outside the range its key admits.
     #[error("{key} is {value}; {reason}")]

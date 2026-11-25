@@ -1,0 +1,963 @@
+annex	table	draft model	draft element	draft cardinality	xtehr model	xtehr element	xtehr cardinality	verdict
+III	1	Document metadata	subject	1..1	EHDSDocument	header.subject	1..1	same
+III	1	Document metadata	identifier	1..*	EHDSDocument	header.identifier	1..*	same
+III	1	Document metadata	version	1..1	EHDSDocument	header.version	0..1	cardinality differs
+III	1	Document metadata	author[x]	1..*	EHDSDocument	header.author[x]	1..*	same
+III	1	Document metadata	date	1..1	EHDSDocument	header.date	1..1	same
+III	1	Document metadata	attestation	0..*	EHDSDocument	header.attestation	0..*	same
+III	1	Document metadata	attestation.attester[x]	1..1	EHDSDocument	header.attestation.attester[x]	1..1	same
+III	1	Document metadata	attestation.dateTime	1..1	EHDSDocument	header.attestation.datetime	1..1	renamed
+III	1	Document metadata	status	1..1	EHDSDocument	header.status	1..1	same
+III	1	Document metadata	language	0..*	EHDSDocument	header.language	0..1	cardinality differs
+III	1	Document metadata	documentCategory	1..1	EHDSDocument			missing in Xt-EHR
+III	1	Document metadata	documentType	1..1	EHDSDocument	header.documentType	1..1	same
+III	1	Document metadata	documentTitle	1..1	EHDSDocument	header.documentTitle	1..1	same
+III	1	Document metadata	period	0..1	EHDSDocument	header.period	0..1	same
+III	1	Document metadata	legalAuthentication	0..*	EHDSDocument	header.legalAuthentication	0..*	same
+III	1	Document metadata	legalAuthentication.legalAuthenticator[x]	1..1	EHDSDocument	header.legalAuthentication.legalAuthenticator[x]	1..1	same
+III	1	Document metadata	legalAuthentication.dateTime	1..1	EHDSDocument	header.legalAuthentication.datetime	1..1	renamed
+III	1	Document metadata	eventCategory	0..*	EHDSDocument	header.eventType	0..*	renamed
+III	1	Document metadata	serviceSpecialty	0..*	EHDSDocument	header.serviceSpecialty	0..*	same
+III	1	Document metadata	custodian	0..1	EHDSDocument	header.custodian	0..1	same
+III	1	Document metadata			EHDSDocument	header.source	0..0	missing in the draft
+III	1	Document metadata			EHDSDocument	presentedForm	0..*	missing in the draft
+III	2	Data group metadata	subject	1..1	EHDSDataSet	header.subject	1..1	same
+III	2	Data group metadata	identifier	0..*	EHDSDataSet	header.identifier	0..*	same
+III	2	Data group metadata	clinicalEventTime[x]	0..1	EHDSDataSet			missing in Xt-EHR
+III	2	Data group metadata	version	0..1	EHDSDataSet			missing in Xt-EHR
+III	2	Data group metadata	author[x]	0..*	EHDSDataSet	header.author[x]	0..*	same
+III	2	Data group metadata	date	1..1	EHDSDataSet	header.date	0..1	cardinality differs
+III	2	Data group metadata	attestation	0..*	EHDSDataSet			missing in Xt-EHR
+III	2	Data group metadata	attestation.attester[x]	1..1	EHDSDataSet			missing in Xt-EHR
+III	2	Data group metadata	attestation.dateTime	1..1	EHDSDataSet			missing in Xt-EHR
+III	2	Data group metadata	status	1..1	EHDSDataSet	header.status	1..1	same
+III	2	Data group metadata	language	0..*	EHDSDataSet	header.language	0..1	cardinality differs
+III	2	Data group metadata	lastUpdate	0..1	EHDSDataSet			missing in Xt-EHR
+III	2	Data group metadata			EHDSDataSet	header.source	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary		0..*	same
+IV		EHDSPatientSummary	header	1..1	EHDSPatientSummary	header	1..1	same
+IV		EHDSPatientSummary	header.subject	1..1	EHDSPatientSummary	header.subject	1..1	same
+IV		EHDSPatientSummary	header.identifier	1..*	EHDSPatientSummary	header.identifier	1..*	same
+IV		EHDSPatientSummary	header.version	1..1	EHDSPatientSummary	header.version	0..1	cardinality differs
+IV		EHDSPatientSummary	header.author[x]	1..*	EHDSPatientSummary	header.author[x]	1..*	same
+IV		EHDSPatientSummary	header.date	1..1	EHDSPatientSummary	header.date	1..1	same
+IV		EHDSPatientSummary	header.status	1..1	EHDSPatientSummary	header.status	1..1	same
+IV		EHDSPatientSummary	header.language	0..*	EHDSPatientSummary	header.language	0..1	cardinality differs
+IV		EHDSPatientSummary	header.documentCategory	1..1	EHDSPatientSummary			missing in Xt-EHR
+IV		EHDSPatientSummary	header.documentType	1..1	EHDSPatientSummary	header.documentType	1..1	same
+IV		EHDSPatientSummary	header.documentTitle	1..1	EHDSPatientSummary	header.documentTitle	1..1	same
+IV		EHDSPatientSummary	header.attestation	0..*	EHDSPatientSummary	header.attestation	0..*	same
+IV		EHDSPatientSummary	header.attestation.attester[x]	1..1	EHDSPatientSummary	header.attestation.attester[x]	1..1	same
+IV		EHDSPatientSummary	header.attestation.dateTime	1..1	EHDSPatientSummary	header.attestation.datetime	1..1	renamed
+IV		EHDSPatientSummary	header.legalAuthentication	0..*	EHDSPatientSummary	header.legalAuthentication	0..*	same
+IV		EHDSPatientSummary	header.legalAuthentication.legalAuthenticator[x]	1..1	EHDSPatientSummary	header.legalAuthentication.legalAuthenticator[x]	1..1	same
+IV		EHDSPatientSummary	header.legalAuthentication.dateTime	1..1	EHDSPatientSummary	header.legalAuthentication.datetime	1..1	renamed
+IV		EHDSPatientSummary	header.eventCategory	0..*	EHDSPatientSummary	header.eventType	0..*	renamed
+IV		EHDSPatientSummary	header.serviceSpecialty	0..*	EHDSPatientSummary	header.serviceSpecialty	0..*	same
+IV		EHDSPatientSummary	header.custodian	0..1	EHDSPatientSummary	header.custodian	0..1	same
+IV		EHDSPatientSummary	header.countryOfOrigin	0..1	EHDSPatientSummary			missing in Xt-EHR
+IV		EHDSPatientSummary	presentedForm	0..*	EHDSPatientSummary	presentedForm	0..*	same
+IV		EHDSPatientSummary	alerts	0..1	EHDSPatientSummary	alerts	0..1	same
+IV		EHDSPatientSummary	alerts.generatedNarrative	0..1	EHDSPatientSummary	alerts.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	alerts.medicalAlert	0..*	EHDSPatientSummary	alerts.medicalAlert	0..*	same
+IV		EHDSPatientSummary	allergiesAndIntolerances	0..1	EHDSPatientSummary	allergiesAndIntolerances	1..1	cardinality differs
+IV		EHDSPatientSummary	allergiesAndIntolerances.generatedNarrative	0..1	EHDSPatientSummary	allergiesAndIntolerances.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	allergiesAndIntolerances.allergyIntolerance	0..*	EHDSPatientSummary	allergiesAndIntolerances.allergyIntolerance	0..*	same
+IV		EHDSPatientSummary	allergiesAndIntolerances.emptyReason	0..1	EHDSPatientSummary	allergiesAndIntolerances.emptyReason	0..1	same
+IV		EHDSPatientSummary	problems	0..1	EHDSPatientSummary	problems	1..1	cardinality differs
+IV		EHDSPatientSummary	problems.generatedNarrative	0..1	EHDSPatientSummary	problems.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	problems.emptyReason	0..1	EHDSPatientSummary	problems.emptyReason	0..1	same
+IV		EHDSPatientSummary	problems.currentProblem	0..*	EHDSPatientSummary	problems.problem	0..*	renamed
+IV		EHDSPatientSummary	problems.pastProblem	0..*	EHDSPatientSummary			missing in Xt-EHR
+IV		EHDSPatientSummary	medicationSummary	0..1	EHDSPatientSummary	medicationSummary	1..1	cardinality differs
+IV		EHDSPatientSummary	medicationSummary.generatedNarrative	0..1	EHDSPatientSummary	medicationSummary.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	medicationSummary.emptyReason	0..1	EHDSPatientSummary	medicationSummary.emptyReason	0..1	same
+IV		EHDSPatientSummary	medicationSummary.medicationUse	0..*	EHDSPatientSummary	medicationSummary.medicationUse	0..*	same
+IV		EHDSPatientSummary	medicalDevicesAndImplants	0..1	EHDSPatientSummary	medicalDevicesAndImplants	1..1	cardinality differs
+IV		EHDSPatientSummary	medicalDevicesAndImplants.generatedNarrative	0..1	EHDSPatientSummary	medicalDevicesAndImplants.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	medicalDevicesAndImplants.emptyReason	0..1	EHDSPatientSummary	medicalDevicesAndImplants.emptyReason	0..1	same
+IV		EHDSPatientSummary	medicalDevicesAndImplants.deviceUse	0..*	EHDSPatientSummary	medicalDevicesAndImplants.deviceUse	0..*	same
+IV		EHDSPatientSummary	procedures	0..1	EHDSPatientSummary	procedures	1..1	cardinality differs
+IV		EHDSPatientSummary	procedures.generatedNarrative	0..1	EHDSPatientSummary	procedures.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	procedures.emptyReason	0..1	EHDSPatientSummary	procedures.emptyReason	0..1	same
+IV		EHDSPatientSummary	procedures.procedure	0..*	EHDSPatientSummary	procedures.procedure	0..*	same
+IV		EHDSPatientSummary	immunisations	0..1	EHDSPatientSummary	immunisations	0..1	same
+IV		EHDSPatientSummary	immunisations.generatedNarrative	0..1	EHDSPatientSummary	immunisations.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	immunisations.emptyReason	0..1	EHDSPatientSummary			missing in Xt-EHR
+IV		EHDSPatientSummary	immunisations.immunisation	0..*	EHDSPatientSummary	immunisations.immunisation	0..*	same
+IV		EHDSPatientSummary	functionalStatus	0..1	EHDSPatientSummary	functionalStatus	0..1	same
+IV		EHDSPatientSummary	functionalStatus.generatedNarrative	0..1	EHDSPatientSummary	functionalStatus.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	functionalStatus.condition	0..*	EHDSPatientSummary	functionalStatus.condition	0..*	same
+IV		EHDSPatientSummary	functionalStatus.assessment	0..*	EHDSPatientSummary	functionalStatus.assessment	0..*	same
+IV		EHDSPatientSummary	socialHistory	0..1	EHDSPatientSummary	socialHistory	0..1	same
+IV		EHDSPatientSummary	socialHistory.generatedNarrative	0..1	EHDSPatientSummary	socialHistory.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	socialHistory.observation	0..*	EHDSPatientSummary	socialHistory.observation	0..*	same
+IV		EHDSPatientSummary	pregnancyHistory	0..1	EHDSPatientSummary	pregnancyHistory	0..1	same
+IV		EHDSPatientSummary	pregnancyHistory.generatedNarrative	0..1	EHDSPatientSummary	pregnancyHistory.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	pregnancyHistory.currentPregnancyStatus	0..1	EHDSPatientSummary	pregnancyHistory.currentPregnancyStatus	0..1	same
+IV		EHDSPatientSummary	pregnancyHistory.previousPregnancies	0..*	EHDSPatientSummary	pregnancyHistory.previousPregnancies	0..*	same
+IV		EHDSPatientSummary	travelHistory	0..1	EHDSPatientSummary	travelHistory	0..1	same
+IV		EHDSPatientSummary	travelHistory.generatedNarrative	0..1	EHDSPatientSummary	travelHistory.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	travelHistory.travelHistory	0..*	EHDSPatientSummary	travelHistory.travelHistory	0..*	same
+IV		EHDSPatientSummary	patientStory	0..1	EHDSPatientSummary	patientStory	0..1	same
+IV		EHDSPatientSummary	patientStory.generatedNarrative	0..1	EHDSPatientSummary			missing in Xt-EHR
+IV		EHDSPatientSummary	advanceDirectives	0..1	EHDSPatientSummary	advanceDirectives	0..1	same
+IV		EHDSPatientSummary	advanceDirectives.generatedNarrative	0..1	EHDSPatientSummary	advanceDirectives.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	advanceDirectives.advanceDirective	0..*	EHDSPatientSummary	advanceDirectives.advanceDirective	0..*	same
+IV		EHDSPatientSummary	observationResults	0..1	EHDSPatientSummary	observationResults	0..1	same
+IV		EHDSPatientSummary	observationResults.generatedNarrative	0..1	EHDSPatientSummary	observationResults.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	observationResults.result	0..*	EHDSPatientSummary	observationResults.result	0..*	same
+IV		EHDSPatientSummary	carePlans	0..1	EHDSPatientSummary	carePlans	0..1	same
+IV		EHDSPatientSummary	carePlans.generatedNarrative	0..1	EHDSPatientSummary	carePlans.generatedNarrative	0..1	same
+IV		EHDSPatientSummary	carePlans.carePlan	0..*	EHDSPatientSummary	carePlans.carePlan	0..*	same
+IV		EHDSPatientSummary			EHDSPatientSummary	advanceDirectives.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	alerts.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	allergiesAndIntolerances.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	carePlans.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	functionalStatus.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	header.period	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	header.source	0..0	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	immunisations.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	medicalDevicesAndImplants.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	medicationSummary.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	observationResults.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	patientStory.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	pregnancyHistory.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	problems.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	procedures.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	socialHistory.note	0..1	missing in the draft
+IV		EHDSPatientSummary			EHDSPatientSummary	travelHistory.note	0..1	missing in the draft
+V		EHDSMedicationPrescription			EHDSMedicationPrescription		0..*	same
+V		EHDSMedicationPrescription	header	1..1	EHDSMedicationPrescription	header	1..1	same
+V		EHDSMedicationPrescription	header.subject	1..1	EHDSMedicationPrescription	header.subject	1..1	same
+V		EHDSMedicationPrescription	header.identifier	1..*	EHDSMedicationPrescription	header.identifier	1..*	same
+V		EHDSMedicationPrescription	header.author[x]	1..*	EHDSMedicationPrescription	header.author[x]	1..*	same
+V		EHDSMedicationPrescription	header.date	1..1	EHDSMedicationPrescription	header.date	1..1	same
+V		EHDSMedicationPrescription	header.status	1..1	EHDSMedicationPrescription	header.status	1..1	same
+V		EHDSMedicationPrescription	header.language	0..*	EHDSMedicationPrescription	header.language	0..1	cardinality differs
+V		EHDSMedicationPrescription	header.statusReason[x]	0..1	EHDSMedicationPrescription	header.statusReason[x]	0..1	same
+V		EHDSMedicationPrescription	presentedForm	0..*	EHDSMedicationPrescription	presentedForm	0..*	same
+V		EHDSMedicationPrescription	prescriptionItem	1..*	EHDSMedicationPrescription	prescriptionItem	1..*	same
+V		EHDSMedicationPrescription	prescriptionItem.identifier	1..*	EHDSMedicationPrescription	prescriptionItem.identifier	1..*	same
+V		EHDSMedicationPrescription	prescriptionItem.status	1..1	EHDSMedicationPrescription	prescriptionItem.status	1..1	same
+V		EHDSMedicationPrescription	prescriptionItem.statusReason[x]	0..1	EHDSMedicationPrescription	prescriptionItem.statusReason[x]	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.medication	1..1	EHDSMedicationPrescription	prescriptionItem.medication	1..1	same
+V		EHDSMedicationPrescription	prescriptionItem.indication[x]	0..*	EHDSMedicationPrescription	prescriptionItem.indication[x]	0..*	same
+V		EHDSMedicationPrescription	prescriptionItem.intendedUseType	0..1	EHDSMedicationPrescription	prescriptionItem.intendedUseType	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.periodOfUse	0..1	EHDSMedicationPrescription	prescriptionItem.periodOfUse	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.quantityPrescribed	1..1	EHDSMedicationPrescription	prescriptionItem.quantityPrescribed	0..1	cardinality differs
+V		EHDSMedicationPrescription	prescriptionItem.dosageInstructions	0..1	EHDSMedicationPrescription	prescriptionItem.dosageInstructions	1..1	cardinality differs
+V		EHDSMedicationPrescription	prescriptionItem.validityPeriod	0..1	EHDSMedicationPrescription	prescriptionItem.validityPeriod	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.substitution	0..1	EHDSMedicationPrescription	prescriptionItem.substitution	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.substitution.allowed[x]	0..1	EHDSMedicationPrescription	prescriptionItem.substitution.allowed[x]	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.substitution.reason[x]	0..1	EHDSMedicationPrescription	prescriptionItem.substitution.reason[x]	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.numberOfRepeats	0..1	EHDSMedicationPrescription	prescriptionItem.numberOfRepeats	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.minimumDispenseInterval	0..1	EHDSMedicationPrescription	prescriptionItem.minimumDispenseInterval	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.offLabel	0..1	EHDSMedicationPrescription	prescriptionItem.offLabel	0..1	same
+V		EHDSMedicationPrescription	prescriptionItem.offLabel.isOffLabelUse	1..1	EHDSMedicationPrescription	prescriptionItem.offLabel.isOffLabelUse	1..1	same
+V		EHDSMedicationPrescription	prescriptionItem.offLabel.reason[x]	0..1	EHDSMedicationPrescription	prescriptionItem.offLabel.reason[x]	0..*	cardinality differs
+V		EHDSMedicationPrescription	prescriptionItem.note	0..1	EHDSMedicationPrescription	prescriptionItem.note	0..1	same
+V		EHDSMedicationPrescription			EHDSMedicationPrescription	header.source	0..0	missing in the draft
+VI		EHDSMedicationDispense			EHDSMedicationDispense		0..*	same
+VI		EHDSMedicationDispense	header	1..1	EHDSMedicationDispense	header	1..1	same
+VI		EHDSMedicationDispense	header.subject	1..1	EHDSMedicationDispense	header.subject	1..1	same
+VI		EHDSMedicationDispense	header.identifier	1..*	EHDSMedicationDispense	header.identifier	0..*	cardinality differs
+VI		EHDSMedicationDispense	header.author[x]	1..*	EHDSMedicationDispense	header.author[x]	1..*	same
+VI		EHDSMedicationDispense	header.date	1..1	EHDSMedicationDispense	header.date	1..1	same
+VI		EHDSMedicationDispense	header.status	1..1	EHDSMedicationDispense	header.status	1..1	same
+VI		EHDSMedicationDispense	header.language	0..*	EHDSMedicationDispense	header.language	0..1	cardinality differs
+VI		EHDSMedicationDispense	dispenseLocation	0..1	EHDSMedicationDispense	dispenseLocation	0..1	same
+VI		EHDSMedicationDispense	receiver[x]	0..1	EHDSMedicationDispense	receiver[x]	0..1	same
+VI		EHDSMedicationDispense	relatedRequest	1..*	EHDSMedicationDispense	relatedRequest	0..*	cardinality differs
+VI		EHDSMedicationDispense	medication	1..1	EHDSMedicationDispense	medication	1..1	same
+VI		EHDSMedicationDispense	dispensedQuantity	1..1	EHDSMedicationDispense	dispensedQuantity	1..1	same
+VI		EHDSMedicationDispense	substitutionOccurred	0..1	EHDSMedicationDispense	substitutionOccurred	0..1	same
+VI		EHDSMedicationDispense	dosageInstructions	0..1	EHDSMedicationDispense	dosageInstructions	0..1	same
+VI		EHDSMedicationDispense	note	0..1	EHDSMedicationDispense	note	0..1	same
+VI		EHDSMedicationDispense			EHDSMedicationDispense	header.source	0..0	missing in the draft
+VI		EHDSMedicationDispense			EHDSMedicationDispense	timeOfDispensation	0..1	missing in the draft
+VII	1	EHDSImagingReport			EHDSImagingReport		0..*	same
+VII	1	EHDSImagingReport	header	1..1	EHDSImagingReport	header	1..1	same
+VII	1	EHDSImagingReport	header.subject	1..1	EHDSImagingReport	header.subject	1..1	same
+VII	1	EHDSImagingReport	header.identifier	1..*	EHDSImagingReport	header.identifier	1..*	same
+VII	1	EHDSImagingReport	header.version	1..1	EHDSImagingReport	header.version	0..1	cardinality differs
+VII	1	EHDSImagingReport	header.author[x]	1..*	EHDSImagingReport	header.author[x]	1..*	same
+VII	1	EHDSImagingReport	header.date	1..1	EHDSImagingReport	header.date	1..1	same
+VII	1	EHDSImagingReport	header.status	1..1	EHDSImagingReport	header.status	1..1	same
+VII	1	EHDSImagingReport	header.language	0..*	EHDSImagingReport	header.language	0..1	cardinality differs
+VII	1	EHDSImagingReport	header.documentCategory	1..1	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	header.documentType	1..1	EHDSImagingReport	header.documentType	1..1	same
+VII	1	EHDSImagingReport	header.documentTitle	1..1	EHDSImagingReport	header.documentTitle	1..1	same
+VII	1	EHDSImagingReport	header.period	0..1	EHDSImagingReport	header.period	0..1	same
+VII	1	EHDSImagingReport	header.attestation	0..*	EHDSImagingReport	header.attestation	0..*	same
+VII	1	EHDSImagingReport	header.attestation.attester[x]	1..1	EHDSImagingReport	header.attestation.attester[x]	1..1	same
+VII	1	EHDSImagingReport	header.attestation.dateTime	1..1	EHDSImagingReport	header.attestation.datetime	1..1	renamed
+VII	1	EHDSImagingReport	header.legalAuthentication	0..*	EHDSImagingReport	header.legalAuthentication	0..*	same
+VII	1	EHDSImagingReport	header.legalAuthentication.legalAuthenticator[x]	1..1	EHDSImagingReport	header.legalAuthentication.legalAuthenticator[x]	1..1	same
+VII	1	EHDSImagingReport	header.legalAuthentication.dateTime	1..1	EHDSImagingReport	header.legalAuthentication.datetime	1..1	renamed
+VII	1	EHDSImagingReport	header.eventCategory	0..*	EHDSImagingReport	header.eventType	0..*	renamed
+VII	1	EHDSImagingReport	header.serviceSpecialty	0..*	EHDSImagingReport	header.serviceSpecialty	0..*	same
+VII	1	EHDSImagingReport	header.custodian	0..1	EHDSImagingReport	header.custodian	0..1	same
+VII	1	EHDSImagingReport	header.countryOfOrigin	0..1	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	header.accessionNumber	0..*	EHDSImagingReport	header.accessionNumber	0..*	same
+VII	1	EHDSImagingReport	header.intendedRecipient[x]	0..*	EHDSImagingReport	header.intendedRecipient[x]	0..*	same
+VII	1	EHDSImagingReport	presentedForm	0..*	EHDSImagingReport	presentedForm	0..*	same
+VII	1	EHDSImagingReport	body	0..1	EHDSImagingReport	body	0..1	same
+VII	1	EHDSImagingReport	body.orderInformation	0..*	EHDSImagingReport	body.orderInformation	0..*	same
+VII	1	EHDSImagingReport	body.orderInformation.orderId	1..*	EHDSImagingReport	body.orderInformation.orderId	1..*	same
+VII	1	EHDSImagingReport	body.orderInformation.orderDateAndTime	0..1	EHDSImagingReport	body.orderInformation.orderDateAndTime	0..1	same
+VII	1	EHDSImagingReport	body.orderInformation.orderPlacer[x]	0..1	EHDSImagingReport	body.orderInformation.orderPlacer[x]	0..1	same
+VII	1	EHDSImagingReport	body.orderInformation.orderReason[x]	0..*	EHDSImagingReport	body.orderInformation.orderReason[x]	0..*	same
+VII	1	EHDSImagingReport	body.orderInformation.clinicalQuestion	0..1	EHDSImagingReport	body.orderInformation.clinicalQuestion	0..1	same
+VII	1	EHDSImagingReport	body.supportingInformation	0..1	EHDSImagingReport	body.supportingInformation	0..1	same
+VII	1	EHDSImagingReport	body.supportingInformation.observation	0..*	EHDSImagingReport	body.supportingInformation.observation	0..*	same
+VII	1	EHDSImagingReport	body.supportingInformation.condition	0..*	EHDSImagingReport	body.supportingInformation.condition	0..*	same
+VII	1	EHDSImagingReport	body.supportingInformation.priorMedicationAdministration	0..*	EHDSImagingReport	body.supportingInformation.priorMedicationAdministration	0..*	same
+VII	1	EHDSImagingReport	body.supportingInformation.device	0..*	EHDSImagingReport	body.supportingInformation.device	0..*	same
+VII	1	EHDSImagingReport	body.supportingInformation.pregnancyStatus	0..1	EHDSImagingReport	body.supportingInformation.pregnancyStatus	0..1	same
+VII	1	EHDSImagingReport	body.specimen	0..*	EHDSImagingReport	body.specimen	0..*	same
+VII	1	EHDSImagingReport	body.exposureInformation	0..1	EHDSImagingReport	body.exposureInformation	0..1	same
+VII	1	EHDSImagingReport	body.exposureInformation.summary	0..1	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	body.exposureInformation.structuredDose	0..*	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	body.exposureInformation.structuredDose.doseQuantity	0..1	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	body.exposureInformation.structuredDose.doseModality	0..1	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	body.exposureInformation.structuredDose.bodySite	0..1	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	body.exposureInformation.structuredDose.numberOfSeries	0..1	EHDSImagingReport			missing in Xt-EHR
+VII	1	EHDSImagingReport	body.examinationReport	1..1	EHDSImagingReport	body.examinationReport	1..1	same
+VII	1	EHDSImagingReport	body.examinationReport.modality	1..*	EHDSImagingReport	body.examinationReport.modality	1..*	same
+VII	1	EHDSImagingReport	body.examinationReport.bodySite	0..*	EHDSImagingReport	body.examinationReport.bodySite	0..*	same
+VII	1	EHDSImagingReport	body.examinationReport.imagingProcedure	0..*	EHDSImagingReport	body.examinationReport.imagingProcedures	0..*	renamed
+VII	1	EHDSImagingReport	body.examinationReport.medicationAdministration	0..*	EHDSImagingReport	body.examinationReport.medicationAdministration	0..*	same
+VII	1	EHDSImagingReport	body.examinationReport.adverseReaction	0..*	EHDSImagingReport	body.examinationReport.adverseReaction	0..*	same
+VII	1	EHDSImagingReport	body.examinationReport.result[x]	0..*	EHDSImagingReport	body.examinationReport.results[x]	0..*	renamed
+VII	1	EHDSImagingReport	body.examinationReport.conclusion	0..1	EHDSImagingReport	body.examinationReport.conclusion	0..1	same
+VII	1	EHDSImagingReport	body.examinationReport.conclusion.impression	1..1	EHDSImagingReport	body.examinationReport.conclusion.impression	1..1	same
+VII	1	EHDSImagingReport	body.examinationReport.conclusion.conditionOrFinding[x]	0..*	EHDSImagingReport	body.examinationReport.conclusion.conditionOrFinding[x]	0..*	same
+VII	1	EHDSImagingReport	body.recommendation	0..1	EHDSImagingReport	body.recommendation	0..1	same
+VII	1	EHDSImagingReport	body.recommendation.description	1..1	EHDSImagingReport	body.recommendation.description	1..1	same
+VII	1	EHDSImagingReport	body.recommendation.carePlan	0..*	EHDSImagingReport	body.recommendation.carePlan	0..*	same
+VII	1	EHDSImagingReport	body.comparisonStudy	0..*	EHDSImagingReport	body.comparisonStudy	0..*	same
+VII	1	EHDSImagingReport	dicomStudyMetadata	0..*	EHDSImagingReport	dicomStudyMetadata	0..*	same
+VII	1	EHDSImagingReport	attachments	0..*	EHDSImagingReport	attachments	0..*	same
+VII	1	EHDSImagingReport			EHDSImagingReport	body.supportingInformation.sexForClinicalUse	0..1	missing in the draft
+VII	1	EHDSImagingReport			EHDSImagingReport	header.source	0..0	missing in the draft
+VII	2	EHDSImagingStudy			EHDSImagingStudy		0..*	same
+VII	2	EHDSImagingStudy	header	1..1	EHDSImagingStudy	header	1..1	same
+VII	2	EHDSImagingStudy	header.subject	1..1	EHDSImagingStudy	header.subject	1..1	same
+VII	2	EHDSImagingStudy	header.identifier	1..*	EHDSImagingStudy	header.identifier	1..*	same
+VII	2	EHDSImagingStudy	header.author[x]	1..*	EHDSImagingStudy	header.author[x]	0..*	cardinality differs
+VII	2	EHDSImagingStudy	header.date	1..1	EHDSImagingStudy	header.date	1..1	same
+VII	2	EHDSImagingStudy	header.status	1..1	EHDSImagingStudy	header.status	1..1	same
+VII	2	EHDSImagingStudy	header.language	0..*	EHDSImagingStudy	header.language	0..1	cardinality differs
+VII	2	EHDSImagingStudy	presentedForm	0..*	EHDSImagingStudy			missing in Xt-EHR
+VII	2	EHDSImagingStudy	modality	0..*	EHDSImagingStudy	modality	0..*	same
+VII	2	EHDSImagingStudy	bodySite	0..*	EHDSImagingStudy	bodySite	0..*	same
+VII	2	EHDSImagingStudy	encounter	0..1	EHDSImagingStudy	encounter	0..1	same
+VII	2	EHDSImagingStudy	started	0..1	EHDSImagingStudy	started	0..1	same
+VII	2	EHDSImagingStudy	basedOn	0..*	EHDSImagingStudy	basedOn	0..*	same
+VII	2	EHDSImagingStudy	numberOfSeries	0..1	EHDSImagingStudy	numberOfSeries	0..1	same
+VII	2	EHDSImagingStudy	numberOfInstances	0..1	EHDSImagingStudy	numberOfInstances	0..1	same
+VII	2	EHDSImagingStudy	description	0..1	EHDSImagingStudy	description	0..1	same
+VII	2	EHDSImagingStudy	custodian	0..1	EHDSImagingStudy	studyCustodian	0..1	renamed
+VII	2	EHDSImagingStudy	endpoint	0..*	EHDSImagingStudy	studyEndpoint	0..*	renamed
+VII	2	EHDSImagingStudy	series	1..*	EHDSImagingStudy	series	0..*	cardinality differs
+VII	2	EHDSImagingStudy	series.seriesUid	1..1	EHDSImagingStudy	series.seriesUid	1..1	same
+VII	2	EHDSImagingStudy	series.number	0..1	EHDSImagingStudy	series.number	0..1	same
+VII	2	EHDSImagingStudy	series.seriesModality	1..1	EHDSImagingStudy	series.seriesModality	1..1	same
+VII	2	EHDSImagingStudy	series.description	0..1	EHDSImagingStudy	series.description	0..1	same
+VII	2	EHDSImagingStudy	series.numberOfInstances	0..1	EHDSImagingStudy	series.numberOfInstances	0..1	same
+VII	2	EHDSImagingStudy	series.seriesEndpoint	1..*	EHDSImagingStudy	series.seriesEndpoint	0..*	cardinality differs
+VII	2	EHDSImagingStudy	series.bodySite	0..1	EHDSImagingStudy	series.bodySite	0..1	same
+VII	2	EHDSImagingStudy	series.specimen	0..*	EHDSImagingStudy	series.specimen	0..*	same
+VII	2	EHDSImagingStudy	series.started	0..1	EHDSImagingStudy	series.started	0..1	same
+VII	2	EHDSImagingStudy	series.instanceInTheSeries	0..*	EHDSImagingStudy	series.instancesInTheSeries	0..*	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.instanceTitle	0..1	EHDSImagingStudy	series.instancesInTheSeries.instanceTitle	0..1	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.instanceUid	1..1	EHDSImagingStudy	series.instancesInTheSeries.instanceUid	1..1	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.sopClass	1..1	EHDSImagingStudy	series.instancesInTheSeries.sopClass	1..1	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.instanceNumber	0..1	EHDSImagingStudy	series.instancesInTheSeries.instanceNumber	0..1	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.numberOfFrames	0..1	EHDSImagingStudy	series.instancesInTheSeries.numberOfFrames	0..1	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.keyImage	0..*	EHDSImagingStudy	series.instancesInTheSeries.keyImage	0..*	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.keyImage.flag	1..1	EHDSImagingStudy	series.instancesInTheSeries.keyImage.flag	1..1	renamed
+VII	2	EHDSImagingStudy	series.instanceInTheSeries.keyImage.reason	0..1	EHDSImagingStudy	series.instancesInTheSeries.keyImage.reason	0..1	renamed
+VII	2	EHDSImagingStudy			EHDSImagingStudy	header.source	0..0	missing in the draft
+VII	2	EHDSImagingStudy			EHDSImagingStudy	series.instancesInTheSeries.keyImage.instanceUID	1..*	missing in the draft
+VII	2	EHDSImagingStudy			EHDSImagingStudy	series.instancesInTheSeries.keyImage.seriesUID	1..*	missing in the draft
+VIII		EHDSMedicalTestReport			EHDSLaboratoryReport		0..*	renamed
+VIII		EHDSMedicalTestReport	header	1..1	EHDSLaboratoryReport	header	1..1	same
+VIII		EHDSMedicalTestReport	header.subject	1..1	EHDSLaboratoryReport	header.subject	1..1	same
+VIII		EHDSMedicalTestReport	header.identifier	1..*	EHDSLaboratoryReport	header.identifier	1..*	same
+VIII		EHDSMedicalTestReport	header.version	1..1	EHDSLaboratoryReport	header.version	0..1	cardinality differs
+VIII		EHDSMedicalTestReport	header.author[x]	1..*	EHDSLaboratoryReport	header.author[x]	1..*	same
+VIII		EHDSMedicalTestReport	header.date	1..1	EHDSLaboratoryReport	header.date	1..1	same
+VIII		EHDSMedicalTestReport	header.status	1..1	EHDSLaboratoryReport	header.status	1..1	same
+VIII		EHDSMedicalTestReport	header.language	0..*	EHDSLaboratoryReport	header.language	0..1	cardinality differs
+VIII		EHDSMedicalTestReport	header.documentCategory	1..1	EHDSLaboratoryReport			missing in Xt-EHR
+VIII		EHDSMedicalTestReport	header.documentType	1..1	EHDSLaboratoryReport	header.documentType	1..1	same
+VIII		EHDSMedicalTestReport	header.documentTitle	1..1	EHDSLaboratoryReport	header.documentTitle	1..1	same
+VIII		EHDSMedicalTestReport	header.period	0..1	EHDSLaboratoryReport	header.period	0..1	same
+VIII		EHDSMedicalTestReport	header.attestation	0..*	EHDSLaboratoryReport	header.attestation	0..*	same
+VIII		EHDSMedicalTestReport	header.attestation.attester[x]	1..1	EHDSLaboratoryReport	header.attestation.attester[x]	1..1	same
+VIII		EHDSMedicalTestReport	header.attestation.dateTime	1..1	EHDSLaboratoryReport	header.attestation.datetime	1..1	renamed
+VIII		EHDSMedicalTestReport	header.legalAuthentication	0..*	EHDSLaboratoryReport	header.legalAuthentication	0..*	same
+VIII		EHDSMedicalTestReport	header.legalAuthentication.legalAuthenticator[x]	1..1	EHDSLaboratoryReport	header.legalAuthentication.legalAuthenticator[x]	1..1	same
+VIII		EHDSMedicalTestReport	header.legalAuthentication.dateTime	1..1	EHDSLaboratoryReport	header.legalAuthentication.datetime	1..1	renamed
+VIII		EHDSMedicalTestReport	header.eventCategory	0..*	EHDSLaboratoryReport	header.eventType	0..*	renamed
+VIII		EHDSMedicalTestReport	header.serviceSpecialty	0..*	EHDSLaboratoryReport	header.serviceSpecialty	0..*	same
+VIII		EHDSMedicalTestReport	header.custodian	0..1	EHDSLaboratoryReport	header.custodian	0..1	same
+VIII		EHDSMedicalTestReport	header.countryOfOrigin	0..1	EHDSLaboratoryReport			missing in Xt-EHR
+VIII		EHDSMedicalTestReport	presentedForm	0..*	EHDSLaboratoryReport	presentedForm	0..*	same
+VIII		EHDSMedicalTestReport	intendedRecipient[x]	0..*	EHDSLaboratoryReport	header.intendedRecipient[x]	0..*	renamed
+VIII		EHDSMedicalTestReport	body	0..1	EHDSLaboratoryReport	body	0..1	same
+VIII		EHDSMedicalTestReport	body.orderInformation	0..*	EHDSLaboratoryReport	body.orderInformation	0..*	same
+VIII		EHDSMedicalTestReport	body.orderInformation.orderId	1..*	EHDSLaboratoryReport	body.orderInformation.orderId	1..*	same
+VIII		EHDSMedicalTestReport	body.orderInformation.orderDateAndTime	0..1	EHDSLaboratoryReport	body.orderInformation.orderDateAndTime	0..1	same
+VIII		EHDSMedicalTestReport	body.orderInformation.orderPlacer[x]	0..1	EHDSLaboratoryReport	body.orderInformation.orderPlacer[x]	0..1	same
+VIII		EHDSMedicalTestReport	body.orderInformation.orderReason[x]	0..*	EHDSLaboratoryReport	body.orderInformation.orderReason[x]	0..*	same
+VIII		EHDSMedicalTestReport	body.orderInformation.clinicalQuestion	0..1	EHDSLaboratoryReport	body.orderInformation.clinicalQuestion	0..1	same
+VIII		EHDSMedicalTestReport	body.supportingInformation	0..1	EHDSLaboratoryReport	body.supportingInformation	0..1	same
+VIII		EHDSMedicalTestReport	body.supportingInformation.observation	0..*	EHDSLaboratoryReport	body.supportingInformation.observation	0..*	same
+VIII		EHDSMedicalTestReport	body.supportingInformation.condition	0..*	EHDSLaboratoryReport	body.supportingInformation.condition	0..*	same
+VIII		EHDSMedicalTestReport	body.supportingInformation.medicationAdministration	0..*	EHDSLaboratoryReport	body.supportingInformation.medicationAdministration	0..*	same
+VIII		EHDSMedicalTestReport	body.supportingInformation.immunisation	0..*	EHDSLaboratoryReport	body.supportingInformation.vaccination	0..*	renamed
+VIII		EHDSMedicalTestReport	body.specimen	0..*	EHDSLaboratoryReport	body.specimen	0..*	same
+VIII		EHDSMedicalTestReport	body.resultData	1..1	EHDSLaboratoryReport	body.resultData	1..1	same
+VIII		EHDSMedicalTestReport	body.resultData.comment	0..1	EHDSLaboratoryReport	body.resultData.commentsInterpretationAndRecommendations	0..*	renamed
+VIII		EHDSMedicalTestReport	body.resultData.medicalTestResult[x]	0..*	EHDSLaboratoryReport	body.resultData.laboratoryTestResults	0..*	renamed
+VIII		EHDSMedicalTestReport	attachment	0..*	EHDSLaboratoryReport	attachments	0..*	renamed
+VIII		EHDSMedicalTestReport			EHDSLaboratoryReport	body.serviceRequest	0..*	missing in the draft
+VIII		EHDSMedicalTestReport			EHDSLaboratoryReport	body.supportingInformation.otherSupportingInformation	0..*	missing in the draft
+VIII		EHDSMedicalTestReport			EHDSLaboratoryReport	body.supportingInformation.sexForClinicalUse	0..1	missing in the draft
+VIII		EHDSMedicalTestReport			EHDSLaboratoryReport	header.source	0..0	missing in the draft
+IX		DischargeReport			EHDSDischargeReport		0..*	renamed
+IX		DischargeReport	header	1..1	EHDSDischargeReport	header	1..1	same
+IX		DischargeReport	header.subject	1..1	EHDSDischargeReport	header.subject	1..1	same
+IX		DischargeReport	header.identifier	1..*	EHDSDischargeReport	header.identifier	1..*	same
+IX		DischargeReport	header.version	1..1	EHDSDischargeReport	header.version	0..1	cardinality differs
+IX		DischargeReport	header.author[x]	1..*	EHDSDischargeReport	header.author[x]	1..*	same
+IX		DischargeReport	header.date	1..1	EHDSDischargeReport	header.date	1..1	same
+IX		DischargeReport	header.status	1..1	EHDSDischargeReport	header.status	1..1	same
+IX		DischargeReport	header.language	0..*	EHDSDischargeReport	header.language	0..1	cardinality differs
+IX		DischargeReport	header.documentCategory	1..1	EHDSDischargeReport			missing in Xt-EHR
+IX		DischargeReport	header.documentType	1..1	EHDSDischargeReport	header.documentType	1..1	same
+IX		DischargeReport	header.documentTitle	1..1	EHDSDischargeReport	header.documentTitle	1..1	same
+IX		DischargeReport	header.period	0..1	EHDSDischargeReport	header.period	0..1	same
+IX		DischargeReport	header.attestation	0..*	EHDSDischargeReport	header.attestation	0..*	same
+IX		DischargeReport	header.attestation.attester[x]	1..1	EHDSDischargeReport	header.attestation.attester[x]	1..1	same
+IX		DischargeReport	header.attestation.dateTime	1..1	EHDSDischargeReport	header.attestation.datetime	1..1	renamed
+IX		DischargeReport	header.legalAuthentication	0..*	EHDSDischargeReport	header.legalAuthentication	0..*	same
+IX		DischargeReport	header.legalAuthentication.legalAuthenticator[x]	1..1	EHDSDischargeReport	header.legalAuthentication.legalAuthenticator[x]	1..1	same
+IX		DischargeReport	header.legalAuthentication.dateTime	1..1	EHDSDischargeReport	header.legalAuthentication.datetime	1..1	renamed
+IX		DischargeReport	header.eventCategory	0..*	EHDSDischargeReport	header.eventType	0..*	renamed
+IX		DischargeReport	header.serviceSpecialty	0..*	EHDSDischargeReport	header.serviceSpecialty	0..*	same
+IX		DischargeReport	header.custodian	0..1	EHDSDischargeReport	header.custodian	0..1	same
+IX		DischargeReport	header.countryOfOrigin	0..1	EHDSDischargeReport			missing in Xt-EHR
+IX		DischargeReport	header.intendedRecipient[x]	0..*	EHDSDischargeReport	header.intendedRecipient[x]	0..*	same
+IX		DischargeReport	presentedForm	0..*	EHDSDischargeReport	presentedForm	0..*	same
+IX		DischargeReport	body	0..1	EHDSDischargeReport	body	0..1	same
+IX		DischargeReport	body.alerts	0..1	EHDSDischargeReport	body.alerts	0..1	same
+IX		DischargeReport	body.alerts.generatedNarrative	0..1	EHDSDischargeReport	body.alerts.generatedNarrative	0..1	same
+IX		DischargeReport	body.alerts.medicalAlert	0..*	EHDSDischargeReport	body.alerts.medicalAlert	0..*	same
+IX		DischargeReport	body.encounterInformation	1..1	EHDSDischargeReport	body.encounterInformation	1..1	same
+IX		DischargeReport	body.encounterInformation.generatedNarrative	0..1	EHDSDischargeReport	body.encounterInformation.generatedNarrative	0..1	same
+IX		DischargeReport	body.encounterInformation.encounter	1..1	EHDSDischargeReport	body.encounterInformation.encounter	0..1	cardinality differs
+IX		DischargeReport	body.encounterInformation.note	0..1	EHDSDischargeReport	body.encounterInformation.note	0..1	same
+IX		DischargeReport	body.admissionEvaluation	0..1	EHDSDischargeReport	body.admissionEvaluation	0..1	same
+IX		DischargeReport	body.admissionEvaluation.generatedNarrative	0..1	EHDSDischargeReport	body.admissionEvaluation.generatedNarrative	0..1	same
+IX		DischargeReport	body.admissionEvaluation.objectiveFindings	0..*	EHDSDischargeReport	body.admissionEvaluation.objectiveFindings	0..*	same
+IX		DischargeReport	body.admissionEvaluation.functionalStatus[x]	0..*	EHDSDischargeReport	body.admissionEvaluation.functionalStatus[x]	0..*	same
+IX		DischargeReport	body.admissionEvaluation.note	0..1	EHDSDischargeReport	body.admissionEvaluation.note	0..1	same
+IX		DischargeReport	body.patientHistory	0..1	EHDSDischargeReport	body.patientHistory	0..1	same
+IX		DischargeReport	body.patientHistory.generatedNarrative	0..1	EHDSDischargeReport	body.patientHistory.generatedNarrative	0..1	same
+IX		DischargeReport	body.patientHistory.pastProblems[x]	0..*	EHDSDischargeReport	body.patientHistory.pastProblems	0..*	renamed
+IX		DischargeReport	body.patientHistory.devicesAndImplants	0..*	EHDSDischargeReport	body.patientHistory.devicesAndImplants	0..*	same
+IX		DischargeReport	body.patientHistory.procedures	0..*	EHDSDischargeReport	body.patientHistory.procedures	0..*	same
+IX		DischargeReport	body.patientHistory.note	0..1	EHDSDischargeReport	body.patientHistory.note	0..1	same
+IX		DischargeReport	body.courseOfEncounter	1..1	EHDSDischargeReport	body.courseOfEncounter	1..1	same
+IX		DischargeReport	body.courseOfEncounter.generatedNarrative	0..1	EHDSDischargeReport	body.courseOfEncounter.generatedNarrative	0..1	same
+IX		DischargeReport	body.courseOfEncounter.conditionSummary	1..*	EHDSDischargeReport	body.courseOfEncounter.diagnosticSummary	0..*	renamed
+IX		DischargeReport	body.courseOfEncounter.procedures	0..*	EHDSDischargeReport	body.courseOfEncounter.procedures	0..*	same
+IX		DischargeReport	body.courseOfEncounter.medicalDevicesAndImplants	0..*	EHDSDischargeReport	body.courseOfEncounter.medicalDevicesAndImplants	0..*	same
+IX		DischargeReport	body.courseOfEncounter.pharmacotherapy	0..*	EHDSDischargeReport	body.courseOfEncounter.pharmacotherapy	0..*	same
+IX		DischargeReport	body.courseOfEncounter.objectiveFindings	0..*	EHDSDischargeReport			missing in Xt-EHR
+IX		DischargeReport	body.courseOfEncounter.testResults[x]	0..*	EHDSDischargeReport	body.courseOfEncounter.testResults[x]	0..*	same
+IX		DischargeReport	body.courseOfEncounter.note	0..1	EHDSDischargeReport	body.courseOfEncounter.note	0..1	same
+IX		DischargeReport	body.dischargeDetails	0..1	EHDSDischargeReport	body.dischargeDetails	0..1	same
+IX		DischargeReport	body.dischargeDetails.generatedNarrative	0..1	EHDSDischargeReport	body.dischargeDetails.generatedNarrative	0..1	same
+IX		DischargeReport	body.dischargeDetails.objectiveFindings	0..*	EHDSDischargeReport	body.dischargeDetails.objectiveFindings	0..*	same
+IX		DischargeReport	body.dischargeDetails.functionalStatus[x]	0..*	EHDSDischargeReport	body.dischargeDetails.functionalStatus[x]	0..*	same
+IX		DischargeReport	body.dischargeDetails.note	0..1	EHDSDischargeReport	body.dischargeDetails.note	0..1	same
+IX		DischargeReport	body.medicationSummary	0..1	EHDSDischargeReport	body.medicationSummary	0..1	same
+IX		DischargeReport	body.medicationSummary.generatedNarrative	0..1	EHDSDischargeReport	body.medicationSummary.generatedNarrative	0..1	same
+IX		DischargeReport	body.medicationSummary.medicationUse	0..*	EHDSDischargeReport	body.medicationSummary.medicationUse	0..*	same
+IX		DischargeReport	body.medicationSummary.note	0..1	EHDSDischargeReport	body.medicationSummary.note	0..1	same
+IX		DischargeReport	body.carePlan	0..1	EHDSDischargeReport	body.carePlan	0..1	same
+IX		DischargeReport	body.carePlan.generatedNarrative	0..1	EHDSDischargeReport	body.carePlan.generatedNarrative	0..1	same
+IX		DischargeReport	body.carePlan.structuredCarePlan	0..*	EHDSDischargeReport	body.carePlan.carePlan	0..*	renamed
+IX		DischargeReport	body.carePlan.otherRecommendations	0..1	EHDSDischargeReport	body.carePlan.otherRecommendations	0..1	same
+IX		DischargeReport	attachment	0..*	EHDSDischargeReport	attachments	0..*	renamed
+IX		DischargeReport			EHDSDischargeReport	body.synthesis	0..1	missing in the draft
+IX		DischargeReport			EHDSDischargeReport	header.source	0..0	missing in the draft
+X	1	EHDSAddress			EHDSAddress		0..*	same
+X	1	EHDSAddress	use	0..1	EHDSAddress	use	0..1	same
+X	1	EHDSAddress	type	0..1	EHDSAddress	type	0..1	same
+X	1	EHDSAddress	text	0..1	EHDSAddress	text	0..1	same
+X	1	EHDSAddress	street	0..1	EHDSAddress	street	0..1	same
+X	1	EHDSAddress	houseNumber	0..1	EHDSAddress	houseNumber	0..1	same
+X	1	EHDSAddress	postBox	0..1	EHDSAddress	postBox	0..1	same
+X	1	EHDSAddress	city	0..1	EHDSAddress	city	0..1	same
+X	1	EHDSAddress	postalCode	0..1	EHDSAddress	postalCode	0..1	same
+X	1	EHDSAddress	country	1..1	EHDSAddress	country	0..1	cardinality differs
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage		0..*	same
+X	2	EHDSAdministeredDosage	renderedDosageInstruction	0..1	EHDSAdministeredDosage	renderedDosageInstruction	0..1	same
+X	2	EHDSAdministeredDosage	dosageDetails	0..1	EHDSAdministeredDosage	dosageDetails	0..1	same
+X	2	EHDSAdministeredDosage	dosageDetails.note	0..1	EHDSAdministeredDosage	dosageDetails.note	0..1	same
+X	2	EHDSAdministeredDosage	dosageDetails.doseAndRate	0..*	EHDSAdministeredDosage	dosageDetails.doseAndRate	0..*	same
+X	2	EHDSAdministeredDosage	dosageDetails.doseAndRate.dose[x]	0..1	EHDSAdministeredDosage	dosageDetails.doseAndRate.dose[x]	0..1	same
+X	2	EHDSAdministeredDosage	dosageDetails.doseAndRate.rate[x]	0..1	EHDSAdministeredDosage	dosageDetails.doseAndRate.rate[x]	0..1	same
+X	2	EHDSAdministeredDosage	dosageDetails.bodySite	0..1	EHDSAdministeredDosage	dosageDetails.bodySite	0..1	same
+X	2	EHDSAdministeredDosage	dosageDetails.routeOfAdministration	0..1	EHDSAdministeredDosage	dosageDetails.routeOfAdministration	0..1	same
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.asNeeded	0..0	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat	0..0	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.bounds[x]	0..1	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.dayOfWeek	0..*	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.duration	0..1	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.eventTime	0..*	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.frequency	0..1	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.frequency.numberOfTimes	1..1	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.frequency.period	1..1	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.repeat.timeOfDay	0..*	missing in the draft
+X	2	EHDSAdministeredDosage			EHDSAdministeredDosage	dosageDetails.sequence	0..0	missing in the draft
+X	3	EHDSAdvanceDirective			EHDSAdvanceDirective		0..*	same
+X	3	EHDSAdvanceDirective	header	1..1	EHDSAdvanceDirective	header	1..1	same
+X	3	EHDSAdvanceDirective	header.subject	1..1	EHDSAdvanceDirective	header.subject	1..1	same
+X	3	EHDSAdvanceDirective	header.identifier	0..*	EHDSAdvanceDirective	header.identifier	0..*	same
+X	3	EHDSAdvanceDirective	header.author[x]	0..*	EHDSAdvanceDirective	header.author[x]	0..*	same
+X	3	EHDSAdvanceDirective	header.date	0..1	EHDSAdvanceDirective	header.date	0..1	same
+X	3	EHDSAdvanceDirective	header.status	1..1	EHDSAdvanceDirective	header.status	1..1	same
+X	3	EHDSAdvanceDirective	header.language	0..*	EHDSAdvanceDirective	header.language	0..1	cardinality differs
+X	3	EHDSAdvanceDirective	category	0..*	EHDSAdvanceDirective	category	0..*	same
+X	3	EHDSAdvanceDirective	directiveType	0..1	EHDSAdvanceDirective			missing in Xt-EHR
+X	3	EHDSAdvanceDirective	note	0..1	EHDSAdvanceDirective	note	0..1	same
+X	3	EHDSAdvanceDirective	attachment	0..1	EHDSAdvanceDirective	attachment	0..1	same
+X	3	EHDSAdvanceDirective			EHDSAdvanceDirective	header.source	0..1	missing in the draft
+X	4	EHDSAlert			EHDSAlert		0..*	same
+X	4	EHDSAlert	header	1..1	EHDSAlert	header	1..1	same
+X	4	EHDSAlert	header.subject	1..1	EHDSAlert	header.subject	1..1	same
+X	4	EHDSAlert	header.identifier	0..*	EHDSAlert	header.identifier	0..*	same
+X	4	EHDSAlert	header.author[x]	0..*	EHDSAlert	header.author[x]	0..*	same
+X	4	EHDSAlert	header.date	0..1	EHDSAlert	header.date	0..1	same
+X	4	EHDSAlert	header.status	1..1	EHDSAlert	header.status	1..1	same
+X	4	EHDSAlert	header.language	0..*	EHDSAlert	header.language	0..1	cardinality differs
+X	4	EHDSAlert	code	0..1	EHDSAlert	code	0..1	same
+X	4	EHDSAlert	description	0..1	EHDSAlert	description	0..1	same
+X	4	EHDSAlert	priority	0..1	EHDSAlert	priority	0..1	same
+X	4	EHDSAlert	period	0..1	EHDSAlert	period	0..1	same
+X	4	EHDSAlert	sourceReference	0..*	EHDSAlert	sourceReference	0..*	same
+X	4	EHDSAlert			EHDSAlert	header.source	0..1	missing in the draft
+X	5	EHDSAllergyIntolerance			EHDSAllergyIntolerance		0..*	same
+X	5	EHDSAllergyIntolerance	header	1..1	EHDSAllergyIntolerance	header	1..1	same
+X	5	EHDSAllergyIntolerance	header.subject	1..1	EHDSAllergyIntolerance	header.subject	1..1	same
+X	5	EHDSAllergyIntolerance	header.identifier	0..*	EHDSAllergyIntolerance	header.identifier	0..*	same
+X	5	EHDSAllergyIntolerance	header.author[x]	0..*	EHDSAllergyIntolerance	header.author[x]	0..*	same
+X	5	EHDSAllergyIntolerance	header.date	0..1	EHDSAllergyIntolerance	header.date	0..1	same
+X	5	EHDSAllergyIntolerance	header.status	1..1	EHDSAllergyIntolerance	header.status	1..1	same
+X	5	EHDSAllergyIntolerance	header.language	0..*	EHDSAllergyIntolerance	header.language	0..1	cardinality differs
+X	5	EHDSAllergyIntolerance	type	0..1	EHDSAllergyIntolerance			missing in Xt-EHR
+X	5	EHDSAllergyIntolerance	agentOrAllergen	1..1	EHDSAllergyIntolerance	agentOrAllergen	1..1	same
+X	5	EHDSAllergyIntolerance	note	0..1	EHDSAllergyIntolerance	note	0..1	same
+X	5	EHDSAllergyIntolerance	criticality	0..1	EHDSAllergyIntolerance	criticality	0..1	same
+X	5	EHDSAllergyIntolerance	certainty	0..1	EHDSAllergyIntolerance	certainty	0..1	same
+X	5	EHDSAllergyIntolerance	onsetDate	0..1	EHDSAllergyIntolerance	onsetDate	0..1	same
+X	5	EHDSAllergyIntolerance	endDate	0..1	EHDSAllergyIntolerance	endDate	0..1	same
+X	5	EHDSAllergyIntolerance	reaction	0..*	EHDSAllergyIntolerance	reaction	0..*	same
+X	5	EHDSAllergyIntolerance	reaction.substance	0..1	EHDSAllergyIntolerance	reaction.agentOrAllergen	0..1	renamed
+X	5	EHDSAllergyIntolerance	reaction.manifestation	0..*	EHDSAllergyIntolerance	reaction.manifestation	0..*	same
+X	5	EHDSAllergyIntolerance	reaction.severity	0..1	EHDSAllergyIntolerance	reaction.severity	0..1	same
+X	5	EHDSAllergyIntolerance	reaction.onset	0..1	EHDSAllergyIntolerance	reaction.onset	0..1	same
+X	5	EHDSAllergyIntolerance			EHDSAllergyIntolerance	header.source	0..1	missing in the draft
+X	6	EHDSAttachment			EHDSAttachment		0..*	same
+X	6	EHDSAttachment	contentType	0..1	EHDSAttachment	contentType	0..1	same
+X	6	EHDSAttachment	language	0..*	EHDSAttachment	language	0..1	cardinality differs
+X	6	EHDSAttachment	data	0..1	EHDSAttachment	data	0..1	same
+X	6	EHDSAttachment	url	0..1	EHDSAttachment	url	0..1	same
+X	6	EHDSAttachment	size	0..1	EHDSAttachment	size	0..1	same
+X	6	EHDSAttachment	title	0..1	EHDSAttachment	title	0..1	same
+X	7	EHDSBodyStructure			EHDSBodyStructure		0..*	same
+X	7	EHDSBodyStructure	morphology	0..1	EHDSBodyStructure	morphology	0..1	same
+X	7	EHDSBodyStructure	location	0..1	EHDSBodyStructure	location	0..1	same
+X	7	EHDSBodyStructure	locationQualifier	0..*	EHDSBodyStructure	locationQualifier	0..*	same
+X	7	EHDSBodyStructure	laterality	0..1	EHDSBodyStructure	laterality	0..1	same
+X	7	EHDSBodyStructure	description	0..1	EHDSBodyStructure	description	0..1	same
+X	8	EHDSCarePlan			EHDSCarePlan		0..*	same
+X	8	EHDSCarePlan	header	1..1	EHDSCarePlan	header	1..1	same
+X	8	EHDSCarePlan	header.subject	1..1	EHDSCarePlan	header.subject	1..1	same
+X	8	EHDSCarePlan	header.identifier	0..*	EHDSCarePlan	header.identifier	0..*	same
+X	8	EHDSCarePlan	header.author[x]	0..*	EHDSCarePlan	header.author[x]	0..*	same
+X	8	EHDSCarePlan	header.date	0..1	EHDSCarePlan	header.date	0..1	same
+X	8	EHDSCarePlan	header.status	1..1	EHDSCarePlan	header.status	1..1	same
+X	8	EHDSCarePlan	header.language	0..*	EHDSCarePlan	header.language	0..1	cardinality differs
+X	8	EHDSCarePlan	title	0..1	EHDSCarePlan	title	0..1	same
+X	8	EHDSCarePlan	description	0..1	EHDSCarePlan	description	0..1	same
+X	8	EHDSCarePlan	period	0..1	EHDSCarePlan	period	0..1	same
+X	8	EHDSCarePlan	conditionAddressed[x]	0..*	EHDSCarePlan	addresses[x]	0..*	renamed
+X	8	EHDSCarePlan	activity[x]	0..*	EHDSCarePlan	activity[x]	0..*	same
+X	8	EHDSCarePlan	goal[x]	0..*	EHDSCarePlan	goal	0..*	renamed
+X	8	EHDSCarePlan			EHDSCarePlan	header.source	0..1	missing in the draft
+X	9	EHDSCondition			EHDSCondition		0..*	same
+X	9	EHDSCondition	header	1..1	EHDSCondition	header	1..1	same
+X	9	EHDSCondition	header.subject	1..1	EHDSCondition	header.subject	1..1	same
+X	9	EHDSCondition	header.identifier	0..*	EHDSCondition	header.identifier	0..*	same
+X	9	EHDSCondition	header.author[x]	0..*	EHDSCondition	header.author[x]	0..*	same
+X	9	EHDSCondition	header.date	0..1	EHDSCondition	header.date	0..1	same
+X	9	EHDSCondition	header.status	1..1	EHDSCondition	header.status	1..1	same
+X	9	EHDSCondition	header.language	0..*	EHDSCondition	header.language	0..1	cardinality differs
+X	9	EHDSCondition	code	1..1	EHDSCondition	problem	1..1	renamed
+X	9	EHDSCondition	onsetDate	0..1	EHDSCondition	onsetDate	0..1	same
+X	9	EHDSCondition	endDate	0..1	EHDSCondition	endDate	0..1	same
+X	9	EHDSCondition	category	0..*	EHDSCondition	category	0..*	same
+X	9	EHDSCondition	resolutionCircumstances	0..1	EHDSCondition	resolutionCircumstances	0..1	same
+X	9	EHDSCondition	severity	0..1	EHDSCondition	severity	0..1	same
+X	9	EHDSCondition	bodySite	0..*	EHDSCondition	bodySite	0..*	same
+X	9	EHDSCondition	stage	0..*	EHDSCondition	stage	0..*	same
+X	9	EHDSCondition	diagnosisAssertionStatus	0..1	EHDSCondition	diagnosisAssertionStatus	0..1	same
+X	9	EHDSCondition	specialistContact	0..*	EHDSCondition	specialistContact	0..*	same
+X	9	EHDSCondition	externalResource	0..*	EHDSCondition	externalResource	0..*	same
+X	9	EHDSCondition	note	0..1	EHDSCondition			missing in Xt-EHR
+X	9	EHDSCondition			EHDSCondition	header.source	0..1	missing in the draft
+X	10	EHDSCurrentPregnancyStatus			EHDSCurrentPregnancy		0..*	renamed
+X	10	EHDSCurrentPregnancyStatus	header	1..1	EHDSCurrentPregnancy	header	1..1	same
+X	10	EHDSCurrentPregnancyStatus	header.subject	1..1	EHDSCurrentPregnancy	header.subject	1..1	same
+X	10	EHDSCurrentPregnancyStatus	header.identifier	0..*	EHDSCurrentPregnancy	header.identifier	0..*	same
+X	10	EHDSCurrentPregnancyStatus	header.author[x]	0..*	EHDSCurrentPregnancy	header.author[x]	0..*	same
+X	10	EHDSCurrentPregnancyStatus	header.date	0..1	EHDSCurrentPregnancy	header.date	0..1	same
+X	10	EHDSCurrentPregnancyStatus	header.status	1..1	EHDSCurrentPregnancy	header.status	1..1	same
+X	10	EHDSCurrentPregnancyStatus	header.language	0..*	EHDSCurrentPregnancy	header.language	0..1	cardinality differs
+X	10	EHDSCurrentPregnancyStatus	currentPregnancyStatus	1..1	EHDSCurrentPregnancy	currentPregnancyStatus	1..1	same
+X	10	EHDSCurrentPregnancyStatus	expectedDateOfDelivery	0..1	EHDSCurrentPregnancy	expectedDateOfDelivery	0..1	same
+X	10	EHDSCurrentPregnancyStatus	gestationalAge	0..1	EHDSCurrentPregnancy	gestationalAge	0..1	same
+X	10	EHDSCurrentPregnancyStatus	note	0..1	EHDSCurrentPregnancy	note	0..1	same
+X	10	EHDSCurrentPregnancyStatus			EHDSCurrentPregnancy	dateOfStatus	0..1	missing in the draft
+X	10	EHDSCurrentPregnancyStatus			EHDSCurrentPregnancy	header.source	0..1	missing in the draft
+X	11	EHDSDevice			EHDSDevice		0..*	same
+X	11	EHDSDevice	instanceIdentifier	0..*	EHDSDevice	instanceIdentifier	0..*	same
+X	11	EHDSDevice	udiCarrier	0..*	EHDSDevice	udi	0..*	renamed
+X	11	EHDSDevice	manufacturer	0..1	EHDSDevice	manufacturer	0..1	same
+X	11	EHDSDevice	manufactureDate	0..1	EHDSDevice	manufactureDate	0..1	same
+X	11	EHDSDevice	expiryDate	0..1	EHDSDevice	expiryDate	0..1	same
+X	11	EHDSDevice	lotNumber	0..1	EHDSDevice	lotNumber	0..1	same
+X	11	EHDSDevice	serialNumber	0..1	EHDSDevice	serialNumber	0..1	same
+X	11	EHDSDevice	name	0..*	EHDSDevice	name	0..*	same
+X	11	EHDSDevice	name.value	1..1	EHDSDevice	name.value	1..1	same
+X	11	EHDSDevice	name.type	1..1	EHDSDevice	name.type	1..1	same
+X	11	EHDSDevice	modelNumber	0..1	EHDSDevice	modelNumber	0..1	same
+X	11	EHDSDevice	version	0..*	EHDSDevice	version	0..*	same
+X	11	EHDSDevice	type	0..*	EHDSDevice	type	0..*	same
+X	11	EHDSDevice	note	0..1	EHDSDevice	note	0..1	same
+X	12	EHDSDeviceUse			EHDSDeviceUse		0..*	same
+X	12	EHDSDeviceUse	header	1..1	EHDSDeviceUse	header	1..1	same
+X	12	EHDSDeviceUse	header.subject	1..1	EHDSDeviceUse	header.subject	1..1	same
+X	12	EHDSDeviceUse	header.identifier	0..*	EHDSDeviceUse	header.identifier	0..*	same
+X	12	EHDSDeviceUse	header.author[x]	0..*	EHDSDeviceUse	header.author[x]	0..*	same
+X	12	EHDSDeviceUse	header.date	0..1	EHDSDeviceUse	header.date	0..1	same
+X	12	EHDSDeviceUse	header.status	1..1	EHDSDeviceUse	header.status	1..1	same
+X	12	EHDSDeviceUse	header.language	0..*	EHDSDeviceUse	header.language	0..1	cardinality differs
+X	12	EHDSDeviceUse	periodOfUse	0..1	EHDSDeviceUse	periodOfUse	0..1	same
+X	12	EHDSDeviceUse	device[x]	1..1	EHDSDeviceUse	device[x]	1..1	same
+X	12	EHDSDeviceUse	bodySite	0..1	EHDSDeviceUse	bodySite	0..1	same
+X	12	EHDSDeviceUse	reason[x]	0..*	EHDSDeviceUse	reason[x]	0..*	same
+X	12	EHDSDeviceUse	note	0..1	EHDSDeviceUse	note	0..1	same
+X	12	EHDSDeviceUse			EHDSDeviceUse	header.source	0..1	missing in the draft
+X	13	EHDSDosage			EHDSDosage		0..*	same
+X	13	EHDSDosage	renderedDosageInstruction	0..1	EHDSDosage	renderedDosageInstruction	0..1	same
+X	13	EHDSDosage	dosageDetails	0..*	EHDSDosage	dosageDetails	0..*	same
+X	13	EHDSDosage	dosageDetails.sequence	0..1	EHDSDosage	dosageDetails.sequence	0..1	same
+X	13	EHDSDosage	dosageDetails.note	0..1	EHDSDosage	dosageDetails.note	0..1	same
+X	13	EHDSDosage	dosageDetails.doseAndRate	0..*	EHDSDosage	dosageDetails.doseAndRate	0..*	same
+X	13	EHDSDosage	dosageDetails.doseAndRate.dose[x]	0..1	EHDSDosage	dosageDetails.doseAndRate.dose[x]	0..1	same
+X	13	EHDSDosage	dosageDetails.doseAndRate.rate[x]	0..1	EHDSDosage	dosageDetails.doseAndRate.rate[x]	0..1	same
+X	13	EHDSDosage	dosageDetails.repeat	0..1	EHDSDosage	dosageDetails.repeat	0..1	same
+X	13	EHDSDosage	dosageDetails.repeat.bounds[x]	0..1	EHDSDosage	dosageDetails.repeat.bounds[x]	0..1	same
+X	13	EHDSDosage	dosageDetails.repeat.duration	0..1	EHDSDosage	dosageDetails.repeat.duration	0..1	same
+X	13	EHDSDosage	dosageDetails.repeat.frequency	0..1	EHDSDosage	dosageDetails.repeat.frequency	0..1	same
+X	13	EHDSDosage	dosageDetails.repeat.frequency.numberOfTimes	0..1	EHDSDosage	dosageDetails.repeat.frequency.numberOfTimes	1..1	cardinality differs
+X	13	EHDSDosage	dosageDetails.repeat.frequency.period	0..1	EHDSDosage	dosageDetails.repeat.frequency.period	1..1	cardinality differs
+X	13	EHDSDosage	dosageDetails.repeat.dayOfWeek	0..*	EHDSDosage	dosageDetails.repeat.dayOfWeek	0..*	same
+X	13	EHDSDosage	dosageDetails.repeat.timeOfDay	0..*	EHDSDosage	dosageDetails.repeat.timeOfDay	0..*	same
+X	13	EHDSDosage	dosageDetails.repeat.eventTime	0..*	EHDSDosage	dosageDetails.repeat.eventTime	0..*	same
+X	13	EHDSDosage	dosageDetails.asNeeded	0..1	EHDSDosage	dosageDetails.asNeeded	0..1	same
+X	13	EHDSDosage	dosageDetails.bodySite	0..1	EHDSDosage	dosageDetails.bodySite	0..1	same
+X	13	EHDSDosage	dosageDetails.routeOfAdministration	0..1	EHDSDosage	dosageDetails.routeOfAdministration	0..1	same
+X	14	EHDSEncounter			EHDSEncounter		0..*	same
+X	14	EHDSEncounter	header	1..1	EHDSEncounter	header	1..1	same
+X	14	EHDSEncounter	header.subject	1..1	EHDSEncounter	header.subject	1..1	same
+X	14	EHDSEncounter	header.identifier	0..*	EHDSEncounter	header.identifier	0..*	same
+X	14	EHDSEncounter	header.author[x]	0..*	EHDSEncounter	header.author[x]	0..*	same
+X	14	EHDSEncounter	header.date	0..1	EHDSEncounter	header.date	0..1	same
+X	14	EHDSEncounter	header.status	1..1	EHDSEncounter	header.status	1..1	same
+X	14	EHDSEncounter	header.language	0..*	EHDSEncounter	header.language	0..1	cardinality differs
+X	14	EHDSEncounter	priority	0..1	EHDSEncounter	priority	0..1	same
+X	14	EHDSEncounter	class	1..1	EHDSEncounter	type	1..1	renamed
+X	14	EHDSEncounter	period	1..1	EHDSEncounter	period	1..1	same
+X	14	EHDSEncounter	serviceProvider	0..1	EHDSEncounter	serviceProvider	0..1	same
+X	14	EHDSEncounter	referringProfessional	0..1	EHDSEncounter	referringProfessional	0..1	same
+X	14	EHDSEncounter	basedOn[x]	0..*	EHDSEncounter	basedOn[x]	0..*	same
+X	14	EHDSEncounter	reason[x]	0..*	EHDSEncounter	reason[x]	0..*	same
+X	14	EHDSEncounter	admission	0..1	EHDSEncounter	admission	0..1	same
+X	14	EHDSEncounter	admission.admitter	0..1	EHDSEncounter	admission.admitter	0..1	same
+X	14	EHDSEncounter	admission.admitSource	0..1	EHDSEncounter	admission.admitSource	0..1	same
+X	14	EHDSEncounter	dischargeDiagnosis[x]	0..*	EHDSEncounter	dischargeDiagnosis[x]	0..*	same
+X	14	EHDSEncounter	dischargeDestination	0..1	EHDSEncounter	dischargeDestination	0..1	same
+X	14	EHDSEncounter	dischargeDestination.type	0..1	EHDSEncounter	dischargeDestination.type	0..1	same
+X	14	EHDSEncounter	dischargeDestination.location[x]	0..1	EHDSEncounter	dischargeDestination.location[x]	0..1	same
+X	14	EHDSEncounter	serviceLocation	0..*	EHDSEncounter	serviceLocation	0..*	same
+X	14	EHDSEncounter	serviceLocation.period	0..1	EHDSEncounter	serviceLocation.period	0..1	same
+X	14	EHDSEncounter	serviceLocation.organisation	1..1	EHDSEncounter	serviceLocation.organisationPart[x]	1..1	renamed
+X	14	EHDSEncounter	subEncounter	0..*	EHDSEncounter	subEncounter	0..*	same
+X	14	EHDSEncounter	note	0..1	EHDSEncounter	note	0..1	same
+X	14	EHDSEncounter			EHDSEncounter	header.source	0..1	missing in the draft
+X	15	EHDSEndpoint			EHDSEndpoint		0..*	same
+X	15	EHDSEndpoint	identifier	1..*	EHDSEndpoint	identifier	1..*	same
+X	15	EHDSEndpoint	status	1..1	EHDSEndpoint	status	1..1	same
+X	15	EHDSEndpoint	connectionType	1..*	EHDSEndpoint	connectionType	1..*	same
+X	15	EHDSEndpoint	name	0..1	EHDSEndpoint	name	0..1	same
+X	15	EHDSEndpoint	managingOrganisation	0..1	EHDSEndpoint	managingOrganisation	0..1	same
+X	15	EHDSEndpoint	payload	0..*	EHDSEndpoint	payload	0..*	same
+X	15	EHDSEndpoint	payload.mimeType	0..*	EHDSEndpoint	payload.mimeType	0..*	same
+X	15	EHDSEndpoint	payload.profileCanonical	0..*	EHDSEndpoint	payload.profileCanonical	0..*	same
+X	15	EHDSEndpoint	payload.profileUri	0..*	EHDSEndpoint	payload.profileUri	0..*	same
+X	15	EHDSEndpoint	address	1..1	EHDSEndpoint	address	1..1	same
+X	15	EHDSEndpoint	header	0..*	EHDSEndpoint	header	0..*	same
+X	15	EHDSEndpoint			EHDSEndpoint	payload.type	0..*	missing in the draft
+X	16	EHDSHealthProfessional			EHDSHealthProfessional		0..*	same
+X	16	EHDSHealthProfessional	identifier	0..*	EHDSHealthProfessional	identifier	0..*	same
+X	16	EHDSHealthProfessional	name	0..1	EHDSHealthProfessional	name	0..1	same
+X	16	EHDSHealthProfessional	address	0..*	EHDSHealthProfessional	address	0..*	same
+X	16	EHDSHealthProfessional	telecom	0..*	EHDSHealthProfessional	telecom	0..*	same
+X	16	EHDSHealthProfessional	professionalRole	0..*	EHDSHealthProfessional	professionalRole	0..*	same
+X	16	EHDSHealthProfessional	professionalRole.role	0..*	EHDSHealthProfessional	professionalRole.role	0..*	same
+X	16	EHDSHealthProfessional	professionalRole.organisation	0..1	EHDSHealthProfessional	professionalRole.organisation	0..1	same
+X	16	EHDSHealthProfessional	professionalRole.specialty	0..*	EHDSHealthProfessional	professionalRole.specialty	0..*	same
+X	17	EHDSHumanName			EHDSHumanName		0..*	same
+X	17	EHDSHumanName	use	0..1	EHDSHumanName	use	0..1	same
+X	17	EHDSHumanName	text	0..1	EHDSHumanName	text	0..1	same
+X	17	EHDSHumanName	family	0..*	EHDSHumanName	family	0..*	same
+X	17	EHDSHumanName	given	0..*	EHDSHumanName	given	0..*	same
+X	17	EHDSHumanName	prefix	0..*	EHDSHumanName	prefix	0..*	same
+X	17	EHDSHumanName	suffix	0..*	EHDSHumanName	suffix	0..*	same
+X	18	EHDSImmunisation			EHDSImmunisation		0..*	same
+X	18	EHDSImmunisation	header	1..1	EHDSImmunisation	header	1..1	same
+X	18	EHDSImmunisation	header.subject	1..1	EHDSImmunisation	header.subject	1..1	same
+X	18	EHDSImmunisation	header.identifier	0..*	EHDSImmunisation	header.identifier	0..*	same
+X	18	EHDSImmunisation	header.author[x]	0..*	EHDSImmunisation	header.author[x]	0..*	same
+X	18	EHDSImmunisation	header.date	0..1	EHDSImmunisation	header.date	0..1	same
+X	18	EHDSImmunisation	header.status	1..1	EHDSImmunisation	header.status	1..1	same
+X	18	EHDSImmunisation	header.language	0..*	EHDSImmunisation	header.language	0..1	cardinality differs
+X	18	EHDSImmunisation	diseaseOrAgentTargeted	0..*	EHDSImmunisation	diseaseOrAgentTargeted	0..*	same
+X	18	EHDSImmunisation	vaccine	1..1	EHDSImmunisation	vaccine	1..1	same
+X	18	EHDSImmunisation	administeredProduct	0..1	EHDSImmunisation	administeredProduct	0..1	same
+X	18	EHDSImmunisation	administrationTime	1..1	EHDSImmunisation	administrationTime	1..1	same
+X	18	EHDSImmunisation	administeringCentre	0..1	EHDSImmunisation	administeringCentre	0..1	same
+X	18	EHDSImmunisation	administrator	0..1	EHDSImmunisation	administrator	0..1	same
+X	18	EHDSImmunisation	note	0..1	EHDSImmunisation	note	0..1	same
+X	18	EHDSImmunisation			EHDSImmunisation	header.source	0..1	missing in the draft
+X	19	EHDSLaboratoryObservation			EHDSLaboratoryObservation		0..*	same
+X	19	EHDSLaboratoryObservation	header	1..1	EHDSLaboratoryObservation	header	1..1	same
+X	19	EHDSLaboratoryObservation	header.subject	1..1	EHDSLaboratoryObservation	header.subject	1..1	same
+X	19	EHDSLaboratoryObservation	header.identifier	0..*	EHDSLaboratoryObservation	header.identifier	0..*	same
+X	19	EHDSLaboratoryObservation	header.author[x]	0..*	EHDSLaboratoryObservation	header.author[x]	0..*	same
+X	19	EHDSLaboratoryObservation	header.date	0..1	EHDSLaboratoryObservation	header.date	0..1	same
+X	19	EHDSLaboratoryObservation	header.status	1..1	EHDSLaboratoryObservation	header.status	1..1	same
+X	19	EHDSLaboratoryObservation	header.language	0..*	EHDSLaboratoryObservation	header.language	0..1	cardinality differs
+X	19	EHDSLaboratoryObservation	header.directSubject[x]	0..1	EHDSLaboratoryObservation	header.directSubject[x]	0..1	same
+X	19	EHDSLaboratoryObservation	observationDate[x]	1..1	EHDSLaboratoryObservation	observationDate[x]	1..1	same
+X	19	EHDSLaboratoryObservation	type	1..1	EHDSLaboratoryObservation	type	1..1	same
+X	19	EHDSLaboratoryObservation	originalName	0..1	EHDSLaboratoryObservation	originalName	0..1	same
+X	19	EHDSLaboratoryObservation	method	0..1	EHDSLaboratoryObservation	method	0..1	same
+X	19	EHDSLaboratoryObservation	specimen	0..1	EHDSLaboratoryObservation	specimen	0..1	same
+X	19	EHDSLaboratoryObservation	order	0..1	EHDSLaboratoryObservation	order	0..1	same
+X	19	EHDSLaboratoryObservation	performer[x]	0..*	EHDSLaboratoryObservation	performer[x]	0..*	same
+X	19	EHDSLaboratoryObservation	bodySite	0..1	EHDSLaboratoryObservation	bodySite	0..1	same
+X	19	EHDSLaboratoryObservation	result	1..1	EHDSLaboratoryObservation	result	1..1	same
+X	19	EHDSLaboratoryObservation	result.value[x]	0..1	EHDSLaboratoryObservation	result.value[x]	0..1	same
+X	19	EHDSLaboratoryObservation	result.uncertainty	0..1	EHDSLaboratoryObservation	result.uncertainty	0..1	same
+X	19	EHDSLaboratoryObservation	result.uncertainty.value	1..1	EHDSLaboratoryObservation	result.uncertainty.value	1..1	same
+X	19	EHDSLaboratoryObservation	result.uncertainty.type	0..1	EHDSLaboratoryObservation	result.uncertainty.type	0..1	same
+X	19	EHDSLaboratoryObservation	result.dataAbsentReason	0..1	EHDSLaboratoryObservation	result.dataAbsentReason	0..1	same
+X	19	EHDSLaboratoryObservation	referenceRange	0..*	EHDSLaboratoryObservation	referenceRange	0..*	same
+X	19	EHDSLaboratoryObservation	referenceRange.low	0..1	EHDSLaboratoryObservation	referenceRange.low	0..1	same
+X	19	EHDSLaboratoryObservation	referenceRange.high	0..1	EHDSLaboratoryObservation	referenceRange.high	0..1	same
+X	19	EHDSLaboratoryObservation	referenceRange.normalValue	0..1	EHDSLaboratoryObservation	referenceRange.normalValue	0..1	same
+X	19	EHDSLaboratoryObservation	referenceRange.type	0..1	EHDSLaboratoryObservation	referenceRange.type	0..1	same
+X	19	EHDSLaboratoryObservation	referenceRange.appliesTo	0..*	EHDSLaboratoryObservation	referenceRange.appliesTo	0..*	same
+X	19	EHDSLaboratoryObservation	referenceRange.age	0..1	EHDSLaboratoryObservation	referenceRange.age	0..1	same
+X	19	EHDSLaboratoryObservation	referenceRange.text	0..1	EHDSLaboratoryObservation	referenceRange.text	0..1	same
+X	19	EHDSLaboratoryObservation	interpretation	0..*	EHDSLaboratoryObservation	interpretation	0..*	same
+X	19	EHDSLaboratoryObservation	note	0..1	EHDSLaboratoryObservation	note	0..1	same
+X	19	EHDSLaboratoryObservation	component	0..*	EHDSLaboratoryObservation	component	0..*	same
+X	19	EHDSLaboratoryObservation	component.type	1..1	EHDSLaboratoryObservation	component.type	1..1	same
+X	19	EHDSLaboratoryObservation	component.originalName	0..1	EHDSLaboratoryObservation	component.originalName	0..1	same
+X	19	EHDSLaboratoryObservation	component.result	1..1	EHDSLaboratoryObservation	component.result	1..1	same
+X	19	EHDSLaboratoryObservation	component.result.value[x]	0..1	EHDSLaboratoryObservation	component.result.value[x]	0..1	same
+X	19	EHDSLaboratoryObservation	component.result.uncertainty	0..1	EHDSLaboratoryObservation	component.result.uncertainty	0..1	same
+X	19	EHDSLaboratoryObservation	component.result.uncertainty.value	1..1	EHDSLaboratoryObservation	component.result.uncertainty.value	1..1	same
+X	19	EHDSLaboratoryObservation	component.result.uncertainty.type	0..1	EHDSLaboratoryObservation	component.result.uncertainty.type	0..1	same
+X	19	EHDSLaboratoryObservation	component.result.dataAbsentReason	0..1	EHDSLaboratoryObservation	component.result.dataAbsentReason	0..1	same
+X	19	EHDSLaboratoryObservation	component.referenceRange	0..*	EHDSLaboratoryObservation	component.referenceRange	0..*	same
+X	19	EHDSLaboratoryObservation	component.referenceRange.low	0..1	EHDSLaboratoryObservation	component.referenceRange.low	0..1	same
+X	19	EHDSLaboratoryObservation	component.referenceRange.high	0..1	EHDSLaboratoryObservation	component.referenceRange.high	0..1	same
+X	19	EHDSLaboratoryObservation	component.referenceRange.normalValue	0..1	EHDSLaboratoryObservation	component.referenceRange.normalValue	0..1	same
+X	19	EHDSLaboratoryObservation	component.referenceRange.type	0..1	EHDSLaboratoryObservation	component.referenceRange.type	0..1	same
+X	19	EHDSLaboratoryObservation	component.referenceRange.appliesTo	0..*	EHDSLaboratoryObservation	component.referenceRange.appliesTo	0..*	same
+X	19	EHDSLaboratoryObservation	component.referenceRange.age	0..1	EHDSLaboratoryObservation	component.referenceRange.age	0..1	same
+X	19	EHDSLaboratoryObservation	component.referenceRange.text	0..1	EHDSLaboratoryObservation	component.referenceRange.text	0..1	same
+X	19	EHDSLaboratoryObservation	component.interpretation	0..*	EHDSLaboratoryObservation	component.interpretation	0..*	same
+X	19	EHDSLaboratoryObservation	derivedFrom[x]	0..*	EHDSLaboratoryObservation	derivedFrom[x]	0..*	same
+X	19	EHDSLaboratoryObservation	hasMember[x]	0..*	EHDSLaboratoryObservation	hasMember[x]	0..*	same
+X	19	EHDSLaboratoryObservation	triggeredBy[x]	0..*	EHDSLaboratoryObservation	triggeredBy[x]	0..*	same
+X	19	EHDSLaboratoryObservation	testKit	0..1	EHDSLaboratoryObservation	testKit	0..1	same
+X	19	EHDSLaboratoryObservation	calibrator	0..1	EHDSLaboratoryObservation	calibrator	0..1	same
+X	19	EHDSLaboratoryObservation	accreditationStatus	0..1	EHDSLaboratoryObservation	accreditationStatus	0..1	same
+X	19	EHDSLaboratoryObservation	previousResults	0..*	EHDSLaboratoryObservation	previousResults	0..*	same
+X	19	EHDSLaboratoryObservation	pointOfCareTest	0..1	EHDSLaboratoryObservation	pointOfCareTest	0..1	same
+X	19	EHDSLaboratoryObservation			EHDSLaboratoryObservation	header.source	0..1	missing in the draft
+X	20	EHDSLocation			EHDSLocation		0..*	same
+X	20	EHDSLocation	identifier	0..*	EHDSLocation	identifier	0..*	same
+X	20	EHDSLocation	name	0..1	EHDSLocation	name	0..1	same
+X	20	EHDSLocation	description	0..1	EHDSLocation	description	0..1	same
+X	20	EHDSLocation	address	0..1	EHDSLocation	address	0..1	same
+X	20	EHDSLocation	managingOrganisation	0..1	EHDSLocation	managingOrganisation	0..1	same
+X	20	EHDSLocation			EHDSLocation	partOf	0..1	missing in the draft
+X	20	EHDSLocation			EHDSLocation	type	0..*	missing in the draft
+X	21	EHDSMedicationAdministration			EHDSMedicationAdministration		0..*	same
+X	21	EHDSMedicationAdministration	header	1..1	EHDSMedicationAdministration	header	1..1	same
+X	21	EHDSMedicationAdministration	header.subject	1..1	EHDSMedicationAdministration	header.subject	1..1	same
+X	21	EHDSMedicationAdministration	header.identifier	0..*	EHDSMedicationAdministration	header.identifier	0..*	same
+X	21	EHDSMedicationAdministration	header.author[x]	0..*	EHDSMedicationAdministration	header.author[x]	0..*	same
+X	21	EHDSMedicationAdministration	header.date	0..1	EHDSMedicationAdministration	header.date	0..1	same
+X	21	EHDSMedicationAdministration	header.status	1..1	EHDSMedicationAdministration	header.status	1..1	same
+X	21	EHDSMedicationAdministration	header.language	0..*	EHDSMedicationAdministration	header.language	0..1	cardinality differs
+X	21	EHDSMedicationAdministration	medication	1..1	EHDSMedicationAdministration	medication	1..1	same
+X	21	EHDSMedicationAdministration	occurrence[x]	1..1	EHDSMedicationAdministration	occurrence[x]	1..1	same
+X	21	EHDSMedicationAdministration	reason[x]	0..*	EHDSMedicationAdministration	reason[x]	0..*	same
+X	21	EHDSMedicationAdministration	dosage	0..1	EHDSMedicationAdministration	dosage	0..1	same
+X	21	EHDSMedicationAdministration	note	0..1	EHDSMedicationAdministration	note	0..1	same
+X	21	EHDSMedicationAdministration			EHDSMedicationAdministration	header.source	0..1	missing in the draft
+X	22	EHDSMedication			EHDSMedication		0..*	same
+X	22	EHDSMedication	identifyingCode[x]	0..*	EHDSMedication	identifyingCode[x]	0..*	same
+X	22	EHDSMedication	classification	0..*	EHDSMedication	classification	0..*	same
+X	22	EHDSMedication	productName	0..1	EHDSMedication	productName	0..1	same
+X	22	EHDSMedication	marketingAuthorisationHolder	0..1	EHDSMedication	marketingAuthorisationHolder	0..1	same
+X	22	EHDSMedication	marketingAuthorisationHolder.organisationName	0..1	EHDSMedication	marketingAuthorisationHolder.organisationName	0..1	same
+X	22	EHDSMedication	marketingAuthorisationHolder.organisationIdentifier	0..*	EHDSMedication	marketingAuthorisationHolder.organisationIdentifier	0..*	same
+X	22	EHDSMedication	doseForm	0..1	EHDSMedication	doseForm	0..1	same
+X	22	EHDSMedication	description	0..1	EHDSMedication	description	0..1	same
+X	22	EHDSMedication	item	0..*	EHDSMedication	item	0..*	same
+X	22	EHDSMedication	item.doseForm	0..1	EHDSMedication	item.doseForm	0..1	same
+X	22	EHDSMedication	item.ingredient	0..*	EHDSMedication	item.ingredient	1..*	cardinality differs
+X	22	EHDSMedication	item.ingredient.isActive	0..1	EHDSMedication	item.ingredient.isActive	0..1	same
+X	22	EHDSMedication	item.ingredient.substance	1..1	EHDSMedication	item.ingredient.substance	1..1	same
+X	22	EHDSMedication	item.ingredient.strengthInfo	0..1	EHDSMedication	item.ingredient.strengthInfo	0..1	same
+X	22	EHDSMedication	item.ingredient.strengthInfo.strength[x]	1..1	EHDSMedication	item.ingredient.strengthInfo.strength	1..1	renamed
+X	22	EHDSMedication	item.ingredient.strengthInfo.basisOfStrengthSubstance	0..1	EHDSMedication	item.ingredient.strengthInfo.basisOfStrengthSubstance	0..1	same
+X	22	EHDSMedication	item.unitOfPresentation	0..1	EHDSMedication	item.unitOfPresentation	0..1	same
+X	22	EHDSMedication	item.containedQuantity	0..1	EHDSMedication	item.containedQuantity	0..1	same
+X	22	EHDSMedication	item.amount	0..1	EHDSMedication	item.amount	0..1	same
+X	22	EHDSMedication	item.packageType	0..1	EHDSMedication	item.packageType	0..1	same
+X	22	EHDSMedication	device	0..*	EHDSMedication	device	0..*	same
+X	22	EHDSMedication	device.deviceQuantity	1..1	EHDSMedication	device.deviceQuantity	1..1	same
+X	22	EHDSMedication	device.device	1..1	EHDSMedication	device.device[x]	1..1	renamed
+X	22	EHDSMedication	characteristic	0..*	EHDSMedication	characteristic	0..*	same
+X	22	EHDSMedication	characteristic.type	1..1	EHDSMedication	characteristic.type	1..1	same
+X	22	EHDSMedication	characteristic.value[x]	0..1	EHDSMedication	characteristic.value[x]	0..1	same
+X	22	EHDSMedication	batch	0..1	EHDSMedication	batch	0..1	same
+X	22	EHDSMedication	batch.lotNumber	0..1	EHDSMedication	batch.lotNumber	0..1	same
+X	22	EHDSMedication	batch.expirationDate	0..1	EHDSMedication	batch.expirationDate	0..1	same
+X	23	EHDSMedicationUse			EHDSMedicationUse		0..*	same
+X	23	EHDSMedicationUse	header	1..1	EHDSMedicationUse	header	1..1	same
+X	23	EHDSMedicationUse	header.subject	1..1	EHDSMedicationUse	header.subject	1..1	same
+X	23	EHDSMedicationUse	header.identifier	0..*	EHDSMedicationUse	header.identifier	0..*	same
+X	23	EHDSMedicationUse	header.author[x]	0..*	EHDSMedicationUse	header.author[x]	0..*	same
+X	23	EHDSMedicationUse	header.date	0..1	EHDSMedicationUse	header.date	0..1	same
+X	23	EHDSMedicationUse	header.status	1..1	EHDSMedicationUse	header.status	1..1	same
+X	23	EHDSMedicationUse	header.language	0..*	EHDSMedicationUse	header.language	0..1	cardinality differs
+X	23	EHDSMedicationUse	medication	1..1	EHDSMedicationUse	medication	1..1	same
+X	23	EHDSMedicationUse	reason[x]	0..*	EHDSMedicationUse	reason[x]	0..*	same
+X	23	EHDSMedicationUse	dosageInstructions	1..1	EHDSMedicationUse	dosageInstructions	1..1	same
+X	23	EHDSMedicationUse	periodOfUse	0..1	EHDSMedicationUse	periodOfUse	0..1	same
+X	23	EHDSMedicationUse	derivedFrom[x]	0..*	EHDSMedicationUse	derivedFrom[x]	0..*	same
+X	23	EHDSMedicationUse	note	0..1	EHDSMedicationUse	note	0..1	same
+X	23	EHDSMedicationUse			EHDSMedicationUse	changeType	0..*	missing in the draft
+X	23	EHDSMedicationUse			EHDSMedicationUse	header.source	0..1	missing in the draft
+X	23	EHDSMedicationUse			EHDSMedicationUse	treatmentStatus	0..1	missing in the draft
+X	24	EHDSObservation			EHDSObservation		0..*	same
+X	24	EHDSObservation	header	1..1	EHDSObservation	header	1..1	same
+X	24	EHDSObservation	header.subject	1..1	EHDSObservation	header.subject	1..1	same
+X	24	EHDSObservation	header.identifier	0..*	EHDSObservation	header.identifier	0..*	same
+X	24	EHDSObservation	header.author[x]	0..*	EHDSObservation	header.author[x]	0..*	same
+X	24	EHDSObservation	header.date	0..1	EHDSObservation	header.date	0..1	same
+X	24	EHDSObservation	header.status	1..1	EHDSObservation	header.status	1..1	same
+X	24	EHDSObservation	header.language	0..*	EHDSObservation	header.language	0..1	cardinality differs
+X	24	EHDSObservation	header.directSubject[x]	0..1	EHDSObservation	header.directSubject[x]	0..1	same
+X	24	EHDSObservation	observationDate[x]	1..1	EHDSObservation	observationDate[x]	1..1	same
+X	24	EHDSObservation	type	1..1	EHDSObservation	type	1..1	same
+X	24	EHDSObservation	originalName	0..1	EHDSObservation	originalName	0..1	same
+X	24	EHDSObservation	method	0..1	EHDSObservation	method	0..1	same
+X	24	EHDSObservation	specimen	0..1	EHDSObservation	specimen	0..1	same
+X	24	EHDSObservation	order	0..1	EHDSObservation	order	0..1	same
+X	24	EHDSObservation	performer[x]	0..*	EHDSObservation	performer[x]	0..*	same
+X	24	EHDSObservation	bodySite	0..1	EHDSObservation	bodySite	0..1	same
+X	24	EHDSObservation	result	1..1	EHDSObservation	result	1..1	same
+X	24	EHDSObservation	result.value[x]	0..1	EHDSObservation	result.value[x]	0..1	same
+X	24	EHDSObservation	result.uncertainty	0..1	EHDSObservation	result.uncertainty	0..1	same
+X	24	EHDSObservation	result.uncertainty.value	1..1	EHDSObservation	result.uncertainty.value	1..1	same
+X	24	EHDSObservation	result.uncertainty.type	0..1	EHDSObservation	result.uncertainty.type	0..1	same
+X	24	EHDSObservation	result.dataAbsentReason	0..1	EHDSObservation	result.dataAbsentReason	0..1	same
+X	24	EHDSObservation	referenceRange	0..*	EHDSObservation	referenceRange	0..*	same
+X	24	EHDSObservation	referenceRange.low	0..1	EHDSObservation	referenceRange.low	0..1	same
+X	24	EHDSObservation	referenceRange.high	0..1	EHDSObservation	referenceRange.high	0..1	same
+X	24	EHDSObservation	referenceRange.normalValue	0..1	EHDSObservation	referenceRange.normalValue	0..1	same
+X	24	EHDSObservation	referenceRange.type	0..1	EHDSObservation	referenceRange.type	0..1	same
+X	24	EHDSObservation	referenceRange.appliesTo	0..*	EHDSObservation	referenceRange.appliesTo	0..*	same
+X	24	EHDSObservation	referenceRange.age	0..1	EHDSObservation	referenceRange.age	0..1	same
+X	24	EHDSObservation	referenceRange.text	0..1	EHDSObservation	referenceRange.text	0..1	same
+X	24	EHDSObservation	interpretation	0..*	EHDSObservation	interpretation	0..*	same
+X	24	EHDSObservation	note	0..1	EHDSObservation	note	0..1	same
+X	24	EHDSObservation	component	0..*	EHDSObservation	component	0..*	same
+X	24	EHDSObservation	component.type	1..1	EHDSObservation	component.type	1..1	same
+X	24	EHDSObservation	component.originalName	0..1	EHDSObservation	component.originalName	0..1	same
+X	24	EHDSObservation	component.result	1..1	EHDSObservation	component.result	1..1	same
+X	24	EHDSObservation	component.result.value[x]	0..1	EHDSObservation	component.result.value[x]	0..1	same
+X	24	EHDSObservation	component.result.uncertainty	0..1	EHDSObservation	component.result.uncertainty	0..1	same
+X	24	EHDSObservation	component.result.uncertainty.value	1..1	EHDSObservation	component.result.uncertainty.value	1..1	same
+X	24	EHDSObservation	component.result.uncertainty.type	0..1	EHDSObservation	component.result.uncertainty.type	0..1	same
+X	24	EHDSObservation	component.result.dataAbsentReason	0..1	EHDSObservation	component.result.dataAbsentReason	0..1	same
+X	24	EHDSObservation	component.referenceRange	0..*	EHDSObservation	component.referenceRange	0..*	same
+X	24	EHDSObservation	component.referenceRange.low	0..1	EHDSObservation	component.referenceRange.low	0..1	same
+X	24	EHDSObservation	component.referenceRange.high	0..1	EHDSObservation	component.referenceRange.high	0..1	same
+X	24	EHDSObservation	component.referenceRange.normalValue	0..1	EHDSObservation	component.referenceRange.normalValue	0..1	same
+X	24	EHDSObservation	component.referenceRange.type	0..1	EHDSObservation	component.referenceRange.type	0..1	same
+X	24	EHDSObservation	component.referenceRange.appliesTo	0..*	EHDSObservation	component.referenceRange.appliesTo	0..*	same
+X	24	EHDSObservation	component.referenceRange.age	0..1	EHDSObservation	component.referenceRange.age	0..1	same
+X	24	EHDSObservation	component.referenceRange.text	0..1	EHDSObservation	component.referenceRange.text	0..1	same
+X	24	EHDSObservation	component.interpretation	0..*	EHDSObservation	component.interpretation	0..*	same
+X	24	EHDSObservation	derivedFrom[x]	0..*	EHDSObservation	derivedFrom[x]	0..*	same
+X	24	EHDSObservation	hasMember[x]	0..*	EHDSObservation	hasMember[x]	0..*	same
+X	24	EHDSObservation			EHDSObservation	header.source	0..1	missing in the draft
+X	25	EHDSOrganisation			EHDSOrganisation		0..*	same
+X	25	EHDSOrganisation	identifier	0..*	EHDSOrganisation	identifier	0..*	same
+X	25	EHDSOrganisation	type	0..*	EHDSOrganisation	type	0..*	same
+X	25	EHDSOrganisation	name	0..1	EHDSOrganisation	name	0..1	same
+X	25	EHDSOrganisation	address	0..*	EHDSOrganisation	address	0..*	same
+X	25	EHDSOrganisation	telecom	0..*	EHDSOrganisation	telecom	0..*	same
+X	25	EHDSOrganisation	partOf	0..1	EHDSOrganisation	partOf	0..1	same
+X	26	EHDSPatient			EHDSPatient		0..*	same
+X	26	EHDSPatient	identifier	1..*	EHDSPatient	identifier	1..*	same
+X	26	EHDSPatient	identifier.type	1..1	EHDSPatient			missing in Xt-EHR
+X	26	EHDSPatient	identifier.value	1..1	EHDSPatient			missing in Xt-EHR
+X	26	EHDSPatient	identifier.system	1..1	EHDSPatient			missing in Xt-EHR
+X	26	EHDSPatient	name	1..*	EHDSPatient	name	0..*	cardinality differs
+X	26	EHDSPatient	dateOfBirth	0..1	EHDSPatient	dateOfBirth	0..1	same
+X	26	EHDSPatient	deceased[x]	0..1	EHDSPatient	deceased[x]	0..1	same
+X	26	EHDSPatient	administrativeGender	1..1	EHDSPatient	administrativeGender	0..1	cardinality differs
+X	26	EHDSPatient	genderIdentity	0..1	EHDSPatient			missing in Xt-EHR
+X	26	EHDSPatient	sexForClinicalUse	0..1	EHDSPatient			missing in Xt-EHR
+X	26	EHDSPatient	address	0..*	EHDSPatient	address	0..*	same
+X	26	EHDSPatient	telecom	0..*	EHDSPatient	telecom	0..*	same
+X	27	EHDSPregnancyHistory			EHDSPregnancyHistory		0..*	same
+X	27	EHDSPregnancyHistory	header	1..1	EHDSPregnancyHistory	header	1..1	same
+X	27	EHDSPregnancyHistory	header.subject	1..1	EHDSPregnancyHistory	header.subject	1..1	same
+X	27	EHDSPregnancyHistory	header.identifier	0..*	EHDSPregnancyHistory	header.identifier	0..*	same
+X	27	EHDSPregnancyHistory	header.author[x]	0..*	EHDSPregnancyHistory	header.author[x]	0..*	same
+X	27	EHDSPregnancyHistory	header.date	0..1	EHDSPregnancyHistory	header.date	0..1	same
+X	27	EHDSPregnancyHistory	header.status	1..1	EHDSPregnancyHistory	header.status	1..1	same
+X	27	EHDSPregnancyHistory	header.language	0..*	EHDSPregnancyHistory	header.language	0..1	cardinality differs
+X	27	EHDSPregnancyHistory	endDate	0..1	EHDSPregnancyHistory	endDate	0..1	same
+X	27	EHDSPregnancyHistory	outcome	0..1	EHDSPregnancyHistory	outcome	0..1	same
+X	27	EHDSPregnancyHistory	note	0..1	EHDSPregnancyHistory	note	0..1	same
+X	27	EHDSPregnancyHistory			EHDSPregnancyHistory	header.source	0..1	missing in the draft
+X	27	EHDSPregnancyHistory			EHDSPregnancyHistory	numberOfFetuses	0..1	missing in the draft
+X	28	EHDSProcedure			EHDSProcedure		0..*	same
+X	28	EHDSProcedure	header	1..1	EHDSProcedure	header	1..1	same
+X	28	EHDSProcedure	header.subject	1..1	EHDSProcedure	header.subject	1..1	same
+X	28	EHDSProcedure	header.identifier	0..*	EHDSProcedure	header.identifier	0..*	same
+X	28	EHDSProcedure	header.author[x]	0..*	EHDSProcedure	header.author[x]	0..*	same
+X	28	EHDSProcedure	header.date	0..1	EHDSProcedure	header.date	0..1	same
+X	28	EHDSProcedure	header.status	1..1	EHDSProcedure	header.status	1..1	same
+X	28	EHDSProcedure	header.language	0..*	EHDSProcedure	header.language	0..1	cardinality differs
+X	28	EHDSProcedure	code	1..1	EHDSProcedure	code	1..1	same
+X	28	EHDSProcedure	procedureDate[x]	0..1	EHDSProcedure	procedureDate[x]	0..1	same
+X	28	EHDSProcedure	performer	0..*	EHDSProcedure	performer	0..*	same
+X	28	EHDSProcedure	bodySite	0..*	EHDSProcedure	bodySite	0..*	same
+X	28	EHDSProcedure	reason[x]	0..*	EHDSProcedure	reason[x]	0..*	same
+X	28	EHDSProcedure	outcome	0..1	EHDSProcedure	outcome	0..1	same
+X	28	EHDSProcedure	complication	0..*	EHDSProcedure	complication	0..*	same
+X	28	EHDSProcedure	deviceUsed	0..*	EHDSProcedure	deviceUsed	0..*	same
+X	28	EHDSProcedure	focalDevice	0..*	EHDSProcedure	focalDevice	0..*	same
+X	28	EHDSProcedure	note	0..1	EHDSProcedure	note	0..1	same
+X	28	EHDSProcedure			EHDSProcedure	header.source	0..1	missing in the draft
+X	29	EHDSRelatedPerson			EHDSRelatedPerson		0..*	same
+X	29	EHDSRelatedPerson	identifier	0..*	EHDSRelatedPerson	personalIdentifier	0..*	renamed
+X	29	EHDSRelatedPerson	identifier.type	1..1	EHDSRelatedPerson			missing in Xt-EHR
+X	29	EHDSRelatedPerson	identifier.value	1..1	EHDSRelatedPerson			missing in Xt-EHR
+X	29	EHDSRelatedPerson	identifier.system	1..1	EHDSRelatedPerson			missing in Xt-EHR
+X	29	EHDSRelatedPerson	name	1..*	EHDSRelatedPerson	name	0..*	cardinality differs
+X	29	EHDSRelatedPerson	subject	1..1	EHDSRelatedPerson	subject	1..1	same
+X	29	EHDSRelatedPerson	relationship	0..1	EHDSRelatedPerson	relationship	0..1	same
+X	29	EHDSRelatedPerson	address	0..*	EHDSRelatedPerson	address	0..*	same
+X	29	EHDSRelatedPerson	telecom	0..*	EHDSRelatedPerson	telecom	0..*	same
+X	30	EHDSServiceRequest			EHDSServiceRequest		0..*	same
+X	30	EHDSServiceRequest	header	1..1	EHDSServiceRequest	header	1..1	same
+X	30	EHDSServiceRequest	header.subject	1..1	EHDSServiceRequest	header.subject	1..1	same
+X	30	EHDSServiceRequest	header.identifier	0..*	EHDSServiceRequest	header.identifier	0..*	same
+X	30	EHDSServiceRequest	header.author[x]	0..*	EHDSServiceRequest	header.author[x]	0..*	same
+X	30	EHDSServiceRequest	header.date	0..1	EHDSServiceRequest	header.date	0..1	same
+X	30	EHDSServiceRequest	header.status	1..1	EHDSServiceRequest	header.status	1..1	same
+X	30	EHDSServiceRequest	header.language	0..*	EHDSServiceRequest	header.language	0..1	cardinality differs
+X	30	EHDSServiceRequest	description	0..1	EHDSServiceRequest	description	0..1	same
+X	30	EHDSServiceRequest	code	0..1	EHDSServiceRequest	code	0..1	same
+X	30	EHDSServiceRequest	quantity	0..1	EHDSServiceRequest	quantity	0..1	same
+X	30	EHDSServiceRequest	bodySite	0..*	EHDSServiceRequest	bodySite	0..*	same
+X	30	EHDSServiceRequest	reason[x]	0..*	EHDSServiceRequest	reason[x]	0..*	same
+X	30	EHDSServiceRequest	priority	0..1	EHDSServiceRequest	priority	0..1	same
+X	30	EHDSServiceRequest	supportingInformation[x]	0..*	EHDSServiceRequest	supportingInformation[x]	0..*	same
+X	30	EHDSServiceRequest	specimen	0..*	EHDSServiceRequest	specimen	0..*	same
+X	30	EHDSServiceRequest	encounter	0..1	EHDSServiceRequest	encounter	0..1	same
+X	30	EHDSServiceRequest	occurrence[x]	0..1	EHDSServiceRequest	occurrence[x]	0..1	same
+X	30	EHDSServiceRequest	patientInstructions	0..1	EHDSServiceRequest	patientInstructions	0..1	same
+X	30	EHDSServiceRequest			EHDSServiceRequest	header.source	0..1	missing in the draft
+X	31	EHDSSpecimen			EHDSSpecimen		0..*	same
+X	31	EHDSSpecimen	identifier	1..*	EHDSSpecimen	identifier	1..*	same
+X	31	EHDSSpecimen	status	0..1	EHDSSpecimen	status	0..1	same
+X	31	EHDSSpecimen	type	0..1	EHDSSpecimen	type	0..1	same
+X	31	EHDSSpecimen	specimenSource[x]	0..1	EHDSSpecimen	specimenSource[x]	0..1	same
+X	31	EHDSSpecimen	parentSpecimen	0..*	EHDSSpecimen	parentSpecimen	0..*	same
+X	31	EHDSSpecimen	request	0..*	EHDSSpecimen	request	0..*	same
+X	31	EHDSSpecimen	collection	0..*	EHDSSpecimen	collection	0..*	same
+X	31	EHDSSpecimen	collection.performer[x]	0..1	EHDSSpecimen	collection.performer[x]	0..1	same
+X	31	EHDSSpecimen	collection.collected[x]	1..1	EHDSSpecimen	collection.collected[x]	1..1	same
+X	31	EHDSSpecimen	collection.quantity	0..1	EHDSSpecimen	collection.quantity	0..1	same
+X	31	EHDSSpecimen	collection.method	0..1	EHDSSpecimen	collection.method	0..1	same
+X	31	EHDSSpecimen	collection.device	0..1	EHDSSpecimen	collection.device	0..1	same
+X	31	EHDSSpecimen	collection.bodySite	0..1	EHDSSpecimen	collection.bodySite	0..1	same
+X	31	EHDSSpecimen	receivedDate	0..1	EHDSSpecimen	receivedDate	0..1	same
+X	31	EHDSSpecimen	container	0..*	EHDSSpecimen	container	0..*	same
+X	31	EHDSSpecimen	container.specimenQuantity	0..1	EHDSSpecimen	container.specimenQuantity	0..1	same
+X	31	EHDSSpecimen	container.containerDevice	1..1	EHDSSpecimen	container.containerDevice	1..1	same
+X	31	EHDSSpecimen	condition	0..*	EHDSSpecimen	condition	0..*	same
+X	31	EHDSSpecimen	note	0..1	EHDSSpecimen	note	0..1	same
+X	31	EHDSSpecimen			EHDSSpecimen	combined	0..1	missing in the draft
+X	32	EHDSTelecom			EHDSTelecom		0..*	same
+X	32	EHDSTelecom	use	0..1	EHDSTelecom	use	0..1	same
+X	32	EHDSTelecom	system	0..1	EHDSTelecom	type	0..1	renamed
+X	32	EHDSTelecom	value	1..1	EHDSTelecom	value	1..1	same
+X	33	EHDSTravelHistory			EHDSTravelHistory		0..*	same
+X	33	EHDSTravelHistory	header	1..1	EHDSTravelHistory	header	1..1	same
+X	33	EHDSTravelHistory	header.subject	1..1	EHDSTravelHistory	header.subject	1..1	same
+X	33	EHDSTravelHistory	header.identifier	0..*	EHDSTravelHistory	header.identifier	0..*	same
+X	33	EHDSTravelHistory	header.author[x]	0..*	EHDSTravelHistory	header.author[x]	0..*	same
+X	33	EHDSTravelHistory	header.date	0..1	EHDSTravelHistory	header.date	0..1	same
+X	33	EHDSTravelHistory	header.status	1..1	EHDSTravelHistory	header.status	1..1	same
+X	33	EHDSTravelHistory	header.language	0..*	EHDSTravelHistory	header.language	0..1	cardinality differs
+X	33	EHDSTravelHistory	country	1..1	EHDSTravelHistory	country	1..1	same
+X	33	EHDSTravelHistory	period	0..1	EHDSTravelHistory	period	0..1	same
+X	33	EHDSTravelHistory			EHDSTravelHistory	header.source	0..1	missing in the draft

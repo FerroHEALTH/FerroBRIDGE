@@ -18,6 +18,7 @@ mod facade;
 mod fhir_outbound;
 mod file;
 mod hl7v2;
+mod inbound;
 mod launch_task;
 mod oauth;
 mod omop_incremental;

@@ -139,7 +139,7 @@ impl Bridge {
         })
     }
 
-    /// Reloads the mapping files on disk, `POST {base}operator/reload`.
+    /// Reloads the mapping files, `POST {base}operator/reload`.
     ///
     /// # Errors
     /// Returns [`BridgeError::Refused`] for any status but `200` and `422`,

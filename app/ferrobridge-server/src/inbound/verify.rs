@@ -148,11 +148,12 @@ pub struct StaticHeader {
     pub header: String,
 }
 
-/// The client certificate subjects a source's connection may present.
+/// The names a source's client certificate may carry.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Mtls {
-    /// The subjects, as the TLS listener writes a certificate's subject.
+    /// The DNS names, any of which the verified client certificate's subject
+    /// alternative name must carry.
     pub subjects: Vec<String>,
 }
 
@@ -188,8 +189,8 @@ pub struct Request<'a> {
     pub headers: &'a HeaderMap,
     /// The raw body, as received.
     pub body: &'a [u8],
-    /// The subject of the client certificate the connection presented.
-    pub peer_subject: Option<&'a str>,
+    /// The verified client certificate the connection presented.
+    pub peer: Option<&'a rustls::pki_types::CertificateDer<'static>>,
     /// The instant the request is verified at, in seconds since the epoch.
     pub now: i64,
 }
@@ -235,8 +236,12 @@ impl Verifier {
                 })
             }
             Self::Mtls(mtls) => {
-                let subject = request.peer_subject.ok_or(Refused::Mismatch)?;
-                if mtls.subjects.iter().any(|allowed| allowed == subject) {
+                let certificate = request.peer.ok_or(Refused::Mismatch)?;
+                if mtls
+                    .subjects
+                    .iter()
+                    .any(|name| ferrobridge_hl7v2::mllp::tls::names(certificate, name))
+                {
                     Ok(())
                 } else {
                     Err(Refused::Mismatch)
