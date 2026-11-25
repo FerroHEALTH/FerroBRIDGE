@@ -50,10 +50,14 @@ pub mod form;
 pub mod imaging;
 #[cfg(feature = "laboratory")]
 pub mod laboratory;
+#[cfg(feature = "imaging")]
+pub mod manifest;
 mod mapped;
 pub mod metadata;
 pub mod representation;
 pub mod section;
+#[cfg(feature = "laboratory")]
+pub mod test_report;
 
 #[cfg(feature = "patient-summary")]
 use form::PATIENT_SUMMARY_FORM;

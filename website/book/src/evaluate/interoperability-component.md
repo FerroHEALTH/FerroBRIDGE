@@ -152,6 +152,14 @@ PDF/A-1b alone, and admits (d) for imaging only.
   still holds, so a category whose profile does not permit a narrative-only
   section refuses it.
 - **(c) Structured** is what every category's document writes.
+- **(d) DICOM with a FHIR report and manifest:** beside the imaging report,
+  `Manifest` writes the imaging study of Annex VII as an HL7 Europe Imaging
+  Manifest 1.0.0-ballot `EuMadoBundle`. The study's identity, modality,
+  start and procedure come from the `ImagingStudy` the imaging mapping
+  writes. Its series, instances and WADO-RS services are DICOM facts that
+  openEHR does not hold, so the caller passes them in from the image
+  archive (QIDO-RS). A manifest without them is refused with a typed error,
+  and none is ever made up.
 
 Which representations a system declares per category is configuration: a
 `Declarations` map from the category code of HL7 Europe's
@@ -192,6 +200,7 @@ the crate's tests:
 | HL7 Europe Medication Prescription and Dispense (`hl7.fhir.eu.mpd`) | 1.0.0 | the prescription and dispensation records |
 | HL7 Europe Laboratory Report (`hl7.fhir.eu.laboratory`) | 2.0.0 | the laboratory report crosswalk and document |
 | HL7 Europe Imaging Report (`hl7.fhir.eu.imaging`) | 1.0.0-ballot | the imaging report and imaging study crosswalks |
+| HL7 Europe Imaging Manifest (`hl7.fhir.eu.imaging-manifest`) | 1.0.0-ballot | the imaging study manifest |
 | HL7 Europe Hospital Discharge Report (`hl7.fhir.eu.hdr`) | 1.0.0 | the discharge report crosswalk and document |
 | MyHealth@EU Master Value Sets Catalogue (`myhealth.eu.fhir.mvc-package`) | 9.1.0 | the preferred system of each terminology |
 
@@ -203,7 +212,11 @@ receipt are built. The prescription and dispensation records are read and
 written in the MPD form, and [mapped from and into openEHR](prescription-mapping.md)
 through FerroBRIDGE's MPD contexts. The laboratory report is
 [mapped from and into openEHR](laboratory-mapping.md) through the shipped
-laboratory project and received as a `Bundle-eu-lab`. The imaging report is
+laboratory project and received as a `Bundle-eu-lab`. A non-laboratory
+medical test report of Annex VIII, a spirometry or an electrocardiogram
+result, is mapped from openEHR through the shipped `test-report` project into
+an R4 `DiagnosticReport` that claims no profile, since no HL7 Europe guide
+profiles one. The imaging report is
 [mapped from and into openEHR](imaging-mapping.md) through the shipped
 imaging project, over FerroBRIDGE's template of published CKM archetypes,
 and received as a `BundleReportEuImaging`. The discharge report is

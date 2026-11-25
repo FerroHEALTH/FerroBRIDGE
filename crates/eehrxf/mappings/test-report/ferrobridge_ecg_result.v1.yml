@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# FerroBRIDGE's model mapping of the CKM OBSERVATION.ecg_result.v1 (revision
+# as vendored in fixtures/ckm/test-report) to an R4 DiagnosticReport: LOINC
+# 11524-6 as the report's code, the event's time as its effective time, the
+# conclusion as its conclusion and each ECG diagnosis as a conclusion code.
+# The archetype records a performed test, so the report is final. No
+# specification governs these choices: our own design.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: OBSERVATION.ecg_result.v1
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-OBSERVATION.ecg_result.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/DiagnosticReport
+
+mappings:
+  - name: "status"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource"
+    manual:
+      - name: "final"
+        fhir:
+          - path: "status"
+            value: "final"
+
+  - name: "code"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.code.coding"
+    manual:
+      - name: "electrocardiogram"
+        fhir:
+          - path: "system"
+            value: "http://loinc.org"
+          - path: "code"
+            value: "11524-6"
+          - path: "display"
+            value: "EKG study"
+
+  - name: "eventParent"
+    with:
+      fhir: "$resource"
+      openehr: "$archetype/data[at0001]/events[at0002]"
+    followedBy:
+      mappings:
+        - name: "eventTime"
+          with:
+            fhir: "effective.as(DateTime)"
+            openehr: "time"
+
+        - name: "conclusion"
+          with:
+            fhir: "conclusion"
+            openehr: "data[at0005]/items[at0089]"
+
+        # NOTE: R4 DiagnosticReport.conclusionCode: "One or more codes that represent the summary
+        # conclusion"; each ECG diagnosis is one.
+        - name: "diagnosis"
+          with:
+            fhir: "conclusionCode"
+            openehr: "data[at0005]/items[at0081]"

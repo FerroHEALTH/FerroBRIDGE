@@ -80,6 +80,9 @@ mod lab_mapped;
 #[cfg(feature = "laboratory")]
 mod laboratory;
 #[cfg(test)]
+#[cfg(all(feature = "imaging", feature = "fhir-r4"))]
+mod manifest;
+#[cfg(test)]
 #[cfg(feature = "openehr")]
 mod mapping;
 #[cfg(test)]
@@ -131,6 +134,9 @@ mod support;
 #[cfg(test)]
 #[cfg(feature = "fhir-r4")]
 mod terminology;
+#[cfg(test)]
+#[cfg(all(feature = "openehr", feature = "laboratory"))]
+mod test_report;
 #[cfg(test)]
 #[cfg(all(feature = "openehr", feature = "patient-summary"))]
 mod transformation;
