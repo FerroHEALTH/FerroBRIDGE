@@ -127,6 +127,12 @@ pub struct Cardinality {
 }
 
 impl Cardinality {
+    /// Creates the cardinality `min..max`.
+    #[must_use]
+    pub const fn new(min: u32, max: Max) -> Self {
+        Self { min, max }
+    }
+
     /// Returns the least number of occurrences.
     #[must_use]
     pub const fn lower(&self) -> u32 {

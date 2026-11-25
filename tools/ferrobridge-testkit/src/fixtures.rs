@@ -39,6 +39,17 @@ macro_rules! ckm_imaging {
     };
 }
 
+/// One vendored CKM archetype of the medical test report template as
+/// `(file name, source)`.
+macro_rules! ckm_test_report {
+    ($file:literal) => {
+        (
+            $file,
+            include_str!(concat!("../fixtures/ckm/test-report/", $file)),
+        )
+    };
+}
+
 /// One vendored CKM archetype of the EHDS record template as
 /// `(file name, source)`.
 macro_rules! ckm_ehds {
@@ -710,6 +721,32 @@ pub const FERROBRIDGE_IMAGING_TEMPLATE_ID: &str =
 pub const CKM_IMAGING_ARCHETYPES: [(&str, &str); 1] = [ckm_imaging!(
     "openEHR-EHR-OBSERVATION.imaging_exam_result.v1.adl"
 )];
+
+/// FerroBRIDGE's ADL 2 medical test report template.
+///
+/// A report result `COMPOSITION` holding an `OBSERVATION.spirometry_result.v2`
+/// or an `OBSERVATION.ecg_result.v1`, at-coded with the ADL 1.4 codes of
+/// [`CKM_LIBRARY_ARCHETYPES`] and [`CKM_TEST_REPORT_ARCHETYPES`]. A suite
+/// builds the ADL 2 operational template from them at test time. The template
+/// identifier is [`FERROBRIDGE_TEST_REPORT_TEMPLATE_ID`].
+pub const FERROBRIDGE_TEST_REPORT_TEMPLATE: &str =
+    include_str!("../fixtures/adl2/ferrobridge_test_report.adlt");
+
+/// The template identifier [`FERROBRIDGE_TEST_REPORT_TEMPLATE`] declares.
+pub const FERROBRIDGE_TEST_REPORT_TEMPLATE_ID: &str =
+    "openEHR-EHR-COMPOSITION.ferrobridge_test_report.v1.0.0";
+
+/// The published CKM archetypes of [`FERROBRIDGE_TEST_REPORT_TEMPLATE`] beside
+/// the report result composition of [`CKM_LIBRARY_ARCHETYPES`], as
+/// `(file name, ADL 1.4 source)`.
+///
+/// `scripts/vendor/ckm-test-report.sh` fetches them at the CKM mirror commit
+/// `docs/VERSIONS.md` pins, and `PROVENANCE.md` beside them records their
+/// source and licence.
+pub const CKM_TEST_REPORT_ARCHETYPES: [(&str, &str); 2] = [
+    ckm_test_report!("openEHR-EHR-OBSERVATION.ecg_result.v1.adl"),
+    ckm_test_report!("openEHR-EHR-OBSERVATION.spirometry_result.v2.adl"),
+];
 
 /// FerroBRIDGE's ADL 2 EHDS record template.
 ///

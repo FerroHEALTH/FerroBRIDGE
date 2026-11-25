@@ -33,6 +33,7 @@ tools/ferrobridge-testkit/fixtures/ckm/ehds/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/ckm/discharge/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/ckm/library/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/ckm/highmed/** linguist-vendored -text
+tools/ferrobridge-testkit/fixtures/ckm/test-report/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-todesursache/** linguist-vendored -text
 tools/ferrobridge-testkit/fixtures/opt/kds-vitalstatus/** linguist-vendored -text
 crates/ferrobridge-hl7v2/vendor/** linguist-vendored -text

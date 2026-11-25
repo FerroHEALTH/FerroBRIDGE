@@ -386,6 +386,49 @@ until an apply.
 | `422` | The set does not compile with the archive's files; the body names every diagnostic, and nothing is recorded |
 | `503` | The CDR did not serve a template, so the set could not be checked |
 
+## Settings registers
+
+With [`[state]`](configuration.md) configured, operational policy you
+change at runtime lives in a register: every write appends one version with
+its committer, and the change is in force on every replica without a
+restart. A register with no version holds its default, version `0`. Without
+`[state]` the routes below answer `409`.
+
+| Register | Document |
+|---|---|
+| `audit-categories` | The category of the data under each template and archetype (Regulation (EU) 2025/327 Annex II 3.2(c)): `national`, the national categories the map may name, each `<system>\|<code>`, and `templates` and `archetypes`, each id to its Art 14(1) categories or `none`. The default maps nothing |
+
+### `GET /operator/registers/{register}`
+
+The version in force: `register`, `version`, `document`, `committer` and
+`committed_at` (both absent for the default), with the version as the
+`ETag`. A name no register has answers `404`.
+
+### `PUT /operator/registers/{register}`
+
+The body is the whole new document, as JSON. The write names, in
+`If-Match`, the version it replaces, as the read's `ETag` gave it, such as
+`"0"` for the default.
+
+| Answer | When |
+|---|---|
+| `200` | The version is committed and every replica classifies by it from its next request on. The body is the new version and the `ETag` its number |
+| `400` | The document is no JSON, is not the register's shape, or breaks its rules (`bad-register`); the version in force stays |
+| `404` | No register has the name |
+| `409` | No `[state]` is configured |
+| `412` | The register changed since the version `If-Match` names: read it again |
+| `428` | No `If-Match` |
+| `503` | The state store did not answer (`registers-unavailable`) |
+
+A write notifies every replica in the transaction that commits it, and each
+replica drops its copy of the register. While a replica's listener is
+disconnected, every request on it reads the register from the store, so a
+lost notification never leaves an old version in force.
+
+### `GET /operator/registers/{register}/history`
+
+Every committed version, newest first.
+
 ## Inbound sources
 
 The systems that send patient events to the bridge are inbound sources, each
@@ -402,8 +445,8 @@ A source carries a `name` (`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, at most
 
 | Kind | Document |
 |---|---|
-| `webhook` | `verify`: `scheme` (`hmac-sha256`), `header` and `keys`, a list of secrets any of which verifies, newest first; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled` |
-| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; `tenants` as above |
+| `webhook` | `verify`: the verifier, by `kind` (`hmac` with `algorithm`, `header`, `encoding` and `prefix`; `standard-webhooks` with `schemes`, `tolerance` and `endpoint_id`; `static-header` with `header`; `mtls` with `subjects`); `keys`: the secrets the verifier checks with, any of which verifies, newest first, none for `mtls`; `events`: the event map (`tenant`, `entity`, `rules`, `otherwise`, `dedupe` and `stamp`); `recovery`: the optional `redeliver` and `reconcile` steps; `tenants`: each `tenant`, `identifier_system`, optional `credentials` (a secret) and `enabled`; `limits`: `body_limit` (`65536`), `concurrency` (`4`) and `max_pending` (`100000`). [The inbound intake](../integrate/inbound.md) describes each part |
+| `fhir-subscription` | optional `header`: `name` and `keys`, the `Subscription.channel.header` the sender authenticates with; optional `mtls`: the `subjects` its client certificate must carry, at least one of the two; `subscriptions`: the tenant of each subscription reference; optional `base`: the FHIR base a relative reference resolves against; `tenants` as above ([FHIR Subscription notifications](../integrate/inbound.md#fhir-subscription-notifications)) |
 | `mllp` | `routes`: each `sending_application` (MSH-3) and `sending_facility` (MSH-4), bound to a `certificate_subject`, to `source_cidrs`, or to both |
 
 A secret is named, never written: `{"secret": "<name>"}` resolves through
@@ -456,6 +499,43 @@ and a missing one `428`. Disabling is a `PUT` with `"enabled": false`.
 
 Deletes a source under `If-Match`, recording the deletion as its last
 version; `204`.
+
+### `GET /operator/sources/{id}/parked`
+
+The parked inbound work items of one source, oldest first, each with its
+`tenant`, `entity`, fixed `reason`, `attempts` and `since`
+([The inbound intake](../integrate/inbound.md#retry-park-and-replay)). With
+`[inbound]` off it answers `404` [`not-found`](problems.md#not-found).
+
+### `POST /operator/sources/{id}/settle`
+
+Settles one parked item from `{"tenant", "entity", "settlement", "reason"}`,
+`settlement` being `retry` or `discard`; `204`. The subject of the
+operator's token and the reason are recorded with it. A blank reason answers
+`400` [`reason-required`](problems.md#reason-required), and an entity with no
+parked item `404` [`not-parked`](problems.md#not-parked).
+
+### `POST /operator/sources/{id}/replay`
+
+Runs inbound work again at a new generation, for one entity
+(`{"tenant", "entity"}`) or for every entity an event received in a range
+named (`{"from", "to"}`, RFC 3339, `to` exclusive); `202` with
+`{"items": <n>}`. A range whose `from` is not before its `to` answers `400`.
+
+### `POST /operator/sources/{id}/reconcile`
+
+Runs every reconciliation poll of the source now, whatever its cursors'
+schedule, under the source's recovery lease; `202` with `{"items": <n>}`,
+the entities marked due. While another replica holds the lease it answers
+`409` [`recovery-leased`](problems.md#recovery-leased), and a poll the
+source refuses or fails answers `502` [`recovery-failed`](problems.md#recovery-failed).
+
+### `POST /operator/sources/{id}/redeliver`
+
+Calls the source's redelivery step now; `204` once the source accepted it,
+`404` when the source declares none, and `502`
+[`recovery-failed`](problems.md#recovery-failed) when the source refused or
+failed the call.
 
 ## What the log records
 

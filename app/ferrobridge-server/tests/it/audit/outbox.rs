@@ -12,7 +12,6 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::time::Duration;
 
-use ehds_logging::map::CategoryMap;
 use ferrobridge_server::audit::outbox::StateOutbox;
 use ferrobridge_server::store::Store;
 use ihe_atna::atna::forwarder::Outbox;
@@ -77,8 +76,8 @@ async fn two_replicas_forwarding_together_send_each_record_once() -> Result<(), 
         outbox.store(&record(n)).await?;
     }
     let arr = super::repository().await;
-    let one = super::access_log(&arr, &first, &CDR.parse()?, CategoryMap::default())?;
-    let two = super::access_log(&arr, &second, &CDR.parse()?, CategoryMap::default())?;
+    let one = super::access_log(&arr, &first, &CDR.parse()?, None).await?;
+    let two = super::access_log(&arr, &second, &CDR.parse()?, None).await?;
     let seen = received(&arr, 40).await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
     let again = received(&arr, 40).await?;
@@ -109,7 +108,7 @@ async fn a_record_a_stopped_replica_stored_is_sent_by_another() -> Result<(), Bo
         .await?;
     killed.pool().close().await;
     let arr = super::repository().await;
-    let log = super::access_log(&arr, &survivor, &CDR.parse()?, CategoryMap::default())?;
+    let log = super::access_log(&arr, &survivor, &CDR.parse()?, None).await?;
     let seen = received(&arr, 1).await?;
     assert_eq!(Some(&1), seen.get("synthetic-1"));
     log.stop();
@@ -133,7 +132,7 @@ async fn a_record_a_stopped_replica_claimed_is_sent_by_another_once_its_lease_ru
     drop(claimed);
     killed.pool().close().await;
     let arr = super::repository().await;
-    let log = super::access_log(&arr, &survivor, &CDR.parse()?, CategoryMap::default())?;
+    let log = super::access_log(&arr, &survivor, &CDR.parse()?, None).await?;
     let seen = received(&arr, 1).await?;
     assert_eq!(Some(&1), seen.get("synthetic-2"));
     assert_eq!(0, waiting(&survivor).await?);

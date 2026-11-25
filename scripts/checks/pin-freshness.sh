@@ -24,9 +24,12 @@
 # against the current release its guide's `package-list.json` names when the
 # pin comes from the guide's canonical site, and
 # the Chrome for Testing release against the newest Stable version its JSON
-# endpoint lists, and a draft implementing act of Regulation (EU) 2025/327
+# endpoint lists, a draft implementing act of Regulation (EU) 2025/327
 # against the first document of the newest publication on its Have your say
-# initiative, which moves when a new draft or the adopted act is published. Needs an authenticated `gh`, curl and jq. `--self-test` runs
+# initiative, which moves when a new draft or the adopted act is published,
+# and a MyHealth@EU CI build against the version, build date
+# and bytes build-fhir.ehdsi.eu serves now, with any guide listed there that
+# the matrix does not know. Needs an authenticated `gh`, curl and jq. `--self-test` runs
 # the Chrome for Testing reader and the product image readers over fixtures
 # and needs no network.
 #
@@ -127,6 +130,41 @@ initiative_newest() {
   jq -er '[.publications[]? | select((.attachments // []) | length > 0)]
     | sort_by(.publishedDate) | last | .attachments[0].documentId | select(type == "string")'
 }
+
+# One "package<TAB>version<TAB>tarball URL<TAB>sha256" record per profile
+# package row of the matrix on stdin that pins a MyHealth@EU CI build.
+ci_build_pins() {
+  awk -F'|' '
+    NF >= 4 && $3 ~ /tarball `https:\/\/build-fhir\.ehdsi\.eu\// {
+      k = $2; v = $3
+      gsub(/[ `]/, "", k); gsub(/`/, "", v)
+      n = split(v, t, /[[:space:]]+/)
+      ver = ""; url = ""; sum = ""
+      for (i = 1; i <= n; i++) {
+        if (ver == "" && t[i] != "") ver = t[i]
+        if (t[i] == "tarball") url = t[i + 1]
+        if (t[i] == "sha256") sum = t[i + 1]
+      }
+      print k "\t" ver "\t" url "\t" sum
+    }'
+}
+
+# The guides the MyHealth@EU CI index page on stdin links to, one per line.
+ci_guides() {
+  grep -oE 'href="https://build-fhir\.ehdsi\.eu/[a-z0-9-]+/?"' | sed -E 's#.*ehdsi\.eu/([a-z0-9-]+)/?"#\1#' | LC_ALL=C sort -u
+}
+
+# The MyHealth@EU CI guides the matrix knows, pinned or not: a guide listed on
+# the index and missing here is a new guide to look at.
+readonly CI_GUIDES_KNOWN="core
+epd
+eps
+euvac
+hdr
+imaging
+laboratory
+mvc-package
+ncp-api"
 
 # The Chrome for Testing release the browser journeys run Chrome and
 # chromedriver at, read against the newest Stable release the Chrome for
@@ -366,6 +404,12 @@ self_test() {
   expect "090166e5374c0181" "$got" "the newest draft of an initiative"
   got="$(initiative_newest <<< '{"publications":[{"publishedDate":"2026/11/23 09:17:20","attachments":[{"documentId":"a"}]},{"publishedDate":"2027/05/02 10:00:00","attachments":[{"documentId":"b"}]}]}')"
   expect "b" "$got" "the adopted act of an initiative"
+  # shellcheck disable=SC2016 # the backticks are the matrix's own text
+  got="$(ci_build_pins <<< '| `myhealth.eu.fhir.core` | 1.0.1 files `134` digest `ab` tarball `https://build-fhir.ehdsi.eu/core/package.tgz` sha256 `cd` | x |
+| `hl7.fhir.eu.base` | 2.0.1 files `75` digest `ef` | y |' | tr '\t' ' ')"
+  expect "myhealth.eu.fhir.core 1.0.1 https://build-fhir.ehdsi.eu/core/package.tgz cd" "$got" "the CI build pins of the matrix"
+  got="$(ci_guides <<< '<a href="https://build-fhir.ehdsi.eu/hdr">x</a><a href="https://build-fhir.ehdsi.eu/core/">y</a><a href="https://example.org/z">' | paste -sd ' ' -)"
+  expect "core hdr" "$got" "the guides of the CI index"
   got="$(package_list_current <<< '{"list":[{"version":"0.2.0"}]}' || echo none)"
   expect "none" "$got" "a package list that marks no current release"
   local fixture d1 d2
@@ -614,6 +658,42 @@ while IFS=$'\t' read -r label initiative; do
   verdict "$label" "$pinned" "$latest" "$url"
   [[ "$pinned" = "$latest" ]] || stale=1
 done <<< "$WATCHED_INITIATIVES"
+# Each MyHealth@EU CI build, read against the build its URL serves now: the
+# version and date of its package.manifest.json, and the sha256 of its bytes,
+# since the publisher overwrites a build in place.
+readonly CI_INDEX=https://build-fhir.ehdsi.eu/
+while IFS=$'\t' read -r package version url sum; do
+  [[ -n "$package" ]] || continue
+  manifest_url="${url%/package.tgz}/package.manifest.json"
+  if ! manifest="$(curl --proto '=https' --tlsv1.2 -fsSL "$manifest_url" 2>&1)" \
+    || ! served="$(jq -er '"\(.version) \(.date)"' <<< "$manifest" 2>&1)"; then
+    printf 'UNREADABLE %s: could not read %s (%s)\n' "$package" "$manifest_url" "${served:-$manifest}"
+    unreadable=1
+    continue
+  fi
+  if ! got="$(curl --proto '=https' --tlsv1.2 -fsSL "$url" | shasum -a 256 | cut -d' ' -f1)" || [[ "$got" = "$(printf '' | shasum -a 256 | cut -d' ' -f1)" ]]; then
+    printf 'UNREADABLE %s: could not download %s\n' "$package" "$url"
+    unreadable=1
+    continue
+  fi
+  if [[ "${served%% *}" = "$version" && "$got" = "$sum" ]]; then
+    printf 'current    %s %s, CI build %s (%s)\n' "$package" "$version" "${served#* }" "$url"
+  else
+    printf 'STALE      %s: pinned the CI build %s with sha256 %s, %s now serves %s built %s with sha256 %s\n' \
+      "$package" "$version" "$sum" "$url" "${served%% *}" "${served#* }" "$got"
+    stale=1
+  fi
+done < <(ci_build_pins < "$MATRIX")
+
+if ! guides="$(curl --proto '=https' --tlsv1.2 -fsSL "$CI_INDEX" | ci_guides)" || [[ -z "$guides" ]]; then
+  printf 'UNREADABLE MyHealth@EU CI guides: could not read the index at %s\n' "$CI_INDEX"
+  unreadable=1
+elif new_guides="$(LC_ALL=C comm -23 <(printf '%s\n' "$guides") <(printf '%s\n' "$CI_GUIDES_KNOWN" | LC_ALL=C sort))" && [[ -n "$new_guides" ]]; then
+  printf 'STALE      MyHealth@EU CI guides: %s lists guides this script does not know: %s\n' "$CI_INDEX" "$(paste -sd ' ' - <<< "$new_guides")"
+  stale=1
+else
+  printf 'current    MyHealth@EU CI guides (%s)\n' "$CI_INDEX"
+fi
 
 pinned="$(matrix_pin "$CHROME_LABEL")"
 if [[ -z "$pinned" ]]; then

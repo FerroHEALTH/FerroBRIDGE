@@ -22,6 +22,7 @@ pub mod error;
 mod events;
 mod fhir_outbound;
 pub mod hl7v2;
+mod inbound;
 mod omop_incremental;
 mod resolve;
 pub mod section;
@@ -67,6 +68,7 @@ use section::change_feed::ChangeFeed;
 use section::events::Events;
 use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
+use section::inbound::Inbound;
 use section::omop_incremental::OmopIncremental;
 use section::shl::Shl;
 use section::state::State;
@@ -160,6 +162,8 @@ pub struct Config {
     pub audit: Audit,
     /// The person's SMART Health Links, off until its section turns it on.
     pub shl: Shl,
+    /// The inbound intake, off until its section turns it on.
+    pub inbound: Inbound,
     /// Where each key came from, which the load records and no file states.
     #[serde(skip)]
     provenance: Provenance,
@@ -381,6 +385,7 @@ impl Config {
             omop_incremental: omop_incremental::resolve(self)?,
             fhir_outbound: fhir_outbound::resolve(self)?,
             shl: shl::resolve(self)?,
+            inbound: inbound::resolve(self)?,
             hl7v2: resolve_hl7v2(self)?,
             operations: OperationsSettings {
                 enabled: self.operations.enabled,
@@ -522,6 +527,8 @@ pub struct Settings {
     pub fhir_outbound: Option<crate::outbound::Settings>,
     /// The person's SMART Health Links, when they are served.
     pub shl: Option<crate::shl::Settings>,
+    /// The inbound intake, when it is on.
+    pub inbound: Option<crate::inbound::Settings>,
     /// The FHIRconnect operations lane.
     pub operations: OperationsSettings,
     /// The installation report to `FerroPULSE`.
