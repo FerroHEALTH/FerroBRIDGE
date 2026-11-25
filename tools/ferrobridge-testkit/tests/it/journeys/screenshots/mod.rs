@@ -529,7 +529,6 @@ async fn answers(
     reload(browser, stack).await?;
     capture(browser, &MAPPINGS_RELOADED, theme, width).await?;
     visit(browser, stack, &MAPPINGS_REVISIONS, (theme, width)).await?;
-    visit(browser, stack, &REVISION, (theme, width)).await?;
     let files = tempfile::tempdir()?;
     let zipped = crate::journeys::archive::archive(files.path(), "regional")?;
     crate::journeys::archive::import(
@@ -539,7 +538,8 @@ async fn answers(
         "a context from the regional repository",
     )
     .await?;
-    capture(browser, &MAPPINGS_IMPORTED, theme, width).await
+    capture(browser, &MAPPINGS_IMPORTED, theme, width).await?;
+    visit(browser, stack, &REVISION, (theme, width)).await
 }
 
 /// Captures every shot of the full stack in `theme`.
