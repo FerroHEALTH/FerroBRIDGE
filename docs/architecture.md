@@ -2805,7 +2805,9 @@ draft upstream change.
   own design). A patient-scoped token's launch patient and every search
   subject resolve the same way, the identity map first and on a miss the
   party read and ITI-83, so a `Patient` with no party the CDR holds reaches
-  no data (our own design). `person_id` maps one
+  no data (our own design). Under `[audit]` the bridge records each ITI-83
+  exchange in the audit outbox as the PIXm Query Consumer `AuditEvent`
+  (PIXm 3.1.0 §2:3.83.5.1.1). `person_id` maps one
   `ehr_id` to one person on the OMOP side; reconciling one person across
   several EHRs is a deployment decision the CDM leaves to the ETL, and the
   bridge does not guess it.

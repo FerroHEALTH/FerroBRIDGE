@@ -472,7 +472,7 @@ pub struct Ingest<'a> {
     /// The composer every composition names, when the face named one.
     composer: Option<Composer>,
     /// Whom the identity source is asked for on behalf of.
-    on_behalf: ihe_atna_next::user::OnBehalfOf,
+    on_behalf: ihe_atna::user::OnBehalfOf,
 }
 
 /// The translator of an ingest built with none: no server, so a
@@ -510,14 +510,14 @@ impl<'a> Ingest<'a> {
             facility: None,
             provider: None,
             composer: None,
-            on_behalf: ihe_atna_next::user::OnBehalfOf::System,
+            on_behalf: ihe_atna::user::OnBehalfOf::System,
         }
     }
 
     /// Returns this ingest asking the identity source on behalf of
     /// `on_behalf`; the default asks for the bridge itself.
     #[must_use]
-    pub fn with_on_behalf(mut self, on_behalf: ihe_atna_next::user::OnBehalfOf) -> Self {
+    pub fn with_on_behalf(mut self, on_behalf: ihe_atna::user::OnBehalfOf) -> Self {
         self.on_behalf = on_behalf;
         self
     }

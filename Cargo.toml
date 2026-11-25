@@ -182,12 +182,11 @@ ferrohealth-usage-report = { version = "=0.5.0", default-features = false }
 # Feed (`feed`) through a `FeedClient` the server writes over its own
 # ferrohealth-smart `OutboundClient`, so the two requirements move apart. Pinned exactly, as a product pins every shared crate;
 # only the server links them.
-ehds-logging = { version = "=0.23.0", default-features = false }
-ihe-atna = { version = "=0.23.0", default-features = false }
+ehds-logging = { version = "=0.27.0", default-features = false }
+ihe-atna = { version = "=0.27.0", default-features = false }
 # The IHE ITI identity profiles (FerroPIX): the PIXm Consumer that asks the
 # identity source for a patient's pseudonym (ITI-83). Pinned exactly.
-ihe-iti = { version = "=0.21.1", default-features = false }
-ihe-atna-next = { package = "ihe-atna", version = "=0.25.0", default-features = false }
+ihe-iti = { version = "=0.22.0", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
@@ -424,10 +423,11 @@ deref_by_slicing = "warn"
 # A clean 500 relies on catch_unwind, which only catches unwinding panics, and
 # tests ignore the panic setting, so abort would be untestable
 # (https://doc.rust-lang.org/cargo/reference/profiles.html#panic).
-# `ihe-atna` writes its BALP `AuditEvent` through the published `fhir-types`,
-# which this workspace builds from source: one model, so the spool's record
-# check and the facade's resources are one crate.
+# `ihe-atna` and `ihe-iti` build on the published `fhir-types` and
+# `fhir-search`, which this workspace builds from source: one copy of each, so
+# the spool's record check and the facade's resources are one model.
 [patch.crates-io]
+fhir-search = { path = "crates/fhir-search" }
 fhir-types = { path = "crates/fhir-types" }
 
 [profile.release]

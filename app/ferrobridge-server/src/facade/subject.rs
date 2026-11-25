@@ -19,7 +19,7 @@ use std::sync::Arc;
 use fhir_types::codec::Value;
 use fhirconnect::engine::demographics::Demographics;
 use http::StatusCode;
-use ihe_atna_next::user::OnBehalfOf;
+use ihe_atna::user::OnBehalfOf;
 use ihe_iti::pixm::identifier::SourceIdentifier;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 
@@ -316,7 +316,7 @@ fn unprocessable(kind: IssueType, text: String) -> Refused {
 pub fn on_behalf(access: &ferrohealth_smart::resource::Access) -> OnBehalfOf {
     access.caller().map_or(OnBehalfOf::System, |caller| {
         OnBehalfOf::User(
-            ihe_atna_next::user::User::local(caller.subject().to_owned())
+            ihe_atna::user::User::local(caller.subject().to_owned())
                 .with_issuer(caller.issuer().map(str::to_owned))
                 .with_client_id(caller.client_id().map(str::to_owned)),
         )

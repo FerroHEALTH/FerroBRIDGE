@@ -13,7 +13,7 @@
 use std::time::Duration;
 
 use http::StatusCode;
-use ihe_atna_next::user::OnBehalfOf;
+use ihe_atna::user::OnBehalfOf;
 use ihe_iti::pixm::PixmClient;
 use ihe_iti::pixm::error::{InvalidInput, PixmError};
 use ihe_iti::pixm::identifier::{CrossReference, SourceIdentifier, TargetSystem};
@@ -141,6 +141,17 @@ impl IdentitySource {
             pseudonym_domain,
             source_domains,
             timeout,
+        }
+    }
+
+    /// Returns this identity source recording every ITI-83 exchange through
+    /// `recorder` as the `PIXm` Query Consumer audit profile fixes it (`PIXm`
+    /// 3.1.0 §2:3.83.5.1.1).
+    #[must_use]
+    pub fn audited(self, recorder: std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>) -> Self {
+        Self {
+            pixm: self.pixm.audited(recorder),
+            ..self
         }
     }
 
