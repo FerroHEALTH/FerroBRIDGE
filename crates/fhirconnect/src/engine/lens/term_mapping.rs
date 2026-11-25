@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn a_written_mapping_is_always_equivalent_and_keeps_its_purpose() {
         let existing = TermMapping {
-            purpose: Some(
+            purpose: Some(Box::new(
                 openehr_rm::v1_2::data_types::text::dv_coded_text::DvCodedText {
                     value: String::from("billing"),
                     hyperlink: None,
@@ -319,7 +319,7 @@ mod tests {
                         preferred_term: None,
                     },
                 },
-            ),
+            )),
             ..mapping('=')
         };
         let view = code_of("http://loinc.org", "LP74849-8");

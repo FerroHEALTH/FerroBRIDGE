@@ -202,8 +202,8 @@ pub const CDR_MAIN_POSTGRES: PinnedImage = PinnedImage {
 /// The `FerroHEALTH` SMART App Launch 2.x authorization server.
 pub const FERROSMART: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferrosmart",
-    tag: "0.6.0",
-    digest: "sha256:28ca6593c5055390c5cb9796f9b183519e1323ffe1fb70d7cf260316db6467cc",
+    tag: "0.7.0",
+    digest: "sha256:dddde7e14fcdd85ce50dad9040ae3a83fefb7a358d37e33e1d09be9a22403dbb",
 };
 
 /// The reference FHIR terminology server.

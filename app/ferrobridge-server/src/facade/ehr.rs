@@ -208,7 +208,7 @@ pub fn status_of(person: &PersonId, link: &SubjectLink) -> EhrStatus {
         // NOTE: an `EHR_STATUS` is an archetype root, and
         // `LOCATABLE.Archetyped_valid` makes `archetype_details` mandatory on
         // one (<https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html>).
-        archetype_details: Some(Archetyped {
+        archetype_details: Some(Box::new(Archetyped {
             archetype_id: ArchetypeId {
                 value: String::from(EHR_STATUS_ARCHETYPE),
             },
@@ -216,17 +216,17 @@ pub fn status_of(person: &PersonId, link: &SubjectLink) -> EhrStatus {
             // NOTE: RM Common IM Release 1.1.0 §3.2.3 `rm_version`; this `EHR_STATUS` carries no attribute
             // the development line changed, so it was created to Release 1.1.0.
             rm_version: String::from(openehr_rm::Generation::V1_1.spec_version()),
-        }),
+        })),
         feeder_audit: None,
         subject: PartySelf {
-            external_ref: Some(PartyRef {
+            external_ref: Some(Box::new(PartyRef {
                 namespace: String::from(person.namespace()),
                 r#type: String::from(link.party_type()),
                 id: ObjectId::GenericId(GenericId {
                     value: String::from(person.id()),
                     scheme: String::from(person.namespace()),
                 }),
-            }),
+            })),
         },
         is_queryable: true,
         is_modifiable: true,

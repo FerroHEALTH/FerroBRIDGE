@@ -189,7 +189,7 @@ pub fn details(kept: &[(String, String)]) -> Option<ItemStructure> {
     let items = kept
         .iter()
         .map(|(element, rendering)| {
-            Item::Element(Element {
+            Item::Element(Box::new(Element {
                 name: dv_text(element),
                 archetype_node_id: DETAILS_NODE.to_owned(),
                 uid: None,
@@ -197,9 +197,9 @@ pub fn details(kept: &[(String, String)]) -> Option<ItemStructure> {
                 archetype_details: None,
                 feeder_audit: None,
                 null_flavour: None,
-                value: Some(DataValue::DvText(dv_text(rendering))),
+                value: Some(Box::new(DataValue::DvText(dv_text(rendering)))),
                 null_reason: None,
-            })
+            }))
         })
         .collect();
     Some(ItemStructure::ItemTree(Box::new(ItemTree {
