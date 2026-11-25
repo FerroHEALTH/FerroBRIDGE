@@ -13,9 +13,11 @@
 //! each notification names before the notification counts as received, and
 //! everything when the session connects again. [`Listeners`] holds every
 //! channel on one `LISTEN` session apart from the pool, so the pool may run
-//! through a transaction-mode pooler that would end a `LISTEN`. No
-//! specification governs the invalidation: our own design on family
-//! precedent.
+//! through a transaction-mode pooler that would end a `LISTEN`. Every
+//! channel is a [`Channel`] declared here, and every write notifies through
+//! [`Channel::notify`]; [`Wake`] is the subscriber that wakes the tasks
+//! waiting on a channel. No specification governs the invalidation: our own
+//! design on family precedent.
 
 use std::fmt;
 use std::future::Future;
@@ -24,6 +26,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
+use sqlx::PgConnection;
 use sqlx::postgres::{PgConnectOptions, PgListener, PgPoolOptions};
 
 /// The `application_name` of the listener session, which tells an operator
@@ -32,6 +35,106 @@ pub const SESSION_NAME: &str = "ferrobridge state listener";
 
 /// The pause before a lost listener connects again.
 const RECONNECT: Duration = Duration::from_secs(1);
+
+/// A channel of the store, declared once here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Channel(&'static str);
+
+/// The settings registers: the payload is the register's name.
+pub const SETTINGS: Channel = Channel("ferrobridge_settings");
+
+/// The inbound sources: the payload is `<source id>:<version>`.
+pub const SOURCES: Channel = Channel("ferrobridge_sources");
+
+/// The running mapping revision: the payload is the revision id.
+pub const MAPPINGS: Channel = Channel("ferrobridge_mappings");
+
+/// The inbound work: the payload is the id of the source with due work.
+pub const INBOUND: Channel = Channel("ferrobridge_inbound");
+
+impl Channel {
+    /// Returns the name a session listens on.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        self.0
+    }
+
+    /// Notifies every session listening on the channel of `payload` when the
+    /// transaction on `connection` commits, and none when it rolls back.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the statement fails.
+    pub async fn notify(
+        self,
+        connection: &mut PgConnection,
+        payload: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("SELECT pg_notify($1, $2)")
+            .bind(self.0)
+            .bind(payload)
+            .execute(connection)
+            .await?;
+        Ok(())
+    }
+}
+
+/// The wake-up a notification, and every connect or loss of the listener,
+/// gives the tasks waiting on a channel.
+#[derive(Debug)]
+pub struct Wake {
+    /// The waiting tasks.
+    waiting: tokio::sync::Notify,
+    /// Whether every waiting task wakes, or one.
+    all: bool,
+}
+
+impl Wake {
+    /// Returns the wake of one waiting task, which a wake with no waiter
+    /// keeps for the next.
+    #[must_use]
+    pub fn one() -> Self {
+        Self {
+            waiting: tokio::sync::Notify::new(),
+            all: false,
+        }
+    }
+
+    /// Returns the wake of every task waiting at the time.
+    #[must_use]
+    pub fn all() -> Self {
+        Self {
+            waiting: tokio::sync::Notify::new(),
+            all: true,
+        }
+    }
+
+    /// Returns the next wake, armed now, so a wake that comes before it is
+    /// awaited is not missed.
+    pub fn armed(&self) -> Pin<Box<tokio::sync::futures::Notified<'_>>> {
+        let mut next = Box::pin(self.waiting.notified());
+        next.as_mut().enable();
+        next
+    }
+
+    /// Wakes the waiting tasks.
+    fn wake(&self) {
+        if self.all {
+            self.waiting.notify_waiters();
+        } else {
+            self.waiting.notify_one();
+        }
+    }
+}
+
+impl Subscriber for Wake {
+    fn notified<'a>(&'a self, _payload: &'a str) -> Dropping<'a> {
+        Box::pin(async move { self.wake() })
+    }
+
+    fn reset(&self) -> Dropping<'_> {
+        Box::pin(async move { self.wake() })
+    }
+}
 
 /// The future a [`Subscriber`] answers with.
 pub type Dropping<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;

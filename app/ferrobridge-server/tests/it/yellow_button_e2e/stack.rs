@@ -224,17 +224,19 @@ struct Assertion {
 }
 
 impl Assertion {
-    /// Generates the key.
+    /// Generates a P-384 key, which signs under ES384, one of the two
+    /// algorithms SMART App Launch 2.2.0 (Client Authentication: Asymmetric)
+    /// has a server validate.
     fn new() -> Result<Self, Box<dyn Error>> {
         let pkcs8 = aws_lc_rs::signature::EcdsaKeyPair::generate_pkcs8(
-            &aws_lc_rs::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &aws_lc_rs::signature::ECDSA_P384_SHA384_FIXED_SIGNING,
             &aws_lc_rs::rand::SystemRandom::new(),
         )
         .map_err(|_unspecified| "an assertion key")?;
         let encoding = jsonwebtoken::EncodingKey::from_ec_der(pkcs8.as_ref());
         let mut jwk = serde_json::to_value(jsonwebtoken::jwk::Jwk::from_encoding_key(
             &encoding,
-            jsonwebtoken::Algorithm::ES256,
+            jsonwebtoken::Algorithm::ES384,
         )?)?;
         jwk["kid"] = serde_json::json!(BRIDGE_KID);
         jwk["use"] = serde_json::json!("sig");

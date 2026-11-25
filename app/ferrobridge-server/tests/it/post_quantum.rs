@@ -35,7 +35,7 @@ const ANSWER: &[u8] =
 
 /// The configuration a CDR, a change feed and a facade make, which the
 /// outbound lane follows.
-const FEED: &str = "[auth]\nenabled = false\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[change_feed]\nenabled = true\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n";
+const FEED: &str = "[auth]\nenabled = false\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[change_feed]\nenabled = true\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n";
 
 /// The synthetic material of one case, with the CA written where an
 /// endpoint's `tls.trust_roots_file` names it.

@@ -70,6 +70,28 @@ use crate::engine::lens::date_time::InstantShortfall;
 use crate::engine::lens::term_mapping::Withheld;
 use crate::model::ast::keyword::Direction;
 
+/// Builds a `DV_QUANTIFIED` descendant of the given fields, taking the
+/// reference-range attributes no data-type table maps from the held value.
+///
+/// `normal_status`, `normal_range`, `other_reference_ranges` and
+/// `magnitude_status` are `-` in every quantified table, so the fields
+/// passed are the ones the cell writes and `accuracy`, whose type differs by
+/// RM class.
+macro_rules! quantified {
+    ($kind:ident, $existing:expr, { $($field:ident $(: $value:expr)?),+ $(,)? }) => {{
+        let existing = $existing;
+        $kind {
+            normal_status: existing.and_then(|held| held.normal_status.clone()),
+            normal_range: existing.and_then(|held| held.normal_range.clone()),
+            other_reference_ranges: existing.and_then(|held| held.other_reference_ranges.clone()),
+            magnitude_status: existing.and_then(|held| held.magnitude_status.clone()),
+            $($field $(: $value)?),+
+        }
+    }};
+}
+
+pub(crate) use quantified;
+
 /// One data-type cell of the specification's chapter, run both ways.
 ///
 /// `O` is the openEHR reference-model value and `F` the FHIR element. One

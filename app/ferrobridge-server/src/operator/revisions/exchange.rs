@@ -29,13 +29,14 @@ use http::header;
 use crate::mappings::files;
 use crate::mappings::revisions::{Entry, Recording};
 use crate::operator::Operator;
-use crate::operator::guard::AUDIT_TARGET;
+use crate::operator::guard::audited;
+use crate::operator::refused::Refused;
 use crate::operator::reload::ReloadError;
 use crate::operator::revisions::archive;
 use crate::operator::save::{
-    Failure, OnBlockingThread, Refused, blocking, reason, subject_of, unavailable,
+    Failure, OnBlockingThread, Uncompiled, blocking, reason, subject_of, unavailable,
 };
-use crate::problem::{Kind, refuse};
+use crate::problem::Kind;
 
 /// The media type of a mapping-set archive.
 pub const ZIP: &str = "application/zip";
@@ -112,10 +113,10 @@ pub async fn import(
 ) -> Response {
     let subject = subject_of(&access).to_owned();
     let Some(reason) = reason(&headers) else {
-        return refuse(
+        return Refused::Problem(
             Kind::ReasonRequired,
             "an import names its reason in the Ferrobridge-Reason header, one line of at most 200 characters",
-        );
+        ).into_response();
     };
     let zipped = headers
         .get(header::CONTENT_TYPE)
@@ -155,16 +156,14 @@ pub async fn import(
         Ok(Imported::Unavailable { error }) => (None, 0, unavailable(&error)),
         Err(failure) => (None, 0, failure.into_response()),
     };
-    tracing::info!(
-        target: AUDIT_TARGET,
-        subject = subject.as_str(),
-        action = "import",
+    audited!(
+        subject.as_str(),
+        "import",
+        response.status(),
         archive_sha256 = digest.as_str(),
         files = files,
         recorded = recorded.as_deref().unwrap_or("-"),
         reason = reason.as_str(),
-        status = response.status().as_u16(),
-        "operator"
     );
     response
 }
@@ -183,8 +182,8 @@ impl Operator {
         let contents = archive::import(archive).map_err(Failure::Archive)?;
         let report = match self.compile(thread, &contents) {
             Ok(prepared) => self.load_report(prepared.report()),
-            Err(Refused::Rejected(report)) => return Ok(Imported::Rejected { report }),
-            Err(Refused::Unavailable(error)) => return Ok(Imported::Unavailable { error }),
+            Err(Uncompiled::Rejected(report)) => return Ok(Imported::Rejected { report }),
+            Err(Uncompiled::Unavailable(error)) => return Ok(Imported::Unavailable { error }),
         };
         let change = thread.wait(store.change()).map_err(Failure::Store)?;
         let entry = Entry {

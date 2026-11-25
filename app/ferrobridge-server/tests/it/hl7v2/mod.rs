@@ -638,6 +638,7 @@ mod facility;
 mod feeder_audit;
 mod intake;
 mod plain;
+mod proofs;
 mod registry;
 mod relay;
 mod routes;

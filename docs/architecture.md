@@ -1039,8 +1039,9 @@ expression is a load error: the reference CDR's connector let `where()` and
   identity map and the CDR; an absolute one is fetched only from a base on
   the `[facade.references] fetch_bases` allow-list (empty by default, so by
   default nothing is fetched and no client can make the bridge call a URL it
-  names), with redirects refused, a timeout, `max_depth` levels and each
-  literal resolved once, every fetch logged by type, id, base and upstream
+  names), through one `ferrohealth-smart` `OutboundClient` with redirects
+  refused, a timeout and one try, `max_depth` levels and each literal
+  resolved once, every fetch logged by type, id, base and upstream
   status. No specification governs that policy: our own design.
 - **A read-side Bundle is well formed.** One entry per composition per
   resource type (two programs over one template do not double an entry), a
@@ -2518,7 +2519,15 @@ own design on family precedent.
 **The inbound intake.** No specification governs an inbound patient-event
 intake: ITS-REST 1.1.0 defines no change notification in either direction
 (<https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/>), so
-the intake is our own design, built on the standard of each step. Behind
+the intake is our own design, built on the standard of each step.
+`crate::inbound` is the one intake owner for every transport. The HTTP
+intake and the HL7 v2 face prove a sender through one
+`inbound::verify::Proofs` set of `Verifier` proofs, every one of which must
+hold, and either commit a clinical message through `facade::ingest` or
+store a patient event in the inbox. The one `Handler` the workers run,
+`inbound::apply::Apply`, is where every inbound step is written, so a new
+inbound feature adds a step there and never a second pipeline beside it.
+Behind
 `[inbound]`, `POST /inbound/{source}` serves every webhook source of `0008`.
 The raw body is read within the source's `limits.body_limit` and
 `[inbound] body_limit`. The source's verifier runs over the raw bytes before
@@ -2596,8 +2605,11 @@ leads the source and after a run of `503` answers, and `reconcile` polls
 that read the entities changed since a cursor per tenant and mark each one
 due. One replica runs a source's recovery under the lane lease
 `inbound-recover:<source id>`, and a cursor (`inbound_cursor`) moves only in
-a transaction that fences the generation that read it. The schedule is our
-own design, since no specification governs it.
+a transaction that fences the generation that read it. Every recovery call
+goes through a `ferrohealth-smart` `OutboundClient`, one per source version
+and credential, which presents the credential's client certificate, gives a
+call 30 seconds and one try, and follows no redirect. The schedule and these
+limits are our own design, since no specification governs them.
 A `fhir-subscription` source receives R4 notifications of the Subscriptions
 R5 Backport IG STU 1.1.0
 (<https://hl7.org/fhir/uv/subscriptions-backport/notifications.html>) on the
@@ -2647,12 +2659,15 @@ TLS with a client certificate per sender (#1638) stays the default and the
 plain listener is an explicit exception for devices.
 
 The senders are `mllp` inbound sources of the state store (#2061), routed by
-MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) through `inbound_route_mllp`. A route
-holds the `certificate_subject` the TLS listener checks against the client
-certificate's subject alternative names, the `source_cidrs` the plain
-listener checks against the peer address, or both, and its source carries
-the per-sender settings. A message whose route the connection does not
-match is answered `AR`, and its plain connection closed
+MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) through `inbound_route_mllp`. A route's
+`certificate_subject` and `source_cidrs` read as `inbound::verify::Verifier`
+proofs (`mtls` against the client certificate's subject alternative names,
+`network` against the peer address), and every proof a route holds must
+hold, through the `Proofs` set the HTTP intake verifies with too. The TLS
+listener needs a route with a certificate proof and the plain listener one
+with a network proof. Its source carries the per-sender settings. A message
+whose connection fails a proof of its route is answered `AR`, and its plain
+connection closed
 (`Connection::close`); a message the store cannot route is answered `AE`.
 The file keeps the listeners alone (`listen`, `[hl7v2.tls]`,
 `[hl7v2.plain] bind`, the timeouts and `frame_limit`), so a new source never

@@ -3,7 +3,7 @@
 
 //! The sources' rows: the head row, every version, and the tenants and MLLP
 //! routes derived from the head document, written in one transaction that
-//! notifies `ferrobridge_sources` when it commits.
+//! notifies [`SOURCES`] when it commits.
 //!
 //! A change and a deletion name the version they replace, and a write over a
 //! version another writer replaced since is refused, the precondition of RFC
@@ -17,9 +17,7 @@ use uuid::Uuid;
 
 use super::Source;
 use super::document::{Document, Invalid};
-
-/// The channel every replica hears a change of a source on.
-pub const CHANNEL: &str = "ferrobridge_sources";
+use crate::store::listen::SOURCES;
 
 /// The columns a source is read with.
 const COLUMNS: &str = "id, name, kind, enabled, version, document::text, updated_by, \
@@ -298,7 +296,7 @@ impl SourceStore {
             .bind(id)
             .execute(&mut *tx)
             .await?;
-        notify(&mut tx, id, "deleted").await?;
+        SOURCES.notify(&mut tx, &format!("{id}:deleted")).await?;
         tx.commit().await?;
         Ok(())
     }
@@ -368,27 +366,18 @@ async fn record(
         .bind(&route.sending_application)
         .bind(&route.sending_facility)
         .bind(id)
+        .bind(route.certificate_subject())
         .bind(
             route
-                .certificate_subject
-                .as_deref()
-                .filter(|subject| !subject.is_empty()),
+                .networks()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
         )
-        .bind(&route.source_cidrs)
         .execute(&mut *connection)
         .await?;
     }
-    notify(connection, id, &version.to_string()).await?;
-    Ok(())
-}
-
-/// Notifies every replica that `id` moved to `version`, delivered when the
-/// caller's transaction commits.
-async fn notify(connection: &mut PgConnection, id: Uuid, version: &str) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT pg_notify($1, $2)")
-        .bind(CHANNEL)
-        .bind(format!("{id}:{version}"))
-        .execute(connection)
+    SOURCES
+        .notify(connection, &format!("{id}:{version}"))
         .await?;
     Ok(())
 }

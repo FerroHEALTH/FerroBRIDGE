@@ -23,11 +23,12 @@ use http::StatusCode;
 use http::header;
 
 use crate::operator::Operator;
-use crate::operator::guard::AUDIT_TARGET;
+use crate::operator::guard::audited;
+use crate::operator::refused::Refused;
 use crate::operator::revisions::apply::Applied;
 use crate::operator::revisions::diff::diff;
 use crate::operator::save::{Failure, Precondition, blocking, reason, subject_of, unavailable};
-use crate::problem::{Kind, refuse};
+use crate::problem::Kind;
 
 /// `GET /operator/revisions`: every revision, newest first, with the id of
 /// the running one.
@@ -113,10 +114,10 @@ pub async fn apply(
 ) -> Response {
     let subject = subject_of(&access).to_owned();
     let Some(reason) = reason(&headers) else {
-        return refuse(
+        return Refused::Problem(
             Kind::ReasonRequired,
             "an apply names its reason in the Ferrobridge-Reason header, one line of at most 200 characters",
-        );
+        ).into_response();
     };
     let precondition = Precondition::of(&headers);
     let applied = blocking(Arc::clone(&operator), {
@@ -144,16 +145,14 @@ pub async fn apply(
         Ok((running, Applied::Unreloaded { error })) => (running, None, unavailable(&error)),
         Err(failure) => (None, None, failure.into_response()),
     };
-    tracing::info!(
-        target: AUDIT_TARGET,
-        subject = subject.as_str(),
-        action = "apply",
+    audited!(
+        subject.as_str(),
+        "apply",
+        response.status(),
         revision = id.as_str(),
         running = running.as_deref().unwrap_or("-"),
         recorded = recorded.as_deref().unwrap_or("-"),
         reason = reason.as_str(),
-        status = response.status().as_u16(),
-        "operator"
     );
     response
 }

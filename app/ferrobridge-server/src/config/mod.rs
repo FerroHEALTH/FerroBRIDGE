@@ -13,22 +13,13 @@
 //! `ferrohealth-usage-report`. No specification governs the configuration:
 //! our own design.
 
-mod audit;
-mod auth;
-mod change_feed;
 mod credentials;
 pub mod document;
 pub mod error;
-mod events;
-mod fhir_outbound;
 pub mod hl7v2;
 pub mod identity_source;
-mod inbound;
-mod omop_incremental;
 mod resolve;
 pub mod section;
-mod shl;
-mod state;
 
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_config::provenance::Provenance;
@@ -49,31 +40,24 @@ use omop_cdm::derived;
 use omop_cdm::writer::input::VisitConcepts;
 
 use error::Error;
-use resolve::hl7v2::resolve_hl7v2;
-use resolve::resolve_cdm;
-use resolve::resolve_cdr;
-use resolve::resolve_etl;
-use resolve::resolve_facade;
-use resolve::resolve_mappings;
-use resolve::resolve_terminology;
-use section::Cdm;
-use section::Cdr;
-use section::Etl;
-use section::Hl7v2;
-use section::Mappings;
-use section::Operations;
-use section::Operator;
-use section::Terminology;
 use section::audit::Audit;
+use section::cdm::Cdm;
+use section::cdr::Cdr;
 use section::change_feed::ChangeFeed;
+use section::etl::Etl;
 use section::events::Events;
 use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
+use section::hl7v2::Hl7v2;
 use section::identity_source::IdentitySource;
 use section::inbound::Inbound;
+use section::mappings::Mappings;
 use section::omop_incremental::OmopIncremental;
+use section::operations::Operations;
+use section::operator::Operator;
 use section::shl::Shl;
 use section::state::State;
+use section::terminology::Terminology;
 
 /// The environment namespace: `FERROBRIDGE__SERVER__LISTEN` sets
 /// `[server] listen`, and `FERROBRIDGE_CONFIG` names the file.
@@ -279,10 +263,10 @@ impl Config {
                 cdr.endpoint.credentials.onward.is_some() || !cdr.onward.is_empty()
             })
         {
-            return Err(Error::Needs {
-                key: String::from("cdr.endpoint.credentials.onward"),
-                needs: String::from("auth.enabled"),
-            });
+            return Err(resolve::needed_by(
+                "cdr.endpoint.credentials.onward",
+                "auth.enabled",
+            ));
         }
         Ok(())
     }
@@ -293,10 +277,7 @@ impl Config {
         // NOTE: no specification governs this: our own design; with `[auth]` off no caller
         // carries a level, so the minimum would hold no request.
         if serves && !self.auth.enabled && self.assurance.any() {
-            return Err(Error::Needs {
-                key: String::from("assurance"),
-                needs: String::from("auth.enabled"),
-            });
+            return Err(resolve::needed_by("assurance", "auth.enabled"));
         }
         Ok(())
     }
@@ -313,25 +294,12 @@ impl Config {
             .as_ref()
             .is_some_and(|cdr| cdr.endpoint.credentials.onward.is_some() || !cdr.onward.is_empty());
         if self.facade.enabled && self.facade.consent.enabled && !onward {
-            return Err(Error::Needs {
-                key: String::from("facade.consent.enabled"),
-                needs: String::from("cdr.endpoint.credentials.onward"),
-            });
+            return Err(resolve::needed_by(
+                "facade.consent.enabled",
+                "cdr.endpoint.credentials.onward",
+            ));
         }
         Ok(())
-    }
-
-    /// Returns the identity source `[identity_source]` names, refused while
-    /// the facade is on without one.
-    fn identity_source(&self) -> Result<Option<crate::identity_source::IdentitySource>, Error> {
-        match self.identity_source.as_ref() {
-            Some(section) => identity_source::resolve(section).map(Some),
-            None if self.facade.enabled => Err(Error::Needs {
-                key: String::from("facade.enabled"),
-                needs: String::from("[identity_source]"),
-            }),
-            None => Ok(None),
-        }
     }
 
     /// Resolves this tree into the settings `process` holds.
@@ -366,81 +334,41 @@ impl Config {
         self.onward_guarded(serves)?;
         self.assurance_guarded(serves)?;
         self.consent_onward()?;
-        let identity_source = self.identity_source()?.map(std::sync::Arc::new);
+        let identity_source = resolve::identity_source::resolve(self)?;
         Ok(Settings {
             server: self.server.clone(),
             telemetry: self.telemetry.clone(),
-            cdr: self.cdr.as_ref().map(resolve_cdr).transpose()?,
-            terminology: self
-                .terminology
-                .as_ref()
-                .map(resolve_terminology)
-                .transpose()?,
+            cdr: resolve::cdr::resolve(self)?,
+            terminology: resolve::terminology::resolve(self)?,
             identity_source: identity_source.clone(),
             display_fallback: self
                 .terminology
                 .as_ref()
                 .is_some_and(|terminology| terminology.display_fallback),
-            cdm: self.cdm.as_ref().map(resolve_cdm).transpose()?,
-            state: self
-                .state
-                .as_ref()
-                .map(|state| state::resolve(state).map(Box::new))
-                .transpose()?,
+            cdm: resolve::cdm::resolve(self)?,
+            state: resolve::state::resolve(self)?,
             secrets: self.secrets.clone(),
-            etl: self.etl.as_ref().map(resolve_etl).transpose()?,
+            etl: resolve::etl::resolve(self)?,
             mapping_directory: self.mappings.directory.clone(),
             omocl_directory: self.mappings.omocl.clone(),
-            mappings: resolve_mappings(&self.mappings)?,
-            facade: match (self.facade.enabled, identity_source) {
-                (true, Some(identity)) => Some(resolve_facade(&self.facade, identity)?),
-                _ => None,
-            },
+            mappings: resolve::mappings::resolve(self)?,
+            facade: resolve::facade::resolve(self, identity_source)?,
             auth: if serves && self.guards_a_surface() {
-                auth::resolve_auth(self)?
+                resolve::auth::resolve(self)?
             } else {
                 None
             },
-            change_feed: if self.change_feed.enabled {
-                Some(change_feed::resolve_change_feed(
-                    &self.change_feed,
-                    self.cdr.is_some(),
-                    self.state.is_some(),
-                    change_feed::Consumer::on(self),
-                )?)
-            } else {
-                None
-            },
-            events: if self.events.enabled {
-                Some(events::resolve_events(self)?)
-            } else {
-                None
-            },
-            omop_incremental: omop_incremental::resolve(self)?,
-            fhir_outbound: fhir_outbound::resolve(self)?,
-            shl: shl::resolve(self)?,
-            inbound: inbound::resolve(self)?,
-            hl7v2: resolve_hl7v2(self)?,
-            operations: OperationsSettings {
-                enabled: self.operations.enabled,
-                device_reference: self.operations.device_reference.clone(),
-                composer: self.operations.composer.clone(),
-                composition_language: self.operations.composition_language.clone(),
-                composition_territory: self.operations.composition_territory.clone(),
-            },
+            change_feed: resolve::change_feed::resolve(self)?,
+            events: resolve::events::resolve(self)?,
+            omop_incremental: resolve::omop_incremental::resolve(self)?,
+            fhir_outbound: resolve::fhir_outbound::resolve(self)?,
+            shl: resolve::shl::resolve(self)?,
+            inbound: resolve::inbound::resolve(self)?,
+            hl7v2: resolve::hl7v2::resolve(self)?,
+            operations: resolve::operations::resolve(self),
             usage_report: self.usage_report.clone(),
-            operator: resolve::resolve_operator(&self.operator, &self.auth)?,
-            audit: if self.audit.enabled {
-                Some(audit::resolve_audit(
-                    &self.audit,
-                    self.facade.enabled,
-                    self.auth.enabled,
-                    self.state.is_some(),
-                    &self.facade.system_id,
-                )?)
-            } else {
-                None
-            },
+            operator: resolve::operator::resolve(self)?,
+            audit: resolve::audit::resolve(self)?,
             configuration: if serves && self.operator.enabled {
                 Some(
                     document::document(self, jiff::Timestamp::now())

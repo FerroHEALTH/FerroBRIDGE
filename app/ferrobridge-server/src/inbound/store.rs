@@ -4,7 +4,7 @@
 //! The inbox, the work items and the slot pool in the state store.
 //!
 //! An event is stored, its entity's work item moved to a new generation and
-//! `ferrobridge_inbound` notified in one transaction, before the source is
+//! [`INBOUND`] notified in one transaction, before the source is
 //! answered. Workers on every replica claim due items with `FOR UPDATE SKIP
 //! LOCKED` under a lease through [`crate::store::claim`], make their
 //! remote calls outside any transaction, and finish at the generation they
@@ -22,10 +22,8 @@ use uuid::Uuid;
 use super::event::{Change, Event};
 use crate::retry::{Decided, Decision};
 use crate::store::claim::{Claim, millis};
+use crate::store::listen::INBOUND;
 use crate::store::seal::{KeyId, SealKeys};
-
-/// The channel an accepted event notifies, with its source id as payload.
-pub const CHANNEL: &str = "ferrobridge_inbound";
 
 /// The entity one work item is about.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -251,7 +249,7 @@ impl InboxStore {
     }
 
     /// Stores `event` of `source_id` for `tenant`, moves its entity's work item to a new
-    /// generation and notifies [`CHANNEL`], in one transaction.
+    /// generation and notifies [`INBOUND`], in one transaction.
     ///
     /// # Errors
     /// Returns [`sqlx::Error`] when a statement or the commit fails; nothing
@@ -574,7 +572,7 @@ impl InboxStore {
         .rows_affected()
             > 0;
         if settled && decided.decision == Decision::Retry {
-            notify(&mut tx, key.source_id).await?;
+            INBOUND.notify(&mut tx, &key.source_id.to_string()).await?;
         }
         if settled && decided.decision == Decision::Discard {
             clear_bodies(&mut tx, key, None).await?;
@@ -620,7 +618,7 @@ impl InboxStore {
         .await?
         .rows_affected();
         if replayed > 0 {
-            notify(&mut tx, source_id).await?;
+            INBOUND.notify(&mut tx, &source_id.to_string()).await?;
         }
         tx.commit().await?;
         Ok(replayed)
@@ -737,7 +735,7 @@ impl InboxStore {
 
 /// Stores `event` of `source_id` for `tenant` in `tx`, with the sealed
 /// `body` and the id of the key it is sealed under, and moves its entity's
-/// work item to a new generation, notifying [`CHANNEL`] when `tx` commits.
+/// work item to a new generation, notifying [`INBOUND`] when `tx` commits.
 ///
 /// A stored repeat changes nothing. An event that carries its record and
 /// whose stamp is older than the stamp its entity applied or waits on is
@@ -905,7 +903,7 @@ fn body_context(source_id: Uuid, tenant: &str, entity: &str) -> Vec<u8> {
 
 /// Moves the work items of `entities` of `source_id` and `tenant` to a new
 /// generation due with `change`, inserting the missing ones, and notifies
-/// [`CHANNEL`] when `tx` commits; a running item keeps running and reruns
+/// [`INBOUND`] when `tx` commits; a running item keeps running and reruns
 /// when its worker gives it back. An item moved by `event` applies that
 /// event's body; a mark or a replay keeps the event it had.
 async fn bump(
@@ -936,19 +934,6 @@ async fn bump(
     .execute(&mut **tx)
     .await?
     .rows_affected();
-    notify(tx, source_id).await?;
+    INBOUND.notify(tx, &source_id.to_string()).await?;
     Ok(bumped)
-}
-
-/// Notifies [`CHANNEL`] that `source_id` has due work when `tx` commits.
-async fn notify(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    source_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT pg_notify($1, $2)")
-        .bind(CHANNEL)
-        .bind(source_id.to_string())
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
 }

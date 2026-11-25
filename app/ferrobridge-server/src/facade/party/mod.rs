@@ -24,6 +24,9 @@
 //! offers no search unless `[facade.party_search]` configures one through
 //! Cadasto's experimental AQL demographic extension
 //! (`crate::facade::search::party`), and the `CapabilityStatement` says so.
+//!
+//! This module owns what every party interaction shares: the `Call` it
+//! serves, its admission, the party it opens and the read of one version.
 
 pub(crate) mod ehds;
 pub(crate) mod provision;
@@ -35,7 +38,9 @@ use ferrohealth_smart::resource::Compartment;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
+use http::HeaderMap;
 use http::StatusCode;
+use http::Uri;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_mapping_core::party::CanonicalParty;
@@ -46,6 +51,7 @@ use crate::cdr::CdrClient;
 use crate::cdr::demographic::Demographic;
 use crate::cdr::error::Upstream;
 use crate::facade::Facade;
+use crate::facade::handlers::Body;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -117,6 +123,141 @@ pub(crate) fn admit(
     }
 }
 
+/// The request one party interaction serves: the facade, the caller, the
+/// party program of the type and the request's headers and URL.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Call<'a> {
+    /// The facade serving the request.
+    pub(crate) facade: &'a Facade,
+    /// What the layer admitted the caller with.
+    pub(crate) access: &'a Access,
+    /// The party program of the type.
+    pub(crate) loaded: &'a Loaded,
+    /// The request's headers.
+    pub(crate) headers: &'a HeaderMap,
+    /// The request's URL.
+    pub(crate) uri: &'a Uri,
+}
+
+impl<'a> Call<'a> {
+    /// Returns the call of `facade` for the caller `access` on the party
+    /// program `loaded`, with the request's headers and URL.
+    #[must_use]
+    pub(crate) const fn new(
+        facade: &'a Facade,
+        access: &'a Access,
+        loaded: &'a Loaded,
+        (headers, uri): (&'a HeaderMap, &'a Uri),
+    ) -> Self {
+        Self {
+            facade,
+            access,
+            loaded,
+            headers,
+            uri,
+        }
+    }
+
+    /// Admits the call on the party `id` names and opens the party, the
+    /// first steps of a read, a history and a delete.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Refusal`] of [`Self::admit`] or [`Self::connect`].
+    pub(crate) async fn open(
+        &self,
+        permission: Permission,
+        party: (&str, &str),
+        body: Body,
+    ) -> Result<Opened, Refusal> {
+        let uid = self.admit(permission, party, body)?;
+        self.connect(uid).await
+    }
+
+    /// Opens the party `uid` names: the CDR client the call runs through and
+    /// the class of the party the program maps.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Refusal`] of the client, of a CDR with no Demographic
+    /// API or of a program of no party class.
+    pub(crate) async fn connect(&self, uid: HierObjectId) -> Result<Opened, Refusal> {
+        let client = self.facade.client_for(self.headers, self.access).await?;
+        let (_, class) = reach(&client, self.loaded)?;
+        Ok(Opened { uid, client, class })
+    }
+
+    /// Admits the call on the party `id` names and returns its id: the
+    /// request shape the route takes, then the caller's `permission` on the
+    /// type.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Refusal`] of the first check that fails.
+    pub(crate) fn admit(
+        &self,
+        permission: Permission,
+        (resource_type, id): (&str, &str),
+        body: Body,
+    ) -> Result<HierObjectId, Refusal> {
+        crate::facade::handlers::guard(self.headers, self.uri, body)?;
+        admit(self.access, permission, resource_type, Some(id))?;
+        party_id(resource_type, id)
+    }
+}
+
+/// One party a call has opened: its id, the CDR client and its class.
+#[derive(Debug)]
+pub(crate) struct Opened {
+    /// The `versioned_object_uid` of the party.
+    pub(crate) uid: HierObjectId,
+    /// The client the call reaches the CDR through.
+    client: CdrClient,
+    /// The class of the party the program maps.
+    class: PartyClass,
+}
+
+impl Opened {
+    /// Returns the Demographic API the party is reached through, and its
+    /// class.
+    ///
+    /// # Errors
+    ///
+    /// Returns the `500` of a CDR with no Demographic API.
+    pub(crate) fn party(&self) -> Result<(Demographic<'_>, PartyClass), Refusal> {
+        Ok((demographic(&self.client)?, self.class))
+    }
+
+    /// Reads the latest version of the party.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Refusal`] of [`get`].
+    pub(crate) async fn latest(&self, resource_type: &str) -> Result<Held, Refusal> {
+        let (demographic, class) = self.party()?;
+        Ok(get(demographic, class, resource_type, self.uid.value()).await?)
+    }
+
+    /// Returns the client the call reaches the CDR through.
+    pub(crate) const fn client(&self) -> &CdrClient {
+        &self.client
+    }
+}
+
+/// Returns the Demographic API of `client` and the class of the party
+/// `loaded` maps, the pair every party read and write goes through.
+///
+/// # Errors
+///
+/// Returns the `500` of a CDR with no Demographic API or a program of no
+/// party class.
+pub(crate) fn reach<'client>(
+    client: &'client CdrClient,
+    loaded: &Loaded,
+) -> Result<(Demographic<'client>, PartyClass), Refusal> {
+    Ok((demographic(client)?, read::class_of(loaded)?))
+}
+
 /// Reads `id` as the `versioned_object_uid` of a party.
 ///
 /// An id that is no `uid` names no party, so it is `404`.
@@ -172,29 +313,11 @@ pub(crate) async fn get(
     resource_type: &str,
     uid: &str,
 ) -> Result<Held, Refused> {
-    macro_rules! get_as {
-        ($call:ident, $outcome:ident) => {{
-            use openehr_its::rest::generated::demographic::client::$outcome;
-            let Answered { outcome, upstream } = demographic
-                .$call(uid, None)
-                .await
-                .map_err(|error| client_refusal(&error))?
-                .answered;
-            match outcome {
-                $outcome::Ok { body, headers } => Held {
-                    value: openehr_its::json::to_canonical_value(&body),
-                    version: version_of(stringify!($call), &upstream, headers.etag.as_deref())?,
-                },
-                $outcome::NoContent => return Err(gone(resource_type, uid)),
-                _ => return Err(refused(&upstream).into()),
-            }
-        }};
+    match fetch(demographic, class, uid).await? {
+        Fetched::Held(held) => Ok(held),
+        Fetched::Deleted => Err(gone(resource_type, uid)),
+        Fetched::Absent(upstream) => Err(refused(&upstream)),
     }
-    Ok(match class {
-        PartyClass::Person => get_as!(person_get, PersonGetOutcome),
-        PartyClass::Organisation => get_as!(organisation_get, OrganisationGetOutcome),
-        PartyClass::Role => get_as!(role_get, RoleGetOutcome),
-    })
 }
 
 /// Reads the latest version of the party `uid` names, `None` when the CDR
@@ -207,7 +330,30 @@ pub(crate) async fn find(
     class: PartyClass,
     uid: &str,
 ) -> Result<Option<Held>, Refused> {
-    macro_rules! find_as {
+    Ok(match fetch(demographic, class, uid).await? {
+        Fetched::Held(held) => Some(held),
+        Fetched::Deleted | Fetched::Absent(_) => None,
+    })
+}
+
+/// What the CDR answered for a party `uid`.
+enum Fetched {
+    /// The version it holds.
+    Held(Held),
+    /// It reports the party deleted (`204`).
+    Deleted,
+    /// It holds none (`404`), with the answer it gave.
+    Absent(Upstream),
+}
+
+/// Reads the party `uid` names, the latest version for a `HIER_OBJECT_ID`
+/// or one version for an `OBJECT_VERSION_ID`.
+async fn fetch(
+    demographic: Demographic<'_>,
+    class: PartyClass,
+    uid: &str,
+) -> Result<Fetched, Refused> {
+    macro_rules! fetch_as {
         ($call:ident, $outcome:ident) => {{
             use openehr_its::rest::generated::demographic::client::$outcome;
             let Answered { outcome, upstream } = demographic
@@ -216,18 +362,19 @@ pub(crate) async fn find(
                 .map_err(|error| client_refusal(&error))?
                 .answered;
             match outcome {
-                $outcome::Ok { body, headers } => Some(Held {
+                $outcome::Ok { body, headers } => Fetched::Held(Held {
                     value: openehr_its::json::to_canonical_value(&body),
                     version: version_of(stringify!($call), &upstream, headers.etag.as_deref())?,
                 }),
-                $outcome::NoContent | $outcome::NotFound { .. } => None,
+                $outcome::NoContent => Fetched::Deleted,
+                $outcome::NotFound { .. } => Fetched::Absent(upstream),
             }
         }};
     }
     Ok(match class {
-        PartyClass::Person => find_as!(person_get, PersonGetOutcome),
-        PartyClass::Organisation => find_as!(organisation_get, OrganisationGetOutcome),
-        PartyClass::Role => find_as!(role_get, RoleGetOutcome),
+        PartyClass::Person => fetch_as!(person_get, PersonGetOutcome),
+        PartyClass::Organisation => fetch_as!(organisation_get, OrganisationGetOutcome),
+        PartyClass::Role => fetch_as!(role_get, RoleGetOutcome),
     })
 }
 
