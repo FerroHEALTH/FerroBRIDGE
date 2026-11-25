@@ -69,16 +69,6 @@ pub struct FixedFile {
     pub code: String,
 }
 
-/// The coding a `fixed` token compares, as written.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FixedFile {
-    /// The code system URI.
-    pub system: String,
-    /// The code.
-    pub code: String,
-}
-
 /// Parses one declaration from `text`, naming `file` in a refusal.
 ///
 /// Duplicate keys are refused and an unrecognised tag is refused, as the

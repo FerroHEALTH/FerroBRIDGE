@@ -214,12 +214,7 @@ fn searchset_reply(
     envelope: &bundle::Envelope<'_>,
     matches: &[Match],
 ) -> Result<Response, Refusal> {
-    let body = bundle::searchset(envelope, matches).map_err(|error| {
-        reply::refusal(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Issue::error(IssueType::Exception).diagnosing(ferrohealth_server::run::chain(&error)),
-        )
-    })?;
+    let body = bundle::searchset(envelope, matches).map_err(|error| reply::exception(&error))?;
     Ok(reply::resource(StatusCode::OK, &body, &[]))
 }
 
