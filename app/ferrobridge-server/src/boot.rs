@@ -287,8 +287,7 @@ where
         .collect();
     let state = Arc::new(started.state.with_lanes(started.lanes));
     let delivery = state.access_log().map(|log| log.spawn());
-    crate::settings::listen(state.registers(), state.store());
-    crate::operator::watch::spawn(state.operator(), state.store());
+    listen(&state);
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let report =
         crate::usage_report::start(&settings.usage_report, state.reported(), began, ci).await;
@@ -349,6 +348,13 @@ where
     }
     signal.abort();
     Ok(())
+}
+
+/// Starts the `LISTEN` sessions of the state held in memory: the settings
+/// registers and the running mapping revision.
+fn listen(state: &crate::state::AppState) {
+    crate::settings::listen(state.registers(), state.store());
+    crate::operator::watch::spawn(state.operator(), state.store());
 }
 
 /// Serves the health routes on `listener` and retries the start after
