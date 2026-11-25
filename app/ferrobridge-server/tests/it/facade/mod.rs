@@ -25,6 +25,7 @@ mod examples;
 mod launch_task;
 mod linked;
 mod losses;
+mod mhd;
 mod outbound;
 mod outbound_crash;
 mod party;

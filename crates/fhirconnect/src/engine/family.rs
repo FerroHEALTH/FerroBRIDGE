@@ -151,8 +151,13 @@ pub fn feeder_audit(
         ),
         original_content: None,
         originating_system_audit: Box::new(FeederAuditDetails {
-            location: origin.location().or(unplaced).map(party_identified),
-            provider: origin.provider().map(party_identified),
+            location: origin
+                .location()
+                .or(unplaced)
+                .map(|party| Box::new(party_identified(party))),
+            provider: origin
+                .provider()
+                .map(|party| Box::new(party_identified(party))),
             ..details(
                 origin.originating_system().unwrap_or(origin.system_id()),
                 source.and_then(|source| source.version_id()),
@@ -211,13 +216,15 @@ pub fn composer(
     identifiers: &[ItemId],
 ) -> NodeValue {
     let party = PartyIdentified::PartyIdentified(PartyIdentifiedData {
-        external_ref: id.map(|id| PartyRef {
-            namespace: id.namespace.clone(),
-            r#type: String::from("PERSON"),
-            id: ObjectId::GenericId(GenericId {
-                value: id.id.clone(),
-                scheme: id.scheme.clone(),
-            }),
+        external_ref: id.map(|id| {
+            Box::new(PartyRef {
+                namespace: id.namespace.clone(),
+                r#type: String::from("PERSON"),
+                id: ObjectId::GenericId(GenericId {
+                    value: id.id.clone(),
+                    scheme: id.scheme.clone(),
+                }),
+            })
         }),
         name: Some(String::from(name)),
         identifiers: dv_identifiers(identifiers),
@@ -361,19 +368,19 @@ pub fn participation(
     let participation = openehr_rm::v1_2::common::generic::participation::Participation {
         function: plain_text(parts.function),
         mode: None,
-        performer: PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(
-            PartyIdentifiedData {
-                external_ref: Some(PartyRef {
+        performer: Box::new(PartyProxy::PartyIdentified(
+            PartyIdentified::PartyIdentified(PartyIdentifiedData {
+                external_ref: Some(Box::new(PartyRef {
                     namespace: String::from(parts.id_namespace),
                     r#type: String::from("PERSON"),
                     id: ObjectId::GenericId(GenericId {
                         value: String::from(parts.id),
                         scheme: String::from(parts.id_scheme),
                     }),
-                }),
+                })),
                 name: parts.name.map(String::from),
                 identifiers: None,
-            },
+            }),
         )),
         time: None,
     };
@@ -605,7 +612,7 @@ pub fn participations(
     .into_iter()
         .filter(|entry| text_of(&entry.function) == function)
         .map(|entry| {
-            let (reference, name) = match entry.performer {
+            let (reference, name) = match *entry.performer {
                 PartyProxy::PartySelf(party) => (party.external_ref, None),
                 PartyProxy::PartyIdentified(PartyIdentified::PartyIdentified(party)) => {
                     (party.external_ref, party.name)
@@ -615,7 +622,7 @@ pub fn participations(
                 }
             };
             Participation {
-                identity: reference.as_ref().and_then(PartyIdentity::from_party_ref),
+                identity: reference.as_deref().and_then(PartyIdentity::from_party_ref),
                 id: reference.map(|reference| id_value(&reference.id)),
                 name,
             }

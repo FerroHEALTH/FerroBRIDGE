@@ -145,7 +145,7 @@ pub enum PartyError {
         class: PartyClass,
         /// What the strict decode refused.
         #[source]
-        source: Box<JsonParseError>,
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// The party does not validate against its template, the RM invariants
     /// or the RM-mandated openEHR terminology
@@ -315,7 +315,14 @@ impl WebTemplateIndex {
         let options = BuildOptions::default().with_rm_version(RM_RELEASE);
         let mut built =
             openehr_sdt::flat::build::build_root(&document, self.web_template(), &options)
-                .map_err(refused)?;
+                .map_err(|source| match source {
+                    FlatError::RawDecode { source, .. } => PartyError::Invalid {
+                        template_id: self.template_id().to_owned(),
+                        class: kind,
+                        source: Box::new(source),
+                    },
+                    other => refused(other),
+                })?;
         self.write_names(&mut built, names)?;
         self.write_members(&mut built, members)?;
         let unsourced = take_relationships(&mut built);

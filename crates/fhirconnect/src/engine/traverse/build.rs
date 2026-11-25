@@ -458,7 +458,7 @@ mod tests {
 
     fn party(name: Option<&str>, external_ref: Option<PartyRef>) -> PartyIdentifiedData {
         PartyIdentifiedData {
-            external_ref,
+            external_ref: external_ref.map(Box::new),
             name: name.map(String::from),
             identifiers: None,
         }

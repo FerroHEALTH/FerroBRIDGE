@@ -172,6 +172,8 @@ pub async fn append(
             gate_keepers: None,
             directives: None,
             labels: None,
+            marking: None,
+            exclusions: None,
         });
     let mut directives = next.directives.take().map(Vec::from).unwrap_or_default();
     let mut keys: Vec<uuid::Uuid> = directives.iter().map(key).collect();
