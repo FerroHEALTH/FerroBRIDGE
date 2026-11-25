@@ -1794,6 +1794,7 @@ dependencies = [
  "clap",
  "eehrxf",
  "ehds-logging",
+ "ferrobridge-fhirpath",
  "ferrobridge-hl7v2",
  "ferrobridge-operator-api",
  "ferrobridge-term",
