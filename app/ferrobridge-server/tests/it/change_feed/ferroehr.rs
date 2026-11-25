@@ -24,6 +24,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::Recording;
 use super::client;
+use super::idle_term;
 use super::reader;
 
 /// The extension root the stub serves the feed under.
@@ -118,7 +119,15 @@ async fn a_page_reads_both_outboxes_each_in_its_own_stream() -> Result<(), Box<d
     }
     let consumer = Recording::default();
     let mut cursor = Cursor::default();
-    let done = pass(&feed(&server)?, &reader(), &consumer, limit(), &mut cursor).await?;
+    let done = pass(
+        &feed(&server)?,
+        &reader(),
+        &consumer,
+        limit(),
+        &mut cursor,
+        &idle_term(),
+    )
+    .await?;
     assert_eq!(2, done.read);
     let party_position = Position::Outbox {
         domain: Domain::Party,
@@ -320,7 +329,15 @@ async fn the_cursor_never_moves_on_a_failed_read() -> Result<(), Box<dyn Error>>
             .await;
         let consumer = Recording::default();
         let mut cursor = Cursor::default();
-        let failed = pass(&feed(&server)?, &reader(), &consumer, limit(), &mut cursor).await;
+        let failed = pass(
+            &feed(&server)?,
+            &reader(),
+            &consumer,
+            limit(),
+            &mut cursor,
+            &idle_term(),
+        )
+        .await;
         assert!(
             matches!(failed, Err(PassError::Feed(_))),
             "{status}: {failed:?}"
@@ -355,7 +372,15 @@ async fn a_pass_acknowledges_only_the_prefix_the_consumer_finished() -> Result<(
     let consumer = Recording::failing_at(1);
     let mut cursor = Cursor::default();
     no_party_events(&server).await;
-    let failed = pass(&feed(&server)?, &reader(), &consumer, limit(), &mut cursor).await;
+    let failed = pass(
+        &feed(&server)?,
+        &reader(),
+        &consumer,
+        limit(),
+        &mut cursor,
+        &idle_term(),
+    )
+    .await;
     assert!(
         matches!(failed, Err(PassError::Consumer { .. })),
         "{failed:?}"
@@ -384,7 +409,15 @@ async fn a_refused_acknowledgement_leaves_the_cursor_where_it_was() -> Result<()
     let consumer = Recording::default();
     let mut cursor = Cursor::default();
     no_party_events(&server).await;
-    let failed = pass(&feed(&server)?, &reader(), &consumer, limit(), &mut cursor).await;
+    let failed = pass(
+        &feed(&server)?,
+        &reader(),
+        &consumer,
+        limit(),
+        &mut cursor,
+        &idle_term(),
+    )
+    .await;
     assert!(
         matches!(failed, Err(PassError::Feed(FeedError::Conflict { .. }))),
         "{failed:?}"
@@ -406,7 +439,15 @@ async fn a_page_out_of_seq_order_is_refused_before_any_event_is_offered()
     let consumer = Recording::default();
     let mut cursor = Cursor::default();
     no_party_events(&server).await;
-    let failed = pass(&feed(&server)?, &reader(), &consumer, limit(), &mut cursor).await;
+    let failed = pass(
+        &feed(&server)?,
+        &reader(),
+        &consumer,
+        limit(),
+        &mut cursor,
+        &idle_term(),
+    )
+    .await;
     assert!(
         matches!(failed, Err(PassError::Unordered { .. })),
         "{failed:?}"
