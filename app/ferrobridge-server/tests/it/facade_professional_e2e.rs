@@ -90,6 +90,7 @@ async fn a_practitioner_round_trips_over_the_reference_cdrs_professional_person(
             language: String::from("en"),
             territory: String::from("GB"),
             ehr_status_system: None,
+            custodian: crate::facade::custodian(),
         },
     ));
 

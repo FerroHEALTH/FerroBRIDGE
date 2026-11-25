@@ -281,6 +281,7 @@ pub(crate) async fn document(
             timestamp,
             patient,
             operator: &summary.operator,
+            custodian: &facade.settings().custodian,
             compositions: &compositions,
         },
         &summary.mapping,

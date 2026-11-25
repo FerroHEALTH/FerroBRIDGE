@@ -213,9 +213,10 @@ pub enum RegisterError {
     },
 }
 
-/// Returns the error a database failure is.
-fn database(source: sqlx::Error) -> RegisterError {
-    RegisterError::Database(Box::new(source))
+impl From<sqlx::Error> for RegisterError {
+    fn from(source: sqlx::Error) -> Self {
+        Self::Database(Box::new(source))
+    }
 }
 
 /// The registers of one state store, with this replica's copy of each.
@@ -333,7 +334,7 @@ impl Registers {
         .bind(register.name())
         .fetch_optional(&self.pool)
         .await
-        .map_err(database)?;
+        ?;
         row.map_or_else(
             || Ok(Version::default_of(register)),
             |row| version(register, &row),
@@ -354,7 +355,7 @@ impl Registers {
         .bind(register.name())
         .fetch_all(&self.pool)
         .await
-        .map_err(database)?;
+        ?;
         rows.iter().map(|row| version(register, row)).collect()
     }
 
@@ -374,19 +375,17 @@ impl Registers {
         committer: &str,
     ) -> Result<Written, RegisterError> {
         register.check(document)?;
-        let mut transaction = self.pool.begin().await.map_err(database)?;
+        let mut transaction = self.pool.begin().await?;
         sqlx::query("SELECT pg_advisory_xact_lock(hashtext('ferrobridge_settings:' || $1))")
             .bind(register.name())
             .execute(&mut *transaction)
-            .await
-            .map_err(database)?;
+            .await?;
         let current: i64 = sqlx::query_scalar(
             "SELECT coalesce(max(version), 0) FROM settings_register WHERE register = $1",
         )
         .bind(register.name())
         .fetch_one(&mut *transaction)
-        .await
-        .map_err(database)?;
+        .await?;
         if current != replaces {
             return Ok(Written::Stale { current });
         }
@@ -402,14 +401,13 @@ impl Registers {
         .bind(committer)
         .fetch_one(&mut *transaction)
         .await
-        .map_err(database)?;
+        ?;
         sqlx::query("SELECT pg_notify($1, $2)")
             .bind(CHANNEL)
             .bind(register.name())
             .execute(&mut *transaction)
-            .await
-            .map_err(database)?;
-        transaction.commit().await.map_err(database)?;
+            .await?;
+        transaction.commit().await?;
         let recorded = version(register, &row)?;
         self.copy.drop_register(Some(register));
         Ok(Written::Committed(recorded))
@@ -418,16 +416,16 @@ impl Registers {
 
 /// Returns the version of `register` a `settings_register` row holds.
 fn version(register: Register, row: &PgRow) -> Result<Version, RegisterError> {
-    let number: i64 = row.try_get("version").map_err(database)?;
-    let document: String = row.try_get("document").map_err(database)?;
+    let number: i64 = row.try_get("version")?;
+    let document: String = row.try_get("document")?;
     Ok(Version {
         number,
         document: serde_json::from_str(&document).map_err(|_unreadable| RegisterError::Record {
             register: register.name(),
             version: number,
         })?,
-        committer: Some(row.try_get("committer").map_err(database)?),
-        committed_at: Some(row.try_get("committed_at").map_err(database)?),
+        committer: Some(row.try_get("committer")?),
+        committed_at: Some(row.try_get("committed_at")?),
     })
 }
 

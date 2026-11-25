@@ -43,7 +43,7 @@ fn tls_table() -> String {
 /// from, with `face` as its section.
 fn bare_face(face: &str) -> String {
     format!(
-        "[auth]\nenabled = false\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\n\n[hl7v2]\nenabled = true\n{face}"
+        "[auth]\nenabled = false\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[hl7v2]\nenabled = true\n{face}"
     )
 }
 

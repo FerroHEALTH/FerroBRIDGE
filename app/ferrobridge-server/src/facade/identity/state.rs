@@ -75,20 +75,18 @@ impl StateStore {
         .bind(expected)
         .bind(&fingerprint)
         .execute(&pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let row = sqlx::query("SELECT derivation, lookup_key FROM identity_meta")
             .fetch_one(&pool)
-            .await
-            .map_err(database)?;
-        let found: i32 = row.try_get("derivation").map_err(database)?;
+            .await?;
+        let found: i32 = row.try_get("derivation")?;
         if found != expected {
             return Err(StoreError::Derivation {
                 found: i64::from(found),
                 expected: DERIVATION,
             });
         }
-        let pinned: Vec<u8> = row.try_get("lookup_key").map_err(database)?;
+        let pinned: Vec<u8> = row.try_get("lookup_key")?;
         if pinned != fingerprint {
             return Err(StoreError::LookupKey);
         }
@@ -112,8 +110,8 @@ impl StateStore {
         let Some(row) = row else {
             return Ok(None);
         };
-        let key_id: String = row.try_get("key_id").map_err(database)?;
-        let sealed: Vec<u8> = row.try_get("person_sealed").map_err(database)?;
+        let key_id: String = row.try_get("key_id")?;
+        let sealed: Vec<u8> = row.try_get("person_sealed")?;
         let key_id = checked(key, "sealing key id", key_id, KeyId::new)?;
         let plain = self
             .keys
@@ -140,10 +138,11 @@ impl StateStore {
     }
 }
 
-/// Returns `error` as the store's.
-fn database(error: sqlx::Error) -> StoreError {
-    StoreError::Database {
-        source: Box::new(error),
+impl From<sqlx::Error> for StoreError {
+    fn from(source: sqlx::Error) -> Self {
+        Self::Database {
+            source: Box::new(source),
+        }
     }
 }
 
@@ -186,8 +185,7 @@ impl Store for StateStore {
         .bind(patient.namespace())
         .bind(&digest)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         found
             .map(|value| checked(patient.namespace(), "ehr_id", value, EhrId::new))
             .transpose()
@@ -221,8 +219,7 @@ impl Store for StateStore {
         .bind(key_id.as_str())
         .bind(&sealed)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let stood = match stood {
             Some(value) => Some(checked(patient.namespace(), "ehr_id", value, EhrId::new)?),
             None => self.ehr_of(patient).await?,
@@ -236,8 +233,7 @@ impl Store for StateStore {
         let row = sqlx::query("SELECT key_id, person_sealed FROM ehr_subject WHERE ehr_id = $1")
             .bind(ehr.as_str())
             .fetch_optional(&self.pool)
-            .await
-            .map_err(database)?;
+            .await?;
         self.opened_person(row, ehr.as_str(), &Self::subject_context(ehr.as_str()))
     }
 
@@ -246,8 +242,7 @@ impl Store for StateStore {
             sqlx::query("SELECT key_id, person_sealed FROM party_person WHERE party_uid = $1")
                 .bind(party)
                 .fetch_optional(&self.pool)
-                .await
-                .map_err(database)?;
+                .await?;
         self.opened_person(row, party, &Self::party_context(party))
     }
 
@@ -260,7 +255,7 @@ impl Store for StateStore {
         .bind(&digest)
         .fetch_optional(&self.pool)
         .await
-        .map_err(database)
+        .map_err(StoreError::from)
     }
 
     async fn record_party(&self, party: &str, person: &PersonId) -> Result<(), StoreError> {
@@ -289,8 +284,7 @@ impl Store for StateStore {
         .bind(key_id.as_str())
         .bind(&sealed)
         .execute(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         Ok(())
     }
 
@@ -305,8 +299,7 @@ impl Store for StateStore {
         .bind(resource_type)
         .bind(external.as_str())
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         found
             .map(|value| checked(external.as_str(), "FHIR id", value, FhirResourceId::new))
             .transpose()
@@ -329,8 +322,7 @@ impl Store for StateStore {
         .bind(external.as_str())
         .bind(internal.as_str())
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let stood = match stood {
             Some(value) => Some(checked(
                 external.as_str(),
@@ -356,8 +348,7 @@ impl Store for StateStore {
         .bind(resource_type)
         .bind(internal.as_str())
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         found
             .map(|value| binding_of_row(internal.as_str(), value))
             .transpose()
@@ -384,8 +375,7 @@ impl Store for StateStore {
         .bind(internal.as_str())
         .bind(&value)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let stood = match stood {
             Some(value) => Some(binding_of_row(internal.as_str(), value)?),
             None => self.binding_of(resource_type, internal).await?,
@@ -402,8 +392,7 @@ impl Store for StateStore {
             source,
         )
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         row.map(|row| consumed_of_row(&row)).transpose()
     }
 
@@ -418,8 +407,7 @@ impl Store for StateStore {
         .bind(source.resource_type())
         .bind(source.id().as_str())
         .fetch_all(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         rows.iter().map(consumed_of_row).collect()
     }
 
@@ -444,8 +432,7 @@ impl Store for StateStore {
         .bind(&consumed.internal_id)
         .bind(&consumed.context)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let stood = match stood {
             Some(row) => Some(consumed_of_row(&row)?),
             None => self.consumed(source).await?,
@@ -465,8 +452,7 @@ impl Store for StateStore {
             source,
         )
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         row.map(|row| committed_of_row(&row)).transpose()
     }
 
@@ -488,8 +474,7 @@ impl Store for StateStore {
         .bind(&committed.ehr_id)
         .bind(&committed.contribution_uid)
         .fetch_optional(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         let stood = match stood {
             Some(row) => Some(committed_of_row(&row)?),
             None => self.committed(source).await?,
@@ -523,7 +508,7 @@ impl Store for StateStore {
         if let Some(system) = system {
             select = select.bind(system);
         }
-        let rows = select.fetch_all(&self.pool).await.map_err(database)?;
+        let rows = select.fetch_all(&self.pool).await?;
         rows.iter()
             .map(|value| identified_id(resource_type, value))
             .collect()
@@ -545,8 +530,7 @@ impl Store for StateStore {
         .bind(&digest)
         .bind(internal.as_str())
         .execute(&self.pool)
-        .await
-        .map_err(database)?;
+        .await?;
         Ok(())
     }
 }
@@ -566,18 +550,18 @@ fn keyed<'q>(
 /// Returns the committed record a row holds.
 fn committed_of_row(row: &sqlx::postgres::PgRow) -> Result<CommittedSource, StoreError> {
     Ok(CommittedSource {
-        ehr_id: row.try_get("ehr_id").map_err(database)?,
-        contribution_uid: row.try_get("contribution_uid").map_err(database)?,
+        ehr_id: row.try_get("ehr_id")?,
+        contribution_uid: row.try_get("contribution_uid")?,
     })
 }
 
 /// Returns the consumed record a row holds.
 fn consumed_of_row(row: &sqlx::postgres::PgRow) -> Result<ConsumedSource, StoreError> {
     Ok(ConsumedSource {
-        ehr_id: row.try_get("ehr_id").map_err(database)?,
-        versioned_object_uid: row.try_get("versioned_object_uid").map_err(database)?,
-        internal_id: row.try_get("internal_id").map_err(database)?,
-        context: row.try_get("context").map_err(database)?,
+        ehr_id: row.try_get("ehr_id")?,
+        versioned_object_uid: row.try_get("versioned_object_uid")?,
+        internal_id: row.try_get("internal_id")?,
+        context: row.try_get("context")?,
     })
 }
 

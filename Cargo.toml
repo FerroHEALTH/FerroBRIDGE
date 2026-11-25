@@ -202,9 +202,6 @@ argon2 = { version = "0.6.0", default-features = false, features = ["password-ha
 # server's per-call engine implements it through the same macro, as does the
 # token provider of ferrobridge-term's OAuth credentials.
 async-trait = "0.1.92"
-# The embedded identity store of the FHIR facade (docs/architecture.md
-# section 9).
-redb = "4.3.0"
 # The bridge's own timestamps: the one instant an ingest defaults every
 # composition field from (docs/architecture.md section 7). UTC only, so the
 # platform time-zone database features stay off.

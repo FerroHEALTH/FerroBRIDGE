@@ -68,6 +68,15 @@ pub(super) fn resolve_facade(
             "facade.composition_territory",
             &facade.composition_territory,
         ),
+        ("facade.custodian.name", &facade.custodian.name),
+        (
+            "facade.custodian.identifier_system",
+            &facade.custodian.identifier_system,
+        ),
+        (
+            "facade.custodian.identifier_value",
+            &facade.custodian.identifier_value,
+        ),
     ] {
         if value.is_empty() {
             return Err(Error::Missing {
@@ -91,6 +100,11 @@ pub(super) fn resolve_facade(
             territory: facade.composition_territory.clone(),
             ehr_status_system: (!facade.ehr_status_identifier_system.is_empty())
                 .then(|| facade.ehr_status_identifier_system.clone()),
+            custodian: crate::facade::Custodian {
+                name: facade.custodian.name.clone(),
+                system: facade.custodian.identifier_system.clone(),
+                value: facade.custodian.identifier_value.clone(),
+            },
         },
         search: search_limits(facade)?,
         references: reference_policy(facade)?,

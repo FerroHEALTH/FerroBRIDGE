@@ -3,7 +3,7 @@
 
 //! The platform the journey runs on: the reference CDR (its `main` image),
 //! FerroSMART on the host network with a stub upstream OpenID Provider, a
-//! stub terminology server and Audit Record Repository, two PostgreSQL
+//! stub terminology server, identity source and Audit Record Repository, two PostgreSQL
 //! databases, and the bridge's own configuration, which the journey serves
 //! in process on a real listener. No specification governs the harness: our
 //! own design.
@@ -21,7 +21,6 @@ use ferrobridge_testkit::containers::Cdr;
 use ferrobridge_testkit::containers::Postgres;
 use ferrobridge_testkit::ferrosmart;
 use ferrobridge_testkit::ferrosmart::FerroSmart;
-use ferrobridge_testkit::fixtures::FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID;
 use ferrobridge_testkit::oidc::Provider;
 use tokio::net::TcpListener;
 use wiremock::MockServer;
@@ -80,10 +79,15 @@ pub(super) struct Stack {
     pub(super) listener: Option<TcpListener>,
     /// The terminology server, kept for the run's length.
     _terminology: MockServer,
+    /// The identity source, kept for the run's length.
+    _identity: MockServer,
     /// FerroSMART's database, kept for the run's length.
     _smart_database: Postgres,
     /// The bridge's state store, kept for the run's length.
     _state: Postgres,
+    /// The operator's Basic credential, user and password, whose
+    /// `[basic_grants]` table grants the operator scope.
+    pub(super) operator: (String, String),
 }
 
 impl Stack {
@@ -102,6 +106,12 @@ impl Stack {
         upstream.publish_metadata().await;
         let terminology = MockServer::start().await;
         mount_terminology(&terminology).await;
+        let identity = MockServer::start().await;
+        wiremock::Mock::given(matchers::method("POST"))
+            .and(matchers::path(crate::support::PIX_PATH))
+            .respond_with(SubjectPseudonym)
+            .mount(&identity)
+            .await;
         let arr = MockServer::start().await;
         wiremock::Mock::given(matchers::method("POST"))
             .and(matchers::path("/AuditEvent"))
@@ -124,13 +134,16 @@ impl Stack {
             &assertion,
         )?)
         .await?;
+        let password = crate::support::random_secret();
         let text = bridge_config(&BridgeConfig {
             origin: &origin,
             cdr: cdr.base_url(),
             smart: smart.issuer(),
             terminology: &terminology.uri(),
+            identity: &format!("{}/pix", identity.uri()),
             arr: &arr.uri(),
             state: state.url(),
+            operator: &password_hash(&password)?,
             onward: (onward == Onward::On).then_some(&assertion),
         })?;
         let settings =
@@ -145,10 +158,60 @@ impl Stack {
             settings,
             listener: Some(listener),
             _terminology: terminology,
+            _identity: identity,
             _smart_database: smart_database,
             _state: state,
+            operator: (String::from(OPERATOR), password),
         })
     }
+}
+
+/// A stub `$ihe-pix` that answers each `sourceIdentifier` of an ITI-83
+/// `POST` with its own value as the pseudonym in [`NAMESPACE`], so each
+/// patient's pseudonym is the subject id its EHR was created with.
+struct SubjectPseudonym;
+
+impl wiremock::Respond for SubjectPseudonym {
+    fn respond(&self, request: &wiremock::Request) -> ResponseTemplate {
+        let value = serde_json::from_slice::<serde_json::Value>(&request.body)
+            .ok()
+            .and_then(|parameters| {
+                let token = parameters["parameter"]
+                    .as_array()?
+                    .iter()
+                    .find(|parameter| parameter["name"] == "sourceIdentifier")?["valueString"]
+                    .as_str()?
+                    .to_owned();
+                token
+                    .strip_prefix(&format!("{SUBJECT_SYSTEM}|"))
+                    .map(str::to_owned)
+            });
+        match value {
+            Some(value) => crate::support::pseudonym_answer(NAMESPACE, &value),
+            None => ResponseTemplate::new(400),
+        }
+    }
+}
+
+/// The user-id of the operator who commits the `audit-categories` register.
+const OPERATOR: &str = "journey-operator";
+
+/// Returns the Argon2id PHC string of `password` under a fresh salt, as
+/// `[[auth.basic.users]] password_hash` takes it.
+fn password_hash(password: &str) -> Result<String, Box<dyn Error>> {
+    use aws_lc_rs::rand::SecureRandom as _;
+    let mut salt = [0_u8; 16];
+    aws_lc_rs::rand::SystemRandom::new()
+        .fill(&mut salt)
+        .map_err(|_unspecified| "a salt")?;
+    Ok(
+        argon2::password_hash::PasswordHasher::hash_password_with_salt(
+            &argon2::Argon2::default(),
+            password.as_bytes(),
+            &salt,
+        )?
+        .to_string(),
+    )
 }
 
 /// The bridge's assertion key for `private_key_jwt` at FerroSMART (RFC 7523
@@ -192,8 +255,9 @@ impl Assertion {
 }
 
 /// Returns FerroSMART's run on `port`: the facade and the CDR as its
-/// resources, the upstream provider with `client_secret_basic` and its
-/// assurance levels, the app and the bridge as clients.
+/// resources, its own Backend Services client, the upstream provider with
+/// `client_secret_basic` and its assurance levels, the app and the bridge as
+/// clients.
 fn smart_launch(
     port: u16,
     database: &Postgres,
@@ -207,6 +271,8 @@ fn smart_launch(
     let config = format!(
         "[ferrosmart]\nissuer = {issuer:?}\n\n\
          [ferrosmart.keys]\nprivate_key_files = [\"/etc/ferrosmart/signing.pem\"]\n\n\
+         [ferrosmart.backend]\nalgorithm = \"ES384\"\n\n\
+         [ferrosmart.backend.keys]\nprivate_key_file = \"/etc/ferrosmart/backend.pem\"\n\n\
          [[ferrosmart.resource]]\nbase = {facade:?}\nkind = \"fhir\"\n\n\
          [[ferrosmart.resource]]\nbase = {openehr:?}\nkind = \"openehr\"\n\
          subject_namespace = {NAMESPACE:?}\nfhir_base = {facade:?}\nsubject_system = {SUBJECT_SYSTEM:?}\n\n\
@@ -237,12 +303,16 @@ fn smart_launch(
     });
     Ok(ferrosmart::Launch {
         port,
-        database_url: format!("{}?sslmode=disable", database.url()),
+        database_url: database.url().to_owned(),
         config,
         files: vec![
             (
                 String::from("signing.pem"),
                 ferrosmart::signing_key_pem()?.into_bytes(),
+            ),
+            (
+                String::from("backend.pem"),
+                ferrosmart::backend_key_pem()?.into_bytes(),
             ),
             (String::from("upstream-secret"), secret.into_bytes()),
         ],
@@ -260,10 +330,14 @@ struct BridgeConfig<'a> {
     smart: &'a str,
     /// The terminology server.
     terminology: &'a str,
+    /// The identity source's FHIR base.
+    identity: &'a str,
     /// The Audit Record Repository.
     arr: &'a str,
     /// The state store's URL.
     state: &'a str,
+    /// The Argon2id PHC string of the operator's password.
+    operator: &'a str,
     /// The assertion key of the onward lane, when it is on.
     onward: Option<&'a Assertion>,
 }
@@ -275,8 +349,10 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
         cdr,
         smart,
         terminology,
+        identity,
         arr,
         state,
+        operator,
         onward,
     } = config;
     let packages: Vec<String> = package_paths()?
@@ -293,17 +369,20 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
          [mappings]\ndirectory = {FIXTURES:?}\n\n\
          [cdr]\nendpoint.url = \"{cdr}/\"\ndemographic = true\n\n\
          [terminology]\nendpoint.url = \"{terminology}/r4\"\n\n\
+         [identity_source]\npseudonym_domain = {NAMESPACE:?}\nsource_domains = [{SUBJECT_SYSTEM:?}]\n\
+         endpoint.url = {identity:?}\n\n\
          [facade]\nenabled = true\nbase_url = \"{origin}/fhir\"\n\
-         subject_namespace = {NAMESPACE:?}\nsubject_id_form = \"logical_id\"\nsubject_type = \"PERSON\"\n\
-         composition_language = \"en\"\ncomposition_territory = \"NL\"\n\n\
+         composition_language = \"en\"\ncomposition_territory = \"NL\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n\
          [facade.summary]\nenabled = true\noperator = \"Synthetic operator\"\npackages = [{packages}]\n\n\
          [auth.issuer.ferrosmart]\nissuer = {smart:?}\n\n\
-         [state]\nurl = \"{state}?sslmode=disable\"\n\n\
+         [[auth.basic.users]]\nuser = {OPERATOR:?}\npassword_hash = {operator:?}\n\n\
+         [basic_grants.{OPERATOR}]\nscopes = [\"__ferrobridge.operator\"]\n\n\
+         [operator]\nenabled = true\n\n\
+         [state]\nurl = \"{state}\"\n\n\
          [state.seal]\nlookup_key = {lookup:?}\n\n\
          [[state.seal.keys]]\nid = \"journey\"\nkey = {seal:?}\n\n\
          [shl]\nenabled = true\nbase_url = {origin:?}\n\n\
-         [audit]\nenabled = true\ncleartext = true\nendpoint.url = {arr:?}\n\n\
-         [audit.categories.templates]\n{FERROBRIDGE_PATIENT_SUMMARY_TEMPLATE_ID:?} = [\"Patient-Summaries\"]\n",
+         [audit]\nenabled = true\ncleartext = true\nendpoint.url = {arr:?}\n",
         listen = origin.trim_start_matches("http://"),
         packages = packages.join(", "),
     );
