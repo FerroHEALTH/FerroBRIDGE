@@ -14,6 +14,7 @@
 
 use fhir_types::r4::primitives;
 use openehr_base::containers::NonEmptyVec;
+use openehr_base::v1_3::base_types::identification::locatable_ref::LocatableRef;
 use openehr_base::v1_3::base_types::identification::party_ref::PartyRef;
 use openehr_mapping_core::index::ResolvedNode;
 use openehr_rm::v1_2::common::generic::party_identified::PartyIdentifiedData;
@@ -25,6 +26,7 @@ use crate::engine::lens::LensError;
 use crate::engine::lens::party::PartyLens;
 use crate::engine::lens::party_ref::PartyRefLens;
 use crate::engine::lens::party_ref::target_of;
+use crate::engine::lens::uid::LocatableRefLens;
 use crate::engine::rm::RmValue;
 use crate::engine::traverse::Run;
 use crate::engine::traverse::build::COMPOSER;
@@ -129,6 +131,24 @@ impl<T: Table + ?Sized> Run<'_, T> {
     ) -> Result<FhirValue, EngineError> {
         PartyRefLens::new(self.reference_target(mapping, target)?)
             .get(party)
+            .map(|reference| FhirValue::Reference(Box::new(reference)))
+            .map_err(|source| EngineError::Cell {
+                mapping: String::from(mapping.name()),
+                element: String::from(target.expression().as_str()),
+                source: Box::new(source),
+            })
+    }
+
+    /// Returns the reference a `LOCATABLE_REF` names, read as the one type the
+    /// element `target` admits.
+    pub(super) fn reference_of_locatable(
+        &self,
+        mapping: &Mapping,
+        target: &FhirTarget,
+        order: &LocatableRef,
+    ) -> Result<FhirValue, EngineError> {
+        LocatableRefLens::new(self.reference_target(mapping, target)?)
+            .get(order)
             .map(|reference| FhirValue::Reference(Box::new(reference)))
             .map_err(|source| EngineError::Cell {
                 mapping: String::from(mapping.name()),

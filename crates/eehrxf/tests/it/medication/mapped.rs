@@ -34,6 +34,7 @@ use ferrobridge_testkit::fixtures::FERROBRIDGE_MEDICATION_TEMPLATE;
 use ferrobridge_testkit::fixtures::FERROBRIDGE_MEDICATION_TEMPLATE_ID;
 use fhir_types::codec::Json;
 use fhir_types::codec::Object;
+use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
@@ -225,9 +226,7 @@ fn round_trip_through(
     mapping: &Mapping,
     resource: &serde_json::Value,
 ) -> Result<(String, Vec<Object>), Box<dyn Error>> {
-    let received = ReceivedResources::read(&collection(resource))?;
-    let composition = mapping.resources_to_openehr(&received, &settings())?;
-    let committed = committed(composition.composition())?;
+    let (composition, committed) = held(mapping, resource)?;
     // FHIRconnect 1.0.0 `$tofhir` context: the caller names the patient the record is of.
     let context = CallContext::new().with_patient(Reference {
         reference: Some("Patient/synthetic-patient".into()),
@@ -241,7 +240,7 @@ fn round_trip_through(
         .filter_map(|entry| entry.resource.as_ref())
         .map(Json::to_json)
         .collect::<Result<Vec<_>, _>>()?;
-    Ok((composition.composition().to_owned(), resources))
+    Ok((composition, resources))
 }
 
 /// Receives `resource` through `context`, maps the composition back out and
@@ -253,9 +252,7 @@ fn emit_mapped(
     name: &str,
 ) -> Result<(), Box<dyn Error>> {
     let mapping = mapping(context)?;
-    let received = ReceivedResources::read(&collection(resource))?;
-    let composition = mapping.resources_to_openehr(&received, &settings())?;
-    let committed = committed(composition.composition())?;
+    let (_, committed) = held(&mapping, resource)?;
     let context = CallContext::new().with_patient(Reference {
         reference: Some("Patient/synthetic-patient".into()),
         ..Reference::default()
@@ -272,8 +269,28 @@ fn emit_mapped(
     emit(name, &serde_json::to_string(&collection)?)
 }
 
-/// Returns `composition` as a CDR serves it once committed, with the version
-/// id a mapped resource's id derives from.
+/// The activity of the medication order a dispense carries out.
+const ACTIVITY: &str = "activities[at0001]";
+
+/// Receives `resource` through `mapping`, answering the composition received
+/// and the composition as a CDR holds it once committed; a dispense names
+/// the order it carries out, as a caller that resolved the order commits it.
+fn held(
+    mapping: &Mapping,
+    resource: &serde_json::Value,
+) -> Result<(String, String), Box<dyn Error>> {
+    let received = ReceivedResources::read(&collection(resource))?;
+    let mut composition = mapping.resources_to_openehr(&received, &settings())?;
+    if resource.get("resourceType") == Some(&serde_json::json!("MedicationDispense")) {
+        composition = composition.instructed_by(&order()?, ACTIVITY)?;
+    }
+    let written = composition.composition().to_owned();
+    let committed = committed(&written)?;
+    Ok((written, committed))
+}
+
+/// Returns `composition` as a CDR serves it once committed: the version id a
+/// mapped resource's id derives from, and the uid of its one entry.
 fn committed(composition: &str) -> Result<String, Box<dyn Error>> {
     let mut canonical: serde_json::Value = serde_json::from_str(composition)?;
     let object = canonical
@@ -284,6 +301,17 @@ fn committed(composition: &str) -> Result<String, Box<dyn Error>> {
         serde_json::json!({
             "_type": "OBJECT_VERSION_ID",
             "value": "5f0c2a9e-0000-4000-8000-000000000001::synthetic.example.org::1"
+        }),
+    );
+    let entry = canonical
+        .pointer_mut("/content/0")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("the composition holds an entry")?;
+    entry.insert(
+        String::from("uid"),
+        serde_json::json!({
+            "_type": "HIER_OBJECT_ID",
+            "value": "0b7d5c3e-0000-4000-8000-000000000002"
         }),
     );
     Ok(canonical.to_string())
@@ -313,6 +341,31 @@ fn text(object: &Object) -> Result<String, Box<dyn Error>> {
         .to_string())
 }
 
+/// The identifier system whose values are URIs
+/// (<https://hl7.org/fhir/R4/terminologies-systems.html>).
+const URI_SYSTEM: &str = "urn:ietf:rfc:3986";
+
+/// The system and value of each of `identifiers`.
+fn values(identifiers: &[Identifier]) -> Vec<(&str, &str)> {
+    identifiers
+        .iter()
+        .map(|identifier| {
+            (
+                identifier
+                    .system
+                    .as_ref()
+                    .and_then(|system| system.value.as_deref())
+                    .unwrap_or_default(),
+                identifier
+                    .value
+                    .as_ref()
+                    .and_then(|value| value.value.as_deref())
+                    .unwrap_or_default(),
+            )
+        })
+        .collect()
+}
+
 #[test]
 fn a_mapped_prescription_reads_as_the_native_record() -> Result<(), Box<dyn Error>> {
     let (_, resources) = round_trip(REQUEST, &request())?;
@@ -337,13 +390,20 @@ fn a_mapped_prescription_reads_as_the_native_record() -> Result<(), Box<dyn Erro
         "the minimum interval between refills"
     );
     assert_eq!(
-        prescription
-            .header
-            .identifier
-            .first()
-            .and_then(|identifier| identifier.value.as_ref())
-            .and_then(|value| value.value.as_deref()),
-        Some("synthetic-prescription-0001")
+        values(&prescription.header.identifier),
+        [(URI_SYSTEM, "urn:uuid:5f0c2a9e-0000-4000-8000-000000000001")],
+        "the prescription is the composition, every item's groupIdentifier"
+    );
+    assert_eq!(
+        values(&item.identifier),
+        [
+            (
+                "http://example.org/fhir/sid/ferrobridge-prescriptions",
+                "synthetic-prescription-0001"
+            ),
+            (URI_SYSTEM, "urn:uuid:0b7d5c3e-0000-4000-8000-000000000002")
+        ],
+        "the item is the order's identifier and the INSTRUCTION's uid"
     );
     assert!(
         matches!(item.medication, Medicinal::Referenced(_)),
@@ -431,6 +491,27 @@ fn a_mapped_dispense_reads_as_the_native_record() -> Result<(), Box<dyn Error>> 
     let (_, resources) = round_trip(DISPENSE, &dispense())?;
     let dispense = Dispense::read(&text(the_one(&resources, "MedicationDispense")?)?)?;
     mpd.check_dispense(&dispense.to_json()?)?;
+    assert_eq!(
+        values(&dispense.identifier),
+        [(URI_SYSTEM, "urn:uuid:0b7d5c3e-0000-4000-8000-000000000002")],
+        "the dispense is the ACTION's uid"
+    );
+    let [prescription] = dispense.related_request.as_slice() else {
+        return Err("one authorizing prescription".into());
+    };
+    assert_eq!(
+        prescription
+            .identifier
+            .as_deref()
+            .map(core::slice::from_ref)
+            .map(values),
+        Some(vec![(
+            URI_SYSTEM,
+            "urn:uuid:8849182c-82ad-4088-a07f-48ead4180515"
+        )]),
+        "the prescription the ACTION's instruction_details name, by the identifier its \
+         composition gives every item as groupIdentifier"
+    );
     the_one(&resources, "Provenance")?;
     Ok(())
 }
@@ -455,7 +536,7 @@ fn a_received_dispense_names_the_order_it_carries_out() -> Result<(), Box<dyn Er
     let received = ReceivedResources::read(&collection(&dispense()))?;
     let composition = mapping
         .resources_to_openehr(&received, &settings())?
-        .instructed_by(&order()?, "activities[at0001]")?;
+        .instructed_by(&order()?, ACTIVITY)?;
     let canonical: serde_json::Value = serde_json::from_str(composition.composition())?;
     assert_eq!(
         canonical
@@ -478,9 +559,9 @@ fn an_order_named_twice_is_refused() -> Result<(), Box<dyn Error>> {
     let received = ReceivedResources::read(&collection(&dispense()))?;
     let once = mapping
         .resources_to_openehr(&received, &settings())?
-        .instructed_by(&order()?, "activities[at0001]")?;
+        .instructed_by(&order()?, ACTIVITY)?;
     assert!(matches!(
-        once.instructed_by(&order()?, "activities[at0001]"),
+        once.instructed_by(&order()?, ACTIVITY),
         Err(InstructionError::Taken)
     ));
     Ok(())
@@ -492,7 +573,7 @@ fn a_composition_with_no_action_names_no_order() -> Result<(), Box<dyn Error>> {
     let received = ReceivedResources::read(&collection(&request()))?;
     let composition = mapping.resources_to_openehr(&received, &settings())?;
     assert!(matches!(
-        composition.instructed_by(&order()?, "activities[at0001]"),
+        composition.instructed_by(&order()?, ACTIVITY),
         Err(InstructionError::NoAction)
     ));
     Ok(())

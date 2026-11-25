@@ -877,6 +877,25 @@ ours:
   canonical URL), and an unmapped non-percent proportion is a typed refusal
   naming the element. The gap is reported upstream (the specification's own
   open issue on date and proportion combinations is the place).
+- **The identities of a record go out of openEHR: our own design (#2115).**
+  The data-type chapter has no row for `LOCATABLE.uid` or
+  `INSTRUCTION_DETAILS.instruction_id`, and no template node holds them, so
+  the compiler admits `uid` below any `LOCATABLE` node (`$composition/uid`
+  among them) and `instruction_details/instruction_id` below an `ACTION`
+  (`rm::IDENTITIES`). A `UID_BASED_ID` reads as an `Identifier` that names
+  the object across its versions: an `OBJECT_VERSION_ID` gives its
+  `object_id`, a root with no extension is the `urn:uuid:` or `urn:oid:`
+  value under the `urn:ietf:rfc:3986` system, a root with an extension is
+  the extension's namespace, and an `INTERNET_ID` root, which has no URI
+  form, is refused. A `LOCATABLE_REF` reads as a `Reference` of the one type
+  the element admits, naming the version container by that identifier; its
+  `path` has no counterpart. Both cells run out of openEHR only, since the
+  CDR assigns the uids. The MPD project maps the composition uid to
+  `MedicationRequest.groupIdentifier`, the `INSTRUCTION` uid to
+  `MedicationRequest.identifier`, the `ACTION` uid to
+  `MedicationDispense.identifier`, and the `ACTION`'s `instruction_id` to
+  `MedicationDispense.authorizingPrescription`, which then names the
+  prescription by the identifier its items share.
 - PROGRAMMED mappings (`mappingCode`) are first-party Rust functions in a
   registry with a typed interface over the canonical model; an unknown code is
   a load error. The library depends on eight codes, six of them the Dosage and
