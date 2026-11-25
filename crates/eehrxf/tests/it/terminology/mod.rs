@@ -53,6 +53,10 @@ pub(crate) enum Script {
     /// `$translate` answers each entry whose source system, source code and
     /// target system are asked as an `equivalent` match to its code, and no
     /// match to anything else.
+    #[cfg_attr(
+        not(all(feature = "openehr", feature = "patient-summary")),
+        expect(dead_code, reason = "only the EPS sections suite scripts a map")
+    )]
     Map(Vec<Mapped>),
     /// `$lookup` answers this display.
     Display(&'static str),
