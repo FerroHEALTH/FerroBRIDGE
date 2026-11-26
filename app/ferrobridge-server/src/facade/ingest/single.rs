@@ -14,14 +14,14 @@ use openehr_rm::v1_2::composition::composition::Composition;
 use crate::cdr::Prefer;
 use crate::cdr::ids::EhrId;
 use crate::facade::commit;
-use crate::facade::ehr;
 use crate::facade::engine;
-use crate::facade::identity::claims::Claim;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::identity::claims::Claim;
+use crate::identity::ehr;
 use ferrohealth_server::run::chain;
 
 use super::Ingest;
@@ -45,6 +45,7 @@ use super::reconcile::one_composition;
 use super::refusal::cdr_refusal;
 use super::refusal::ehr_refusal;
 use super::refusal::engine_refusal;
+use super::refusal::precondition_refusal;
 use super::refusal::store_refusal;
 use super::refusal::upstream_refusal;
 
@@ -86,7 +87,7 @@ impl Ingest<'_> {
     /// not hold the resource's source key, and a `500` when the identity
     /// store cannot be read or holds an identifier this version cannot read.
     ///
-    /// [`SourceVersion`]: crate::facade::identity::record::SourceVersion
+    /// [`SourceVersion`]: crate::identity::record::SourceVersion
     pub async fn recognise(
         &self,
         claim: &Claim<'_>,
@@ -272,7 +273,8 @@ impl Ingest<'_> {
         }
         let ehr_id = ehr::resolve(&self.client, self.store, &subject, self.settings.ehr_policy)
             .await
-            .map_err(|error| ehr_refusal(&error))?;
+            .map_err(|error| ehr_refusal(&error))?
+            .id;
         let built = match linking {
             Linking::Commit => self.build_linked(program, inbound, provenance).await?,
             Linking::Refuse => {
@@ -451,19 +453,11 @@ impl Ingest<'_> {
                 ));
             }
             CompositionUpdateOutcome::PreconditionFailed { body, headers } => {
-                let latest = crate::cdr::optional_version_from_etag(
+                return Err(precondition_refusal(
                     "composition_update",
                     headers.etag.as_deref(),
-                )
-                .map_err(|error| cdr_refusal(&error))?;
-                let mut answer = status::Answer::new(
-                    status::PRECONDITION_FAILED,
-                    status::diagnostics(StatusCode::PRECONDITION_FAILED, &body),
-                );
-                if let Some(latest) = latest {
-                    answer = answer.with_entity_tag(String::from(latest.version_tree_id().value()));
-                }
-                return Err(Refused::of_answer(&answer));
+                    &body,
+                ));
             }
             CompositionUpdateOutcome::NotFound { body } => {
                 return Err(upstream_refusal(

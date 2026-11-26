@@ -56,7 +56,7 @@ fn settings(
         settings: crate::facade::Settings {
             base_url: facade.base_url.clone(),
             ehr_policy,
-            subject: crate::facade::subject::SubjectLink::new(identity),
+            subject: crate::identity::subject::SubjectLink::new(identity),
             system_id: facade.system_id.clone(),
             language: facade.composition_language.clone(),
             territory: facade.composition_territory.clone(),
@@ -324,10 +324,10 @@ fn search_limits(facade: &Facade) -> Result<crate::facade::search::Limits, Error
 }
 
 /// Returns the EHR policy `value` names under `key`.
-fn ehr_policy_of(key: &str, value: &str) -> Result<crate::facade::ehr::Policy, Error> {
+fn ehr_policy_of(key: &str, value: &str) -> Result<crate::identity::ehr::Policy, Error> {
     match value {
-        "existing" => Ok(crate::facade::ehr::Policy::Existing),
-        "create_on_first_write" => Ok(crate::facade::ehr::Policy::CreateOnFirstWrite),
+        "existing" => Ok(crate::identity::ehr::Policy::Existing),
+        "create_on_first_write" => Ok(crate::identity::ehr::Policy::CreateOnFirstWrite),
         _ => Err(Error::EhrPolicy {
             key: key.to_owned(),
             value: value.to_owned(),

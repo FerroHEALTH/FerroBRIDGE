@@ -19,15 +19,15 @@ use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVer
 
 use crate::cdr::CdrClient;
 use crate::facade::Facade;
-use crate::facade::ehr;
-use crate::facade::ehr::Policy;
-use crate::facade::identity::PersonId;
 use crate::facade::ingest::Refused;
 use crate::facade::ingest::refusal::ehr_refusal;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
+use crate::identity::PersonId;
+use crate::identity::ehr;
+use crate::identity::ehr::Policy;
 use ferrohealth_server::run::chain;
 
 /// The party resource type that is the subject of an EHR.

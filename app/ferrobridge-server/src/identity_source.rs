@@ -8,7 +8,9 @@
 //! one domain over ITI-83 by `POST`, so the source identifier never sits in a
 //! URL (`PIXm` 3.1.0 §2:3.83.4.1.2.2,
 //! <https://profiles.ihe.net/ITI/PIXm/3.1.0/ITI-83.html>), and every EHR's
-//! `EHR_STATUS.subject.external_ref` names that pseudonym.
+//! `EHR_STATUS.subject.external_ref` names that pseudonym. The inbound engine
+//! also feeds it as a Patient Identity Source over ITI-104 (`PIXm` 3.1.0
+//! §2:3.104).
 
 use std::time::Duration;
 
@@ -17,15 +19,19 @@ use ihe_atna::user::OnBehalfOf;
 use ihe_iti::pixm::PixmClient;
 use ihe_iti::pixm::error::{InvalidInput, PixmError};
 use ihe_iti::pixm::identifier::{CrossReference, SourceIdentifier, TargetSystem};
+use ihe_iti::pixm::source::PixmSourceClient;
+use ihe_iti::pixm::source::error::SourceError as FeedError;
 use secrecy::{ExposeSecret, SecretString};
 
-use crate::facade::identity::PersonId;
+use crate::identity::PersonId;
 
 /// The identity source, resolved from `[identity_source]`.
 #[derive(Clone)]
 pub struct IdentitySource {
     /// The `PIXm` Consumer bound to the identity source.
     pixm: PixmClient,
+    /// The Patient Identity Source bound to the identity source.
+    feed: PixmSourceClient,
     /// The domain the pseudonym is asked in.
     pseudonym_domain: TargetSystem,
     /// The identifier systems a source identifier may be in, in the order a
@@ -39,6 +45,7 @@ impl std::fmt::Debug for IdentitySource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IdentitySource")
             .field("endpoint", &self.pixm.endpoint().as_str())
+            .field("feed", &self.feed.endpoint().as_str())
             .field("pseudonym_domain", &self.pseudonym_domain.as_str())
             .field("source_domains", &self.source_domains)
             .field("timeout", &self.timeout)
@@ -92,7 +99,7 @@ pub enum PseudonymError {
     Upstream(#[source] Box<PixmError>),
     /// The pseudonym cannot be an EHR subject.
     #[error("the pseudonym cannot be an EHR subject")]
-    Subject(#[source] crate::facade::identity::IdError),
+    Subject(#[source] crate::identity::IdError),
 }
 
 impl PseudonymError {
@@ -127,17 +134,19 @@ impl PseudonymError {
 }
 
 impl IdentitySource {
-    /// Returns the identity source `pixm` reaches, asked by `POST` for the
-    /// pseudonym in `pseudonym_domain` within `timeout`.
+    /// Returns the identity source `pixm` and `feed` reach, asked by `POST`
+    /// for the pseudonym in `pseudonym_domain` and fed, each within
+    /// `timeout`.
     #[must_use]
     pub fn new(
-        pixm: PixmClient,
+        (pixm, feed): (PixmClient, PixmSourceClient),
         pseudonym_domain: TargetSystem,
         source_domains: Vec<String>,
         timeout: Duration,
     ) -> Self {
         Self {
             pixm: pixm.invoked_by(ihe_iti::pixm::Invocation::Post),
+            feed,
             pseudonym_domain,
             source_domains,
             timeout,
@@ -145,14 +154,55 @@ impl IdentitySource {
     }
 
     /// Returns this identity source recording every ITI-83 exchange through
-    /// `recorder` as the `PIXm` Query Consumer audit profile fixes it (`PIXm`
-    /// 3.1.0 §2:3.83.5.1.1).
+    /// `recorder` as the `PIXm` Query Consumer audit profile fixes it, and
+    /// every ITI-104 exchange as the Feed Source profile does (`PIXm` 3.1.0
+    /// §2:3.83.5.1.1, §2:3.104.5.1.1).
     #[must_use]
     pub fn audited(self, recorder: std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>) -> Self {
         Self {
-            pixm: self.pixm.audited(recorder),
+            pixm: self.pixm.audited(std::sync::Arc::clone(&recorder)),
+            feed: self.feed.audited(recorder),
             ..self
         }
+    }
+
+    /// Feeds `patient` as the patient `local` names in its source's domain
+    /// (ITI-104 Add or Revise Patient, §2:3.104.4.1).
+    ///
+    /// # Errors
+    /// Returns the [`FeedError`] of a message not admitted or not applied.
+    pub async fn feed(
+        &self,
+        local: &SourceIdentifier,
+        patient: &fhir_types::r4::patient::Patient,
+    ) -> Result<(), FeedError> {
+        self.feed
+            .feed(local, patient, &OnBehalfOf::System, self.timeout)
+            .await
+            .map(drop)
+    }
+
+    /// Tells the identity source the patient `subsumed` names was merged into
+    /// the one `survivor` names, sending `patient`, the subsumed patient
+    /// (ITI-104 Resolve Duplicate Patient, §2:3.104.4.2).
+    ///
+    /// # Errors
+    /// Returns the [`FeedError`] of a message not admitted or not applied.
+    pub async fn merge(
+        &self,
+        (subsumed, survivor): (&SourceIdentifier, &SourceIdentifier),
+        patient: &fhir_types::r4::patient::Patient,
+    ) -> Result<(), FeedError> {
+        self.feed
+            .resolve_duplicate(
+                subsumed,
+                survivor,
+                patient,
+                &OnBehalfOf::System,
+                self.timeout,
+            )
+            .await
+            .map(drop)
     }
 
     /// Returns the domain every EHR subject is a pseudonym in.

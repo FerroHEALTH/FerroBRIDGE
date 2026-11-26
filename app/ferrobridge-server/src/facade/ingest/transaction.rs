@@ -24,13 +24,13 @@ use crate::cdr::error::CdrError;
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
 use crate::facade::commit;
-use crate::facade::ehr;
-use crate::facade::identity::ExternalResourceId;
-use crate::facade::identity::record::ConsumedSource;
-use crate::facade::identity::record::SourceVersion;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::status;
+use crate::identity::ExternalResourceId;
+use crate::identity::ehr;
+use crate::identity::record::ConsumedSource;
+use crate::identity::record::SourceVersion;
 
 use super::Commit;
 use super::Committed;
@@ -289,8 +289,8 @@ impl Ingest<'_> {
     /// back or its versions cannot bind the entries; and a `500` when the
     /// identity store cannot be read or written.
     ///
-    /// [`CommittedSource`]: crate::facade::identity::record::CommittedSource
-    /// [`Claims`]: crate::facade::identity::claims::Claims
+    /// [`CommittedSource`]: crate::identity::record::CommittedSource
+    /// [`Claims`]: crate::identity::claims::Claims
     pub async fn ingest_bundle(
         &self,
         bundle: &Value,
@@ -358,7 +358,8 @@ impl Ingest<'_> {
         }
         let ehr_id = ehr::resolve(&self.client, self.store, subject, self.settings.ehr_policy)
             .await
-            .map_err(|error| ehr_refusal(&error))?;
+            .map_err(|error| ehr_refusal(&error))?
+            .id;
         let preceding = self.preceding(&ehr_id, &partition.mapped, &revised).await?;
         let offered: Vec<SubjectIdentifier> = partition
             .mapped

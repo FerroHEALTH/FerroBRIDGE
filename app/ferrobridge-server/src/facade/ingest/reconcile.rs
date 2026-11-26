@@ -17,15 +17,15 @@ use openehr_rm::v1_2::composition::composition::Composition;
 use crate::cdr::Returned;
 use crate::cdr::ids::ContributionUid;
 use crate::cdr::ids::EhrId;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::record::CommittedSource;
-use crate::facade::identity::record::ConsumedSource;
-use crate::facade::identity::record::SourceVersion;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::record::CommittedSource;
+use crate::identity::record::ConsumedSource;
+use crate::identity::record::SourceVersion;
 use ferrohealth_server::run::chain;
 
 use super::Commit;
@@ -428,7 +428,7 @@ impl Ingest<'_> {
                 contribution,
                 &format!(
                     "reading it back found nothing: {}",
-                    status::diagnostics(StatusCode::NOT_FOUND, &body)
+                    crate::cdr::error::diagnostics(StatusCode::NOT_FOUND, &body)
                 ),
             )),
         }

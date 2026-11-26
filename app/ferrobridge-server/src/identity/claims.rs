@@ -23,7 +23,7 @@ use std::sync::PoisonError;
 #[derive(Debug, Default)]
 pub struct Claims {
     /// The storage keys claimed now, as
-    /// [`SourceVersion::storage_key`](crate::facade::identity::record::SourceVersion::storage_key)
+    /// [`SourceVersion::storage_key`](crate::identity::record::SourceVersion::storage_key)
     /// spells them.
     held: Mutex<BTreeSet<String>>,
 }
