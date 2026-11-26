@@ -3,12 +3,16 @@
 
 //! What a source's request proves before anything of it is read or stored.
 //!
+//! A sender's verification is a set of proofs, and every proof of the set
+//! must hold; one that fails refuses the request whatever the others say.
 //! Every verifier runs over the raw body bytes before they are parsed, and
 //! every comparison of a secret runs in constant time. A key list holds the
 //! current key and the ones still accepted, so a key rotates by adding the
 //! new key before the old one leaves. A refusal names the reason and never a
 //! value of the request.
 
+use std::borrow::Cow;
+use std::net::IpAddr;
 use std::time::Duration;
 
 use aws_lc_rs::constant_time::verify_slices_are_equal;
@@ -40,6 +44,8 @@ pub enum Verifier {
     StaticHeader(StaticHeader),
     /// The TLS client certificate the connection presented.
     Mtls(Mtls),
+    /// The network the connection's peer address lies in.
+    Network(Network),
 }
 
 /// An HMAC (RFC 2104) of the request in one header.
@@ -157,6 +163,42 @@ pub struct Mtls {
     pub subjects: Vec<String>,
 }
 
+/// The networks a source's connection may come from.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Network {
+    /// The networks, in one of which the peer address must lie.
+    #[serde(deserialize_with = "networks")]
+    pub networks: Vec<ipnet::IpNet>,
+}
+
+impl Network {
+    /// Returns whether `address` lies in one of the networks, an IPv4 peer
+    /// seen as an IPv4-mapped IPv6 address included.
+    fn holds(&self, address: IpAddr) -> bool {
+        let address = address.to_canonical();
+        self.networks
+            .iter()
+            .any(|network| network.contains(&address))
+    }
+}
+
+/// Reads networks in CIDR notation, refusing one that does not read.
+pub(crate) fn networks<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<ipnet::IpNet>, D::Error> {
+    Vec::<String>::deserialize(deserializer)?
+        .iter()
+        .map(|text| {
+            crate::sources::document::cidr(text)
+                .and_then(|(address, length)| ipnet::IpNet::new(address, length).ok())
+                .ok_or_else(|| {
+                    serde::de::Error::custom(format!("{text} is no network in CIDR notation"))
+                })
+        })
+        .collect()
+}
+
 /// A key a verifier checks with, read from the secret it names.
 pub struct Key(SecretBox<[u8]>);
 
@@ -222,6 +264,9 @@ pub enum Refused {
 impl Verifier {
     /// Checks `request` against the verifier with `keys`.
     ///
+    /// A network verifier refuses here, since a request alone names no peer
+    /// address; [`Proofs::verify`] gives it one.
+    ///
     /// # Errors
     /// Returns [`Refused`] when the request does not prove it is the
     /// source's.
@@ -247,7 +292,73 @@ impl Verifier {
                     Err(Refused::Mismatch)
                 }
             }
+            Self::Network(_) => Err(Refused::Mismatch),
         }
+    }
+}
+
+/// The proofs a sender's request must all carry, each with the keys it
+/// checks with.
+#[derive(Debug, Default)]
+pub struct Proofs<'a>(Vec<(Cow<'a, Verifier>, Vec<Key>)>);
+
+/// The proof a request failed, and why.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Unproven<'a> {
+    /// The proof that failed.
+    pub proof: &'a Verifier,
+    /// Why it failed.
+    pub reason: Refused,
+}
+
+impl<'a> Proofs<'a> {
+    /// Returns the set with `proof`, checked with `keys`, added.
+    #[must_use]
+    pub fn with(mut self, proof: impl Into<Cow<'a, Verifier>>, keys: Vec<Key>) -> Self {
+        self.0.push((proof.into(), keys));
+        self
+    }
+
+    /// Checks `request`, which arrived from `address`, against every proof.
+    ///
+    /// Every proof is checked, so the time taken does not tell which one
+    /// failed.
+    ///
+    /// # Errors
+    /// Returns the first proof in the set's order that `request` fails,
+    /// with its reason; an empty set proves nothing and refuses.
+    pub fn verify(
+        &self,
+        request: &Request<'_>,
+        address: Option<IpAddr>,
+    ) -> Result<(), Option<Unproven<'_>>> {
+        if self.0.is_empty() {
+            return Err(None);
+        }
+        let mut first = None;
+        for (proof, keys) in &self.0 {
+            let checked = match (proof.as_ref(), address) {
+                (Verifier::Network(network), Some(address)) if network.holds(address) => Ok(()),
+                (Verifier::Network(_), _) => Err(Refused::Mismatch),
+                (verifier, _) => verifier.verify(request, keys),
+            };
+            if let Err(reason) = checked {
+                first.get_or_insert(Unproven { proof, reason });
+            }
+        }
+        first.map_or(Ok(()), |unproven| Err(Some(unproven)))
+    }
+}
+
+impl From<Verifier> for Cow<'_, Verifier> {
+    fn from(verifier: Verifier) -> Self {
+        Cow::Owned(verifier)
+    }
+}
+
+impl<'a> From<&'a Verifier> for Cow<'a, Verifier> {
+    fn from(verifier: &'a Verifier) -> Self {
+        Cow::Borrowed(verifier)
     }
 }
 

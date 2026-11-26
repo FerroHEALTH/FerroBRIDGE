@@ -9,6 +9,7 @@ mod apply;
 mod event;
 pub(crate) mod intake;
 mod notification;
+mod proofs;
 pub(crate) mod recover;
 mod retry;
 pub(crate) mod store;
