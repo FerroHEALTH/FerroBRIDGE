@@ -4,7 +4,9 @@
 //! The reads of a `Parameters` resource the four contracts share.
 
 use fhir_types::codec::Json;
+use fhir_types::codec::Object;
 use fhir_types::codec::Path;
+use fhir_types::codec::Value;
 use fhir_types::operation::ParametersError;
 use fhir_types::r4::parameters::Parameters;
 use fhir_types::r4::parameters::ParametersParameter;
@@ -18,29 +20,51 @@ use crate::operations::error::OperationError;
 
 use crate::operations::contract::CONTEXT;
 
-/// Reads a `Parameters` resource out of JSON text.
+/// Reads a request body out of JSON text as one JSON object.
 ///
 /// # Errors
 ///
-/// Returns [`OperationError::Body`] when the text is not a `Parameters`
-/// resource of the FHIR version in play.
-pub fn parameters_from_json(
-    operation: &'static str,
-    text: &str,
-) -> Result<Parameters, OperationError> {
+/// Returns [`OperationError::Payload`] when the text is not JSON and
+/// [`OperationError::NotAnObject`] when it is not an object.
+pub fn body_object(text: &str) -> Result<Object, OperationError> {
     let value: serde_json::Value =
         serde_json::from_str(text).map_err(|source| OperationError::Payload { source })?;
-    let fhir_types::codec::Value::Object(object) = fhir_types::codec::Value::from_serde_json(value)
-    else {
-        return Err(OperationError::NotAnObject { what: "body" });
-    };
-    Parameters::from_json(&object, &mut Path::root("Parameters")).map_err(|source| {
+    match Value::from_serde_json(value) {
+        Value::Object(object) => Ok(object),
+        _ => Err(OperationError::NotAnObject { what: "body" }),
+    }
+}
+
+/// Reads a `Parameters` resource out of a JSON object.
+///
+/// # Errors
+///
+/// Returns [`OperationError::Body`] when the object is not a `Parameters`
+/// resource of the FHIR version in play.
+pub fn parameters_from_object(
+    operation: &'static str,
+    object: &Object,
+) -> Result<Parameters, OperationError> {
+    Parameters::from_json(object, &mut Path::root("Parameters")).map_err(|source| {
         OperationError::Body {
             operation,
             expected: "Parameters",
             source: Box::new(source),
         }
     })
+}
+
+/// Reads a `Parameters` resource out of JSON text.
+///
+/// # Errors
+///
+/// Returns what [`body_object`] and [`parameters_from_object`] return.
+pub fn parameters_from_json(
+    operation: &'static str,
+    text: &str,
+) -> Result<Parameters, OperationError> {
+    let object = body_object(text)?;
+    parameters_from_object(operation, &object)
 }
 
 /// Returns the name of one parameter.
