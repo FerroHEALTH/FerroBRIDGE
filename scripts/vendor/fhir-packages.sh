@@ -143,7 +143,7 @@ vendor_one() {
   echo "== $pkg $ver"
   local meta_url
   meta_url="$(meta_url_for "$pkg")"
-  meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$meta_url")" \
+  meta="$(fetch_text "$meta_url")" \
     || die "cannot read registry metadata for $pkg"
   shasum="$(printf '%s' "$meta" | jq -r --arg v "$ver" '.versions[$v].dist.shasum // empty')"
   tarball_url="$(printf '%s' "$meta" | jq -r --arg v "$ver" '.versions[$v].dist.tarball // empty')"
@@ -152,7 +152,7 @@ vendor_one() {
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
   [[ -n "$tarball_url" ]] || die "the registry lists no tarball for $pkg $ver"
-  with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
+  fetch_url "$tmp/pkg.tgz" "$tarball_url" \
     || die "download of $pkg $ver failed"
   got="$(shasum -a 1 "$tmp/pkg.tgz" | cut -d' ' -f1)"
   [[ "$got" = "$shasum" ]] || die "checksum mismatch for $pkg $ver: registry $shasum, downloaded $got"
@@ -272,7 +272,7 @@ fetch_example() {
 
   echo "== $pkg $ver"
   meta_url="$(meta_url_for "$pkg")"
-  meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$meta_url")" \
+  meta="$(fetch_text "$meta_url")" \
     || die "cannot read registry metadata for $pkg"
   shasum="$(jq -r --arg v "$ver" '.versions[$v].dist.shasum // empty' <<< "$meta")"
   tarball_url="$(jq -r --arg v "$ver" '.versions[$v].dist.tarball // empty' <<< "$meta")"
@@ -280,7 +280,7 @@ fetch_example() {
   [[ -n "$tarball_url" ]] || die "the registry lists no tarball for $pkg $ver"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
-  with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
+  fetch_url "$tmp/pkg.tgz" "$tarball_url" \
     || die "download of $pkg $ver failed"
   got="$(shasum -a 1 "$tmp/pkg.tgz" | cut -d' ' -f1)"
   [[ "$got" = "$shasum" ]] || die "checksum mismatch for $pkg $ver: registry $shasum, downloaded $got"
