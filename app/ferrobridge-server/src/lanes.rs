@@ -86,7 +86,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         if let Some(audit) = settings.audit.as_ref() {
             let log = start_audit(audit, settings, &lane, &state).await?;
             let identity = lane.settings.subject.identity().clone();
-            lane.settings.subject = facade::subject::SubjectLink::new(Arc::new(
+            lane.settings.subject = crate::identity::subject::SubjectLink::new(Arc::new(
                 identity.audited(Arc::clone(log.recorder())),
             ));
             state = state.with_access_log(Arc::new(log));
@@ -819,7 +819,7 @@ async fn build_facade(
     let state = state.context(
         "the facade needs a [state] section: every replica resolves its identities in the state store",
     )?;
-    let store = facade::identity::state::StateStore::open(state)
+    let store = crate::identity::state::StateStore::open(state)
         .await
         .context("opening the identity map in the state store")?;
     let owned = |on: bool| on.then(|| Arc::new(facade::owned::OwnedStore::open(state)));

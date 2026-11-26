@@ -9,12 +9,12 @@ use http::StatusCode;
 
 use crate::cdr::error::CdrError;
 use crate::cdr::ids::ContributionUid;
-use crate::facade::ehr;
 use crate::facade::engine;
-use crate::facade::identity::store::StoreError;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::status;
+use crate::identity::ehr;
+use crate::identity::store::StoreError;
 use ferrohealth_server::run::chain;
 
 use super::Mapped;
@@ -35,9 +35,30 @@ pub(super) fn upstream_refusal(
 ) -> Refused {
     Refused::of_answer(&status::Answer::new(
         row,
-        status::diagnostics(answered, body),
+        crate::cdr::error::diagnostics(answered, body),
     ))
     .with_upstream(Some(answered))
+}
+
+/// Returns the refusal a CDR `412` on `operation` with `body` renders as,
+/// carrying the version the CDR's `etag` names as the latest.
+pub(super) fn precondition_refusal(
+    operation: &'static str,
+    etag: Option<&str>,
+    body: &openehr_its::rest::client::ErrorBody,
+) -> Refused {
+    let latest = match crate::cdr::optional_version_from_etag(operation, etag) {
+        Ok(latest) => latest,
+        Err(error) => return cdr_refusal(&error),
+    };
+    let mut answer = status::Answer::new(
+        status::PRECONDITION_FAILED,
+        crate::cdr::error::diagnostics(StatusCode::PRECONDITION_FAILED, body),
+    );
+    if let Some(latest) = latest {
+        answer = answer.with_entity_tag(String::from(latest.version_tree_id().value()));
+    }
+    Refused::of_answer(&answer)
 }
 
 /// Returns the refusal a contribution the CDR rejected with `answered` and
@@ -51,7 +72,7 @@ pub(super) fn refuse_all(
     answered: StatusCode,
     body: &openehr_its::rest::client::ErrorBody,
 ) -> Refused {
-    let detail = status::diagnostics(answered, body);
+    let detail = crate::cdr::error::diagnostics(answered, body);
     let mut issues = vec![
         Issue::error(row.issue())
             .diagnosing(detail.clone())

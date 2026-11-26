@@ -28,10 +28,10 @@ use crate::cdr::Prefer;
 use crate::cdr::ids::EhrId;
 use crate::cdr::ids::SubjectId;
 use crate::cdr::ids::SubjectNamespace;
-use crate::facade::identity::PersonId;
-use crate::facade::identity::store::Store;
-use crate::facade::identity::store::StoreError;
-use crate::facade::subject::PARTY_TYPE;
+use crate::identity::PersonId;
+use crate::identity::store::Store;
+use crate::identity::store::StoreError;
+use crate::identity::subject::PARTY_TYPE;
 
 /// The archetype every openEHR `EHR_STATUS` declares.
 ///
@@ -181,7 +181,7 @@ async fn create(
         }
         EhrCreateOutcome::BadRequest { body } => Err(EhrError::Refused {
             subject: person.to_string(),
-            detail: crate::facade::status::diagnostics(StatusCode::BAD_REQUEST, &body),
+            detail: crate::cdr::error::diagnostics(StatusCode::BAD_REQUEST, &body),
         }),
         EhrCreateOutcome::Conflict { body } => {
             let found = client
@@ -192,7 +192,7 @@ async fn create(
                 EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body).map(|id| (id, false)),
                 EhrGetBySubjectOutcome::NotFound { .. } => Err(EhrError::Refused {
                     subject: person.to_string(),
-                    detail: crate::facade::status::diagnostics(StatusCode::CONFLICT, &body),
+                    detail: crate::cdr::error::diagnostics(StatusCode::CONFLICT, &body),
                 }),
             }
         }
@@ -269,7 +269,7 @@ fn store_error(source: StoreError) -> EhrError {
 #[cfg(test)]
 mod tests {
     use super::{EHR_STATUS_ARCHETYPE, Policy, status_of};
-    use crate::facade::identity::PersonId;
+    use crate::identity::PersonId;
     use openehr_base::v1_3::base_types::identification::object_id::ObjectId;
 
     #[test]

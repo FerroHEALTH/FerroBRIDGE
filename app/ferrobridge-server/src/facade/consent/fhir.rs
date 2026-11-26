@@ -47,7 +47,6 @@ use crate::facade::consent::state;
 use crate::facade::consent::subject;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::write::refuse;
-use crate::facade::identity::FhirResourceId;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -57,6 +56,7 @@ use crate::facade::search::bundle::Match;
 use crate::facade::status::consent::of_document_refusal;
 use crate::facade::status::consent::of_exchange_error;
 use crate::facade::status::consent::of_unstatable;
+use crate::identity::FhirResourceId;
 
 /// The instant the bridge answers, the `dateTime` of an exported `Consent`.
 fn now() -> String {
