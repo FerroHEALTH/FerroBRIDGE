@@ -32,6 +32,7 @@ pub mod authorities;
 pub mod directory;
 pub mod edit;
 mod envelope;
+pub mod intake;
 pub mod origin;
 pub mod plain;
 mod stamped;
@@ -84,6 +85,8 @@ pub struct Face {
     /// The access-record lane each committed message is recorded through,
     /// with the address the face listens at.
     access_log: Option<(Arc<AccessLog>, SocketAddr)>,
+    /// The inbound intake an ADT patient trigger's patient is stored in.
+    inbox: Option<crate::inbound::store::InboxStore>,
 }
 
 impl Sender {
@@ -170,6 +173,23 @@ impl Routed {
     }
 }
 
+/// Returns MSH-9.1 and MSH-9.2 of `inbound` as its message type, or its
+/// structure's name when the parse let MSH-9 through empty.
+fn message_type_of(inbound: &Inbound) -> Option<MessageType> {
+    let message = inbound.parsed().message();
+    let type_code = [message.message_type(1), message.message_type(2)]
+        .into_iter()
+        .flatten()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<&str>>()
+        .join("^");
+    // NOTE: no specification governs this: our own design; MSH-9 is
+    // required, so a type the parse let through empty is named by the structure.
+    MessageType::new(type_code)
+        .or_else(|_| MessageType::new(inbound.parsed().structure_name()))
+        .ok()
+}
+
 /// The document of a source no route takes, which no message reaches.
 static EMPTY: std::sync::LazyLock<Mllp> = std::sync::LazyLock::new(Mllp::default);
 
@@ -195,7 +215,16 @@ impl Face {
             lane: Lane::Tls,
             usage: Arc::new(crate::usage_report::window()),
             access_log: None,
+            inbox: None,
         }
+    }
+
+    /// Returns the face storing each ADT patient trigger's patient in
+    /// `inbox`, the inbound intake's rows, when the intake runs.
+    #[must_use]
+    pub fn with_inbox(mut self, inbox: Option<crate::inbound::store::InboxStore>) -> Self {
+        self.inbox = inbox;
+        self
     }
 
     /// Returns the directory of the face's maps, with the messages each one
@@ -465,20 +494,13 @@ impl Face {
         if !unsettled.is_empty() {
             return (Settled::Unregistered(unsettled), tally);
         }
-        let type_code = [message.message_type(1), message.message_type(2)]
-            .into_iter()
-            .flatten()
-            .filter(|part| !part.is_empty())
-            .collect::<Vec<&str>>()
-            .join("^");
-        // NOTE: no specification governs this: our own design; MSH-9 is
-        // required, so a type the parse let through empty is named by the structure.
-        let message_type = MessageType::new(type_code)
-            .or_else(|_| MessageType::new(inbound.parsed().structure_name()));
-        let Ok(message_type) = message_type else {
+        let Some(message_type) = message_type_of(inbound) else {
             return (Settled::Unkeyed, tally);
         };
         let mut bundle = mapped.into_bundle();
+        if let Err(settled) = self.store_patient(message, &bundle, routed).await {
+            return (settled, tally);
+        }
         edit::claim_profiles(&mut bundle, &mllp.profiles);
         edit::link_subjects(&mut bundle);
         let sending = origin::sending_system(message);
@@ -539,6 +561,36 @@ impl Face {
             }
             Err(refused) => (Settled::Refused(refused), tally),
         }
+    }
+
+    /// Stores the patient events of `message`, an ADT patient trigger whose
+    /// maps wrote `bundle`, in the inbound intake before the message is
+    /// answered; any other message, or a face with no intake, stores none.
+    async fn store_patient(
+        &self,
+        message: &Message,
+        bundle: &fhir_types::codec::Value,
+        routed: &Routed,
+    ) -> Result<(), Settled> {
+        let (Some(inbox), Some(trigger)) = (self.inbox.as_ref(), intake::trigger(message)) else {
+            return Ok(());
+        };
+        let events = intake::events(message, bundle, trigger).map_err(Settled::Unidentified)?;
+        for patient in &events {
+            if let Err(error) = inbox
+                .accept_with_body(
+                    routed.source.id,
+                    &patient.tenant,
+                    &patient.event,
+                    &patient.body,
+                )
+                .await
+            {
+                tracing::warn!(error = %ferrohealth_server::run::chain(&error), "a patient event could not be stored");
+                return Err(Settled::Unstored);
+            }
+        }
+        Ok(())
     }
 
     /// Records the import of `message` from `peer`, which committed

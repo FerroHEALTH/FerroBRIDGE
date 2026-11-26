@@ -28,9 +28,12 @@ CREATE TABLE inbound_event (
     stamp text,
     received_at timestamptz NOT NULL DEFAULT now(),
     -- The sealed body of a source whose event carries the record, cleared
-    -- once applied, with the key it is sealed under.
+    -- once applied, discarded or expired, with the key it is sealed under.
     body bytea,
     body_key_id text,
+    -- Whether the event is older than the entity's applied or pending one,
+    -- so it moves no work item and keeps no body.
+    superseded boolean NOT NULL DEFAULT false,
     CONSTRAINT inbound_event_dedupe_key UNIQUE (source_id, dedupe_key),
     CONSTRAINT inbound_event_body_check CHECK ((body IS NULL) = (body_key_id IS NULL))
 );
@@ -56,6 +59,9 @@ CREATE TABLE inbound_work (
     leased_until timestamptz,
     -- The newest source stamp applied.
     applied_stamp text,
+    -- The event that moved the item to its generation, whose body the
+    -- worker applies; null for a mark or a replay of a source without one.
+    event_id uuid REFERENCES inbound_event ON DELETE SET NULL,
     -- The fixed reason a parked item carries; it names no value.
     park_reason text,
     -- Who settled a parked item, why and when.

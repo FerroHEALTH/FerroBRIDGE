@@ -135,6 +135,7 @@ impl Keeper {
                     ]),
                     stamp: Some(event.number.to_string()),
                 },
+                None,
             )
             .await?;
             if accepted == super::store::Accepted::Stored {

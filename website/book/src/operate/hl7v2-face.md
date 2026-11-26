@@ -116,6 +116,30 @@ The TLS listener requires a client certificate that chains to
 authorities file is read again when its modification time changes, so a
 rotated file is in force for the next handshake without a restart.
 
+## Patient triggers and the inbound intake
+
+With `[inbound]` on, the face stores the patient of an ADT patient trigger
+in the inbound intake before it answers, and the intake's workers register
+the patient with the identity source and ensure its one EHR
+([The inbound intake](../integrate/inbound.md)):
+
+- A01, A04, A05 and A08 (IHE ITI-8) and A28 and A31 (IHE ITI-30) store the
+  message's `Patient` as an upsert, keeping only its identifiers, names,
+  birth date, gender and deceased status.
+- A40 and A47 store the source's merge statement: the prior identifier in
+  MRG-1 is replaced by the identifier in PID-3, which reaches the identity
+  source as a Resolve Duplicate. MRG-1 must name the same assigning
+  authority as PID-3; otherwise the message is answered `AE` at MRG-1.
+- A repeated MSH-10 stores nothing again. An event stamped (EVN-2, or MSH-7
+  without it) before the one its patient already applied or waits on is
+  kept as superseded and changes nothing.
+- The record is sealed under `[state.seal]` and cleared once applied, once
+  an operator discards its parked item, or after
+  `[inbound] parked_body_retention` in a park.
+- `AA` follows the store's commit. A store that cannot take the event
+  answers `AE`, so the sender sends the message again; the message's
+  clinical entries are not committed then.
+
 ## Devices without TLS
 
 Some lab analysers have no TLS stack, no certificate store and no client
@@ -382,6 +406,8 @@ ERR-3 and the text in ERR-8.
 | The connection's client certificate does not carry the `certificate_subject` of the message's route | `AR` | `207` at MSH^1^4 |
 | The message's route holds no network the peer address lies in, or, on the plain listener, names no network; on the plain listener the connection then closes | `AR` | `207` at MSH^1^4 |
 | The routes cannot be read | `AE` | `207` |
+| A patient trigger's event cannot be stored in the inbound intake | `AE` | `207` |
+| A patient trigger names no identifier its event can be keyed by, or MRG-1 names another assigning authority than PID-3 | `AE` | `101` at PID-3 or MRG-1 |
 | MSH-10 empty | `AE` | `101` at MSH-10 |
 | A result whose message names no clinician, from a sender that is no device | `AE` | `101` at OBX^1^16 |
 | A health care facility no listed sender names | `AE` | `207` at its field |
