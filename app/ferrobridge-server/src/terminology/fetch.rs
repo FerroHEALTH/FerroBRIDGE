@@ -22,7 +22,10 @@ use fhir_types::r4::primitives::{Boolean, Canonical, Code, Uri};
 
 /// What the server answered for one question, shared across the repeated
 /// runs: its response, or the failure it answered with.
-pub(super) type Stored<R> = Result<R, Arc<dyn Error + Send + Sync>>;
+pub(super) type Stored<R> = Result<R, Shared>;
+
+/// A failure in the form every run that meets its question shares.
+pub(super) type Shared = Arc<dyn Error + Send + Sync>;
 
 /// What the server answered for one `$translate`.
 pub(super) type Answer = Stored<ConceptMapTranslateResponse>;
@@ -74,7 +77,7 @@ pub(super) async fn fetch(
             let answer = client
                 .translate(one)
                 .await
-                .map_err(shared)
+                .map_err(|error| -> Shared { Arc::new(error) })
                 .and_then(|outcome| response(&outcome));
             return (vec![(one.clone(), answer)], Vec::new());
         }
@@ -82,7 +85,7 @@ pub(super) async fn fetch(
             let answer = client
                 .lookup(&one.system, &one.code, one.version.as_deref())
                 .await
-                .map_err(shared)
+                .map_err(|error| -> Shared { Arc::new(error) })
                 .and_then(|outcome| displayed(&outcome));
             return (Vec::new(), vec![(one.clone(), answer)]);
         }
@@ -101,10 +104,10 @@ pub(super) async fn fetch(
                 .into_iter()
                 .zip(entries.by_ref())
                 .map(|(translation, entry)| {
-                    let answer = match entry {
+                    let answer: Answer = match entry {
                         Ok(BatchOutcome::Translate(outcome)) => response(&outcome),
-                        Ok(_) => Err(shared(UnexpectedAnswer)),
-                        Err(error) => Err(shared(error)),
+                        Ok(_) => Err(Arc::new(UnexpectedAnswer)),
+                        Err(error) => Err(Arc::new(error)),
                     };
                     (translation, answer)
                 })
@@ -113,10 +116,10 @@ pub(super) async fn fetch(
                 .into_iter()
                 .zip(entries)
                 .map(|(lookup, entry)| {
-                    let answer = match entry {
+                    let answer: Displayed = match entry {
                         Ok(BatchOutcome::Lookup(outcome)) => displayed(&outcome),
-                        Ok(_) => Err(shared(UnexpectedAnswer)),
-                        Err(error) => Err(shared(error)),
+                        Ok(_) => Err(Arc::new(UnexpectedAnswer)),
+                        Err(error) => Err(Arc::new(error)),
                     };
                     (lookup, answer)
                 })
@@ -124,7 +127,7 @@ pub(super) async fn fetch(
             (translated, looked_up)
         }
         Err(error) => {
-            let error = shared(error);
+            let error: Shared = Arc::new(error);
             (
                 translations
                     .into_iter()
@@ -137,11 +140,6 @@ pub(super) async fn fetch(
             )
         }
     }
-}
-
-/// Returns `error` in the form every run that meets its question shares.
-pub(super) fn shared(error: impl Error + Send + Sync + 'static) -> Arc<dyn Error + Send + Sync> {
-    Arc::new(error)
 }
 
 /// A batch entry answered with an outcome of another operation.
@@ -169,7 +167,7 @@ fn response(outcome: &TranslateOutcome) -> Answer {
             message: message.as_deref().map(primitives::String::from),
             ..ConceptMapTranslateResponse::default()
         }),
-        _ => Err(shared(UnexpectedAnswer)),
+        _ => Err(Arc::new(UnexpectedAnswer)),
     }
 }
 
@@ -192,7 +190,7 @@ fn displayed(outcome: &LookupOutcome) -> Displayed {
             ..CodeSystemLookupResponse::default()
         })),
         LookupOutcome::NotFound { .. } => Ok(None),
-        _ => Err(shared(UnexpectedAnswer)),
+        _ => Err(Arc::new(UnexpectedAnswer)),
     }
 }
 
