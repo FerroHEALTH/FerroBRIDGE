@@ -14,6 +14,8 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
+mod inbound;
+
 use crate::config::{self, Settings};
 use crate::serve_until;
 use crate::state::AppState;
@@ -33,6 +35,8 @@ pub(crate) struct Started {
     pub(crate) face: Option<StartedFace>,
     /// The change-feed consumers that run.
     pub(crate) feeds: Vec<StartedFeed>,
+    /// The inbound workers, when the intake and the facade run.
+    pub(crate) workers: Option<Arc<crate::inbound::worker::Pool>>,
 }
 
 impl Started {
@@ -75,14 +79,14 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             );
         }
     }
-    state = open_sources(settings, state)?;
+    state = inbound::open_sources(settings, state)?;
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
         let mut lane = lane.clone();
         if let Some(audit) = settings.audit.as_ref() {
             let log = start_audit(audit, settings, &lane, &state).await?;
             let identity = lane.settings.subject.identity().clone();
-            lane.settings.subject = facade::subject::SubjectLink::new(Arc::new(
+            lane.settings.subject = crate::identity::subject::SubjectLink::new(Arc::new(
                 identity.audited(Arc::clone(log.recorder())),
             ));
             state = state.with_access_log(Arc::new(log));
@@ -140,43 +144,13 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_change_feed(report);
         feeds = started;
     }
+    let workers = inbound::workers(settings, &state);
     Ok(Started {
         state,
         lanes,
         face,
         feeds,
-    })
-}
-
-/// Returns `state` serving the inbound sources of its state store, the
-/// `[secrets]` directory they name opened.
-fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState> {
-    use anyhow::Context;
-
-    let Some(store) = state.store() else {
-        return Ok(state);
-    };
-    let sources = Arc::new(
-        crate::sources::Sources::open(store, settings.secrets.as_ref())
-            .context("opening the [secrets] directory the inbound sources name")?,
-    );
-    let intake = settings.inbound.map(|inbound| {
-        // TODO(#2048): start the worker pool with the identity-feed handler.
-        crate::inbound::intake::Intake::new(
-            Arc::clone(&sources),
-            crate::inbound::store::InboxStore::new(store.pool().clone()),
-            inbound.body_limit,
-        )
-        .with_recoverer(Arc::new(crate::inbound::recover::Recoverer::new(
-            store.clone(),
-            Arc::clone(&sources),
-            inbound.workers.lease,
-        )))
-    });
-    let state = state.with_sources(sources);
-    Ok(match intake {
-        Some(intake) => state.with_intake(Arc::new(intake)),
-        None => state,
+        workers,
     })
 }
 
@@ -216,14 +190,18 @@ impl StartedFeed {
 }
 
 /// Spawns every change-feed follower, the inbound recovery and the link
-/// sweeper of `state`, each on its own task until `stop` reads `true`.
+/// sweeper of `state`, and the inbound `workers`, each on its own task until
+/// `stop` reads `true`.
 pub(crate) fn spawn_followers(
-    feeds: Vec<StartedFeed>,
+    (feeds, workers): (Vec<StartedFeed>, Option<Arc<crate::inbound::worker::Pool>>),
     state: &AppState,
     settings: &Settings,
     stop: &tokio::sync::watch::Sender<bool>,
 ) -> Vec<tokio::task::JoinHandle<()>> {
     let mut followers: Vec<_> = feeds.into_iter().map(|feed| feed.spawn(stop)).collect();
+    if let Some(workers) = workers {
+        followers.extend(workers.spawn(&stop.subscribe()));
+    }
     if let (Some(recoverer), Some(inbound)) = (
         state.intake().and_then(|intake| intake.recoverer()),
         settings.inbound,
@@ -829,7 +807,7 @@ async fn build_facade(
     let state = state.context(
         "the facade needs a [state] section: every replica resolves its identities in the state store",
     )?;
-    let store = facade::identity::state::StateStore::open(state)
+    let store = crate::identity::state::StateStore::open(state)
         .await
         .context("opening the identity map in the state store")?;
     let owned = |on: bool| on.then(|| Arc::new(facade::owned::OwnedStore::open(state)));

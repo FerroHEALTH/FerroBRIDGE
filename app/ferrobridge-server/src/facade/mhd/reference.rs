@@ -150,7 +150,7 @@ pub(super) async fn read(
     client: &CdrClient,
     id: &str,
 ) -> Result<Object, Refusal> {
-    let Ok(internal) = crate::facade::identity::FhirResourceId::new(id) else {
+    let Ok(internal) = crate::identity::FhirResourceId::new(id) else {
         return Err(super::unknown(DOCUMENT_REFERENCE, id));
     };
     let Some(binding) = handlers::read::binding(facade, COMPOSITION, &internal).await? else {

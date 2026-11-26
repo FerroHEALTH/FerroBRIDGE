@@ -56,10 +56,10 @@ use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::Settings;
-use ferrobridge_server::facade::ehr::Policy;
-use ferrobridge_server::facade::identity::store::MemoryStore;
-use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::programs;
+use ferrobridge_server::identity::ehr::Policy;
+use ferrobridge_server::identity::store::MemoryStore;
+use ferrobridge_server::identity::store::Store;
 use ferrobridge_server::operations::lane::OperationsLane;
 use ferrobridge_server::state::AppState;
 use ferrobridge_server::terminology::Translator;
@@ -595,16 +595,12 @@ async fn post_transaction(
 /// Returns the consumed-source key of the synthetic Condition at `version`.
 fn condition_source_at(
     version: &str,
-) -> Result<ferrobridge_server::facade::identity::record::SourceVersion, Box<dyn Error>> {
-    Ok(
-        ferrobridge_server::facade::identity::record::SourceVersion::new(
-            "Condition",
-            ferrobridge_server::facade::identity::ExternalResourceId::new(
-                "ferrobridge-synthetic-condition-1",
-            )?,
-            Some(String::from(version)),
-        ),
-    )
+) -> Result<ferrobridge_server::identity::record::SourceVersion, Box<dyn Error>> {
+    Ok(ferrobridge_server::identity::record::SourceVersion::new(
+        "Condition",
+        ferrobridge_server::identity::ExternalResourceId::new("ferrobridge-synthetic-condition-1")?,
+        Some(String::from(version)),
+    ))
 }
 
 /// Returns the `diagnostics` of every issue of an `OperationOutcome`.

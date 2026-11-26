@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The identity map: the seam, and the in-memory implementation tests use;
-//! [`crate::facade::identity::state`] holds it in the state store.
+//! [`crate::identity::state`] holds it in the state store.
 //!
 //! No specification governs the identity map: our own design. Four tables
 //! relate a patient identifier to an `ehr_id`, an external resource id to the
@@ -28,17 +28,17 @@ use std::sync::Mutex;
 
 use crate::cdr::ids::EhrId;
 
-use crate::facade::identity::ExternalResourceId;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::PersonId;
-use crate::facade::identity::record::CommittedSource;
-use crate::facade::identity::record::CompositionBinding;
-use crate::facade::identity::record::ConsumedSource;
-use crate::facade::identity::record::Identifier;
-use crate::facade::identity::record::IdentifierQuery;
-use crate::facade::identity::record::SourceVersion;
-use crate::facade::identity::record::external_key;
-use crate::facade::identity::record::internal_key;
+use crate::identity::ExternalResourceId;
+use crate::identity::FhirResourceId;
+use crate::identity::PersonId;
+use crate::identity::record::CommittedSource;
+use crate::identity::record::CompositionBinding;
+use crate::identity::record::ConsumedSource;
+use crate::identity::record::Identifier;
+use crate::identity::record::IdentifierQuery;
+use crate::identity::record::SourceVersion;
+use crate::identity::record::external_key;
+use crate::identity::record::internal_key;
 
 /// Why the identity store could not answer.
 ///
@@ -568,8 +568,8 @@ impl Store for MemoryStore {
 mod tests {
     use super::{MemoryStore, Store};
     use crate::cdr::ids::EhrId;
-    use crate::facade::identity::record::{CompositionBinding, ConsumedSource, SourceVersion};
-    use crate::facade::identity::{ExternalResourceId, FhirResourceId, PersonId};
+    use crate::identity::record::{CompositionBinding, ConsumedSource, SourceVersion};
+    use crate::identity::{ExternalResourceId, FhirResourceId, PersonId};
 
     /// Returns a binding naming `uid` as its version container.
     fn binding(uid: &str) -> CompositionBinding {
@@ -581,7 +581,7 @@ mod tests {
             entry_path: String::from("/content[1]"),
             split: 0,
             context: String::from("ferrobridge_diagnosis.context"),
-            derivation: Some(crate::facade::identity::derive::DERIVATION),
+            derivation: Some(crate::identity::derive::DERIVATION),
             created: None,
         }
     }

@@ -20,20 +20,17 @@
 
 use axum::body::Bytes;
 use base64::Engine as _;
-use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Json as _;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
 use fhir_types::r4::binary::Binary;
-use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 use openehr_rm::draft::access_control::access_control::access_directive::AccessDirective;
 
 use crate::consent::Refused;
 use crate::consent::exchange;
-use crate::facade::Facade;
 use crate::facade::consent::CONSENT;
 use crate::facade::consent::Committed;
 use crate::facade::consent::PATIENT;
@@ -44,6 +41,7 @@ use crate::facade::consent::commit;
 use crate::facade::consent::logical_id;
 use crate::facade::consent::state;
 use crate::facade::consent::subject;
+use crate::facade::context::Context;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::write::refuse;
 use crate::facade::media;
@@ -127,13 +125,16 @@ fn one<'a>(pairs: &'a [(String, String)], name: &str) -> Result<&'a str, Refusal
 /// `422` naming the element a refused document fails at, and the refusals of
 /// [`subject`] and of the exchange.
 pub async fn import(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     profile: Profile,
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &Bytes,
 ) -> Result<axum::response::Response, Refusal> {
+    let Context {
+        facade,
+        access,
+        headers,
+        uri,
+    } = cx;
     let settings = crate::facade::consent::settings(facade)?;
     let xml = headers
         .get(http::header::CONTENT_TYPE)
@@ -202,12 +203,15 @@ pub async fn import(
 /// be written in (`500`, naming the attribute), and the refusals of
 /// [`subject`] and of the exchange.
 pub async fn export(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     profile: Profile,
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<axum::response::Response, Refusal> {
+    let Context {
+        facade,
+        access,
+        headers,
+        uri,
+    } = cx;
     let settings = admit(facade, headers, uri, Body::Absent)?;
     let pairs = parameters(uri, &[PATIENT])?;
     let patient = one(&pairs, PATIENT)?;

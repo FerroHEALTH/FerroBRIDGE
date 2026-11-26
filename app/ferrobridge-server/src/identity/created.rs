@@ -22,12 +22,12 @@ use fhirconnect::engine::seam::ReferenceError;
 use fhirconnect::engine::seam::identity::IdentityRequest;
 use fhirconnect::engine::seam::identity::IdentitySink;
 
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::derive;
-use crate::facade::identity::record::CompositionBinding;
-use crate::facade::identity::record::CreatedBy;
-use crate::facade::identity::store::Store;
-use crate::facade::identity::store::StoreError;
+use crate::identity::FhirResourceId;
+use crate::identity::derive;
+use crate::identity::record::CompositionBinding;
+use crate::identity::record::CreatedBy;
+use crate::identity::store::Store;
+use crate::identity::store::StoreError;
 
 /// The identity sink of one outbound run over the entry a parent resource
 /// maps.

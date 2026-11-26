@@ -37,15 +37,15 @@ use crate::consent::fhir::export::ExportContext;
 use crate::consent::fhir::model::Ref;
 use crate::facade::Facade;
 use crate::facade::compartment;
-use crate::facade::ehr;
 use crate::facade::handlers::write::refuse;
-use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::search::declaration::FixedToken;
 use crate::facade::status::consent::of_exchange_error;
+use crate::identity::PersonId;
+use crate::identity::ehr;
 
 /// The resource type this module serves.
 pub const CONSENT: &str = "Consent";
@@ -191,7 +191,7 @@ pub fn names_scope(tokens: &[fhir_search::token::Token], code: &str) -> bool {
 /// The two id schemes are disjoint by construction: an access directive's
 /// id is 64 hex digits ([`logical_id`]), and every mapped `Consent` id is
 /// the 52 base32 characters of a FHIRconnect deterministic id
-/// ([`crate::facade::identity::derive`]), since the facade declares
+/// ([`crate::identity::derive`]), since the facade declares
 /// `updateCreate: false` and assigns every id itself. No specification
 /// governs the ids: our own design.
 #[must_use]
@@ -469,7 +469,7 @@ pub async fn subject(
             )
         })
         .and_then(|literal| {
-            crate::facade::subject::patient_of_reference(literal).map_err(|error| {
+            crate::identity::subject::patient_of_reference(literal).map_err(|error| {
                 reply::refusal(
                     StatusCode::UNPROCESSABLE_ENTITY,
                     Issue::error(IssueType::Value)
@@ -481,7 +481,8 @@ pub async fn subject(
     compartment::admit_person(facade, access, permission, CONSENT, Some(&person)).await?;
     let ehr = ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing)
         .await
-        .map_err(|error| Refusal::from(crate::facade::ingest::refusal::ehr_refusal(&error)))?;
+        .map_err(|error| Refusal::from(crate::facade::ingest::refusal::ehr_refusal(&error)))?
+        .id;
     Ok(Subject { person, ehr })
 }
 
@@ -527,7 +528,7 @@ pub async fn export_context(
         .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
     let reference = match person.as_ref() {
         Some(person) => {
-            crate::facade::subject::reference_of(
+            crate::facade::patients::reference_of(
                 &facade.settings().subject,
                 facade.store(),
                 &facade.programs(),
@@ -559,7 +560,7 @@ mod tests {
     use super::{Lanes, lanes_of, logical_id, parse_id, release_of};
     use crate::cdr::ids::EhrId;
     use crate::consent::fhir::Release;
-    use crate::facade::identity::derive::{EntryKey, entry_id};
+    use crate::identity::derive::{EntryKey, entry_id};
     use fhirconnect::engine::identity::{DIGEST_CHARACTERS, created_id, deterministic_id};
     use fhirconnect::engine::seam::identity::IdentityRequest;
     use http::{HeaderMap, HeaderValue, StatusCode, header};
