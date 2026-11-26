@@ -6,6 +6,7 @@
 //! store.
 
 mod apply;
+mod body;
 mod event;
 pub(crate) mod intake;
 mod notification;

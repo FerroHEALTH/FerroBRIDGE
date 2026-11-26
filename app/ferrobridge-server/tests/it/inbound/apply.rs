@@ -549,3 +549,80 @@ async fn each_feed_and_ehr_create_is_recorded_in_the_outbox() -> Result<(), Box<
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn an_hl7v2_merge_carried_in_its_event_reaches_the_identity_source_as_resolve_duplicate()
+-> Result<(), Box<dyn Error>> {
+    // PIXm 3.1.0 §2:3.104.4.2.2: an A40's MRG-1 replaced by its PID-3, read from the
+    // sealed body of the event the item was claimed at.
+    let Some((_postgres, store)) = crate::store::sealed_store().await? else {
+        return Ok(());
+    };
+    let secrets = tempfile::tempdir()?;
+    let sources = crate::inbound::store::sources(&store, secrets.path())?;
+    let mllp = crate::inbound::store::create(
+        &sources,
+        &ferrobridge_operator_api::sources::Write {
+            name: String::from("northhosp-adt"),
+            kind: ferrobridge_operator_api::sources::Kind::Mllp,
+            enabled: true,
+            document: serde_json::json!({"routes": [{
+                "sending_application": "ADMIT", "sending_facility": "NORTHHOSP",
+                "source_cidrs": ["127.0.0.0/8"]
+            }]}),
+        },
+    )
+    .await?;
+    let inbox = ferrobridge_server::inbound::store::InboxStore::new(store.pool().clone())
+        .with_seal(store.seal().cloned());
+    let statement = serde_json::json!({
+        "resourceType": "Patient",
+        "identifier": [{"system": LOCAL, "value": "local-0001"}],
+        "link": [{
+            "other": {"identifier": {"system": LOCAL, "value": "local-0002"}},
+            "type": "replaced-by"
+        }]
+    });
+    inbox
+        .accept_with_body(
+            mllp.id,
+            LOCAL,
+            &ferrobridge_server::inbound::event::Event {
+                change: Change::Upsert,
+                tenant: Some(LOCAL.to_owned()),
+                entity: String::from("local-0001"),
+                dedupe_key: ferrobridge_server::inbound::event::DedupeKey::of(vec![
+                    serde_json::json!("hl7v2"),
+                    serde_json::json!("MSG-A40"),
+                    serde_json::json!(0),
+                ]),
+                stamp: Some(String::from("2026-11-25T10:00:00Z")),
+            },
+            &ferrobridge_server::inbound::store::Body::new(statement.to_string().into_bytes()),
+        )
+        .await?;
+    let claimed = inbox
+        .claim(uuid::Uuid::new_v4(), std::time::Duration::from_secs(30), 1)
+        .await?
+        .remove(0);
+    let upstreams = Upstreams::start().await;
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .connect_lazy("postgres://nobody:nothing@127.0.0.1:1/none?sslmode=disable")?;
+    let sources = Arc::new(ferrobridge_server::sources::Sources::new(pool, None));
+    let handler = upstreams
+        .handler(Arc::new(
+            ferrobridge_server::inbound::resolve::Declared::new(sources),
+        ))
+        .with_inbox(Some(inbox));
+    handler
+        .apply(&mllp, &claimed)
+        .await
+        .map_err(|failed| failed.reason)?;
+    let fed = upstreams.fed().await?;
+    assert_eq!(1, fed.len());
+    let (condition, patient) = &fed[0];
+    assert!(condition.contains("local-0001"), "{condition}");
+    assert_eq!(statement["link"], patient["link"]);
+    assert_eq!(0, upstreams.count("POST", "/ehr").await);
+    Ok(())
+}

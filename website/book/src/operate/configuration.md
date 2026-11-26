@@ -710,6 +710,7 @@ live in its document, within these.
 | `max_attempts` | `10` | no | The attempts before a failing item parks for an operator, at least 1 |
 | `idle` | `5s` | no | How long an idle worker waits for a notification before it looks for due work again; more than `0s` |
 | `recovery_tick` | `30s` | no | How often each replica looks for a source whose redelivery or reconciliation is due ([Recover what an outage lost](../integrate/inbound.md#recover-what-an-outage-lost)); more than `0s` |
+| `parked_body_retention` | `7d` | no | How long the sealed patient record an HL7 v2 patient event carries is kept once its item parks, before it is cleared; more than `0s` |
 
 ```toml
 [inbound]
