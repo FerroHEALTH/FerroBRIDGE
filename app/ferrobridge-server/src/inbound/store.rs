@@ -116,15 +116,15 @@ pub enum Outcome {
 }
 
 /// How a worker gives a work item back.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Returned {
     /// The work is done.
     Done,
     /// The attempt failed; run it again after the delay.
     Retry(Duration),
-    /// The attempt failed for good; park it with the fixed reason, which
-    /// names no value.
-    Park(&'static str),
+    /// The attempt failed for good; park it with the reason, which names no
+    /// value of a record.
+    Park(std::borrow::Cow<'static, str>),
     /// Not attempted: no slot was free, or the source is disabled.
     Defer(Duration),
 }

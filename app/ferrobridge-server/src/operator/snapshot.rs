@@ -218,7 +218,13 @@ impl Snapshot {
                 .structuremap_files()
                 .iter()
                 .any(|file| file == path)
-                .then_some("map"),
+                .then(|| {
+                    let logical = path
+                        .extension()
+                        .and_then(std::ffi::OsStr::to_str)
+                        .is_some_and(|extension| extension.eq_ignore_ascii_case("json"));
+                    if logical { "logical-model" } else { "map" }
+                }),
             Language::Fhirconnect => {
                 if crate::walk::is_declaration(path) {
                     return Some("search");

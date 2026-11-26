@@ -18,22 +18,66 @@ pub mod syntax;
 
 use std::sync::{Arc, PoisonError, RwLock};
 
-/// The maps of the running mapping revision, which a reload on any replica
-/// replaces whole; a run in flight finishes on the maps it took.
-#[derive(Debug, Default)]
+/// The maps and logical models of one mapping revision.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Set {
+    /// The maps, in path order.
+    pub maps: Vec<syntax::StructureMap>,
+    /// The logical models the maps read.
+    pub logical: model::Logical,
+}
+
+/// The engine over the running mapping revision, which a reload on any
+/// replica replaces whole; a run in flight finishes on the engine it took.
+#[derive(Debug)]
 pub struct Running {
-    maps: RwLock<Arc<[syntax::StructureMap]>>,
+    /// What `translate` calls, when a terminology server is configured.
+    translator: Option<Arc<dyn engine::translate::Translate>>,
+    /// The engine every later run reads.
+    engine: RwLock<Arc<engine::Engine>>,
+}
+
+impl Default for Running {
+    fn default() -> Self {
+        Self::new(None)
+    }
 }
 
 impl Running {
-    /// Returns the maps every later run reads.
+    /// Returns no maps, every later engine running `translate` through
+    /// `translator`.
     #[must_use]
-    pub fn current(&self) -> Arc<[syntax::StructureMap]> {
-        Arc::clone(&self.maps.read().unwrap_or_else(PoisonError::into_inner))
+    pub fn new(translator: Option<Arc<dyn engine::translate::Translate>>) -> Self {
+        let engine = Arc::new(build(Set::default(), translator.as_ref()));
+        Self {
+            translator,
+            engine: RwLock::new(engine),
+        }
     }
 
-    /// Replaces the maps every later run reads.
-    pub fn replace(&self, maps: Vec<syntax::StructureMap>) {
-        *self.maps.write().unwrap_or_else(PoisonError::into_inner) = Arc::from(maps);
+    /// Returns the engine every later run reads.
+    #[must_use]
+    pub fn current(&self) -> Arc<engine::Engine> {
+        Arc::clone(&self.engine.read().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    /// Replaces the engine every later run reads with one over `set`.
+    pub fn replace(&self, set: Set) {
+        let engine = Arc::new(build(set, self.translator.as_ref()));
+        *self.engine.write().unwrap_or_else(PoisonError::into_inner) = engine;
+    }
+}
+
+/// Returns the engine over `set`, translating through `translator`.
+fn build(set: Set, translator: Option<&Arc<dyn engine::translate::Translate>>) -> engine::Engine {
+    let engine = engine::Engine::new(
+        set.maps,
+        model::Known {
+            logical: set.logical,
+        },
+    );
+    match translator {
+        Some(translator) => engine.with_translator(Arc::clone(translator)),
+        None => engine,
     }
 }

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The batch jobs beside `serve`: `cdm init`, `vocab load`, `etl run` and
-//! `mapping check`.
+//! The batch jobs beside `serve`: `cdm init`, `vocab load`, `etl run`,
+//! `mapping check` and `mapping logical-model`.
 //!
 //! Each runs on the run path's runtime, does its one job and prints what it
 //! did for the operator. No specification governs the job output: our own design.
@@ -10,6 +10,45 @@
 use crate::config;
 use crate::config::Settings;
 use crate::etl;
+
+/// Writes the logical model of the schema `schema` of the `OpenAPI` document
+/// at `openapi`, with the canonical `url`, to stdout as JSON.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "the model is the job's output on stdout, and a refusal goes to stderr"
+)]
+pub(crate) fn logical_model_command(
+    openapi: &std::path::Path,
+    schema: &str,
+    url: &str,
+) -> std::process::ExitCode {
+    let model = std::fs::read_to_string(openapi)
+        .map_err(|error| format!("{} does not read: {error}", openapi.display()))
+        .and_then(|text| {
+            serde_json::from_str::<serde_json::Value>(&text)
+                .map_err(|error| format!("{} is no JSON: {error}", openapi.display()))
+        })
+        .and_then(|document| {
+            crate::structuremap::openapi::logical_model(
+                &fhir_types::codec::Value::from_serde_json(document),
+                schema,
+                url,
+            )
+            .map_err(|error| error.to_string())
+        })
+        .and_then(|model| serde_json::to_string_pretty(&model).map_err(|error| error.to_string()));
+    match model {
+        Ok(text) => {
+            println!("{text}");
+            std::process::ExitCode::SUCCESS
+        }
+        Err(reason) => {
+            eprintln!("ferrobridge mapping logical-model: {reason}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
 
 /// Applies the CDM DDL and the bridge schema to the configured database, and
 /// prints what it found and did.

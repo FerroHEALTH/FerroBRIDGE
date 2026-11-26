@@ -13,6 +13,7 @@
 //! governs the order of the steps: our own design over `PIXm` 3.1.0 and the
 //! ITS-REST 1.1.0 EHR API.
 
+use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -50,28 +51,24 @@ const KEPT: [&str; 6] = [
 /// The future of one step that answers a value.
 pub type Step<'a, T> = Pin<Box<dyn Future<Output = Result<T, Failed>> + Send + 'a>>;
 
+/// What a source holds for an entity.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Resolved {
+    /// The entity, as an R4 `Patient`.
+    Patient(Value),
+    /// The source holds the entity no more.
+    Removed,
+}
+
 /// How a source's entity is read as an R4 `Patient`.
 pub trait Resolve: std::fmt::Debug + Send + Sync {
-    /// Returns the `Patient` the source holds for `entity` of `tenant`.
+    /// Returns what the source holds for `entity` of `tenant`.
     fn patient<'a>(
         &'a self,
         source: &'a Source,
         tenant: &'a Tenant,
         entity: &'a str,
-    ) -> Step<'a, Value>;
-}
-
-/// The resolution of a source that declares none, which parks every item.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Undeclared;
-
-impl Resolve for Undeclared {
-    fn patient<'a>(&'a self, _: &'a Source, _: &'a Tenant, _: &'a str) -> Step<'a, Value> {
-        Box::pin(std::future::ready(Err(Failed {
-            failure: Failure::Poisoned,
-            reason: "resolution-undeclared",
-        })))
-    }
+    ) -> Step<'a, Resolved>;
 }
 
 /// The handler: what it resolves through, feeds, asks and writes into.
@@ -130,9 +127,12 @@ impl Apply {
 
     /// Reads the source's patient through its resolution and applies it.
     async fn upsert(&self, source: &Source, tenant: &Tenant, entity: &str) -> Result<(), Failed> {
-        let resolved = self.resolve.patient(source, tenant, entity).await?;
-        self.upsert_resolved(source, tenant, entity, &resolved)
-            .await
+        match self.resolve.patient(source, tenant, entity).await? {
+            Resolved::Patient(patient) => {
+                self.upsert_resolved(source, tenant, entity, &patient).await
+            }
+            Resolved::Removed => self.deactivate(source, tenant, entity).await,
+        }
     }
 
     /// Applies the patient an MLLP source's event carries: the tenant is the
@@ -147,7 +147,7 @@ impl Apply {
             .await
             .map_err(|_unread| Failed {
                 failure: Failure::Transient,
-                reason: "event-body-unreadable",
+                reason: Cow::Borrowed("event-body-unreadable"),
             })?
             .ok_or_else(|| refused("event-body-absent"))?;
         let resolved: Value = serde_json::from_slice(body.as_bytes())
@@ -156,6 +156,7 @@ impl Apply {
             name: item.key.tenant.clone(),
             identifier_system: item.key.tenant.clone(),
             credentials: None,
+            base: None,
             enabled: true,
         };
         self.upsert_resolved(source, &tenant, &item.key.entity, &resolved)
@@ -235,7 +236,7 @@ impl Apply {
                 } else {
                     Failure::Poisoned
                 },
-                reason: "pseudonym-refused",
+                reason: Cow::Borrowed("pseudonym-refused"),
             })?;
         let place = self.reserve().await?;
         let ensured = ehr::resolve(
@@ -316,7 +317,7 @@ impl Handler for Apply {
 const fn refused(reason: &'static str) -> Failed {
     Failed {
         failure: Failure::Poisoned,
-        reason,
+        reason: Cow::Borrowed(reason),
     }
 }
 
@@ -338,7 +339,7 @@ async fn record(
 const fn unrecorded() -> Failed {
     Failed {
         failure: Failure::Transient,
-        reason: "audit-unrecorded",
+        reason: Cow::Borrowed("audit-unrecorded"),
     }
 }
 
@@ -407,7 +408,7 @@ fn fed_failed(error: &FeedError) -> Failed {
     match failure {
         Failure::Transient => Failed {
             failure,
-            reason: "feed-unavailable",
+            reason: Cow::Borrowed("feed-unavailable"),
         },
         Failure::Poisoned => refused("feed-refused"),
     }
@@ -424,7 +425,7 @@ fn ehr_failed(error: &EhrError) -> Failed {
     match failure {
         Failure::Transient => Failed {
             failure,
-            reason: "ehr-unavailable",
+            reason: Cow::Borrowed("ehr-unavailable"),
         },
         Failure::Poisoned => refused("ehr-refused"),
     }

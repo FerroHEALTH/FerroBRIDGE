@@ -106,6 +106,9 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             state.store(),
             state.facade().cloned(),
             state.operations_handle().cloned(),
+            state
+                .sources()
+                .map(|sources| Arc::clone(sources.structuremaps())),
         )
         .await
         .context("starting the operator API")?;
@@ -667,6 +670,7 @@ async fn build_operator(
     store: Option<&crate::store::Store>,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<crate::operations::lane::OperationsLane>>,
+    structuremaps: Option<Arc<crate::structuremap::Running>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 
@@ -707,7 +711,7 @@ async fn build_operator(
             omocl: settings.omocl_directory.is_some(),
             facade,
             operations,
-            structuremaps: Some(Arc::default()),
+            structuremaps,
         };
         let revisions = crate::mappings::revisions::Revisions::new(store);
         revisions

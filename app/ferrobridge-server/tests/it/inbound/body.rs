@@ -174,7 +174,7 @@ async fn a_discarded_park_clears_its_bodies() -> Result<(), Box<dyn Error>> {
     let worker = Uuid::new_v4();
     let claimed = inbox.claim(worker, LEASE, 1).await?.remove(0);
     inbox
-        .give_back(&claimed, worker, Returned::Park("feed-refused"))
+        .give_back(&claimed, worker, Returned::Park("feed-refused".into()))
         .await?;
     assert!(
         inbox
@@ -208,7 +208,7 @@ async fn a_body_parked_past_its_retention_is_cleared() -> Result<(), Box<dyn Err
     let worker = Uuid::new_v4();
     let claimed = inbox.claim(worker, LEASE, 1).await?.remove(0);
     inbox
-        .give_back(&claimed, worker, Returned::Park("feed-refused"))
+        .give_back(&claimed, worker, Returned::Park("feed-refused".into()))
         .await?;
     assert_eq!(
         0,

@@ -118,6 +118,14 @@ where
 )]
 async fn dispatch(cli: Cli) -> ExitCode {
     let job = Job::of(&cli.command);
+    if let Job::LogicalModel {
+        openapi,
+        schema,
+        url,
+    } = &job
+    {
+        return jobs::logical_model_command(openapi, schema, url);
+    }
     let loaded = match Config::load(cli.config.config.as_deref(), &cli.config.sets) {
         Ok(loaded) => loaded,
         Err(error) => {
@@ -284,6 +292,18 @@ impl Job {
             cli::Command::Dq {
                 command: cli::Dq::Check { format },
             } => Job::DqCheck { format: *format },
+            cli::Command::Mapping {
+                command:
+                    cli::Mapping::LogicalModel {
+                        openapi,
+                        schema,
+                        url,
+                    },
+            } => Job::LogicalModel {
+                openapi: openapi.clone(),
+                schema: schema.clone(),
+                url: url.clone(),
+            },
         }
     }
 
@@ -295,6 +315,11 @@ impl Job {
     async fn run(self, settings: Settings) -> ExitCode {
         match self {
             Job::ConfigCheck | Job::Healthcheck => ExitCode::SUCCESS,
+            Job::LogicalModel {
+                openapi,
+                schema,
+                url,
+            } => jobs::logical_model_command(&openapi, &schema, &url),
             Job::Serve => match Box::pin(serve_command(settings)).await {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
@@ -424,6 +449,15 @@ enum Job {
         format: cli::ReportFormat,
         /// Whether the OMOCL literals are checked against the vocabulary.
         vocabulary: bool,
+    },
+    /// `mapping logical-model`, which reads no configuration.
+    LogicalModel {
+        /// The `OpenAPI` document.
+        openapi: std::path::PathBuf,
+        /// The schema.
+        schema: String,
+        /// The model's canonical URL.
+        url: String,
     },
 }
 

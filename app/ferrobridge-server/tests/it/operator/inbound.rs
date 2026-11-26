@@ -107,7 +107,7 @@ async fn parked_case() -> Result<Option<Parked>, Box<dyn Error>> {
             .give_back(
                 &item,
                 worker,
-                Returned::Park("the identity source refused the patient"),
+                Returned::Park("the identity source refused the patient".into()),
             )
             .await?;
     }

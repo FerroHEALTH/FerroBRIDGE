@@ -199,6 +199,7 @@ fn tenant_of(system: &str) -> Tenant {
         name: system.to_owned(),
         identifier_system: system.to_owned(),
         credentials: None,
+        base: None,
         enabled: true,
     }
 }
