@@ -8,11 +8,11 @@
 # release build of ferrobridge over its own FerroEHR CDR and its own CDR
 # database, at the "FerroEHR CDR image" and "FerroEHR CDR database image"
 # pins of docs/VERSIONS.md, with one RabbitMQ and one FerroTERM terminology
-# server at their pins for both. The head arm also asks a FerroPIX identity
-# source, at its pin, for the ITI-83 pseudonym of every subject it resolves,
-# its token signed by a stub OpenID Provider at its pin; a base from before
-# the facade needed one asks nothing, so the head's latency then carries an
-# ITI-83 round trip the base's does not.
+# server at their pins for both. Each arm whose tree names an identity
+# source asks one FerroPIX, at its pin, for the ITI-83 pseudonym of every
+# subject it resolves, its token signed by a stub OpenID Provider at its pin;
+# a base from before the facade needed one asks nothing, so the head's
+# latency then carries an ITI-83 round trip the base's does not.
 #
 #   scripts/perf/gate.sh build [BASE]
 #       Builds target/release/ferrobridge of the checkout, the head, and of
@@ -601,6 +601,12 @@ TOML
   done
 }
 
+# pseudonymous TREE: whether TREE's bridge asks an identity source, its
+# perf/ferrobridge.toml naming [identity_source].
+pseudonymous() {
+  grep -q '^\[identity_source\]' "$1/$CONFIG"
+}
+
 # pseudonym VALUE: the head arm's pseudonym of the subject VALUE of the
 # subjects' domain, asked over ITI-83 as the head's facade asks it (PIXm
 # 3.1.0 §2:3.83.4.1.2), which the head's search names its subject by.
@@ -747,22 +753,29 @@ run() {
   command -v ferrohealth-perf > /dev/null || die "ferrohealth-perf is not on PATH"
   trap cleanup EXIT
   start
-  local head_id base_id body search head_search code=0 arm
+  local head_id base_id body search head_search base_search code=0 arm
   head_id="$(seed head)" || exit 2
   base_id="$(seed base)" || exit 2
   body="$(condition synthetic-subject-perf-write)"
   search="subject:identifier=$(jq --raw-input --raw-output '@uri' <<< "$SUBJECTS|synthetic-subject-perf-read")"
   # NOTE: R4 search.html §3.1.1.4.12; the head renders its subject as a pseudonym reference with no identifier, so its search names that reference.
   head_search="subject=Patient/$(pseudonym synthetic-subject-perf-read)" || exit 2
+  base_search="$search"
+  if pseudonymous "$root/$BASE_TREE/src"; then
+    base_search="$head_search"
+  fi
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     printf "The base is \`%s\`.\n\n" "$(< "$BASE_TREE/rev")" >> "$GITHUB_STEP_SUMMARY"
-    printf 'The head arm asks a FerroPIX identity source over ITI-83 for every subject it resolves; a base from before the facade needed one does not, so a head-over-base rise in the facade groups includes that round trip.\n\n' >> "$GITHUB_STEP_SUMMARY"
   fi
-  echo "perf-gate: the head arm asks FerroPIX over ITI-83 for every subject it resolves; a rise over a base without an identity source includes that round trip"
+  if ! pseudonymous "$root/$BASE_TREE/src"; then
+    [[ -z "${GITHUB_STEP_SUMMARY:-}" ]] ||
+      printf 'The head arm asks a FerroPIX identity source over ITI-83 for every subject it resolves; this base, from before the facade needed one, does not, so a head-over-base rise in the facade groups includes that round trip.\n\n' >> "$GITHUB_STEP_SUMMARY"
+    echo "perf-gate: the head arm asks FerroPIX over ITI-83 for every subject it resolves; a rise over this base, which has no identity source, includes that round trip"
+  fi
   ferrohealth-perf ab --plan "$PLAN" \
     --base-url "$(facade base)" --base-pid "$base_pid" \
     --base-mllp-address "127.0.0.1:$(port base mllp)" --base-database-url "$(admin_url base)" \
-    --base-var "READ_ID=$base_id" --base-var "CREATE_BODY=$body" --base-var "SEARCH=$search" \
+    --base-var "READ_ID=$base_id" --base-var "CREATE_BODY=$body" --base-var "SEARCH=$base_search" \
     --head-url "$(facade head)" --head-pid "$head_pid" \
     --head-mllp-address "127.0.0.1:$(port head mllp)" --head-database-url "$(admin_url head)" \
     --head-var "READ_ID=$head_id" --head-var "CREATE_BODY=$body" --head-var "SEARCH=$head_search" \
@@ -805,6 +818,12 @@ self_test() {
   check "the seeded Condition names its subject and the profile" \
     "$PROFILE s-1" "$(condition s-1 | jq --raw-output '"\(.meta.profile[0]) \(.subject.identifier.value)"')"
   check "the seeded Condition carries no id" null "$(condition s-1 | jq --raw-output '.id')"
+  mkdir -p "$work/pseudonymous/perf" "$work/plain/perf"
+  printf '[identity_source]\npseudonym_domain = "urn:oid:2.999.9"\n' > "$work/pseudonymous/$CONFIG"
+  printf '[facade]\nenabled = true\n' > "$work/plain/$CONFIG"
+  check "a tree naming an identity source is pseudonymous" 1 "$(pseudonymous "$work/pseudonymous" && echo 1 || echo 0)"
+  check "a tree naming none is not" 0 "$(pseudonymous "$work/plain" && echo 1 || echo 0)"
+  check "this tree names one" 1 "$(pseudonymous "$root" && echo 1 || echo 0)"
   check "the arms listen apart" "18080 18081 12575 12576" \
     "$(port head facade) $(port base facade) $(port head mllp) $(port base mllp)"
   local file
