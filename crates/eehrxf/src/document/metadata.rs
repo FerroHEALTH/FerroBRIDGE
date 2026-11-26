@@ -303,8 +303,9 @@ impl DocumentMetadata {
             size: pdf.bytes().len(),
             source,
         })?;
-        // NOTE: draft EEHRxF Art 3(1)(a) embeds the PDF/A, which EehrxfMhdDocumentReference forbids
-        // (attachment.data 0..0, url 1..1), so the act wins and the PDF form claims it not (#2235).
+        // NOTE: draft EEHRxF Art 3(1)(a) embeds the PDF (PDF/A-1a or PDF/A-1b, Annex II footnote 1),
+        // which EehrxfMhdDocumentReference forbids (attachment.data 0..0, url 1..1), so the act
+        // wins and the PDF form claims it not (#2235).
         self.reference(
             header,
             id,
