@@ -84,7 +84,7 @@ pub(crate) fn identity_source_accepting(
 
 /// Returns the subject link whose pseudonyms are in `namespace`, over an
 /// identity source no case reaches.
-pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subject::SubjectLink {
+pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::identity::subject::SubjectLink {
     subject_link_at("http://127.0.0.1:9/fhir", namespace)
 }
 
@@ -93,8 +93,8 @@ pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subje
 pub(crate) fn subject_link_at(
     base: &str,
     namespace: &str,
-) -> ferrobridge_server::facade::subject::SubjectLink {
-    ferrobridge_server::facade::subject::SubjectLink::new(identity_source(base, namespace))
+) -> ferrobridge_server::identity::subject::SubjectLink {
+    ferrobridge_server::identity::subject::SubjectLink::new(identity_source(base, namespace))
 }
 
 /// The pseudonym the stub identity source answers every patient with.
@@ -163,9 +163,9 @@ pub(crate) async fn served_identity_accepting(
     mount_pseudonym(server, &domain).await;
     let base = format!("{}/pix", server.uri());
     ferrobridge_server::facade::Settings {
-        subject: ferrobridge_server::facade::subject::SubjectLink::new(identity_source_accepting(
-            &base, &domain, accepted,
-        )),
+        subject: ferrobridge_server::identity::subject::SubjectLink::new(
+            identity_source_accepting(&base, &domain, accepted),
+        ),
         ..settings
     }
 }
@@ -222,7 +222,10 @@ impl wiremock::Respond for PerIdentifier {
 /// pseudonym ([`pseudonym_of`]), so each subject keeps its own EHR.
 pub(crate) async fn per_identifier(
     more: &[&str],
-) -> (MockServer, ferrobridge_server::facade::subject::SubjectLink) {
+) -> (
+    MockServer,
+    ferrobridge_server::identity::subject::SubjectLink,
+) {
     let server = MockServer::start().await;
     wiremock::Mock::given(wiremock::matchers::method("POST"))
         .and(wiremock::matchers::path(PIX_PATH))
@@ -233,7 +236,7 @@ pub(crate) async fn per_identifier(
         .await;
     let mut accepted = vec![SOURCE_DOMAIN, PATIENT_SYSTEM, SUBJECT_SYSTEM];
     accepted.extend_from_slice(more);
-    let link = ferrobridge_server::facade::subject::SubjectLink::new(identity_source_accepting(
+    let link = ferrobridge_server::identity::subject::SubjectLink::new(identity_source_accepting(
         &format!("{}/pix", server.uri()),
         PSEUDONYM_DOMAIN,
         &accepted,
