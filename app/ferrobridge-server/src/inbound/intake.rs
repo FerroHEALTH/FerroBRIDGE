@@ -28,7 +28,7 @@ use super::event::{Event, Reading};
 use super::keeper::Keeper;
 use super::recover::{Recoverer, Unavailable};
 use super::store::InboxStore;
-use super::verify::{Key, Request, StaticHeader, Verifier};
+use super::verify::{Key, Proofs, Refused, Request, StaticHeader, Verifier};
 use crate::problem::{Kind, blank, refuse};
 use crate::sources::document::{Document, FhirSubscription, Webhook};
 use crate::sources::{Source, Sources};
@@ -161,13 +161,16 @@ async fn receive(
 /// The `404` detail of a name no enabled source of an HTTP kind has.
 const UNKNOWN: &str = "no enabled webhook or FHIR Subscription source has this name";
 
-/// The `401` of a request that failed its verifier, logged with its reason.
-fn unverified(source: &Source, reason: super::verify::Refused) -> Response {
+/// Checks `request` against every proof of `source`, answering the `401`
+/// of the first that fails, logged with its reason.
+fn unproven(source: &Source, proofs: &Proofs<'_>, request: &Request<'_>) -> Option<Response> {
+    let failed = proofs.verify(request, None).err()?;
+    let reason = failed.map_or(Refused::Declaration, |unproven| unproven.reason);
     tracing::info!(source = %source.name, %reason, "an inbound request failed verification");
-    refuse(
+    Some(refuse(
         Kind::Unverified,
         "the request does not prove it comes from the source",
-    )
+    ))
 }
 
 /// Returns the values of `keys` as verifier keys.
@@ -195,8 +198,12 @@ async fn receive_event(
         Ok(keys) => keys,
         Err(unavailable) => return unavailable.into_response(),
     };
-    if let Err(reason) = webhook.verify.verify(request, &keys) {
-        return unverified(source, reason);
+    if let Some(refused) = unproven(
+        source,
+        &Proofs::default().with(&webhook.verify, keys),
+        request,
+    ) {
+        return refused;
     }
     let Ok(value) = serde_json::from_slice::<serde_json::Value>(request.body) else {
         return refuse(Kind::UnreadableEvent, "the body is no JSON");
@@ -252,6 +259,7 @@ async fn receive_notification(
     subscription: &FhirSubscription,
     request: &Request<'_>,
 ) -> Response {
+    let mut proofs = Proofs::default();
     if let Some(header) = &subscription.header {
         let keys = match keys_of(intake, source, &header.keys) {
             Ok(keys) => keys,
@@ -260,14 +268,13 @@ async fn receive_notification(
         let verifier = Verifier::StaticHeader(StaticHeader {
             header: header.name.clone(),
         });
-        if let Err(reason) = verifier.verify(request, &keys) {
-            return unverified(source, reason);
-        }
+        proofs = proofs.with(verifier, keys);
     }
-    if let Some(mtls) = &subscription.mtls
-        && let Err(reason) = Verifier::Mtls(mtls.clone()).verify(request, &[])
-    {
-        return unverified(source, reason);
+    if let Some(mtls) = &subscription.mtls {
+        proofs = proofs.with(Verifier::Mtls(mtls.clone()), Vec::new());
+    }
+    if let Some(refused) = unproven(source, &proofs, request) {
+        return refused;
     }
     let notification = match serde_json::from_slice::<serde_json::Value>(request.body)
         .map_err(|_json| super::subscription::Malformed::NotHistory)

@@ -48,11 +48,20 @@ fn settings(cdm: &Cdm) -> Result<CdmSettings, Error> {
         .as_ref()
         .map(pseudonymiser_of)
         .transpose()?;
-    let connection = omop_cdm::connection::CdmConnection::new(url.expose_secret(), ca.as_deref())
-        .map_err(|source| Error::CdmConnection {
-        key: keys.refused(&source),
-        source,
-    })?;
+    let session = omop_cdm::connection::session::Session {
+        statement_timeout: cdm.statement_timeout.get(),
+        lock_timeout: cdm.lock_timeout.get(),
+        idle_in_transaction_session_timeout: cdm.idle_in_transaction_session_timeout.get(),
+        statement_cache_capacity: cdm.statement_cache_capacity,
+        max_lifetime: cdm.max_lifetime.get(),
+        idle_timeout: cdm.idle_timeout.get(),
+    };
+    let connection = keys.connection(
+        url.expose_secret(),
+        ca.as_deref(),
+        session,
+        |key, source| Error::CdmConnection { key, source },
+    )?;
     Ok(CdmSettings {
         url,
         connection,

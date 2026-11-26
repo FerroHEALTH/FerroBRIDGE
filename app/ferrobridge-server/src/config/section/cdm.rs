@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use ferrohealth_config::units::Duration;
 use ferrohealth_secret::secret::Secret;
 
 /// The OMOP CDM database lane.
@@ -30,6 +31,20 @@ pub struct Cdm {
     /// What the writer does for an EHR with no `PERSON` row:
     /// `create_on_first_sight` (a placeholder row) or `existing` (a refusal).
     pub person_policy: String,
+    /// The longest one statement runs before the server cancels it; `0s`
+    /// disables it.
+    pub statement_timeout: Duration,
+    /// The longest a statement waits for a lock; `0s` disables it.
+    pub lock_timeout: Duration,
+    /// The longest a session stays idle inside an open transaction; `0s`
+    /// disables it.
+    pub idle_in_transaction_session_timeout: Duration,
+    /// How many prepared statements each pooled connection keeps.
+    pub statement_cache_capacity: usize,
+    /// The longest a pooled connection lives.
+    pub max_lifetime: Duration,
+    /// The longest a pooled connection stays idle.
+    pub idle_timeout: Duration,
     /// The pseudonymisation of every row the writer writes, off until the
     /// section is present.
     pub pseudonymisation: Option<CdmPseudonymisation>,
@@ -45,6 +60,15 @@ impl Default for Cdm {
             schema: String::from("cdm"),
             bridge_schema: String::from("ferrobridge"),
             person_policy: String::from("create_on_first_sight"),
+            // NOTE: PostgreSQL 19 docs, "Client Connection Defaults": a vocabulary load or a derived
+            // table build runs one statement for minutes, so no statement timeout; a lock or an open
+            // transaction still ends.
+            statement_timeout: Duration::from_secs(0),
+            lock_timeout: Duration::from_secs(60),
+            idle_in_transaction_session_timeout: Duration::from_secs(10 * 60),
+            statement_cache_capacity: 100,
+            max_lifetime: Duration::from_secs(30 * 60),
+            idle_timeout: Duration::from_secs(10 * 60),
             pseudonymisation: None,
         }
     }

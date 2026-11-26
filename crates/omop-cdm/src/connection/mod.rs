@@ -30,8 +30,10 @@ use std::fmt;
 use std::sync::{Arc, Mutex, PoisonError};
 
 mod relay;
+pub mod session;
 
 use relay::{Relay, Upstream};
+use session::{Session, SessionError};
 
 /// The oldest PostgreSQL the CDM clients run on, as a `server_version_num`.
 ///
@@ -165,6 +167,18 @@ pub enum ConnectionError {
         /// The parameter the URL carries.
         name: String,
     },
+    /// The URL carries `options`, which the session settings own.
+    #[error(
+        "the URL carries `options`; the session settings come from the configuration, so set them there"
+    )]
+    Options,
+    /// A session setting cannot be sent.
+    #[error("a session setting cannot be sent")]
+    Session {
+        /// Why.
+        #[source]
+        source: SessionError,
+    },
     /// A CA is configured for a connection that uses no TLS.
     #[error("a CA is configured and the URL says sslmode=disable")]
     CaWithoutTls,
@@ -248,6 +262,7 @@ pub struct CdmConnection {
     tls: Arc<ClientConfig>,
     upstream: Option<Upstream>,
     relay: Arc<Mutex<Option<Relay>>>,
+    session: Session,
 }
 
 impl fmt::Debug for CdmConnection {
@@ -256,6 +271,7 @@ impl fmt::Debug for CdmConnection {
         f.debug_struct("CdmConnection")
             .field("mode", &self.mode)
             .field("ca", &self.ca.is_some())
+            .field("session", &self.session)
             .finish_non_exhaustive()
     }
 }
@@ -279,8 +295,9 @@ impl CdmConnection {
     /// [`ConnectionError::FallbackMode`] for `prefer` and `allow`,
     /// [`ConnectionError::UnknownMode`] and [`ConnectionError::RepeatedMode`]
     /// for a mode that is not one of the four, [`ConnectionError::Parameter`]
-    /// for any other `ssl` parameter, [`ConnectionError::CaWithoutTls`] for a
-    /// CA with `disable`, the CA errors when `ca` does not parse, and
+    /// for any other `ssl` parameter, [`ConnectionError::Options`] for
+    /// `options`, [`ConnectionError::CaWithoutTls`] for a CA with `disable`,
+    /// the CA errors when `ca` does not parse, and
     /// [`ConnectionError::Url`] or [`ConnectionError::PoolUrl`] when a client
     /// refuses the URL, and [`ConnectionError::Hosts`] for a URL that asks
     /// for TLS and names other than one TCP host and port.
@@ -337,7 +354,39 @@ impl CdmConnection {
             tls,
             upstream,
             relay: Arc::default(),
+            session: Session::default(),
         })
+    }
+
+    /// Returns the connection with every session of both clients started
+    /// with `session`'s settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConnectionError::Session`] for a timeout the server cannot
+    /// hold.
+    pub fn with_session(mut self, session: Session) -> Result<Self, ConnectionError> {
+        let parameters = session
+            .parameters()
+            .map_err(|source| ConnectionError::Session { source })?;
+        let options = parameters
+            .iter()
+            .map(|(name, value)| format!("-c {name}={value}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        self.writer.options(&options);
+        self.pool = self
+            .pool
+            .options(parameters)
+            .statement_cache_capacity(session.statement_cache_capacity);
+        self.session = session;
+        Ok(self)
+    }
+
+    /// Returns the session settings every session starts with.
+    #[must_use]
+    pub fn session(&self) -> &Session {
+        &self.session
     }
 
     /// Returns the mode the connection is secured with.
@@ -442,6 +491,8 @@ fn split_ssl(url: &str) -> Result<(String, SslMode), ConnectionError> {
                 return Err(ConnectionError::RepeatedMode);
             }
             mode = Some(mode_of(value)?);
+        } else if key == "options" {
+            return Err(ConnectionError::Options);
         } else if key.starts_with("ssl") {
             return Err(ConnectionError::Parameter {
                 name: key.to_owned(),
@@ -730,5 +781,38 @@ mod tests {
         let connection =
             CdmConnection::new(&format!("{URL}?sslmode=disable"), None).expect("the URL reads");
         assert!(!format!("{connection:?}").contains("secret"));
+    }
+
+    #[test]
+    fn both_clients_start_every_session_with_the_session_settings() {
+        let session = super::Session {
+            statement_timeout: std::time::Duration::from_secs(30),
+            lock_timeout: std::time::Duration::from_secs(5),
+            idle_in_transaction_session_timeout: std::time::Duration::from_mins(1),
+            statement_cache_capacity: 50,
+            ..super::Session::default()
+        };
+        let connection = CdmConnection::new(&format!("{URL}?sslmode=disable"), None)
+            .expect("the URL reads")
+            .with_session(session)
+            .expect("every timeout fits");
+        let sent = "-c statement_timeout=30000 -c lock_timeout=5000 \
+                    -c idle_in_transaction_session_timeout=60000";
+        assert_eq!(connection.writer().0.get_options(), Some(sent));
+        let pool = connection.pool_options().expect("no relay without TLS");
+        assert_eq!(pool.get_options(), Some(sent));
+        assert_eq!(connection.session(), &session);
+    }
+
+    #[test]
+    fn a_url_that_carries_options_is_refused() {
+        let refused = CdmConnection::new(
+            &format!("{URL}?sslmode=disable&options=-c%20statement_timeout%3D0"),
+            None,
+        );
+        assert!(
+            matches!(refused, Err(ConnectionError::Options)),
+            "{refused:?}"
+        );
     }
 }

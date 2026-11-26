@@ -92,18 +92,20 @@ the testkit tool crate. Beside it:
   deletion check (`etl::deletions`, #527) and the run report. `src/outbound/`
   is the outbound FHIR lane behind `[fhir_outbound]` (#1374): a change-feed
   consumer that maps each changed composition through the facade's programs
-  (`facade::handlers::emit`) and posts one transaction Bundle per event, with
+  (`facade::emit`) and posts one transaction Bundle per event, with
   the record of what it delivered (`outbound_delivered` in the state store,
   committed with the lane's watermark) that a deletion or an erasure
   retracts. `src/facade/`
   is the FHIR R4 facade (#85), mounted under `/fhir` behind `[facade]`: the
   six interactions over the CDR and search over the AQL projections a
   `*.search.yml` file declares beside a context (#98),
-  the identity map in the state store with the derivation
-  `docs/architecture.md` §9 fixes, the one status table
+  the one status table
   from a CDR answer to a FHIR answer, the `CapabilityStatement` built from
   the loaded programs, and the IHE MHD Document Responder behind
-  `[facade.mhd]` (`facade::mhd`, #2089). `facade::summary` is `Patient/[id]/$summary` behind
+  `[facade.mhd]` (`facade::mhd`, #2089). `src/identity/` owns the identity
+  map in the state store with the derivation `docs/architecture.md` §9
+  fixes, the subject link and the EHR resolution, which the facade, the
+  HL7 v2 face, the outbound lane and the inbound engine share. `facade::summary` is `Patient/[id]/$summary` behind
   `[facade.summary]` (#2014): the IPS 2.0.1 or EPS document `eehrxf` writes
   from the patient's summary compositions, validated by
   `ferrobridge-validator` before it is served. `src/hl7v2/` is the HL7 v2

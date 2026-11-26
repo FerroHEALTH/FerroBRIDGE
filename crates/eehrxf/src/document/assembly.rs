@@ -5,6 +5,7 @@
 //! (no specification governs the split: our own design, each rule citing the
 //! profile it follows).
 
+use fhir_types::codec::Json;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::composition::Composition;
 use fhir_types::r4::diagnostic_report::DiagnosticReport;
@@ -15,7 +16,9 @@ use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 
 use crate::document::form::{Authorship, Companion, Kind, SectionRule};
-use crate::document::{Document, DocumentError, REPORT_ID, URN_SYSTEM, coding, reference};
+use crate::document::{
+    Document, DocumentError, REPORT_ID, URN_SYSTEM, codec, coding, reference, text,
+};
 
 impl Document {
     /// Writes the form's type, categories and authors on `composition`, with
@@ -113,6 +116,38 @@ impl Document {
                     {
                         return Err(DocumentError::Absent { slices, invariant });
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Holds every entry to the elements the form's entry profiles require
+    /// of its resource type ([`crate::document::form::EntryRule`]), before
+    /// any metadata fills one, so an element the record does not give
+    /// refuses the document.
+    pub(super) fn hold_entry_rules(&self) -> Result<(), DocumentError> {
+        if self.form.entries.is_empty() {
+            return Ok(());
+        }
+        for (_, resource) in &self.entries {
+            let object = Json::to_json(resource).map_err(codec)?;
+            let kind = text(&object, "resourceType");
+            for rule in self.form.entries {
+                if kind != Some(rule.resource) {
+                    continue;
+                }
+                if let Some(element) = rule
+                    .elements
+                    .iter()
+                    .copied()
+                    .find(|element| !object.contains_key(*element))
+                {
+                    return Err(DocumentError::EntryElement {
+                        resource: rule.resource,
+                        element,
+                        profile: rule.profile,
+                    });
                 }
             }
         }

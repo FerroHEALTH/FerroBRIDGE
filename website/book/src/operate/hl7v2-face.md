@@ -59,7 +59,7 @@ read and committed. Its document:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `routes` | none, at least one | Each sender: `sending_application` (MSH-3) and `sending_facility` (MSH-4), each a namespace id (HD.1) or `^<universal id>^<type>` (HD.2 and HD.3), bound to the `certificate_subject` its client certificate carries in its subject alternative name, to `source_cidrs` (networks in CIDR notation) for a device on the plain listener, or to both. A sender is routed by one source at a time; a facility a composition names is one of the routes' facilities |
+| `routes` | none, at least one | Each sender: `sending_application` (MSH-3) and `sending_facility` (MSH-4), each a namespace id (HD.1) or `^<universal id>^<type>` (HD.2 and HD.3), bound to the `certificate_subject` its client certificate carries in its subject alternative name, to `source_cidrs` (networks in CIDR notation) for a device on the plain listener, or to both, in which case a connection must prove both. A sender is routed by one source at a time; a facility a composition names is one of the routes' facilities |
 | `origin` | `clinician` | `device` for an analyser feed with no human, whose results commit as acts of the device |
 | `device_identifier_issuer` | none | The namespace of the device identifiers, one of the CDR client's `device_identifier_issuers`; named with `origin = "device"` and only then |
 | `profiles` | `{}` | Each R4 resource type to the profile a resource of that type claims in `meta.profile` when the guide's maps wrote none |
@@ -86,12 +86,15 @@ read and committed. Its document:
 ```
 
 Each message is routed by MSH-3 and MSH-4 (HL7 v2.9 §2.14.9) to its source,
-read in the source's character set, and checked against the connection: on
-the TLS listener the client certificate must carry the route's
-`certificate_subject`, on the plain listener the peer address must lie in
-one of the route's `source_cidrs`. A message no enabled route takes, or one
-whose route disagrees with its connection, is answered `AR`; a route that
-disagrees on the plain listener also closes the connection. While the routes
+read in the source's character set, and checked against the connection.
+Every proof the route names must hold: the client certificate must carry the
+route's `certificate_subject`, and the peer address must lie in one of the
+route's `source_cidrs`. The TLS listener takes only a route with a
+`certificate_subject`, and the plain listener only a route with
+`source_cidrs`, so a route bound to both is served on the TLS listener alone.
+A message no enabled route takes, or one whose connection fails a proof of
+its route, is answered `AR`; on the plain listener the connection also
+closes. While the routes
 cannot be read the message is answered `AE`, so the sender sends it again.
 
 ```mermaid
@@ -103,7 +106,7 @@ sequenceDiagram
     D->>F: MLLP frame (MSH-3, MSH-4)
     F->>S: route of MSH-3 and MSH-4
     S-->>F: the MLLP source and its route
-    F->>F: route against the certificate subject or the peer network
+    F->>F: every proof of the route: certificate subject, peer network
     F->>C: ingest under the source's settings
     F-->>D: AA, AE or AR
 ```
@@ -377,7 +380,7 @@ ERR-3 and the text in ERR-8.
 | A required field or segment missing, an undecoded escape | `AE` | `101`, `100` or `102`, located |
 | MSH-3 and MSH-4 name a sender no enabled route takes | `AR` | `207` at MSH^1^4 |
 | The connection's client certificate does not carry the `certificate_subject` of the message's route | `AR` | `207` at MSH^1^4 |
-| On the plain listener, the message's route holds no network the peer address lies in; the connection then closes | `AR` | `207` at MSH^1^4 |
+| The message's route holds no network the peer address lies in, or, on the plain listener, names no network; on the plain listener the connection then closes | `AR` | `207` at MSH^1^4 |
 | The routes cannot be read | `AE` | `207` |
 | MSH-10 empty | `AE` | `101` at MSH-10 |
 | A result whose message names no clinician, from a sender that is no device | `AE` | `101` at OBX^1^16 |

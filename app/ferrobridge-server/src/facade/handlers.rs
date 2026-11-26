@@ -12,7 +12,8 @@
 //! at a call site. Create, update and transaction write through
 //! [`crate::facade::ingest`], so the handlers keep only the HTTP half.
 //!
-//! Every handler but metadata reads the [`Access`] the layer of
+//! Every handler but metadata reads the
+//! [`Access`](ferrohealth_smart::resource::Access) the layer of
 //! [`crate::facade::guard`] left on the request and holds a `patient/` token to
 //! its patient's compartment ([`crate::facade::compartment`]). A request that
 //! reaches a handler without one never passed the layer, and the extractor
@@ -28,14 +29,10 @@ mod transaction;
 mod validate;
 pub(crate) mod write;
 
-use std::sync::Arc;
-
 use axum::Extension;
 use axum::body::Bytes;
 use axum::extract::Path;
-use axum::extract::State;
 use axum::response::Response;
-use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Json;
 use http::HeaderMap;
@@ -47,6 +44,8 @@ use crate::facade::app_state;
 use crate::facade::capability;
 use crate::facade::compartment;
 use crate::facade::consent;
+use crate::facade::context::Context;
+use crate::facade::context::Entry;
 use crate::facade::endpoint;
 use crate::facade::guard::OperatorScope;
 use crate::facade::launch_task;
@@ -76,55 +75,47 @@ pub fn metadata_route(
 /// `POST [base]/{type}`: create, conditional and idempotent by source
 /// identity.
 pub async fn create_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path(resource_type): Path<String>,
-    headers: HeaderMap,
-    uri: Uri,
     body: Bytes,
 ) -> Response {
-    if resource_type == consent::CONSENT && consent::directs_access(&facade, &body) {
-        return consent::fhir::create(&facade, &access, &headers, &body)
+    let cx = entry.context();
+    if resource_type == consent::CONSENT && consent::directs_access(cx.facade, &body) {
+        return consent::fhir::create(cx, &body)
             .await
             .unwrap_or_else(Refusal::into_response);
     }
-    if let Some(loaded) = facade.programs().party(&resource_type) {
+    if let Some(loaded) = cx.facade.programs().party(&resource_type) {
         return crate::facade::party::write::create(
-            crate::facade::party::Call::new(&facade, &access, loaded, (&headers, &uri)),
+            crate::facade::party::Call::new(cx, loaded),
             &resource_type,
             &body,
         )
         .await
         .unwrap_or_else(Refusal::into_response);
     }
-    write::create(&facade, &access, &resource_type, &headers, &uri, &body)
+    write::create(cx, &resource_type, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
 
 /// `GET [base]/{type}?…`: search the type over its declared AQL projections.
-pub async fn search_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    Path(resource_type): Path<String>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
+pub async fn search_route(entry: Entry, Path(resource_type): Path<String>) -> Response {
+    let cx = entry.context();
     if resource_type == consent::CONSENT
-        && let Some(answer) = consent_search(&facade, &access, &headers, &uri, None).await
+        && let Some(answer) = consent_search(cx, None).await
     {
         return answer;
     }
-    if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
-        return endpoint::search(&facade, &access, &headers, &uri, &[])
-            .unwrap_or_else(Refusal::into_response);
+    if resource_type == endpoint::ENDPOINT && cx.facade.endpoints().is_some() {
+        return endpoint::search(cx, &[]).unwrap_or_else(Refusal::into_response);
     }
-    if mhd::serves(&facade, &resource_type) {
-        return mhd::search(&facade, &access, &resource_type, &headers, &uri, &[])
+    if mhd::serves(cx.facade, &resource_type) {
+        return mhd::search(cx, &resource_type, &[])
             .await
             .unwrap_or_else(Refusal::into_response);
     }
-    search::search_get(&facade, &access, &resource_type, &headers, &uri)
+    search::search_get(cx, &resource_type)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
@@ -132,28 +123,25 @@ pub async fn search_route(
 /// `POST [base]/{type}/_search`: the same search, its parameters in a form
 /// body.
 pub async fn search_form_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path(resource_type): Path<String>,
-    headers: HeaderMap,
-    uri: Uri,
     body: Bytes,
 ) -> Response {
-    if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
-        return endpoint::search(&facade, &access, &headers, &uri, &body)
-            .unwrap_or_else(Refusal::into_response);
+    let cx = entry.context();
+    if resource_type == endpoint::ENDPOINT && cx.facade.endpoints().is_some() {
+        return endpoint::search(cx, &body).unwrap_or_else(Refusal::into_response);
     }
-    if mhd::serves(&facade, &resource_type) {
-        return mhd::search(&facade, &access, &resource_type, &headers, &uri, &body)
+    if mhd::serves(cx.facade, &resource_type) {
+        return mhd::search(cx, &resource_type, &body)
             .await
             .unwrap_or_else(Refusal::into_response);
     }
     if resource_type == consent::CONSENT
-        && let Some(answer) = consent_search(&facade, &access, &headers, &uri, Some(&body)).await
+        && let Some(answer) = consent_search(cx, Some(&body)).await
     {
         return answer;
     }
-    search::search_post(&facade, &access, &resource_type, &headers, &uri, &body)
+    search::search_post(cx, &resource_type, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
@@ -161,26 +149,20 @@ pub async fn search_form_route(
 /// Answers a `Consent` search, its parameters in the query and in `form`, a
 /// `POST _search` body, when it reaches the access directives
 /// ([`consent::lanes`]); `None` for one the mapped search answers alone.
-async fn consent_search(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    uri: &Uri,
-    form: Option<&[u8]>,
-) -> Option<Response> {
-    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+async fn consent_search(cx: Context<'_>, form: Option<&[u8]>) -> Option<Response> {
+    let mut pairs = media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes());
     if let Some(body) = form {
-        if let Err(refusal) = search::form::check_form(headers) {
+        if let Err(refusal) = search::form::check_form(cx.headers) {
             return Some(refusal.into_response());
         }
         pairs.extend(media::query_pairs(body));
     }
-    let lanes = consent::lanes(facade, &pairs);
+    let lanes = consent::lanes(cx.facade, &pairs);
     if lanes == consent::Lanes::Mapped {
         return None;
     }
     Some(
-        consent::fhir::search(facade, access, headers, uri, &pairs, lanes)
+        consent::fhir::search(cx, &pairs, lanes)
             .await
             .unwrap_or_else(Refusal::into_response),
     )
@@ -188,27 +170,24 @@ async fn consent_search(
 
 /// `GET [base]/{type}/{id}`: read one mapped resource back out of the CDR.
 pub async fn read_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path((resource_type, id)): Path<(String, String)>,
-    headers: HeaderMap,
-    uri: Uri,
 ) -> Response {
-    if resource_type == consent::CONSENT && consent::reads_access(&facade, &id) {
-        return consent::fhir::read(&facade, &access, &id, &headers)
+    let cx = entry.context();
+    if resource_type == consent::CONSENT && consent::reads_access(cx.facade, &id) {
+        return consent::fhir::read(cx, &id)
             .await
             .unwrap_or_else(Refusal::into_response);
     }
-    if resource_type == endpoint::ENDPOINT && facade.endpoints().is_some() {
-        return endpoint::read(&facade, &access, &id, &headers, &uri)
-            .unwrap_or_else(Refusal::into_response);
+    if resource_type == endpoint::ENDPOINT && cx.facade.endpoints().is_some() {
+        return endpoint::read(cx, &id).unwrap_or_else(Refusal::into_response);
     }
-    if mhd::serves(&facade, &resource_type) {
-        return mhd::read(&facade, &access, (&resource_type, &id), &headers, &uri)
+    if mhd::serves(cx.facade, &resource_type) {
+        return mhd::read(cx, (&resource_type, &id))
             .await
             .unwrap_or_else(Refusal::into_response);
     }
-    read(&facade, &access, (&resource_type, &id), &headers, &uri)
+    read(cx, (&resource_type, &id))
         .await
         .unwrap_or_else(Refusal::into_response)
 }
@@ -216,27 +195,20 @@ pub async fn read_route(
 /// `GET [base]/{type}/{id}/$document`: the document Bundle of one mapped
 /// Composition (<https://hl7.org/fhir/R4/composition-operation-document.html>).
 pub async fn document_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path((resource_type, id)): Path<(String, String)>,
-    headers: HeaderMap,
-    uri: Uri,
 ) -> Response {
-    document(&facade, &access, &resource_type, Some(&id), &headers, &uri)
+    let cx = entry.context();
+    document(cx, &resource_type, Some(&id))
         .await
         .unwrap_or_else(Refusal::into_response)
 }
 
 /// `GET [base]/{type}/$document?id=[id]`, identical in meaning to the
 /// instance form (<https://hl7.org/fhir/R4/composition-operation-document.html>).
-pub async fn document_type_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    Path(resource_type): Path<String>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
-    document(&facade, &access, &resource_type, None, &headers, &uri)
+pub async fn document_type_route(entry: Entry, Path(resource_type): Path<String>) -> Response {
+    let cx = entry.context();
+    document(cx, &resource_type, None)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
@@ -252,12 +224,9 @@ pub async fn document_type_route(
 /// in FHIR JSON or XML as the request asks, and `406` for any other media
 /// type (ITI TF-2: 3.68.4.1.3).
 async fn document(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     resource_type: &str,
     path_id: Option<&str>,
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<Response, Refusal> {
     if resource_type != read::COMPOSITION {
         return Err(reply::refusal(
@@ -267,12 +236,12 @@ async fn document(
             )),
         ));
     }
-    let format = format_of(headers, uri)?;
+    let format = format_of(cx.headers, cx.uri)?;
     let invalid = |code: IssueType, text: String| {
         reply::refusal(StatusCode::BAD_REQUEST, Issue::error(code).diagnosing(text))
     };
     let mut named = None;
-    for (name, value) in media::query_pairs(uri.query().unwrap_or_default().as_bytes()) {
+    for (name, value) in media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes()) {
         match name.as_str() {
             "id" => named = Some(value),
             "persist" => match value.as_str() {
@@ -317,7 +286,7 @@ async fn document(
             ));
         }
         (Some(id), None) => id.to_owned(),
-        (None, Some(id)) => local_id(facade, &id).ok_or_else(|| {
+        (None, Some(id)) => local_id(cx.facade, &id).ok_or_else(|| {
             invalid(
                 IssueType::NotSupported,
                 format!("{id} names a Composition on another server"),
@@ -330,9 +299,9 @@ async fn document(
             ));
         }
     };
-    admit_existing(facade, access, Permission::Read, read::COMPOSITION, &id).await?;
-    let client = facade.client_for(headers, access).await?;
-    let assembled = read::assembled(facade, access, &client, &id).await?;
+    admit_existing(cx, Permission::Read, read::COMPOSITION, &id).await?;
+    let client = cx.facade.client_for(cx.headers, cx.access).await?;
+    let assembled = read::assembled(cx.facade, cx.access, &client, &id).await?;
     Ok(reply::formatted(
         StatusCode::OK,
         &assembled.bundle,
@@ -372,42 +341,25 @@ fn local_id(facade: &Facade, id: &str) -> Option<String> {
 /// `GET [base]/{type}/{id}/_history/{vid}`: read one version of a mapped
 /// resource back out of the CDR.
 pub async fn vread_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path((resource_type, id, vid)): Path<(String, String, String)>,
-    headers: HeaderMap,
-    uri: Uri,
 ) -> Response {
-    vread(
-        &facade,
-        &access,
-        (&resource_type, &id, &vid),
-        &headers,
-        &uri,
-    )
-    .await
-    .unwrap_or_else(Refusal::into_response)
+    let cx = entry.context();
+    vread(cx, (&resource_type, &id, &vid))
+        .await
+        .unwrap_or_else(Refusal::into_response)
 }
 
 /// `PUT [base]/{type}/{id}`: update a resource the identity map knows.
 pub async fn update_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path((resource_type, id)): Path<(String, String)>,
-    headers: HeaderMap,
-    uri: Uri,
     body: Bytes,
 ) -> Response {
-    update(
-        &facade,
-        &access,
-        (&resource_type, &id),
-        &headers,
-        &uri,
-        &body,
-    )
-    .await
-    .unwrap_or_else(Refusal::into_response)
+    let cx = entry.context();
+    update(cx, (&resource_type, &id), &body)
+        .await
+        .unwrap_or_else(Refusal::into_response)
 }
 
 /// `DELETE [base]/{type}/{id}` and `GET [base]/{type}/{id}/_history`, the
@@ -418,135 +370,113 @@ pub async fn update_route(
 /// loads only with `[cdr] demographic` on (no specification governs this: our
 /// own design).
 pub async fn party_only_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path((resource_type, id)): Path<(String, String)>,
     method: http::Method,
-    headers: HeaderMap,
-    uri: Uri,
 ) -> Response {
-    let programs = facade.programs();
+    let cx = entry.context();
+    let programs = cx.facade.programs();
     let Some(loaded) = programs.party(&resource_type) else {
         return not_supported(&resource_type).into_response();
     };
-    let call = crate::facade::party::Call::new(&facade, &access, loaded, (&headers, &uri));
+    let call = crate::facade::party::Call::new(cx, loaded);
     let instance = (resource_type.as_str(), id.as_str());
     if method == http::Method::DELETE {
         crate::facade::party::write::delete(call, instance).await
     } else {
-        crate::facade::party::read::history(call, instance).await
+        crate::facade::party::read::get(call, instance, crate::facade::party::read::Get::History)
+            .await
     }
     .unwrap_or_else(Refusal::into_response)
 }
 
 /// `POST [base]/{type}/$validate`: the dry run that commits nothing.
 pub async fn validate_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Extension(operator): Extension<OperatorScope>,
     Path(resource_type): Path<String>,
-    headers: HeaderMap,
-    uri: Uri,
     body: Bytes,
 ) -> Response {
-    let admission = validate::Admission {
-        access: &access,
-        operator: operator.0.as_deref(),
-    };
-    validate::validate(&facade, admission, &resource_type, &headers, &uri, &body)
+    let cx = entry.context();
+    validate::validate(cx, operator.0.as_deref(), &resource_type, &body)
         .await
         .unwrap_or_else(Refusal::into_response)
 }
 
 /// `POST [base]`: a `transaction` Bundle, all or nothing, or a `batch`
 /// Bundle, each entry on its own.
-pub async fn transaction_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    headers: HeaderMap,
-    uri: Uri,
-    body: Bytes,
-) -> Response {
-    Box::pin(transaction::transaction(
-        &facade, &access, &headers, &uri, &body,
-    ))
-    .await
-    .unwrap_or_else(Refusal::into_response)
+pub async fn transaction_route(entry: Entry, body: Bytes) -> Response {
+    let cx = entry.context();
+    Box::pin(transaction::transaction(cx, &body))
+        .await
+        .unwrap_or_else(Refusal::into_response)
 }
 
 /// The read interaction behind its route and a batch entry: the compartment
 /// check, then the read.
 pub(crate) async fn read(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<Response, Refusal> {
-    if let Some(loaded) = facade.programs().party(resource_type) {
-        return crate::facade::party::read::read(
-            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
+    if let Some(loaded) = cx.facade.programs().party(resource_type) {
+        return crate::facade::party::read::get(
+            crate::facade::party::Call::new(cx, loaded),
             (resource_type, id),
+            crate::facade::party::read::Get::Latest,
         )
         .await;
     }
-    admit_existing(facade, access, Permission::Read, resource_type, id).await?;
+    admit_existing(cx, Permission::Read, resource_type, id).await?;
     read::read(
-        facade,
-        &facade.client_for(headers, access).await?,
+        cx.facade,
+        &cx.facade.client_for(cx.headers, cx.access).await?,
         resource_type,
         id,
-        headers,
-        uri,
+        cx.headers,
+        cx.uri,
     )
     .await
 }
 
 /// The vread interaction behind its route and a batch entry.
 pub(crate) async fn vread(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     (resource_type, id, vid): (&str, &str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<Response, Refusal> {
-    if let Some(loaded) = facade.programs().party(resource_type) {
+    if let Some(loaded) = cx.facade.programs().party(resource_type) {
         return crate::facade::party::read::vread(
-            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
+            crate::facade::party::Call::new(cx, loaded),
             (resource_type, id, vid),
         )
         .await;
     }
-    admit_existing(facade, access, Permission::Read, resource_type, id).await?;
+    admit_existing(cx, Permission::Read, resource_type, id).await?;
     read::vread(
-        facade,
-        &facade.client_for(headers, access).await?,
+        cx.facade,
+        &cx.facade.client_for(cx.headers, cx.access).await?,
         (resource_type, id, vid),
-        headers,
-        uri,
+        cx.headers,
+        cx.uri,
     )
     .await
 }
 
 /// The update interaction behind its route and a batch entry.
 pub(crate) async fn update(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<Response, Refusal> {
-    if let Some(loaded) = facade.programs().party(resource_type) {
+    if let Some(loaded) = cx.facade.programs().party(resource_type) {
         return crate::facade::party::write::update(
-            crate::facade::party::Call::new(facade, access, loaded, (headers, uri)),
+            crate::facade::party::Call::new(cx, loaded),
             (resource_type, id),
             body,
         )
         .await;
     }
-    admit_existing(facade, access, Permission::Update, resource_type, id).await?;
-    write::update(facade, access, (resource_type, id), headers, uri, body).await
+    admit_existing(cx, Permission::Update, resource_type, id).await?;
+    write::update(cx, (resource_type, id), body).await
 }
 
 /// Checks that `access` reaches the composition the identity map binds to
@@ -555,8 +485,7 @@ pub(crate) async fn update(
 /// An id the map does not know passes, so the handler answers its `404` as
 /// it does for any caller.
 async fn admit_existing(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     permission: Permission,
     resource_type: &str,
     id: &str,
@@ -564,13 +493,13 @@ async fn admit_existing(
     let Ok(internal) = crate::identity::FhirResourceId::new(id) else {
         return Ok(());
     };
-    let Some(binding) = read::binding(facade, resource_type, &internal).await? else {
+    let Some(binding) = read::binding(cx.facade, resource_type, &internal).await? else {
         return Ok(());
     };
     let ehr = binding
         .ehr(&internal)
         .map_err(|error| read::stored_identifier(&error))?;
-    compartment::admit_ehr(facade, access, permission, resource_type, &ehr).await
+    compartment::admit_ehr(cx.facade, cx.access, permission, resource_type, &ehr).await
 }
 
 /// Returns the IHE operation `uri` ends in on `resource_type`, or the
@@ -590,15 +519,13 @@ fn exchange_profile(resource_type: &str, uri: &Uri) -> Result<consent::ihe::Prof
 /// `POST [base]/Consent/$bppc` and `POST [base]/Consent/$appc`: imports one
 /// IHE document ([`consent::ihe`]).
 pub async fn exchange_import_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
+    entry: Entry,
     Path(resource_type): Path<String>,
-    headers: HeaderMap,
-    uri: Uri,
     body: Bytes,
 ) -> Response {
-    let imported = match exchange_profile(&resource_type, &uri) {
-        Ok(profile) => consent::ihe::import(&facade, &access, profile, &headers, &uri, &body).await,
+    let cx = entry.context();
+    let imported = match exchange_profile(&resource_type, cx.uri) {
+        Ok(profile) => consent::ihe::import(cx, profile, &body).await,
         Err(refusal) => Err(refusal),
     };
     imported.unwrap_or_else(Refusal::into_response)
@@ -606,15 +533,10 @@ pub async fn exchange_import_route(
 
 /// `GET [base]/Consent/$bppc` and `GET [base]/Consent/$appc`: exports the
 /// patient's directives as IHE documents ([`consent::ihe`]).
-pub async fn exchange_export_route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    Path(resource_type): Path<String>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
-    let exported = match exchange_profile(&resource_type, &uri) {
-        Ok(profile) => consent::ihe::export(&facade, &access, profile, &headers, &uri).await,
+pub async fn exchange_export_route(entry: Entry, Path(resource_type): Path<String>) -> Response {
+    let cx = entry.context();
+    let exported = match exchange_profile(&resource_type, cx.uri) {
+        Ok(profile) => consent::ihe::export(cx, profile).await,
         Err(refusal) => Err(refusal),
     };
     exported.unwrap_or_else(Refusal::into_response)

@@ -14,20 +14,24 @@ use crate::support::profile_set;
 use crate::support::vendored_base;
 use eehrxf::category::Category;
 use eehrxf::crosswalk::discharge::HDR_COMPOSITION;
+use eehrxf::document::Document;
 use eehrxf::document::DocumentError;
 use eehrxf::document::discharge::HDR_BUNDLE;
 use eehrxf::document::discharge::HDR_ENCOUNTER;
+use eehrxf::document::discharge::MYHEALTHEU_DISCHARGE_REPORT_FORM;
+use eehrxf::document::discharge::MYHEALTHEU_HDR_MEDICATION_REQUEST;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::conform::check_resource;
 use ferrobridge_term::client::Client;
 use fhir_types::codec::Json;
 use fhir_types::r4::bundle::Bundle;
+use fhir_types::r4::patient::Patient;
 use serde_json::Value;
 use std::error::Error;
 
 use super::{
-    ADMITTED, DIAGNOSIS, NOW, composition, diagnosis, discharge_document, full_report, mapping,
-    sent, sent_myhealtheu,
+    ADMITTED, DIAGNOSIS, DISCHARGED, NOW, composition, diagnosis, discharge_document, full_report,
+    mapping, sent, sent_myhealtheu,
 };
 #[test]
 fn the_mapped_report_is_a_discharge_document_its_profiles_constrain() -> Result<(), Box<dyn Error>>
@@ -254,5 +258,128 @@ async fn the_mapped_report_is_written_in_the_myhealtheu_form() -> Result<(), Box
         .ok_or("the composition names its author")?;
     assert!(author.contains("/Practitioner/"), "{author}");
     emit("eehrxf-discharge-myhealtheu", &text)?;
+    Ok(())
+}
+
+// NOTE: MyHealth@EU HDR 9.2.0 medicationRequest-hdr-myhealtheu: authoredOn and requester 1..1, written
+// from the record's context end time and composer.
+#[tokio::test]
+async fn each_order_of_the_myhealtheu_report_names_its_authoring_time_and_requester()
+-> Result<(), Box<dyn Error>> {
+    let text = sent_myhealtheu(
+        &mapping()?,
+        &full_report(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d104",
+    )
+    .await?;
+    let root: Value = serde_json::from_str(&text)?;
+    let orders: Vec<&Value> = root["entry"]
+        .as_array()
+        .ok_or("the entries")?
+        .iter()
+        .map(|entry| &entry["resource"])
+        .filter(|resource| resource["resourceType"] == "MedicationRequest")
+        .collect();
+    assert_eq!(orders.len(), 1, "the report holds its one order");
+    for order in orders {
+        assert_eq!(order["authoredOn"], DISCHARGED);
+        assert_eq!(order["requester"]["display"], "Synthetic composer");
+    }
+    emit("eehrxf-discharge-myhealtheu-medication", &text)?;
+    Ok(())
+}
+
+/// The refusal the MyHealth@EU form gives a document that takes a run whose
+/// one discharge medication is `order`.
+fn refused_myhealtheu(identifier: &str, order: Value) -> Result<DocumentError, Box<dyn Error>> {
+    let mut document = Document::of(
+        &MYHEALTHEU_DISCHARGE_REPORT_FORM,
+        "https://gateway.example.org/fhir",
+        identifier.to_owned(),
+        String::from(NOW),
+        String::from("Discharge report"),
+    );
+    document.with_patient(Patient {
+        id: Some(String::from("synthetic-patient")),
+        ..Patient::default()
+    })?;
+    let run = bundle_of(&[
+        serde_json::json!({
+            "resourceType": "Composition",
+            "status": "final",
+            "type": { "coding": [{ "system": "http://loinc.org", "code": "34105-7" }] },
+            "date": NOW,
+            "author": [{ "display": "Synthetic author" }],
+            "title": "Discharge report",
+            "section": [{
+                "title": "Discharge medications",
+                "code": { "coding": [{ "system": "http://loinc.org", "code": "75311-1" }] },
+                "entry": [{ "reference": "MedicationRequest/synthetic-order" }]
+            }]
+        }),
+        order,
+    ])?;
+    for section in document.with_mapped_composition(&run)? {
+        document.with_section(section.into_section(vec![String::from("Orders.")]))?;
+    }
+    match document.into_bundle() {
+        Ok(_) => Err("the report was written".into()),
+        Err(refusal) => Ok(refusal),
+    }
+}
+
+/// A synthetic discharge medication, with `extra` added to it.
+fn order_with(extra: &Value) -> Value {
+    let mut order = serde_json::json!({
+        "resourceType": "MedicationRequest",
+        "id": "synthetic-order",
+        "status": "unknown",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Synthetic medicine" },
+        "subject": { "reference": "Patient/synthetic-patient" }
+    });
+    if let (Some(order), Some(extra)) = (order.as_object_mut(), extra.as_object()) {
+        order.extend(extra.clone());
+    }
+    order
+}
+
+#[test]
+fn a_myhealtheu_order_with_no_authoring_time_is_refused() -> Result<(), Box<dyn Error>> {
+    let refusal = refused_myhealtheu(
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d105",
+        order_with(&serde_json::json!({ "requester": { "display": "Synthetic composer" } })),
+    )?;
+    assert!(
+        matches!(
+            refusal,
+            DocumentError::EntryElement {
+                resource: "MedicationRequest",
+                element: "authoredOn",
+                profile: MYHEALTHEU_HDR_MEDICATION_REQUEST,
+            }
+        ),
+        "{refusal:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_myhealtheu_order_with_no_requester_is_refused() -> Result<(), Box<dyn Error>> {
+    let refusal = refused_myhealtheu(
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d106",
+        order_with(&serde_json::json!({ "authoredOn": DISCHARGED })),
+    )?;
+    assert!(
+        matches!(
+            refusal,
+            DocumentError::EntryElement {
+                resource: "MedicationRequest",
+                element: "requester",
+                profile: MYHEALTHEU_HDR_MEDICATION_REQUEST,
+            }
+        ),
+        "{refusal:?}"
+    );
     Ok(())
 }
