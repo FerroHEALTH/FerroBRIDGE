@@ -16,7 +16,7 @@ use std::time::Duration;
 /// The statement a client reads the session's timeouts back with: each
 /// name and its value, an integer of milliseconds (PostgreSQL 19 docs,
 /// `pg_settings`, `setting` in the setting's `unit`).
-pub(crate) const SESSION_QUERY: &str = "SELECT name, setting FROM pg_settings \
+pub const SESSION_QUERY: &str = "SELECT name, setting FROM pg_settings \
      WHERE name IN ('statement_timeout', 'lock_timeout', 'idle_in_transaction_session_timeout')";
 
 /// The largest timeout PostgreSQL accepts, in milliseconds: the three
