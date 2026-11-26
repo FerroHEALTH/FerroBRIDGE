@@ -7,6 +7,7 @@
 
 use crate::crosswalk::laboratory::{LAB_COMPOSITION, LAB_DIAGNOSTIC_REPORT};
 use crate::document::form::{Authorship, Code, Companion, Form, Kind, Slot};
+use crate::document::language::Language;
 use crate::document::{EU_CORE_PATIENT, LOINC};
 
 /// The canonical URL of the HL7 Europe Laboratory Report `Bundle` profile.
@@ -54,7 +55,7 @@ pub const LABORATORY_REPORT_FORM: Form = Form {
         back: "http://hl7.org/fhir/5.0/StructureDefinition/extension-DiagnosticReport.composition",
     }),
     encounter: None,
-    language: false,
+    language: Language::OPTIONAL,
     // NOTE: Composition-eu-lab 2.0.0 adds no section invariant; FHIR R4 cmp-1 holds by the narrative.
     rules: &[],
     legal_authentication: false,
