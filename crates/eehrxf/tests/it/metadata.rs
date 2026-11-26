@@ -13,6 +13,7 @@
 use std::error::Error;
 
 use eehrxf::category::{Category, PRIORITY_SYSTEM};
+use eehrxf::document::language::DocumentLanguage;
 #[cfg(feature = "laboratory")]
 use eehrxf::document::metadata::Header;
 use eehrxf::document::metadata::{
@@ -94,7 +95,7 @@ fn holds_table_1(metadata: &DocumentMetadata, bundle: &Bundle) -> Result<(), Box
     assert!(composition["status"].is_string());
     assert!(composition["type"]["coding"][0]["code"].is_string());
     assert!(composition["title"].is_string());
-    assert_eq!(composition["language"], "en");
+    assert_eq!(composition["language"], "en-GB");
     assert_eq!(composition["attester"][0]["mode"], "professional");
     assert_eq!(
         composition["event"][0]["period"]["start"],
@@ -149,7 +150,7 @@ fn holds_table_1(metadata: &DocumentMetadata, bundle: &Bundle) -> Result<(), Box
         reference["content"][0]["attachment"]["contentType"],
         FHIR_JSON
     );
-    assert_eq!(reference["content"][0]["attachment"]["language"], "en");
+    assert_eq!(reference["content"][0]["attachment"]["language"], "en-GB");
     assert_eq!(
         reference["context"]["event"][0]["coding"][0]["code"],
         "26436-6"
@@ -191,6 +192,7 @@ fn written(document: Document, code: &str) -> Result<(Bundle, DocumentMetadata),
     let mut document = authored(document)?;
     let metadata = metadata(code)?;
     document.with_metadata(metadata.clone());
+    document.with_language(DocumentLanguage::new("en", "GB")?)?;
     Ok((document.into_bundle()?, metadata))
 }
 
@@ -224,7 +226,7 @@ fn every_laboratory_data_group_carries_its_annex_iii_date_and_language()
     for entry in bundle["entry"].as_array().ok_or("entries")? {
         let resource = &entry["resource"];
         if resource["resourceType"] == "Observation" {
-            assert_eq!(resource["language"], "en");
+            assert_eq!(resource["language"], "en-GB");
         }
     }
     Ok(())
@@ -272,7 +274,7 @@ fn a_header_describes_the_document_before_it_is_written() -> Result<(), Box<dyn 
         listed["content"][0]["attachment"],
         json!({
             "contentType": FHIR_JSON,
-            "language": "en",
+            "language": "en-GB",
             "title": "Synthetic laboratory report",
             "url": "Binary/synthetic-token"
         })
@@ -290,21 +292,6 @@ fn a_composition_without_a_version_is_refused() {
         DocumentMetadata::from_composition(&composition, category("11502-2"), None),
         Err(DocumentError::MissingMetadata { element: "version" })
     ));
-}
-
-#[test]
-#[cfg(feature = "laboratory")]
-fn a_second_language_is_refused_where_r4_holds_one() -> Result<(), Box<dyn Error>> {
-    let mut document = authored(super::lab_document::document()?)?;
-    document.with_metadata(metadata("11502-2")?.with_language(String::from("nl")));
-    assert!(matches!(
-        document.into_bundle(),
-        Err(DocumentError::TooMany {
-            element: "language",
-            given: 2
-        })
-    ));
-    Ok(())
 }
 
 #[test]

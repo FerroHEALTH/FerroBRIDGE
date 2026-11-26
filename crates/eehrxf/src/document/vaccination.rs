@@ -15,8 +15,9 @@
 //! `Bundle.entry:immunisation` slice requires at least one
 //! `vaccination-myhealtheu-euvac`.
 
-use crate::document::LOINC;
 use crate::document::form::{Authorship, Code, Form, Kind, SectionRule, Slot};
+use crate::document::language::{EHDSI_LANGUAGE, Language};
+use crate::document::{LOINC, MYHEALTHEU_PATIENT};
 
 /// The canonical URL of the MyHealth@EU Vaccination `Bundle` profile.
 pub const EUVAC_BUNDLE: &str =
@@ -25,11 +26,6 @@ pub const EUVAC_BUNDLE: &str =
 /// The canonical URL of the MyHealth@EU Vaccination `Composition` profile.
 pub const EUVAC_COMPOSITION: &str =
     "http://fhir.ehdsi.eu/euvac/StructureDefinition/composition-euvac-myhealtheu";
-
-/// The canonical URL of the MyHealth@EU Core `Patient` profile, which
-/// `bundle-euvac-myhealtheu` names for its patient entry slice.
-pub const MYHEALTHEU_PATIENT: &str =
-    "http://fhir.ehdsi.eu/core/StructureDefinition/patient-myhealtheu-core";
 
 /// The LOINC code `composition-euvac-myhealtheu` fixes as
 /// `Composition.type` and as the code of its immunisations section.
@@ -57,7 +53,11 @@ pub const VACCINATION_HISTORY_FORM: Form = Form {
     slots: &EUVAC_SLOTS,
     report: None,
     encounter: None,
-    language: false,
+    // NOTE: composition-euvac-myhealtheu Composition.language 0..1, bound required to eHDSILanguage.
+    language: Language {
+        required: false,
+        binding: Some(EHDSI_LANGUAGE),
+    },
     // NOTE: composition-euvac-myhealtheu section:immunisations 1..1, and bundle-euvac-myhealtheu
     // entry:immunisation 1..* holds the Immunization resources that section lists.
     rules: &[

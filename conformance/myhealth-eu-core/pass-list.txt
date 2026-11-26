@@ -1,8 +1,10 @@
+eehrxf-discharge-full.0.Composition
 eehrxf-discharge-full.1.Patient
 eehrxf-discharge-full.3.Organization
 eehrxf-discharge-full.5.Condition
 eehrxf-discharge-full.6.Procedure
 eehrxf-discharge-full.7.MedicationRequest
+eehrxf-discharge-mapped.0.Composition
 eehrxf-discharge-mapped.1.Patient
 eehrxf-discharge-mapped.3.Organization
 eehrxf-discharge-mapped.5.Condition
@@ -41,6 +43,7 @@ eehrxf-manifest-study.5.Organization
 eehrxf-mpd-dispense.1.Medication
 eehrxf-mpd-prescription.0.MedicationRequest
 eehrxf-mpd-prescription.1.Medication
+eehrxf-narrative-discharge.0.Composition
 eehrxf-narrative-discharge.1.Patient
 eehrxf-narrative-discharge.3.Organization
 eehrxf-summary-eu-mapping.0.Composition
