@@ -28,7 +28,6 @@ use ferrohealth_smart::resource::Compartment;
 use ferrohealth_smart::scope::Permission;
 use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::ResultSetRow;
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -38,6 +37,7 @@ use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::cdr::query::QueryPageError;
 use crate::facade::Facade;
+use crate::facade::context::Context;
 use crate::facade::engine;
 use crate::facade::engine::entry::Entry;
 use crate::facade::handlers::Body;
@@ -76,32 +76,39 @@ use crate::identity::record::CompositionBinding;
 use crate::terminology::Session;
 
 /// `GET [base]/{type}?…`.
-pub(crate) async fn search_get(
-    facade: &Facade,
-    access: &Access,
-    resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
-) -> Result<Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    let pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    search(facade, access, resource_type, headers, &pairs, None).await
+pub(crate) async fn search_get(cx: Context<'_>, resource_type: &str) -> Result<Response, Refusal> {
+    crate::facade::handlers::guard(cx.headers, cx.uri, Body::Absent)?;
+    let pairs = media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes());
+    search(
+        cx.facade,
+        cx.access,
+        resource_type,
+        cx.headers,
+        &pairs,
+        None,
+    )
+    .await
 }
 
 /// `POST [base]/{type}/_search`, the parameters in the URL and the form body.
 pub(crate) async fn search_post(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    form::check_form(headers)?;
-    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    crate::facade::handlers::guard(cx.headers, cx.uri, Body::Absent)?;
+    form::check_form(cx.headers)?;
+    let mut pairs = media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes());
     pairs.extend(media::query_pairs(body));
-    search(facade, access, resource_type, headers, &pairs, None).await
+    search(
+        cx.facade,
+        cx.access,
+        resource_type,
+        cx.headers,
+        &pairs,
+        None,
+    )
+    .await
 }
 
 /// Runs one search, its searchset opened with `lead` when another lane of

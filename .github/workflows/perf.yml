@@ -71,11 +71,11 @@ on:
 permissions: {}
 
 env:
-  # A called workflow does not inherit ci.yml's two-job cap, and the two
-  # release builds take all four cores: with the release features of #1737
-  # the base peaked at 10.4 GB two jobs wide, and a job count changes neither
-  # binary (#1758).
-  CARGO_BUILD_JOBS: "4"
+  # A called workflow does not inherit ci.yml's two-job cap. Four jobs wide
+  # the base's release build peaked at 15 of the runner's 16 GB with 2.4 GB
+  # of swap and lost the runner (#2261); a job count changes neither binary
+  # (#1758).
+  CARGO_BUILD_JOBS: "2"
   FERROHEALTH_PERF_VERSION: 0.11.0
   FERROBRIDGE__USAGE_REPORT__ENABLED: "false"
   # The CPU models whose runners stall every route for 100 to 300 ms for a
