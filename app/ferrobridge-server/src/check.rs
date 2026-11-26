@@ -109,8 +109,8 @@ pub struct Report {
     omocl_files: Vec<PathBuf>,
     /// The FHIR Mapping Language files read.
     structuremap_files: Vec<PathBuf>,
-    /// The maps they parsed into, when every one parsed.
-    structuremaps: Vec<crate::structuremap::syntax::StructureMap>,
+    /// The maps and logical models they read into, when every one read.
+    structuremaps: crate::structuremap::Set,
     /// The Web Template indices the contexts compiled against, by identifier.
     indexes: BTreeMap<String, Arc<WebTemplateIndex>>,
 }
@@ -164,10 +164,10 @@ impl Report {
         &self.structuremap_files
     }
 
-    /// Returns the maps the FHIR Mapping Language files parsed into, empty
-    /// when one did not parse.
+    /// Returns the maps and logical models the FHIR Mapping Language files
+    /// read into, empty when one did not read.
     #[must_use]
-    pub fn structuremaps(&self) -> &[crate::structuremap::syntax::StructureMap] {
+    pub const fn structuremaps(&self) -> &crate::structuremap::Set {
         &self.structuremaps
     }
 
@@ -384,7 +384,7 @@ pub async fn check_files(
     }
     if let Some(tree) = structuremap {
         match crate::mappings::tree::structuremap_set(tree) {
-            Ok(maps) => report.structuremaps = maps,
+            Ok(set) => report.structuremaps = set,
             Err(mut diagnostics) => report.diagnostics.append(&mut diagnostics),
         }
         report.structuremap_files = tree.paths().map(Path::to_path_buf).collect();

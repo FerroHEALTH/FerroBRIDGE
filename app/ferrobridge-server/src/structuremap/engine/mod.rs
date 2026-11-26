@@ -208,6 +208,12 @@ impl Engine {
         self
     }
 
+    /// Returns the map whose canonical URL is `url`.
+    #[must_use]
+    pub fn map(&self, url: &str) -> Option<&StructureMap> {
+        self.maps.iter().find(|map| map.url == url)
+    }
+
     /// Runs [`Engine::transform`] on a blocking thread, where the translator
     /// may wait on the terminology server.
     ///

@@ -20,6 +20,7 @@ pub mod event;
 pub mod intake;
 pub mod keeper;
 pub mod recover;
+pub mod resolve;
 pub mod store;
 pub mod subscription;
 pub mod verify;

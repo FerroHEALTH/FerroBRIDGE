@@ -410,7 +410,7 @@ impl Handler for Failing {
         Box::pin(async move {
             Err(Failed {
                 failure,
-                reason: "the identity source refused the patient",
+                reason: "the identity source refused the patient".into(),
             })
         })
     }

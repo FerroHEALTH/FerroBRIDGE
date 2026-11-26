@@ -35,6 +35,8 @@ pub struct Tenant {
     /// The secret the tenant's credentials are read from, when it has its
     /// own.
     pub credentials: Option<SecretRef>,
+    /// The URL a webhook source's resolve calls lie below.
+    pub base: Option<String>,
     /// Whether the tenant is served.
     pub enabled: bool,
 }
@@ -45,6 +47,7 @@ impl Default for Tenant {
             name: String::new(),
             identifier_system: String::new(),
             credentials: None,
+            base: None,
             enabled: true,
         }
     }
@@ -71,6 +74,9 @@ pub struct Webhook {
     /// The recovery steps: redelivery and reconciliation.
     #[serde(default)]
     pub recovery: crate::inbound::recover::Recovery,
+    /// How the entity a notification names is read as an R4 `Patient`.
+    #[serde(default)]
+    pub resolve: Option<crate::inbound::resolve::Resolution>,
 }
 
 /// The bounds of one webhook source.
@@ -479,6 +485,9 @@ impl Webhook {
             }
         }
         self.recovery.check().map_err(Invalid)?;
+        if let Some(resolution) = self.resolve.as_ref() {
+            resolution.check(&self.tenants)?;
+        }
         if self.limits.body_limit == 0
             || self.limits.concurrency == 0
             || self.limits.max_pending == 0
@@ -651,6 +660,55 @@ mod tests {
                 Kind::Webhook,
                 json!({"verify": {"kind": "mtls", "subjects": ["CN=a"]}, "keys": key, "events": events}),
             ),
+            (
+                Kind::Webhook,
+                resolving(
+                    json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m"}),
+                    None,
+                ),
+            ),
+            (
+                Kind::Webhook,
+                resolving(
+                    json!({"calls": [{"path": "/c/{entity}/{other}"}], "map": "urn:m"}),
+                    Some("https://api.example"),
+                ),
+            ),
+            (
+                Kind::Webhook,
+                resolving(
+                    json!({"calls": [{"path": "https://evil.example/{entity}"}], "map": "urn:m"}),
+                    Some("https://api.example"),
+                ),
+            ),
+            (
+                Kind::Webhook,
+                resolving(
+                    json!({"calls": [{"path": "/c/{entity}", "headers": {"Authorization": "Basic x"}}], "map": "urn:m"}),
+                    Some("https://api.example"),
+                ),
+            ),
+            (
+                Kind::Webhook,
+                resolving(
+                    json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m", "removed_on": 503}),
+                    Some("https://api.example"),
+                ),
+            ),
+            (
+                Kind::Webhook,
+                resolving(
+                    json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m"}),
+                    Some("https://user:secret@api.example"),
+                ),
+            ),
+            (
+                Kind::Webhook,
+                resolving(
+                    json!({"calls": [], "map": "urn:m"}),
+                    Some("https://api.example"),
+                ),
+            ),
             (Kind::Mllp, json!({"routes": []})),
             (
                 Kind::Mllp,
@@ -663,6 +721,28 @@ mod tests {
         ] {
             assert!(Document::read(kind, &value).is_err(), "{value}");
         }
+    }
+
+    /// Returns an mTLS webhook declaring `resolve`, its tenant below `base`.
+    fn resolving(resolve: serde_json::Value, base: Option<&str>) -> serde_json::Value {
+        json!({
+            "verify": {"kind": "mtls", "subjects": ["CN=a"]},
+            "events": {"entity": "/id", "dedupe": {"pointers": ["/id"]}},
+            "tenants": [{"tenant": "t", "identifier_system": "s", "base": base}],
+            "resolve": resolve
+        })
+    }
+
+    #[test]
+    fn a_resolution_below_each_tenant_base_reads() {
+        let document = Document::read(
+            Kind::Webhook,
+            &resolving(
+                json!({"calls": [{"path": "/v0/clients/{entity}?fields=id", "headers": {"X-Field-Whitelist": "id"}}], "map": "urn:m", "removed_on": 404}),
+                Some("https://api.example/t"),
+            ),
+        );
+        assert!(document.is_ok(), "{document:?}");
     }
 
     #[test]

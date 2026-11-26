@@ -30,7 +30,8 @@ pub enum Language {
     Fhirconnect,
     /// OMOCL files.
     Omocl,
-    /// FHIR Mapping Language maps (FHIR R4 §7.7), one map per file.
+    /// FHIR Mapping Language maps (FHIR R4 §7.7), one map per file, and
+    /// the logical models they read, one `StructureDefinition` per JSON file.
     Structuremap,
 }
 
@@ -51,7 +52,7 @@ impl Language {
     pub fn holds(self, path: &Path) -> bool {
         let extensions: &[&str] = match self {
             Self::Fhirconnect | Self::Omocl => &EXTENSIONS,
-            Self::Structuremap => &[STRUCTUREMAP_EXTENSION],
+            Self::Structuremap => &STRUCTUREMAP_EXTENSIONS,
         };
         path.extension()
             .and_then(std::ffi::OsStr::to_str)
@@ -211,8 +212,8 @@ impl Located {
 /// The extensions a FHIRconnect or OMOCL file carries.
 const EXTENSIONS: [&str; 2] = ["yml", "yaml"];
 
-/// The extension a FHIR Mapping Language map carries.
-const STRUCTUREMAP_EXTENSION: &str = "map";
+/// The extensions of a FHIR Mapping Language map and of a logical model.
+const STRUCTUREMAP_EXTENSIONS: [&str; 2] = ["map", "json"];
 
 /// Returns whether `wire` names a mapping file of the language its root
 /// names.

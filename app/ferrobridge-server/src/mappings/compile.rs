@@ -47,6 +47,10 @@ pub const STRUCTUREMAP_SYNTAX: &str = "fb-structuremap-syntax";
 /// The code of a map whose URL another map of the set carries.
 pub const STRUCTUREMAP_URL: &str = "fb-structuremap-url";
 
+/// The code of a JSON file of the map root that is no logical model
+/// (FHIR R4 structuredefinition.html, `kind = logical`).
+pub const STRUCTUREMAP_LOGICAL: &str = "fb-structuremap-logical";
+
 /// Where one template came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateOrigin {

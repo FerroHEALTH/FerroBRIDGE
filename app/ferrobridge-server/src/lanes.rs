@@ -104,6 +104,9 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             state.store(),
             state.facade().cloned(),
             state.operations_handle().cloned(),
+            state
+                .sources()
+                .map(|sources| Arc::clone(sources.structuremaps())),
         )
         .await
         .context("starting the operator API")?;
@@ -168,7 +171,7 @@ fn inbound_workers(
         return None;
     };
     let handler = crate::inbound::apply::Apply::new(
-        Arc::new(crate::inbound::apply::Undeclared),
+        Arc::new(crate::inbound::resolve::Declared::new(Arc::clone(sources))),
         facade.settings().subject.identity_handle(),
         facade.client().clone(),
         facade.store_handle(),
@@ -190,9 +193,16 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
     let Some(store) = state.store() else {
         return Ok(state);
     };
+    let translator = state.terminology().cloned().map(|client| {
+        Arc::new(crate::structuremap::engine::translate::Terminology::new(
+            client,
+            tokio::runtime::Handle::current(),
+        )) as Arc<dyn crate::structuremap::engine::translate::Translate>
+    });
     let sources = Arc::new(
         crate::sources::Sources::open(store, settings.secrets.as_ref())
-            .context("opening the [secrets] directory the inbound sources name")?,
+            .context("opening the [secrets] directory the inbound sources name")?
+            .with_structuremaps(Arc::new(crate::structuremap::Running::new(translator))),
     );
     let intake = settings.inbound.map(|inbound| {
         crate::inbound::intake::Intake::new(
@@ -714,6 +724,7 @@ async fn build_operator(
     store: Option<&crate::store::Store>,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<crate::operations::lane::OperationsLane>>,
+    structuremaps: Option<Arc<crate::structuremap::Running>>,
 ) -> anyhow::Result<operator::Operator> {
     use anyhow::Context;
 
@@ -754,7 +765,7 @@ async fn build_operator(
             omocl: settings.omocl_directory.is_some(),
             facade,
             operations,
-            structuremaps: Some(Arc::default()),
+            structuremaps,
         };
         let revisions = crate::mappings::revisions::Revisions::new(store);
         revisions
