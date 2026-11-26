@@ -5,8 +5,8 @@
 //!
 //! No specification governs the configuration: our own design.
 
+use crate::cdr::config::CdrCredentials;
 use crate::config::Config;
-use crate::config::credentials::Upstream;
 use crate::config::credentials::resolve_credentials;
 use crate::config::error::Error;
 use crate::config::section::cdr::Cdr;
@@ -50,18 +50,18 @@ fn settings(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Error> {
         ..endpoint.credentials.clone()
     };
     match resolve_credentials("cdr.endpoint.credentials", &own)? {
-        Some(Upstream::Basic { user, password }) => {
+        Some(CdrCredentials::Basic { user, password }) => {
             config = config
                 .with_basic(user, password)
                 .with_committer_issuer(cdr.committer_issuer.clone());
         }
-        Some(Upstream::OAuth(_)) | None if cdr.committer_issuer.is_some() => {
+        Some(CdrCredentials::OAuth(_)) | None if cdr.committer_issuer.is_some() => {
             return Err(super::needed_by(
                 "cdr.committer_issuer",
                 "cdr.endpoint.credentials.user",
             ));
         }
-        Some(Upstream::OAuth(grant)) => {
+        Some(CdrCredentials::OAuth(grant)) => {
             config = config.with_oauth(*grant);
         }
         None => {}
