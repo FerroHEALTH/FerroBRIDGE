@@ -69,5 +69,6 @@ pub const TEST_REPORT_FORM: Form = Form {
     language: Language::OPTIONAL,
     // NOTE: FHIR R4 Composition cmp-1 holds by the narrative every section carries.
     rules: &[],
+    entries: &[],
     legal_authentication: false,
 };

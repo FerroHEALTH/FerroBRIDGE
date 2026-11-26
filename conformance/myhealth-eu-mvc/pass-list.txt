@@ -12,6 +12,15 @@ eehrxf-discharge-mapped.0.Composition Composition.section.code http://loinc.org|
 eehrxf-discharge-mapped.0.Composition Composition.type http://loinc.org|34105-7
 eehrxf-discharge-mapped.5.Condition Condition.bodySite http://snomed.info/sct|39607008
 eehrxf-discharge-mapped.5.Condition Condition.code http://hl7.org/fhir/sid/icd-10|J45.9
+eehrxf-discharge-myhealtheu-medication.0.Composition Composition.section.code http://loinc.org|10185-7
+eehrxf-discharge-myhealtheu-medication.0.Composition Composition.section.code http://loinc.org|11535-2
+eehrxf-discharge-myhealtheu-medication.0.Composition Composition.section.code http://loinc.org|75311-1
+eehrxf-discharge-myhealtheu-medication.0.Composition Composition.section.code http://loinc.org|8648-8
+eehrxf-discharge-myhealtheu-medication.0.Composition Composition.type http://loinc.org|34105-7
+eehrxf-discharge-myhealtheu-medication.4.Condition Condition.bodySite http://snomed.info/sct|39607008
+eehrxf-discharge-myhealtheu-medication.4.Condition Condition.code http://hl7.org/fhir/sid/icd-10|J45.9
+eehrxf-discharge-myhealtheu-medication.5.Procedure Procedure.bodySite http://snomed.info/sct|66754008
+eehrxf-discharge-myhealtheu-medication.5.Procedure Procedure.code http://snomed.info/sct|80146002
 eehrxf-discharge-myhealtheu.0.Composition Composition.section.code http://loinc.org|11535-2
 eehrxf-discharge-myhealtheu.0.Composition Composition.section.code http://loinc.org|8648-8
 eehrxf-discharge-myhealtheu.0.Composition Composition.type http://loinc.org|34105-7
@@ -82,4 +91,4 @@ eehrxf-summary-two-runs.4.AllergyIntolerance AllergyIntolerance.code http://snom
 eehrxf-summary-two-runs.6.AllergyIntolerance AllergyIntolerance.code http://snomed.info/sct|762952008
 eehrxf-test-report-ecg.0.Composition Composition.section.code http://loinc.org|30954-2
 eehrxf-test-report-spirometry.0.Composition Composition.section.code http://loinc.org|30954-2
-total 97
+total 106

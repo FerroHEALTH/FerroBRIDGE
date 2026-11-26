@@ -98,6 +98,7 @@ fn a_hospital_course_and_a_severity_are_declared_not_carried() -> Result<(), Box
             "MedicationRequest.status",
             "MedicationRequest.intent",
             "MedicationRequest.authoredOn",
+            "MedicationRequest.requester",
         ],
         "the hospital course once, each entry element the project does not read, and nothing \
          the project carries: {issues:?}"

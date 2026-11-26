@@ -97,5 +97,6 @@ pub const IMAGING_REPORT_FORM: Form = Form {
             slices: &["imagingstudy", "order", "history", "procedure"],
         },
     ],
+    entries: &[],
     legal_authentication: false,
 };
