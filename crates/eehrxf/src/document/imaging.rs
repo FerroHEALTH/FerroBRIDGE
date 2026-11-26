@@ -13,6 +13,7 @@
 use crate::category::PRIORITY_SYSTEM;
 use crate::crosswalk::imaging::{IMAGING_COMPOSITION, IMAGING_DIAGNOSTIC_REPORT};
 use crate::document::form::{Authorship, Code, Companion, Form, Kind, SectionRule, Slot};
+use crate::document::language::Language;
 use crate::document::{EU_CORE_PATIENT, LOINC};
 
 /// The canonical URL of the HL7 Europe Imaging Report `Bundle` profile.
@@ -73,7 +74,7 @@ pub const IMAGING_REPORT_FORM: Form = Form {
         back: "http://hl7.org/fhir/5.0/StructureDefinition/extension-DiagnosticReport.composition",
     }),
     encounter: None,
-    language: false,
+    language: Language::OPTIONAL,
     // NOTE: CompositionEuImaging `eu-imaging-composition-1` (error) on every section: an entry or an
     // emptyReason, the document writing neither sub-sections nor the `note` extension it also admits.
     rules: &[

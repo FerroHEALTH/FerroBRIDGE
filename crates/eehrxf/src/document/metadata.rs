@@ -24,7 +24,7 @@
 //! | author\[x\] | `author` | `author` |
 //! | date | `date` | `date` |
 //! | attestation | `attester`, mode `professional` | none in R4 |
-//! | status | `status` | none: `EehrxfMhdDocumentReference` holds `docStatus` to 0 |
+//! | status | `status` | `docStatus` in the PDF form; none in a listing, since `EehrxfMhdDocumentReference` holds `docStatus` to 0 |
 //! | language | `language` | `content.attachment.language` |
 //! | documentCategory | `category`, and the report's `category` on a laboratory or test report; not on an imaging report, whose form fixes it | `category`, one concept with the Art 14(1) priority category beside it |
 //! | documentType | `type` | `type` |
@@ -35,10 +35,11 @@
 //! | serviceSpecialty | none in R4 | `context.practiceSetting` |
 //! | custodian | `custodian` | `custodian` |
 //!
-//! R4 holds one `Composition.language` and one
-//! `DocumentReference.context.practiceSetting` where Table 1 allows many, so
-//! a second value is refused with [`DocumentError::TooMany`] rather than
-//! dropped.
+//! The language is the document's own ([`Document::with_language`]), one
+//! value written on the `Bundle`, the `Composition`, each data group and the
+//! description. R4 holds one `DocumentReference.context.practiceSetting`
+//! where Table 1 allows many, so a second value is refused with
+//! [`DocumentError::TooMany`] rather than dropped.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
@@ -61,6 +62,7 @@ use fhir_types::r4::resource::Resource;
 use sha1::{Digest as _, Sha1};
 
 use crate::category::{Category, PRIORITY_SYSTEM};
+use crate::document::language::DocumentLanguage;
 use crate::document::representation::PdfA;
 use crate::document::{Document, DocumentError, URN_SYSTEM, reference};
 
@@ -78,6 +80,11 @@ pub const DOCUMENT_REFERENCE_VERSION: &str =
 /// profile every description claims.
 pub const EEHRXF_MHD_DOCUMENT_REFERENCE: &str =
     "http://hl7.eu/fhir/health-data-api/StructureDefinition/EehrxfMhdDocumentReference";
+
+/// The IHE MHD code system of identifier types
+/// (`IHE.MHD.MHDIdentifierType`).
+pub const MHD_IDENTIFIER_TYPE: &str =
+    "https://profiles.ihe.net/ITI/MHD/CodeSystem/IHE.MHD.MHDIdentifierType";
 
 /// The media type of a PDF document (RFC 8118).
 pub const PDF: &str = "application/pdf";
@@ -108,7 +115,6 @@ pub struct DocumentMetadata {
     category: CodeableConcept,
     priority: Option<Category>,
     status: String,
-    languages: Vec<String>,
     period: Option<Period>,
     attestations: Vec<Attestation>,
     legal: Vec<Attestation>,
@@ -134,7 +140,6 @@ impl DocumentMetadata {
             category,
             priority,
             status: String::new(),
-            languages: Vec::new(),
             period: None,
             attestations: Vec::new(),
             legal: Vec::new(),
@@ -150,10 +155,11 @@ impl DocumentMetadata {
     ///
     /// openEHR RM 1.1.0 (`COMPOSITION`, `EVENT_CONTEXT`): the version is the
     /// version tree id of `uid`, an `OBJECT_VERSION_ID`
-    /// (`object_id::creating_system_id::version_tree_id`), the language is
-    /// `language.code_string`, and the period runs from `context.start_time`
-    /// to `context.end_time`. Attestations live on the `VERSION`, not in the
-    /// composition, so the caller adds them.
+    /// (`object_id::creating_system_id::version_tree_id`), and the period
+    /// runs from `context.start_time` to `context.end_time`. Attestations
+    /// live on the `VERSION`, not in the composition, so the caller adds
+    /// them. The language is the document's
+    /// ([`super::language::DocumentLanguage::of_composition`]).
     ///
     /// # Errors
     ///
@@ -174,9 +180,6 @@ impl DocumentMetadata {
             .filter(|version| !version.is_empty())
             .ok_or(DocumentError::MissingMetadata { element: "version" })?;
         let mut metadata = Self::new(version.to_owned(), category, priority);
-        if let Some(language) = text("/language/code_string") {
-            metadata.languages.push(language.to_owned());
-        }
         let start = text("/context/start_time/value");
         let end = text("/context/end_time/value");
         if start.is_some() || end.is_some() {
@@ -193,13 +196,6 @@ impl DocumentMetadata {
     #[must_use]
     pub fn with_status(mut self, status: String) -> Self {
         self.status = status;
-        self
-    }
-
-    /// Adds a language the document is written in, a BCP 47 tag.
-    #[must_use]
-    pub fn with_language(mut self, language: String) -> Self {
-        self.languages.push(language);
         self
     }
 
@@ -267,7 +263,7 @@ impl DocumentMetadata {
     /// first, [`DocumentError::MissingMetadata`] when it carries no
     /// identifier, type, date, title or custodian, and
     /// [`DocumentError::TooMany`] for more than one service specialty or
-    /// language.
+    /// legal authentication.
     pub fn describe(&self, bundle: &Bundle, id: &str) -> Result<DocumentReference, DocumentError> {
         let header = Header::of_document(bundle)?;
         let title = header.title.clone();
@@ -286,10 +282,15 @@ impl DocumentMetadata {
     /// PDF/A-1 document `pdf`, its bytes unchanged in the attachment with
     /// their size and SHA-1, described by `header` and this metadata.
     ///
+    /// It carries what [`DocumentMetadata::describe_at`] writes and every
+    /// element MyHealth@EU DocumentReference-minimal requires, and claims no
+    /// `EehrxfMhdDocumentReference`, which holds `attachment.data` to 0..0
+    /// and so has no place for the embedded PDF the act asks for.
+    ///
     /// # Errors
     ///
-    /// [`DocumentError::TooMany`] for more than one service specialty,
-    /// language or legal authentication, [`DocumentError::TooLarge`] for a
+    /// [`DocumentError::TooMany`] for more than one service specialty or
+    /// legal authentication, [`DocumentError::TooLarge`] for a
     /// PDF whose size an R4 `unsignedInt` cannot hold, and
     /// [`DocumentError::MissingMetadata`] for a header with no custodian.
     pub fn describe_pdf(
@@ -302,9 +303,12 @@ impl DocumentMetadata {
             size: pdf.bytes().len(),
             source,
         })?;
-        self.describe_at(
+        // NOTE: draft EEHRxF Art 3(1)(a) embeds the PDF/A, which EehrxfMhdDocumentReference forbids
+        // (attachment.data 0..0, url 1..1), so the act wins and the PDF form claims it not (#2235).
+        self.reference(
             header,
             id,
+            None,
             Attachment {
                 content_type: Some(PDF.into()),
                 data: Some(STANDARD.encode(pdf.bytes()).into()),
@@ -320,7 +324,7 @@ impl DocumentMetadata {
     /// names with this metadata, with its `id` set to `id` and its one
     /// content `attachment` as the caller gives it: the URL the document is
     /// read at, its media type and its title; the attachment's language is
-    /// this metadata's.
+    /// the header's.
     ///
     /// It writes what [`DocumentMetadata::describe`] writes of a document,
     /// with no written `Bundle`, so a caller that lists documents describes
@@ -337,17 +341,28 @@ impl DocumentMetadata {
     ///
     /// # Errors
     ///
-    /// [`DocumentError::TooMany`] for more than one service specialty,
-    /// language or legal authentication, and
+    /// [`DocumentError::TooMany`] for more than one service specialty or
+    /// legal authentication, and
     /// [`DocumentError::MissingMetadata`] for a header with no custodian.
     pub fn describe_at(
         &self,
         header: &Header,
         id: &str,
+        attachment: Attachment,
+    ) -> Result<DocumentReference, DocumentError> {
+        self.reference(header, id, Some(EEHRXF_MHD_DOCUMENT_REFERENCE), attachment)
+    }
+
+    /// The `DocumentReference` of [`DocumentMetadata::describe_at`], claiming
+    /// `claimed` when it is given.
+    fn reference(
+        &self,
+        header: &Header,
+        id: &str,
+        claimed: Option<&'static str>,
         mut attachment: Attachment,
     ) -> Result<DocumentReference, DocumentError> {
         let practice_setting = at_most_one("serviceSpecialty", &self.specialties)?.cloned();
-        let language = at_most_one("language", &self.languages)?;
         let legal = at_most_one("legalAuthentication", &self.legal)?;
         let custodian = header
             .custodian
@@ -355,7 +370,7 @@ impl DocumentMetadata {
             .ok_or(DocumentError::MissingMetadata {
                 element: "custodian",
             })?;
-        attachment.language = language.map(|language| language.as_str().into());
+        attachment.language = header.language.as_deref().map(Into::into);
         let mut category = self.category.clone();
         if let Some(priority) = self.priority {
             category.coding.push(Coding {
@@ -374,19 +389,33 @@ impl DocumentMetadata {
             });
         Ok(DocumentReference {
             id: Some(id.to_owned()),
+            // NOTE: R4 Element ele-1: a meta with neither a profile nor a source is left out.
             meta: Some(Meta {
-                profile: vec![EEHRXF_MHD_DOCUMENT_REFERENCE.into()],
+                profile: claimed.into_iter().map(Into::into).collect(),
                 source: self.source.as_ref().map(|source| source.as_str().into()),
                 ..Meta::default()
-            }),
+            })
+            .filter(|meta| *meta != Meta::default()),
             extension: vec![version_extension(DOCUMENT_REFERENCE_VERSION, &self.version)],
-            // NOTE: IHE MHD 4.2.2 IHE.MHD.UniqueIdIdentifier: the unique id's use is `usual`.
+            // NOTE: IHE MHD 4.2.5 IHE.MHD.UniqueIdIdentifier: use `usual`, type MHDIdentifierType#uniqueId.
             master_identifier: Some(Identifier {
                 r#use: Some("usual".into()),
+                r#type: Some(CodeableConcept {
+                    coding: vec![Coding {
+                        system: Some(MHD_IDENTIFIER_TYPE.into()),
+                        code: Some("uniqueId".into()),
+                        ..Coding::default()
+                    }],
+                    ..CodeableConcept::default()
+                }),
                 ..header.identifier.clone()
             }),
             identifier: header.composition.iter().cloned().collect(),
             status: "current".into(),
+            // NOTE: EehrxfMhdDocumentReference holds docStatus to 0..0; the unclaimed PDF form keeps it.
+            doc_status: Some(self.status.as_str())
+                .filter(|status| claimed.is_none() && !status.is_empty())
+                .map(Into::into),
             r#type: Some(header.kind.clone()),
             category: vec![category],
             subject: Some(header.subject.clone()),
@@ -426,6 +455,7 @@ pub struct Header {
     kind: CodeableConcept,
     title: String,
     custodian: Option<Reference>,
+    language: Option<String>,
 }
 
 impl Header {
@@ -450,7 +480,15 @@ impl Header {
             kind,
             title,
             custodian: None,
+            language: None,
         }
+    }
+
+    /// Sets the language the document is written in.
+    #[must_use]
+    pub fn with_language(mut self, language: &DocumentLanguage) -> Self {
+        self.language = Some(language.tag().to_owned());
+        self
     }
 
     /// Adds an author.
@@ -517,6 +555,10 @@ impl Header {
                 .filter(|title| !title.is_empty())
                 .ok_or_else(|| missing("documentTitle"))?,
             custodian: composition.custodian.clone(),
+            language: composition
+                .language
+                .as_ref()
+                .and_then(|language| language.value.clone()),
         })
     }
 }
@@ -653,10 +695,10 @@ impl Document {
     /// Fills the Annex III Table 2 metadata of every data group the document
     /// holds, once metadata is set.
     pub(super) fn fill_data_groups(&mut self) -> Result<(), DocumentError> {
-        let Some(metadata) = &self.metadata else {
+        if self.metadata.is_none() {
             return Ok(());
-        };
-        let language = at_most_one("language", &metadata.languages)?.map(String::as_str);
+        }
+        let language = self.language.as_deref();
         for (_, resource) in &mut self.entries {
             data_group(resource, &self.timestamp, language)?;
         }
@@ -693,9 +735,6 @@ impl Document {
             .push(version_extension(COMPOSITION_VERSION, &metadata.version));
         if !metadata.status.is_empty() {
             composition.status = metadata.status.as_str().into();
-        }
-        if let Some(language) = at_most_one("language", &metadata.languages)? {
-            composition.language = Some(language.as_str().into());
         }
         // NOTE: Composition-eu-lab 2.0.0 slices category open; the imaging form fixes it (#2120).
         if self.form.categories.is_empty() && !composition.category.contains(&metadata.category) {
