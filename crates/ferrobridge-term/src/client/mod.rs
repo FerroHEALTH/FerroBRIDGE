@@ -402,7 +402,6 @@ impl Client {
     /// Returns [`Error::Refused`] when the server refused the search, and
     /// [`Error::Body`] when the answer is not a `searchset` `Bundle`;
     /// [`Error`] otherwise when the call did not reach an answer.
-    #[cfg(feature = "naming-system")]
     pub async fn identifier_systems(&self, value: &str) -> Result<Vec<String>, Error> {
         let mut url = self.url("NamingSystem")?;
         url.query_pairs_mut()

@@ -91,10 +91,9 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             ));
             state = state.with_access_log(Arc::new(log));
         }
-        let (mounted, counts) =
-            build_facade(settings, &lane, state.terminology().cloned(), state.store())
-                .await
-                .context("starting the FHIR facade")?;
+        let (mounted, counts) = build_facade(settings, &lane, &state)
+            .await
+            .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
@@ -103,6 +102,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     if settings.operator.is_some() {
         let operator = build_operator(
             settings,
+            state.cdr(),
             state.store(),
             state.facade().cloned(),
             state.operations_handle().cloned(),
@@ -211,6 +211,14 @@ pub(crate) fn spawn_followers(
     ) {
         followers.push(recoverer.spawn(inbound.recovery_tick, &stop.subscribe()));
     }
+    if let (Some(store), Some(inbound)) = (state.store(), settings.inbound) {
+        followers.push(crate::inbound::store::spawn_body_expiry(
+            crate::inbound::store::InboxStore::new(store.pool().clone()),
+            inbound.recovery_tick,
+            inbound.parked_body_retention,
+            &stop.subscribe(),
+        ));
+    }
     if let Some(links) = state.links() {
         followers.push(links.spawn_sweeper(&stop.subscribe()));
     }
@@ -314,11 +322,10 @@ async fn start_change_feed(
 ) -> anyhow::Result<(Vec<StartedFeed>, change_feed::report::Report)> {
     use anyhow::Context;
 
-    let cdr = settings
-        .cdr
-        .as_ref()
+    let client = state
+        .cdr()
+        .cloned()
         .context("the change feed reads the CDR, and [cdr] is not set")?;
-    let client = cdr::CdrClient::new(cdr).context("building the CDR client the feed reads")?;
     let store = state.store().cloned().context(
         "the change feed keeps its cursors and dead letters in the state store, and [state] is not set",
     )?;
@@ -504,7 +511,11 @@ async fn start_hl7v2(
     )?;
     let face = hl7v2::Face::new(facade, terminology, routes)
         .with_usage(Arc::clone(state.usage_window()))
-        .with_access_log(state.access_log().cloned(), lane.listen);
+        .with_access_log(state.access_log().cloned(), lane.listen)
+        .with_inbox(settings.inbound.and(state.store()).map(|store| {
+            crate::inbound::store::InboxStore::new(store.pool().clone())
+                .with_seal(store.seal().cloned())
+        }));
     let plain = match lane.plain {
         Some(bind) => Some(hl7v2::plain::bind(bind, &face).await?),
         None => None,
@@ -655,6 +666,7 @@ async fn start_audit(
 /// runs (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
+    cdr: Option<&cdr::CdrClient>,
     store: Option<&crate::store::Store>,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<crate::operations::lane::OperationsLane>>,
@@ -664,13 +676,7 @@ async fn build_operator(
 
     let needs_cdr =
         settings.mappings.is_none() && (settings.mapping_directory.is_some() || store.is_some());
-    let cdr = match settings.cdr.as_ref() {
-        Some(config) if needs_cdr => Some(
-            cdr::CdrClient::new(config)
-                .context("building the CDR client the templates are fetched through")?,
-        ),
-        _ => None,
-    };
+    let cdr = cdr.filter(|_| needs_cdr).cloned();
     let mut roots = Vec::new();
     if let Some(directory) = settings.mapping_directory.as_ref() {
         roots.push(crate::mappings::files::Root::new(
@@ -755,17 +761,14 @@ async fn build_operator(
 async fn build_facade(
     settings: &Settings,
     lane: &config::FacadeSettings,
-    terminology: Option<ferrobridge_term::client::Client>,
-    state: Option<&crate::store::Store>,
+    app: &AppState,
 ) -> anyhow::Result<(facade::Facade, startup::MappingCounts)> {
     use anyhow::Context;
 
-    let cdr = settings
-        .cdr
-        .as_ref()
+    let client = app
+        .cdr()
+        .cloned()
         .context("the facade needs a [cdr] section: it maps every request onto CDR operations")?;
-    let client =
-        cdr::CdrClient::new(cdr).context("building the CDR client the facade calls through")?;
     let directory = settings
         .mapping_directory
         .as_ref()
@@ -808,7 +811,7 @@ async fn build_facade(
         templates: templates.len(),
     };
     let search = facade::search::load(directory, &programs).context("reading the searches")?;
-    let state = state.context(
+    let state = app.store().context(
         "the facade needs a [state] section: every replica resolves its identities in the state store",
     )?;
     let store = crate::identity::state::StateStore::open(state)
@@ -827,7 +830,8 @@ async fn build_facade(
     };
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
         .with_translator(
-            Translator::new(terminology).with_display_fallback(settings.display_fallback),
+            Translator::new(app.terminology().cloned())
+                .with_display_fallback(settings.display_fallback),
         );
     Ok((
         built

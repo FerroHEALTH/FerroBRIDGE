@@ -26,7 +26,7 @@ use ihe_iti::pixm::source::error::SourceError as FeedError;
 use secrecy::SecretString;
 
 use super::event::Change;
-use super::store::Claimed;
+use super::store::{Claimed, InboxStore};
 use super::worker::{Attempt, Failed, Handler};
 use crate::audit::AccessLog;
 use crate::cdr::CdrClient;
@@ -35,7 +35,7 @@ use crate::identity::store::Store;
 use crate::identity_source::IdentitySource;
 use crate::retry::Failure;
 use crate::sources::Source;
-use crate::sources::document::Tenant;
+use crate::sources::document::{Document, Tenant};
 
 /// The `Patient` elements the identity source is fed, and nothing else
 /// (GDPR Art 5(1)(c)).
@@ -84,6 +84,8 @@ pub struct Apply {
     store: Arc<dyn Store>,
     /// The access-record lane each step is recorded in, under `[audit]`.
     access_log: Option<Arc<AccessLog>>,
+    /// The inbox whose sealed event bodies carry an MLLP source's patient.
+    inbox: Option<InboxStore>,
 }
 
 impl Apply {
@@ -102,7 +104,15 @@ impl Apply {
             client,
             store,
             access_log: None,
+            inbox: None,
         }
+    }
+
+    /// Returns this handler reading an MLLP source's patient from the
+    /// sealed body of the event it applies in `inbox`.
+    #[must_use]
+    pub fn with_inbox(self, inbox: Option<InboxStore>) -> Self {
+        Self { inbox, ..self }
     }
 
     /// Returns this handler recording each feed and each EHR it creates in
@@ -115,16 +125,56 @@ impl Apply {
         }
     }
 
-    /// Creates or updates the patient, or forwards the source's merge, then
-    /// ensures the patient's one EHR.
+    /// Reads the source's patient through its resolution and applies it.
     async fn upsert(&self, source: &Source, tenant: &Tenant, entity: &str) -> Result<(), Failed> {
-        let resolved = match self.resolve.patient(source, tenant, entity).await? {
-            Resolved::Patient(patient) => patient,
-            Resolved::Removed => return self.deactivate(source, tenant, entity).await,
+        match self.resolve.patient(source, tenant, entity).await? {
+            Resolved::Patient(patient) => {
+                self.upsert_resolved(source, tenant, entity, &patient).await
+            }
+            Resolved::Removed => self.deactivate(source, tenant, entity).await,
+        }
+    }
+
+    /// Applies the patient an MLLP source's event carries: the tenant is the
+    /// identifier system the face settled the patient's identifier in.
+    async fn carried(&self, source: &Source, item: &Claimed) -> Result<(), Failed> {
+        let inbox = self
+            .inbox
+            .as_ref()
+            .ok_or_else(|| refused("inbox-unavailable"))?;
+        let body = inbox
+            .body(&item.key, item.generation)
+            .await
+            .map_err(|_unread| Failed {
+                failure: Failure::Transient,
+                reason: Cow::Borrowed("event-body-unreadable"),
+            })?
+            .ok_or_else(|| refused("event-body-absent"))?;
+        let resolved: Value = serde_json::from_slice(body.as_bytes())
+            .map_err(|_unread| refused("patient-unreadable"))?;
+        let tenant = Tenant {
+            name: item.key.tenant.clone(),
+            identifier_system: item.key.tenant.clone(),
+            credentials: None,
+            base: None,
+            enabled: true,
         };
+        self.upsert_resolved(source, &tenant, &item.key.entity, &resolved)
+            .await
+    }
+
+    /// Creates or updates the `resolved` patient, or forwards the source's
+    /// merge, then ensures the patient's one EHR.
+    async fn upsert_resolved(
+        &self,
+        source: &Source,
+        tenant: &Tenant,
+        entity: &str,
+        resolved: &Value,
+    ) -> Result<(), Failed> {
         let local = local_of(tenant, entity)?;
-        let patient = typed(&minimised(&resolved, tenant, entity))?;
-        let survivor = survivor_of(&resolved, tenant)?;
+        let patient = typed(&minimised(resolved, tenant, entity))?;
+        let survivor = survivor_of(resolved, tenant)?;
         let place = self.reserve().await?;
         match survivor.as_ref() {
             // NOTE: PIXm 3.1.0 §2:3.104.4.2: the source's own merge goes to the identity
@@ -246,6 +296,9 @@ impl Apply {
 impl Handler for Apply {
     fn apply<'a>(&'a self, source: &'a Source, item: &'a Claimed) -> Attempt<'a> {
         Box::pin(async move {
+            if matches!(source.parsed, Document::Mllp(_)) {
+                return self.carried(source, item).await;
+            }
             let tenant = source
                 .parsed
                 .tenants()
