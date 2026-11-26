@@ -8,12 +8,12 @@
 use std::error::Error;
 
 use ferrobridge_server::cdr::ids::EhrId;
-use ferrobridge_server::facade::identity::record::{
+use ferrobridge_server::identity::record::{
     CompositionBinding, Identifier, IdentifierQuery, SystemMatch,
 };
-use ferrobridge_server::facade::identity::state::StateStore;
-use ferrobridge_server::facade::identity::store::{Store as _, StoreError};
-use ferrobridge_server::facade::identity::{FhirResourceId, PersonId};
+use ferrobridge_server::identity::state::StateStore;
+use ferrobridge_server::identity::store::{Store as _, StoreError};
+use ferrobridge_server::identity::{FhirResourceId, PersonId};
 use ferrobridge_testkit::containers;
 
 /// A person identifier shaped like a BSN, synthetic.
@@ -29,7 +29,7 @@ fn binding(uid: &str) -> CompositionBinding {
         entry_path: String::from("/content[1]"),
         split: 0,
         context: String::from("ferrobridge_diagnosis.context"),
-        derivation: Some(ferrobridge_server::facade::identity::derive::DERIVATION),
+        derivation: Some(ferrobridge_server::identity::derive::DERIVATION),
         created: None,
     }
 }

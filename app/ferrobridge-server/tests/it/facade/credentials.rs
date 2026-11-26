@@ -8,8 +8,8 @@
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::facade::Facade;
-use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
+use ferrobridge_server::identity::store::MemoryStore;
 use ferrobridge_server::state::AppState;
 use ferrohealth_health::registry::Registry;
 use ferrohealth_smart::client::ClientCredentials;

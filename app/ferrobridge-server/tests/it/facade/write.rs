@@ -5,8 +5,8 @@
 //! the EHR resolved or created by subject, and the `If-Match` rule.
 
 use axum::body::Body;
-use ferrobridge_server::facade::ehr::Policy;
-use ferrobridge_server::facade::identity::store::Store;
+use ferrobridge_server::identity::ehr::Policy;
+use ferrobridge_server::identity::store::Store;
 use http::Request;
 use http::Response;
 use http::StatusCode;
@@ -85,7 +85,7 @@ async fn a_create_answers_two_hundred_and_one_with_location_and_etag() -> Result
 async fn a_create_records_the_identity_it_assigned() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
-    let internal = ferrobridge_server::facade::identity::FhirResourceId::new(&id)?;
+    let internal = ferrobridge_server::identity::FhirResourceId::new(&id)?;
     let binding = harness
         .store
         .binding_of("Condition", &internal)
@@ -126,7 +126,7 @@ async fn a_derived_id_follows_the_r4_grammar() -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let id = create_one(&harness).await?;
     assert!(
-        ferrobridge_server::facade::identity::is_fhir_id(&id),
+        ferrobridge_server::identity::is_fhir_id(&id),
         "{id} is outside [A-Za-z0-9\\-\\.]{{1,64}}"
     );
     Ok(())
@@ -505,19 +505,16 @@ async fn invalid_mapped_content_stores_nothing() -> Result<(), Box<dyn Error>> {
         .await;
     let (status, body) = call(harness.app(), post_condition(&condition())).await?;
     assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, status, "{body}");
-    let source = ferrobridge_server::facade::identity::ExternalResourceId::new(
-        "ferrobridge-synthetic-condition-1",
-    )?;
+    let source =
+        ferrobridge_server::identity::ExternalResourceId::new("ferrobridge-synthetic-condition-1")?;
     assert!(
         harness
             .store
-            .consumed(
-                &ferrobridge_server::facade::identity::record::SourceVersion::new(
-                    "Condition",
-                    source.clone(),
-                    None,
-                )
-            )
+            .consumed(&ferrobridge_server::identity::record::SourceVersion::new(
+                "Condition",
+                source.clone(),
+                None,
+            ))
             .await?
             .is_none(),
         "a refused commit recorded the source as consumed"

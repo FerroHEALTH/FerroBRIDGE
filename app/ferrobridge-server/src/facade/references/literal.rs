@@ -11,7 +11,7 @@
 use fhir_types::codec::Value;
 use url::Url;
 
-use crate::facade::identity::FhirResourceId;
+use crate::identity::FhirResourceId;
 
 use super::Policy;
 use super::Reason;

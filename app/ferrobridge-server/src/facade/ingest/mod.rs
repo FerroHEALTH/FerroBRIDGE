@@ -54,16 +54,16 @@ use crate::facade::Settings;
 use crate::facade::commit;
 use crate::facade::commit::Committer;
 use crate::facade::engine::Composer;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::claims::Claims;
-use crate::facade::identity::record::ConsumedSource;
-use crate::facade::identity::store::Store;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::programs::Programs;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::claims::Claims;
+use crate::identity::record::ConsumedSource;
+use crate::identity::store::Store;
 use crate::terminology::Translator;
 use ferrohealth_usage_report::window::Window;
 
@@ -526,9 +526,9 @@ impl<'a> Ingest<'a> {
     /// source.
     pub(super) async fn person_of(
         &self,
-        subject: crate::facade::subject::Subject,
-    ) -> Result<crate::facade::identity::PersonId, Refused> {
-        crate::facade::subject::Patients {
+        subject: crate::identity::subject::Subject,
+    ) -> Result<crate::identity::PersonId, Refused> {
+        crate::facade::patients::Patients {
             link: &self.settings.subject,
             store: self.store,
             programs: Arc::clone(&self.programs),
