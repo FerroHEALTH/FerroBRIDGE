@@ -16,6 +16,7 @@ use std::error::Error;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use eehrxf::category::Category;
+use eehrxf::document::language::DocumentLanguage;
 use eehrxf::document::metadata::{DocumentMetadata, Header, PDF};
 use eehrxf::document::representation::{
     Conformance, Declarations, PdfA, Representation, RepresentationError,
@@ -80,14 +81,14 @@ fn described(pdf: &PdfA) -> Result<DocumentReference, DocumentError> {
         String::from("Laboratory report"),
         to("Organization/laboratory"),
     )
-    .with_custodian(to("Organization/laboratory"));
+    .with_custodian(to("Organization/laboratory"))
+    .with_language(&DocumentLanguage::new("en", "GB").expect("a language-region tag"));
     // The laboratory report's priority category, in a build that has it.
     #[cfg(feature = "laboratory")]
     let priority = Some(Category::Laboratory);
     #[cfg(not(feature = "laboratory"))]
     let priority = None;
     DocumentMetadata::new(String::from("1"), loinc("11502-2"), priority)
-        .with_language(String::from("en"))
         .with_status(String::from("final"))
         .describe_pdf(&header, pdf, "pdf-report")
 }
@@ -136,7 +137,7 @@ fn the_pdf_travels_byte_for_byte_with_its_size_and_hash() -> Result<(), Box<dyn 
     assert_eq!(STANDARD.decode(data)?, bytes);
     assert_eq!(attachment["size"], bytes.len());
     assert_eq!(attachment["hash"], STANDARD.encode(Sha1::digest(&bytes)));
-    assert_eq!(attachment["language"], "en");
+    assert_eq!(attachment["language"], "en-GB");
     // DocumentReference-minimal on the PDF form too.
     assert!(read["masterIdentifier"]["value"].is_string());
     // EehrxfMhdDocumentReference holds attachment.data to 0..0, so the PDF form claims it not.

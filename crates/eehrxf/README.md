@@ -45,6 +45,14 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   profile.
 - `fhir-r4`: the FHIR R4 serialisation of the exchange format. It compiles
   the R4 resources and no openEHR crate.
+  A document's language is one RFC 5646 language-region tag built from the
+  openEHR composition's `language` and `territory`
+  (`document::language::DocumentLanguage`), and a form whose `Composition`
+  profile binds the language `required` takes it only as a `HeldLanguage`,
+  which the terminology server's `ValueSet/$validate-code` gives. The
+  discharge report has the HL7 Europe form and the MyHealth@EU Hospital
+  Discharge Report 9.2.0 form (`MYHEALTHEU_DISCHARGE_REPORT_FORM`), whose
+  author is the one the record names (`document::authored::recorded_author`).
 - `mapping` (feature `openehr`, which turns on `fhir-r4`): FHIRconnect 1.0.0
   context mappings compiled once against an openEHR operational template and
   run in process, through the `fhirconnect` engine, over a
