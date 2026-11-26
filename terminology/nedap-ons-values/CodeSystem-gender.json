@@ -7,13 +7,25 @@
   "status": "active",
   "experimental": true,
   "publisher": "Cadasto B.V. (FerroBRIDGE)",
-  "description": "The values of the gender field of an Ons API client, as the Nedap Ons source template reads them.",
+  "description": "The values of the gender of an Ons API client, `components/schemas/ons_administration.Gender` of the Ons API OpenAPI document (https://ons-api.nl/assets/openapi.json): M, F, X and U.",
   "caseSensitive": true,
   "content": "complete",
   "concept": [
-    {"code": "M", "display": "Man"},
-    {"code": "F", "display": "Vrouw"},
-    {"code": "X", "display": "Anders"},
-    {"code": "U", "display": "Onbekend"}
+    {
+      "code": "M",
+      "display": "Male"
+    },
+    {
+      "code": "F",
+      "display": "Female"
+    },
+    {
+      "code": "X",
+      "display": "Other"
+    },
+    {
+      "code": "U",
+      "display": "Unknown"
+    }
   ]
 }

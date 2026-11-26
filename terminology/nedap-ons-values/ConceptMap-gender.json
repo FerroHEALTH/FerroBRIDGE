@@ -7,7 +7,7 @@
   "status": "active",
   "experimental": true,
   "publisher": "Cadasto B.V. (FerroBRIDGE)",
-  "description": "Maps the gender of an Ons API client to the R4 administrative-gender the Nedap Ons template's map writes into Patient.gender.",
+  "description": "Maps the gender of an Ons API client (`components/schemas/ons_administration.Gender` of https://ons-api.nl/assets/openapi.json: M Male, F Female, X Other, U Unknown) to the R4 administrative-gender the Nedap Ons template's map writes into Patient.gender.",
   "sourceUri": "https://ferrobridge.eu/fhir/nedap-ons/CodeSystem/gender",
   "targetUri": "http://hl7.org/fhir/ValueSet/administrative-gender",
   "group": [
@@ -15,10 +15,42 @@
       "source": "https://ferrobridge.eu/fhir/nedap-ons/CodeSystem/gender",
       "target": "http://hl7.org/fhir/administrative-gender",
       "element": [
-        {"code": "M", "target": [{"code": "male", "equivalence": "equivalent"}]},
-        {"code": "F", "target": [{"code": "female", "equivalence": "equivalent"}]},
-        {"code": "X", "target": [{"code": "other", "equivalence": "equivalent"}]},
-        {"code": "U", "target": [{"code": "unknown", "equivalence": "equivalent"}]}
+        {
+          "code": "M",
+          "target": [
+            {
+              "code": "male",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "F",
+          "target": [
+            {
+              "code": "female",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "X",
+          "target": [
+            {
+              "code": "other",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "U",
+          "target": [
+            {
+              "code": "unknown",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
       ]
     }
   ]

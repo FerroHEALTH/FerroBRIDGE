@@ -17,6 +17,116 @@
         ]
       },
       {
+        "id": "Bsn.bsnDocumentType",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.bsnDocumentType",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.bsnIdVerifiedType",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.bsnIdVerifiedType",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.bsnSource",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.bsnSource",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.bsnUnknown",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.bsnUnknown",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.bsnVerifiedDate",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.bsnVerifiedDate",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.clientId",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.clientId",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.id",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.id",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.idNumber",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.idNumber",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.idType",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.idType",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.idValidUntil",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.idValidUntil",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
         "id": "Bsn.idVerified",
         "max": "1",
         "min": 0,
@@ -28,6 +138,28 @@
         ]
       },
       {
+        "id": "Bsn.idVerifiedDate",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.idVerifiedDate",
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.idVerifiedType",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.idVerifiedType",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
         "id": "Bsn.number",
         "max": "1",
         "min": 0,
@@ -35,6 +167,61 @@
         "type": [
           {
             "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.reasonBsnUnknown",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.reasonBsnUnknown",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.source",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.source",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.sourceVerified",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.sourceVerified",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.verifiedByEmployeeId",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.verifiedByEmployeeId",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.widVerified",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.widVerified",
+        "type": [
+          {
+            "code": "boolean"
           }
         ]
       }
