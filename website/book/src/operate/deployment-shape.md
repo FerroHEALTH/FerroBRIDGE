@@ -43,6 +43,24 @@ start and which stays apart from the CDM database
 else it holds is configuration: the loaded
 mapping files, the terminology server address, and the CDR address.
 
+## What it asks of PostgreSQL
+
+The state database and the CDM database each run PostgreSQL 19 or newer;
+the bridge reads `server_version_num` when it connects and refuses an older
+server. Each asks the following of the server, every other setting left at
+its default:
+
+| Server setting | What the bridge needs | Why |
+|---|---|---|
+| `max_connections` | at least the sum, over every replica, of `[state] max_connections`, plus three for the CDM clients of one ETL run, plus the server's reserved slots | a pool that cannot open a connection makes requests wait `acquire_timeout` and then answer unavailable (<https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-MAX-CONNECTIONS>) |
+| `ssl` | `on` with a certificate when the URL names `require`, `verify-ca` or `verify-full` | the clients never fall back to plaintext (<https://www.postgresql.org/docs/current/ssl-tcp.html>) |
+| `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout` | nothing set for the bridge's role that a session cannot override | the bridge sets the three per session from its configuration and refuses a server that does not hold them (<https://www.postgresql.org/docs/current/runtime-config-client.html>) |
+| a connection pooler | one that passes the `options` startup parameter through | the timeouts travel in that parameter, and a pooler that drops it makes the bridge refuse the server |
+
+Give the state role ownership of its database, which it migrates at start,
+and give the CDM role the rights `cdm init` needs on the two schemas of
+[`[cdm]`](configuration.md#cdm).
+
 ## What it asks of the CDR
 
 The FHIR side uses the composition and EHR endpoints:

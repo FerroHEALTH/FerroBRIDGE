@@ -8,6 +8,12 @@ eehrxf-discharge-mapped.0.Composition
 eehrxf-discharge-mapped.1.Patient
 eehrxf-discharge-mapped.3.Organization
 eehrxf-discharge-mapped.5.Condition
+eehrxf-discharge-myhealtheu-medication.0.Composition
+eehrxf-discharge-myhealtheu-medication.1.Patient
+eehrxf-discharge-myhealtheu-medication.2.Practitioner
+eehrxf-discharge-myhealtheu-medication.4.Condition
+eehrxf-discharge-myhealtheu-medication.5.Procedure
+eehrxf-discharge-myhealtheu-medication.6.MedicationRequest
 eehrxf-discharge-myhealtheu.0.Composition
 eehrxf-discharge-myhealtheu.1.Patient
 eehrxf-discharge-myhealtheu.2.Practitioner
@@ -70,4 +76,4 @@ eehrxf-test-report-ecg.4.Organization
 eehrxf-test-report-spirometry.1.DiagnosticReport
 eehrxf-test-report-spirometry.2.Patient
 eehrxf-test-report-spirometry.4.Organization
-total 74
+total 80

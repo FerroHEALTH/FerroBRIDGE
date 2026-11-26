@@ -41,7 +41,7 @@ time.
 | the composition's `context/start_time` and `context/end_time` | `encounter-eu-hdr`, its `period` |
 | each `EVALUATION.problem_diagnosis.v1` of the diagnostic summary | one `condition-eu-core` entry of `sectionDiagnosticSummary`: its `code`, `onset[x]`, `assertedDate` extension, `severity`, `abatement[x]` from the date of resolution, `verificationStatus` from the diagnostic certainty, `bodySite` and `note` |
 | each `ACTION.procedure.v1` of the significant procedures | one `procedure-eu-core` entry of `sectionSignificantProcedures`: its `status` from the careflow step, `code`, `performed[x]` from the action's time, `bodySite`, `reasonCode`, `outcome`, `complication` and `note` |
-| each `INSTRUCTION.medication_order.v3` of the discharge medications | one `medicationRequest-eu-core` entry of `sectionDischargeMedications`: its `medicationCodeableConcept`, one `dosageInstruction` holding the overall directions as `text`, the route as `route` and the order start as `timing.repeat.boundsPeriod.start`, and `note` |
+| each `INSTRUCTION.medication_order.v3` of the discharge medications | one `medicationRequest-eu-core` entry of `sectionDischargeMedications`: its `medicationCodeableConcept`, one `dosageInstruction` holding the overall directions as `text`, the route as `route` and the order start as `timing.repeat.boundsPeriod.start`, and `note`, with `authoredOn` from the composition's `context/end_time` and `requester` from its `composer` |
 
 The template records neither the status nor the class of the stay, and
 `encounter-eu-hdr` requires both. The mapping writes the status `finished`
@@ -51,8 +51,11 @@ finished hospital stay. A procedure commenced is `in-progress`, one
 completed `completed` and one aborted `stopped`, the three careflow steps of
 the CKM procedure action at which it was performed. An `INSTRUCTION` records
 no request status, so a discharge medication is `unknown` and an `order`, as
-in the MPD project. A section is written only when the composition holds an
-entry for it.
+in the MPD project. The orders are written with the report at the end of the
+stay, so each is authored at the context's end time by the composer. The
+MyHealth@EU form requires both (`medicationRequest-hdr-myhealtheu`, 1..1
+each) and refuses a report whose record gives neither. A section is written
+only when the composition holds an entry for it.
 
 The archetypes code a problem's severity locally (mild, moderate, severe),
 and R4 `Condition.severity` prefers SNOMED CT, so the local code is served

@@ -137,20 +137,77 @@ pub struct FhirSubscription {
 }
 
 /// One route of an MLLP source: the sender by MSH-3 and MSH-4, bound to the
-/// connection it may arrive on.
+/// connection it may arrive on by proofs that must all hold.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "RouteDocument")]
 pub struct Route {
     /// MSH-3, the sending application, as its namespace id.
     pub sending_application: String,
     /// MSH-4, the sending facility, as its namespace id.
     pub sending_facility: String,
-    /// The subject a TLS connection's client certificate names.
+    /// What the connection must prove: the subject its client certificate
+    /// names first, then the networks its peer lies in.
+    pub proofs: Vec<crate::inbound::verify::Verifier>,
+}
+
+impl Route {
+    /// Returns the subject a TLS connection's client certificate must name,
+    /// `None` when the route is bound to none.
+    #[must_use]
+    pub fn certificate_subject(&self) -> Option<&str> {
+        self.proofs.iter().find_map(|proof| match proof {
+            crate::inbound::verify::Verifier::Mtls(mtls) => {
+                mtls.subjects.first().map(String::as_str)
+            }
+            _ => None,
+        })
+    }
+
+    /// Returns the networks a connection's peer must lie in.
+    pub fn networks(&self) -> impl Iterator<Item = &ipnet::IpNet> {
+        self.proofs
+            .iter()
+            .filter_map(|proof| match proof {
+                crate::inbound::verify::Verifier::Network(network) => Some(&network.networks),
+                _ => None,
+            })
+            .flatten()
+    }
+}
+
+/// A route as its document writes it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RouteDocument {
+    sending_application: String,
+    sending_facility: String,
     #[serde(default)]
-    pub certificate_subject: Option<String>,
-    /// The networks a plain connection's peer lies in.
-    #[serde(default)]
-    pub source_cidrs: Vec<String>,
+    certificate_subject: Option<String>,
+    #[serde(default, deserialize_with = "crate::inbound::verify::networks")]
+    source_cidrs: Vec<ipnet::IpNet>,
+}
+
+impl From<RouteDocument> for Route {
+    fn from(document: RouteDocument) -> Self {
+        use crate::inbound::verify::{Mtls, Network, Verifier};
+
+        let subject = document
+            .certificate_subject
+            .filter(|subject| !subject.is_empty())
+            .map(|subject| {
+                Verifier::Mtls(Mtls {
+                    subjects: vec![subject],
+                })
+            });
+        let networks = (!document.source_cidrs.is_empty()).then_some(Verifier::Network(Network {
+            networks: document.source_cidrs,
+        }));
+        Self {
+            sending_application: document.sending_application,
+            sending_facility: document.sending_facility,
+            proofs: subject.into_iter().chain(networks).collect(),
+        }
+    }
 }
 
 /// What stands behind an MLLP sender.
@@ -453,6 +510,11 @@ impl Webhook {
                 }
                 false
             }
+            Verifier::Network(_) => {
+                return Err(Invalid(String::from(
+                    "a network verifier binds an MLLP route only",
+                )));
+            }
         };
         if needs_keys && self.keys.is_empty() {
             return Err(Invalid(String::from("keys names no key")));
@@ -526,8 +588,7 @@ fn tenants(tenants: &[Tenant]) -> Result<(), Invalid> {
 }
 
 /// Refuses an MLLP source without routes, a route without a sender, one bound
-/// to neither a certificate subject nor a network, a network that does not
-/// read, and a sender routed twice.
+/// to neither a certificate subject nor a network, and a sender routed twice.
 fn routes(routes: &[Route]) -> Result<(), Invalid> {
     if routes.is_empty() {
         return Err(Invalid(String::from(
@@ -541,21 +602,11 @@ fn routes(routes: &[Route]) -> Result<(), Invalid> {
                 "a route names its sending application and facility",
             )));
         }
-        if route
-            .certificate_subject
-            .as_deref()
-            .is_none_or(str::is_empty)
-            && route.source_cidrs.is_empty()
-        {
+        if route.proofs.is_empty() {
             return Err(Invalid(format!(
                 "the route {}^{} is bound to no certificate subject and no network",
                 route.sending_application, route.sending_facility
             )));
-        }
-        for network in &route.source_cidrs {
-            if cidr(network).is_none() {
-                return Err(Invalid(format!("{network} is no network in CIDR notation")));
-            }
         }
         if !seen.insert((
             route.sending_application.as_str(),

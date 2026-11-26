@@ -82,6 +82,9 @@ pub(super) struct ConnectionKeys<'a> {
     pub tls_ca_file: Option<&'a Path>,
 }
 
+/// The connection keys that refuse a value, and the error a refusal of one is.
+type Refusal = fn(String, omop_cdm::connection::ConnectionError) -> Error;
+
 impl ConnectionKeys<'_> {
     /// Returns the configured CA, read from `tls_ca` or `tls_ca_file`.
     ///
@@ -105,11 +108,46 @@ impl ConnectionKeys<'_> {
         }
     }
 
+    /// Returns the connection to `url` over the CA `ca`, every session
+    /// started with `session`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Bound`] for a pooled connection's lifetime or idle
+    /// time of `0s`, and `refusal` of the key whose value the connection
+    /// refuses.
+    pub(super) fn connection(
+        &self,
+        url: &str,
+        ca: Option<&[u8]>,
+        session: omop_cdm::connection::session::Session,
+        refusal: Refusal,
+    ) -> Result<omop_cdm::connection::CdmConnection, Error> {
+        for (name, value) in [
+            ("max_lifetime", session.max_lifetime),
+            ("idle_timeout", session.idle_timeout),
+        ] {
+            if value.is_zero() {
+                return Err(Error::Bound {
+                    key: format!("{}.{name}", self.section),
+                    value: 0,
+                    reason: "a pooled connection lives longer than no time",
+                });
+            }
+        }
+        omop_cdm::connection::CdmConnection::new(url, ca)
+            .and_then(|connection| connection.with_session(session))
+            .map_err(|source| refusal(self.refused(&source), source))
+    }
+
     /// Returns the key whose value `error` refuses: the CA's for a CA fault,
-    /// the URL's for every other.
+    /// the timeout's for a timeout fault, the URL's for every other.
     pub(super) fn refused(&self, error: &omop_cdm::connection::ConnectionError) -> String {
         use omop_cdm::connection::ConnectionError;
+        use omop_cdm::connection::session::SessionError;
         let key = match error {
+            ConnectionError::Session {
+                source: SessionError::TooLong { name },
+            } => name,
             ConnectionError::NoCertificate
             | ConnectionError::Pem { .. }
             | ConnectionError::Root { .. }

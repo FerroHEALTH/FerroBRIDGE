@@ -177,3 +177,72 @@ fn the_url_reaches_the_store_through_the_environment() -> Result<(), Box<dyn std
     assert!(settings.state.is_some());
     Ok(())
 }
+
+#[test]
+fn every_session_takes_the_state_defaults() -> Result<(), Box<dyn std::error::Error>> {
+    let state = resolve(&with_state(""))?
+        .state
+        .ok_or("the store is configured")?;
+    let session = state.connection.session();
+    assert_eq!(Duration::from_secs(30), session.statement_timeout);
+    assert_eq!(Duration::from_secs(5), session.lock_timeout);
+    assert_eq!(
+        Duration::from_secs(60),
+        session.idle_in_transaction_session_timeout
+    );
+    assert_eq!(100, session.statement_cache_capacity);
+    assert_eq!(Duration::from_mins(30), session.max_lifetime);
+    assert_eq!(Duration::from_mins(10), session.idle_timeout);
+    Ok(())
+}
+
+#[test]
+fn the_cdm_sessions_set_no_statement_timeout() -> Result<(), Box<dyn std::error::Error>> {
+    let cdm = resolve("[cdm]\nurl = \"postgres://bridge@db.invalid/cdm?sslmode=disable\"\n")?
+        .cdm
+        .ok_or("the CDM is configured")?;
+    let session = cdm.connection.session();
+    assert_eq!(Duration::ZERO, session.statement_timeout);
+    assert_eq!(Duration::from_secs(60), session.lock_timeout);
+    assert_eq!(
+        Duration::from_mins(10),
+        session.idle_in_transaction_session_timeout
+    );
+    Ok(())
+}
+
+#[test]
+fn a_configured_session_reaches_the_connection() -> Result<(), Box<dyn std::error::Error>> {
+    let state = resolve(&with_state(
+        "statement_timeout = \"2s\"\nlock_timeout = \"0s\"\nstatement_cache_capacity = 0\n",
+    ))?
+    .state
+    .ok_or("the store is configured")?;
+    let session = state.connection.session();
+    assert_eq!(Duration::from_secs(2), session.statement_timeout);
+    assert_eq!(Duration::ZERO, session.lock_timeout);
+    assert_eq!(0, session.statement_cache_capacity);
+    Ok(())
+}
+
+#[test]
+fn a_timeout_past_postgresqls_largest_or_a_zero_lifetime_is_refused_naming_it() {
+    assert!(matches!(
+        resolve(&with_state("lock_timeout = \"30d\"\n")),
+        Err(Error::StateConnection { key, .. }) if key == "state.lock_timeout"
+    ));
+    for name in ["max_lifetime", "idle_timeout"] {
+        assert!(matches!(
+            resolve(&with_state(&format!("{name} = \"0s\"\n"))),
+            Err(Error::Bound { key, .. }) if key == format!("state.{name}")
+        ));
+    }
+}
+
+#[test]
+fn a_url_that_carries_options_is_refused_naming_the_url() {
+    assert!(matches!(
+        resolve("[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable&options=-c%20lock_timeout%3D0\"\n"),
+        Err(Error::StateConnection { key, .. }) if key == "state.url"
+    ));
+}

@@ -280,15 +280,24 @@ async fn cdm_pool(
 ) -> anyhow::Result<omop_cdm::database::CdmPool> {
     use anyhow::Context;
 
-    omop_cdm::database::CdmPool::connect(
-        sqlx::postgres::PgPoolOptions::new().max_connections(1),
+    let session = cdm.connection.session();
+    let pool = omop_cdm::database::CdmPool::connect(
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .max_lifetime(session.max_lifetime)
+            .idle_timeout(session.idle_timeout),
         cdm.connection
             .pool_options()
             .context("preparing the connection to the CDM database")?,
         schema,
     )
     .await
-    .context("connecting to the CDM database")
+    .context("connecting to the CDM database")?;
+    session
+        .held_by(pool.pool())
+        .await
+        .context("reading the CDM database's session settings back")?;
+    Ok(pool)
 }
 
 /// Checks the OMOCL literals of `files` against the vocabulary of the `cdm`

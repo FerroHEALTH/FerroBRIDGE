@@ -83,8 +83,9 @@ four ways:
   write a patient summary or a laboratory report document and hold it to the
   profiles also write it to the directory `EEHRXF_EMIT_DIR` names, and so
   does the suite that maps a prescription and a dispensation to their MPD
-  resources. The CI `fhir-validator` job runs HL7's FHIR Validator over
-  every one of them, offline, against `hl7.fhir.eu.eps` 1.0.0-ballot,
+  resources. The server's suites that open the patient summary through a
+  SMART Health Link write it there too, in the CI `e2e (containers)` job. The
+  CI `fhir-validator` job runs HL7's FHIR Validator over every one of them, offline, against `hl7.fhir.eu.eps` 1.0.0-ballot,
   `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.eu.laboratory` 2.0.0,
   `hl7.fhir.eu.mpd` 1.0.0, the remaining-dispensations extension and the
   MyHealth@EU Master Value Sets Catalogue, with the jar and every package

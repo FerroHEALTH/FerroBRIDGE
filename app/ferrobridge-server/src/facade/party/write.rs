@@ -56,14 +56,18 @@ pub(crate) async fn create(
     resource_type: &str,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(call.headers, call.uri, Body::Present)?;
-    party::admit(call.access, Permission::Create, resource_type, None)?;
-    let client = call.facade.client_for(call.headers, call.access).await?;
+    crate::facade::handlers::guard(call.cx.headers, call.cx.uri, Body::Present)?;
+    party::admit(call.cx.access, Permission::Create, resource_type, None)?;
+    let client = call
+        .cx
+        .facade
+        .client_for(call.cx.headers, call.cx.access)
+        .await?;
     let (built, person) = prepared(call, &client, (resource_type, None), body).await?;
     let (demographic, class) = party::reach(&client, call.loaded)?;
-    let creation = commit(call.facade, call.loaded, Change::Creation)?;
-    let modification = commit(call.facade, call.loaded, Change::Modification)?;
-    let deletion = commit(call.facade, call.loaded, Change::Deleted)?;
+    let creation = commit(call.cx.facade, call.loaded, Change::Creation)?;
+    let modification = commit(call.cx.facade, call.loaded, Change::Modification)?;
+    let deletion = commit(call.cx.facade, call.loaded, Change::Deleted)?;
     let first = commit_party(demographic, class, &built, &creation, None).await?;
     let (built, version) = match relate(
         call.loaded,
@@ -82,7 +86,7 @@ pub(crate) async fn create(
     };
     let written = (&built, &version);
     respond(
-        call.facade,
+        call.cx.facade,
         call.loaded,
         resource_type,
         written,
@@ -108,8 +112,8 @@ pub(crate) async fn update(
     let (demographic, class) = opened.party()?;
     let uid = &opened.uid;
     let built = sourced(call.loaded, &built, uid.value())?;
-    let preceding = preceding(call.headers, &latest.version)?;
-    let commit = commit(call.facade, call.loaded, Change::Modification)?;
+    let preceding = preceding(call.cx.headers, &latest.version)?;
+    let commit = commit(call.cx.facade, call.loaded, Change::Modification)?;
     let version = commit_party(
         demographic,
         class,
@@ -120,7 +124,7 @@ pub(crate) async fn update(
     .await?;
     let written = (&built, &version);
     respond(
-        call.facade,
+        call.cx.facade,
         call.loaded,
         resource_type,
         written,
@@ -141,7 +145,7 @@ pub(crate) async fn delete(
         .await?;
     let latest = accepted(call, (resource_type, id), &opened).await?;
     let (demographic, class) = opened.party()?;
-    let commit = commit(call.facade, call.loaded, Change::Deleted)?;
+    let commit = commit(call.cx.facade, call.loaded, Change::Deleted)?;
     delete_version((demographic, class), &latest.version, &commit).await?;
     Ok(reply::minimal(StatusCode::NO_CONTENT, &[]))
 }
@@ -159,7 +163,7 @@ async fn accepted(
 ) -> Result<party::Held, Refusal> {
     let latest = opened.latest(resource_type).await?;
     party::accept(call.loaded, resource_type, id, &latest)?;
-    party::unbound(call.facade, resource_type, &latest.value)?;
+    party::unbound(call.cx.facade, resource_type, &latest.value)?;
     Ok(latest)
 }
 
@@ -206,11 +210,11 @@ async fn prepared(
     if let Some(id) = id {
         same_id(&inbound, id)?;
     }
-    let built = build(call.facade, call.loaded, inbound.document()).await?;
-    party::unbound(call.facade, resource_type, built.value())?;
+    let built = build(call.cx.facade, call.loaded, inbound.document()).await?;
+    party::unbound(call.cx.facade, resource_type, built.value())?;
     let person = party::provision::pseudonym(
-        call.facade,
-        (call.access, client),
+        call.cx.facade,
+        (call.cx.access, client),
         resource_type,
         inbound.document(),
     )

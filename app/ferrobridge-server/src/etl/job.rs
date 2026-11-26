@@ -47,6 +47,9 @@ pub enum JobError {
     /// The concept resolver could not connect to the CDM database.
     #[error("connecting the concept resolver to the CDM database")]
     Resolver(#[source] ConnectError),
+    /// The CDM database does not hold the concept resolver's session settings.
+    #[error("the CDM database does not hold the concept resolver's session settings")]
+    Session(#[source] omop_cdm::connection::session::SessionError),
     /// The writer could not connect to the CDM database.
     #[error("connecting the CDM writer")]
     Writer(#[source] WriteError),
@@ -277,14 +280,19 @@ async fn keep(
 /// # Errors
 ///
 /// Returns [`JobError::Connection`] and [`JobError::Resolver`] when the
-/// resolver's connection cannot be prepared or opened.
+/// resolver's connection cannot be prepared or opened, and
+/// [`JobError::Session`] when the database does not hold its session settings.
 pub(crate) async fn mapper(
     etl: &crate::config::EtlSettings,
     cdm: &crate::config::CdmSettings,
     set: omocl::model::load::MappingSet,
 ) -> Result<(OmoclMapper<CdmVocabulary>, CdmPool), JobError> {
+    let session = cdm.connection.session();
     let pool = CdmPool::connect(
-        sqlx::postgres::PgPoolOptions::new().max_connections(2),
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(2)
+            .max_lifetime(session.max_lifetime)
+            .idle_timeout(session.idle_timeout),
         cdm.connection
             .pool_options()
             .map_err(JobError::Connection)?,
@@ -292,6 +300,10 @@ pub(crate) async fn mapper(
     )
     .await
     .map_err(JobError::Resolver)?;
+    session
+        .held_by(pool.pool())
+        .await
+        .map_err(JobError::Session)?;
     let mapper = OmoclMapper::new(
         set,
         CdmVocabulary::new(ConceptResolver::new(pool.clone())),

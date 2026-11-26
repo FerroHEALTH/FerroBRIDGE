@@ -1,9 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The inbound engine's intake: what a source's request must prove, what its
-//! event says, where it is stored before the source is answered, and how the
-//! workers on every replica apply it.
+//! The inbound engine's intake, the one owner for every transport.
+//!
+//! It holds what a sender must prove (`verify`, for the HTTP intake and the
+//! HL7 v2 face alike), what its event says, where it is stored before the
+//! source is answered, and the one `Handler` the workers on every replica
+//! run.
 //!
 //! The workers apply every stored item through one handler,
 //! [`apply::Apply`], which feeds the identity source and ensures the

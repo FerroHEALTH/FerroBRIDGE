@@ -28,13 +28,13 @@
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
+use crate::facade::context::Context;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhirconnect::operations::issues;
 use fhirconnect::resolve::program::binding::TemplateId;
 use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 use http::header;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -84,18 +84,22 @@ pub(crate) fn ingest_for<'a>(
 
 /// `POST [base]/{type}`.
 pub(crate) async fn create(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    let inbound = crate::facade::handlers::inbound(facade, resource_type, (headers, uri), body)?;
-    let (program, client, resolved) =
-        prepared(facade, access, Permission::Create, &inbound, headers).await?;
+    let inbound =
+        crate::facade::handlers::inbound(cx.facade, resource_type, (cx.headers, cx.uri), body)?;
+    let (program, client, resolved) = prepared(
+        cx.facade,
+        cx.access,
+        Permission::Create,
+        &inbound,
+        cx.headers,
+    )
+    .await?;
     let program = &program;
-    let ingest = ingest_for(facade, access, client, &resolved);
+    let ingest = ingest_for(cx.facade, cx.access, client, &resolved);
     let claim = ingest.claim_resource(&inbound)?;
 
     match ingest
@@ -104,38 +108,50 @@ pub(crate) async fn create(
     {
         Recognised::Replayed(written) => {
             compartment::admit_ehr(
-                facade,
-                access,
+                cx.facade,
+                cx.access,
                 Permission::Create,
                 resource_type,
                 &written.ehr_id,
             )
             .await?;
-            return answer(facade, program, &written, headers, StatusCode::OK).await;
+            return answer(cx.facade, program, &written, cx.headers, StatusCode::OK).await;
         }
         Recognised::Revised(known) => {
             let ehr_id = known.ehr().map_err(|error| store_identifier(&error))?;
-            compartment::admit_ehr(facade, access, Permission::Create, resource_type, &ehr_id)
-                .await?;
+            compartment::admit_ehr(
+                cx.facade,
+                cx.access,
+                Permission::Create,
+                resource_type,
+                &ehr_id,
+            )
+            .await?;
             // NOTE: SMART App Launch 2.x scopes-and-launch-context maps `u` to update, and a
             // create that revises a known resource is an update in effect (our own design).
-            compartment::admit_ehr(facade, access, Permission::Update, resource_type, &ehr_id)
-                .await?;
-            let (internal, binding) = binding_of(facade, resource_type, &known).await?;
+            compartment::admit_ehr(
+                cx.facade,
+                cx.access,
+                Permission::Update,
+                resource_type,
+                &ehr_id,
+            )
+            .await?;
+            let (internal, binding) = binding_of(cx.facade, resource_type, &known).await?;
             return resend(
-                facade,
+                cx.facade,
                 &ingest,
                 program,
                 &inbound,
                 (&internal, &binding),
-                headers,
+                cx.headers,
             )
             .await;
         }
         Recognised::Unknown => {}
     }
     if let Some(answer) =
-        conditional::if_none_exist(facade, ingest.client(), resource_type, headers).await?
+        conditional::if_none_exist(cx.facade, ingest.client(), resource_type, cx.headers).await?
     {
         return Ok(answer);
     }
@@ -152,22 +168,19 @@ pub(crate) async fn create(
         ingest::Delivery::Committed => StatusCode::CREATED,
         ingest::Delivery::Reconciled | ingest::Delivery::Replayed => StatusCode::OK,
     };
-    answer(facade, program, &written, headers, status).await
+    answer(cx.facade, program, &written, cx.headers, status).await
 }
 
 /// `PUT [base]/{type}/{id}`.
 pub(crate) async fn update(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Present)?;
-    crate::facade::handlers::supported(facade, resource_type)?;
+    crate::facade::handlers::guard(cx.headers, cx.uri, Body::Present)?;
+    crate::facade::handlers::supported(cx.facade, resource_type)?;
     let internal = read::internal_id(id)?;
-    let binding = read::binding(facade, resource_type, &internal).await?.ok_or_else(|| {
+    let binding = read::binding(cx.facade, resource_type, &internal).await?.ok_or_else(|| {
         // NOTE: `updateCreate` is false in the CapabilityStatement, so a PUT
         // to an unknown id is a 404 rather than a create
         // (<https://hl7.org/fhir/R4/http.html#update>).
@@ -191,17 +204,23 @@ pub(crate) async fn update(
     }
     let inbound = read::parse(body, resource_type)?;
     same_id(&inbound, id)?;
-    let (program, client, resolved) =
-        prepared(facade, access, Permission::Update, &inbound, headers).await?;
+    let (program, client, resolved) = prepared(
+        cx.facade,
+        cx.access,
+        Permission::Update,
+        &inbound,
+        cx.headers,
+    )
+    .await?;
     let program = &program;
-    let ingest = ingest_for(facade, access, client, &resolved);
+    let ingest = ingest_for(cx.facade, cx.access, client, &resolved);
     resend(
-        facade,
+        cx.facade,
         &ingest,
         program,
         &inbound,
         (&internal, &binding),
-        headers,
+        cx.headers,
     )
     .await
 }
