@@ -17,6 +17,7 @@ use crate::crosswalk::EhnElement;
 use crate::crosswalk::Row;
 use crate::crosswalk::SHALL;
 use crate::crosswalk::SHOULD;
+use crate::crosswalk::ehn;
 use crate::crosswalk::uncontexted as row;
 
 /// The canonical URL of the HL7 Europe MPD `MedicationDispense` profile.
@@ -53,11 +54,6 @@ const EHN: &[EhnElement] = &[
     ehn("B.1.10", "Dispensation date"),
     ehn("B.1.11", "Substitution"),
 ];
-
-/// The catalogue entry `id`, `name`.
-const fn ehn(id: &'static str, name: &'static str) -> EhnElement {
-    EhnElement { id, name }
-}
 
 /// The rows, in the model's order.
 const ROWS: &[Row] = &[

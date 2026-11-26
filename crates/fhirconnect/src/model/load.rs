@@ -53,15 +53,7 @@ impl MappingSet {
     /// Returns a diagnostic naming both files when the name is already
     /// claimed.
     pub fn insert_model(&mut self, file: ModelMappingFile) -> Result<(), Box<Diagnostic>> {
-        let name = file.header().name().value().clone();
-        if let Some(first) = self.file_of(&name) {
-            return Err(Box::new(duplicate(
-                &name,
-                first,
-                file.file(),
-                file.header(),
-            )));
-        }
+        let name = self.unclaimed(file.file(), file.header())?;
         self.models.insert(name, file);
         Ok(())
     }
@@ -73,17 +65,22 @@ impl MappingSet {
     /// Returns a diagnostic naming both files when the name is already
     /// claimed.
     pub fn insert_context(&mut self, file: ContextMappingFile) -> Result<(), Box<Diagnostic>> {
-        let name = file.header().name().value().clone();
-        if let Some(first) = self.file_of(&name) {
-            return Err(Box::new(duplicate(
-                &name,
-                first,
-                file.file(),
-                file.header(),
-            )));
-        }
+        let name = self.unclaimed(file.file(), file.header())?;
         self.contexts.insert(name, file);
         Ok(())
+    }
+
+    /// Returns the name `header` declares, when no file of the set claims it.
+    fn unclaimed(
+        &self,
+        file: &Path,
+        header: &openehr_mapping_core::header::Header,
+    ) -> Result<MappingName, Box<Diagnostic>> {
+        let name = header.name().value().clone();
+        match self.file_of(&name) {
+            Some(first) => Err(Box::new(duplicate(&name, first, file, header))),
+            None => Ok(name),
+        }
     }
 
     /// Returns the model or extension mapping declaring `name`.

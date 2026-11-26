@@ -168,21 +168,7 @@ impl WebTemplateIndex {
                     .collect(),
             },
         )?;
-        let messages = openehr_sdt::rm_instance::validate_composition(&built, self.web_template());
-        if !messages.is_empty() {
-            return Err(PathError::InvalidComposition {
-                template_id: self.template_id().to_owned(),
-                messages: messages
-                    .iter()
-                    .map(|message| format!("{}: {}", message.path, message.message))
-                    .collect(),
-            });
-        }
-        Ok(CanonicalComposition {
-            value: built,
-            template_id: self.template_id().to_owned(),
-            generation: self.generation(),
-        })
+        self.accept(built)
     }
 
     /// Wraps canonical JSON a caller handed in, validated against this

@@ -329,19 +329,7 @@ pub fn defines(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
 /// knows the hierarchy.
 #[must_use]
 pub fn is_a(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
-    let mut current = Some(ty.name);
-    let mut hops = 0_u8;
-    while let Some(candidate) = current {
-        if candidate == name {
-            return true;
-        }
-        hops = hops.saturating_add(1);
-        if hops > 16 {
-            return false;
-        }
-        current = model.base(candidate);
-    }
-    false
+    descends(ty, name, |candidate| model.base(candidate))
 }
 
 /// Whether `ty` is `name` or a subclass of it for the `is` operator.
@@ -352,6 +340,18 @@ pub fn is_a(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
 /// `ofType()`.
 #[must_use]
 pub fn specializes(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
+    descends(ty, name, |candidate| {
+        if model.primitives().contains_key(candidate) {
+            model.primitive_base(candidate)
+        } else {
+            model.base(candidate)
+        }
+    })
+}
+
+/// Whether `name` is `ty` or one of the bases `base` names above it, within
+/// sixteen hops.
+fn descends(ty: &FhirType, name: &str, base: impl Fn(&str) -> Option<&'static str>) -> bool {
     let mut current = Some(ty.name);
     let mut hops = 0_u8;
     while let Some(candidate) = current {
@@ -362,11 +362,7 @@ pub fn specializes(model: &dyn Model, ty: &FhirType, name: &str) -> bool {
         if hops > 16 {
             return false;
         }
-        current = if model.primitives().contains_key(candidate) {
-            model.primitive_base(candidate)
-        } else {
-            model.base(candidate)
-        };
+        current = base(candidate);
     }
     false
 }
