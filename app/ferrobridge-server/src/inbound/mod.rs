@@ -5,6 +5,10 @@
 //! event says, where it is stored before the source is answered, and how the
 //! workers on every replica apply it.
 //!
+//! The workers apply every stored item through one handler,
+//! [`apply::Apply`], which feeds the identity source and ensures the
+//! patient's one EHR.
+//!
 //! Each step is driven by a source's document, so a new source is data and
 //! never code. No specification governs an inbound patient-event intake
 //! (ITS-REST 1.1.0 defines no change notification): our own design, built on
