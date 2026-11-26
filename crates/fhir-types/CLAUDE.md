@@ -11,8 +11,9 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
   fails on any difference.
 - The emission scope is per feature, over one emitted tree. `terminology` is
   the first declared root set (Bundle, CapabilityStatement, CodeSystem,
-  ConceptMap, OperationOutcome, Parameters, TerminologyCapabilities, ValueSet,
-  and the terminology OperationDefinitions); `resources` widens it to every
+  ConceptMap, NamingSystem, OperationOutcome, Parameters, Provenance,
+  TerminologyCapabilities, ValueSet, and the terminology
+  OperationDefinitions); `resources` widens it to every
   concrete `kind: resource` StructureDefinition of the package, in every
   enabled version, and `<version>-resources` widens one version alone (a
   resource-scope item carries `any(feature = "resources", feature =
@@ -23,7 +24,7 @@ to hand edits; the only hand-maintained files are `Cargo.toml` and this
 - The five version modules are behind `stu3`, `r4`, `r4b`, `r5` and `r6`; the
   default feature set is every version plus `terminology`, which is the
   surface the sibling terminology server consumes. STU3 has no
-  `TerminologyCapabilities`, so its terminology root set is the other seven,
+  `TerminologyCapabilities`, so its terminology root set is the other nine,
   and the terminology ecosystem overlay is not applied to it.
 - The operation contracts stay the terminology set.
 - `schema::SCHEMAS` is the one element table per version: the XML codec and the

@@ -391,6 +391,7 @@ fn the_resource_enum_covers_the_root_set() {
             "CapabilityStatement",
             "CodeSystem",
             "ConceptMap",
+            "NamingSystem",
             "OperationOutcome",
             "Parameters",
             "Provenance",

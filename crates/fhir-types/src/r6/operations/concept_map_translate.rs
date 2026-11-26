@@ -123,6 +123,12 @@ pub struct ConceptMapTranslateResponse {
     /// by no FHIR version. A code system version the translation drew on, one
     /// parameter per system.
     pub used_system: Vec<super::super::primitives::Uri>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. That a returned target code is not valid in its code
+    /// system, one parameter per such target; the match is still returned as
+    /// the map states it (IG 1.11.0, \`$translate\`, The result).
+    pub error: Vec<super::super::primitives::String>,
 }
 
 /// The parts of the `match` parameter.
@@ -163,6 +169,12 @@ pub struct ConceptMapTranslateResponseMatch {
     /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
     /// by no FHIR version. Whether the source element is explicitly not mapped.
     pub no_map: Option<super::super::primitives::Boolean>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. That the server does not know the target code
+    /// system, so the target code has not been validated (IG 1.11.0,
+    /// \`$translate\`, The result).
+    pub note: Option<super::super::primitives::String>,
 }
 
 /// The parts of the `property` parameter.
@@ -1230,6 +1242,7 @@ impl ConceptMapTranslateResponse {
         let mut field_match: Vec<ConceptMapTranslateResponseMatch> = Vec::new();
         let mut field_used_conceptmap: Vec<super::super::primitives::Uri> = Vec::new();
         let mut field_used_system: Vec<super::super::primitives::Uri> = Vec::new();
+        let mut field_error: Vec<super::super::primitives::String> = Vec::new();
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -1427,6 +1440,51 @@ impl ConceptMapTranslateResponse {
                         }
                     });
                 }
+                "error" => {
+                    field_error.push(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::String(value)) => {
+                            value.clone()
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Code(value)) => {
+                            super::super::primitives::String {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Id(value)) => {
+                            super::super::primitives::String {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Markdown(
+                            value,
+                        )) => super::super::primitives::String {
+                            id: value.id.clone(),
+                            extension: value.extension.clone(),
+                            value: value.value.clone(),
+                        },
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "error",
+                                    expected: "String",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "error",
+                                },
+                            );
+                        }
+                    });
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -1448,12 +1506,13 @@ impl ConceptMapTranslateResponse {
             r#match: field_match,
             used_conceptmap: field_used_conceptmap,
             used_system: field_used_system,
+            error: field_error,
         })
     }
     /// Writes the fields as a parameter list, by move.
     #[must_use]
     pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
-        let mut out = Vec::with_capacity(5);
+        let mut out = Vec::with_capacity(6);
         {
             let value = self.result;
             out.push(super::super::parameters::ParametersParameter {
@@ -1498,6 +1557,15 @@ impl ConceptMapTranslateResponse {
                 ..Default::default()
             });
         }
+        for value in self.error {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "error".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::String(
+                    value,
+                )),
+                ..Default::default()
+            });
+        }
         out
     }
     /// Writes the fields as a parameter list, from a reference.
@@ -1528,6 +1596,7 @@ impl ConceptMapTranslateResponseMatch {
         let mut field_source_comment: Option<super::super::primitives::String> = None;
         let mut field_target_comment: Option<super::super::primitives::String> = None;
         let mut field_no_map: Option<super::super::primitives::Boolean> = None;
+        let mut field_note: Option<super::super::primitives::String> = None;
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -1822,6 +1891,57 @@ impl ConceptMapTranslateResponseMatch {
                         }
                     });
                 }
+                "note" => {
+                    if field_note.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "match.note",
+                        });
+                    }
+                    field_note = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::String(value)) => {
+                            value.clone()
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Code(value)) => {
+                            super::super::primitives::String {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Id(value)) => {
+                            super::super::primitives::String {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Markdown(
+                            value,
+                        )) => super::super::primitives::String {
+                            id: value.id.clone(),
+                            extension: value.extension.clone(),
+                            value: value.value.clone(),
+                        },
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "match.note",
+                                    expected: "String",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "match.note",
+                                },
+                            );
+                        }
+                    });
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -1843,12 +1963,13 @@ impl ConceptMapTranslateResponseMatch {
             source_comment: field_source_comment,
             target_comment: field_target_comment,
             no_map: field_no_map,
+            note: field_note,
         })
     }
     /// Writes the fields as a parameter list, by move.
     #[must_use]
     pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
-        let mut out = Vec::with_capacity(10);
+        let mut out = Vec::with_capacity(11);
         if let Some(value) = self.relationship {
             out.push(super::super::parameters::ParametersParameter {
                 name: "relationship".into(),
@@ -1926,6 +2047,15 @@ impl ConceptMapTranslateResponseMatch {
             out.push(super::super::parameters::ParametersParameter {
                 name: "noMap".into(),
                 value: Some(super::super::parameters::ParametersParameterValue::Boolean(
+                    value,
+                )),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.note {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "note".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::String(
                     value,
                 )),
                 ..Default::default()
@@ -2815,6 +2945,18 @@ pub const CONCEPT_MAP_TRANSLATE: super::super::super::operation::Operation =
                         source: super::super::super::operation::ParameterSource::Ecosystem,
                         parts: &[],
                     },
+                    super::super::super::operation::Parameter {
+                        name: "note",
+                        usage: super::super::super::operation::ParameterUse::Out,
+                        cardinality: super::super::super::operation::Cardinality {
+                            min: 0,
+                            max: Some(1),
+                        },
+                        type_code: Some("string"),
+                        scope: &[],
+                        source: super::super::super::operation::ParameterSource::Ecosystem,
+                        parts: &[],
+                    },
                 ],
             },
             super::super::super::operation::Parameter {
@@ -2831,6 +2973,15 @@ pub const CONCEPT_MAP_TRANSLATE: super::super::super::operation::Operation =
                 usage: super::super::super::operation::ParameterUse::Out,
                 cardinality: super::super::super::operation::Cardinality { min: 0, max: None },
                 type_code: Some("uri"),
+                scope: &[],
+                source: super::super::super::operation::ParameterSource::Ecosystem,
+                parts: &[],
+            },
+            super::super::super::operation::Parameter {
+                name: "error",
+                usage: super::super::super::operation::ParameterUse::Out,
+                cardinality: super::super::super::operation::Cardinality { min: 0, max: None },
+                type_code: Some("string"),
                 scope: &[],
                 source: super::super::super::operation::ParameterSource::Ecosystem,
                 parts: &[],

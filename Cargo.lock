@@ -1507,14 +1507,14 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.40.0"
+version = "0.41.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
  "ferrobridge-term",
  "ferrobridge-testkit",
  "ferrobridge-validator",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "fhirconnect",
  "flate2",
  "http",
@@ -1692,7 +1692,7 @@ dependencies = [
  "ferrohealth-smart",
  "ferrohealth-telemetry",
  "ferrohealth-ui",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "fluent-templates",
  "http",
  "jsonwebtoken",
@@ -1713,12 +1713,12 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.23.1",
  "chumsky",
  "ferrobridge-testkit",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "jiff",
  "logos",
  "quick-xml",
@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.35.0"
+version = "0.36.0"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1740,7 +1740,7 @@ dependencies = [
  "ferrobridge-term",
  "ferrobridge-testkit",
  "ferrobridge-validator",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "fhirconnect",
  "hl7v2-types",
  "insta",
@@ -1796,7 +1796,7 @@ dependencies = [
  "ferrohealth-telemetry",
  "ferrohealth-usage-report",
  "fhir-search",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "fhirconnect",
  "futures-core",
  "futures-util",
@@ -1848,14 +1848,14 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "async-trait",
  "backon",
  "ferrobridge-testkit",
  "ferrohealth-config",
  "ferrohealth-smart",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "http",
  "rcgen",
  "reqwest",
@@ -1882,7 +1882,7 @@ dependencies = [
  "ferrobridge-operator-api",
  "ferrobridge-server",
  "ferrohealth-ui",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "jiff",
  "jsonwebtoken",
  "omop-cdm",
@@ -1911,12 +1911,12 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
  "ferrobridge-testkit",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "flate2",
  "http",
  "regex",
@@ -2135,7 +2135,7 @@ version = "0.0.29"
 dependencies = [
  "anyhow",
  "clap",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "generated-tree",
  "hl7v2-types",
  "insta",
@@ -2171,7 +2171,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "quick-xml",
  "regex",
@@ -2181,11 +2181,11 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
- "fhir-types 0.2.0",
+ "fhir-types 0.3.0",
  "insta",
  "jsonschema",
  "openehr-adl",
