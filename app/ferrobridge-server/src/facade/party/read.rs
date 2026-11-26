@@ -25,21 +25,38 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
 use crate::facade::party::Call;
+use crate::facade::party::Opened;
 use crate::facade::programs::Loaded;
 use crate::facade::reply;
 use crate::facade::reply::Header;
 use crate::facade::reply::Refusal;
 
-/// `GET [base]/{type}/{id}` of a party type.
-pub(crate) async fn read(
+/// What a `GET` on one party instance answers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Get {
+    /// `GET [base]/{type}/{id}`: the latest version.
+    Latest,
+    /// `GET [base]/{type}/{id}/_history`: a `history` Bundle, newest version
+    /// first.
+    History,
+}
+
+/// `GET` on one instance of a party type: its latest version or its history.
+pub(crate) async fn get(
     call: Call<'_>,
     (resource_type, id): (&str, &str),
+    get: Get,
 ) -> Result<axum::response::Response, Refusal> {
     let opened = call
         .open(Permission::Read, (resource_type, id), Body::Absent)
         .await?;
-    let held = opened.latest(resource_type).await?;
-    answer(call.facade, call.loaded, (resource_type, id), &held).await
+    match get {
+        Get::Latest => {
+            let held = opened.latest(resource_type).await?;
+            answer(call.cx.facade, call.loaded, (resource_type, id), &held).await
+        }
+        Get::History => history(call, &opened, (resource_type, id)).await,
+    }
 }
 
 /// `GET [base]/{type}/{id}/_history/{vid}` of a party type.
@@ -60,18 +77,15 @@ pub(crate) async fn vread(
         &tree,
     );
     let held = party::get(demographic, class, resource_type, version.value()).await?;
-    answer(call.facade, call.loaded, (resource_type, id), &held).await
+    answer(call.cx.facade, call.loaded, (resource_type, id), &held).await
 }
 
-/// `GET [base]/{type}/{id}/_history` of a party type: a `history` Bundle,
-/// newest version first.
-pub(crate) async fn history(
+/// The `history` Bundle of the `opened` party, newest version first.
+async fn history(
     call: Call<'_>,
+    opened: &Opened,
     (resource_type, id): (&str, &str),
 ) -> Result<axum::response::Response, Refusal> {
-    let opened = call
-        .open(Permission::Read, (resource_type, id), Body::Absent)
-        .await?;
     let (demographic, class) = opened.party()?;
     let Answered { outcome, upstream } = demographic
         .revision_history(opened.uid.value())
@@ -84,9 +98,19 @@ pub(crate) async fn history(
     for item in body.items.iter().rev() {
         let held = party::get(demographic, class, resource_type, item.version_id.value()).await?;
         let accepted = party::accept(call.loaded, resource_type, id, &held)?;
-        let resource =
-            party::render(call.facade.renders(), call.loaded, &accepted, &held.version).await?;
-        entries.push(entry(call.facade, resource_type, &held.version, resource));
+        let resource = party::render(
+            call.cx.facade.renders(),
+            call.loaded,
+            &accepted,
+            &held.version,
+        )
+        .await?;
+        entries.push(entry(
+            call.cx.facade,
+            resource_type,
+            &held.version,
+            resource,
+        ));
     }
     let mut bundle = Object::new();
     bundle.insert(

@@ -27,13 +27,12 @@ use fhir_types::r4::bundle::BundleEntry;
 use fhir_types::r4::bundle::BundleEntryResponse;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::operations::issues;
-use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 
 use crate::facade::Facade;
 use crate::facade::commit::Change;
 use crate::facade::compartment;
+use crate::facade::context::Context;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::read;
 use crate::facade::ingest::Committed;
@@ -58,13 +57,10 @@ const RESPONSE: &str = "transaction-response";
 
 /// `POST [base]`.
 pub(crate) async fn transaction(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    uri: &Uri,
+    cx: Context<'_>,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Present)?;
+    crate::facade::handlers::guard(cx.headers, cx.uri, Body::Present)?;
     let bundle = read::parse(body, "Bundle")?;
     let kind = bundle
         .document()
@@ -73,9 +69,9 @@ pub(crate) async fn transaction(
         .unwrap_or_default();
     if kind == BATCH {
         return Box::pin(super::batch::batch(
-            facade,
-            access,
-            headers,
+            cx.facade,
+            cx.access,
+            cx.headers,
             bundle.document(),
         ))
         .await;
@@ -90,22 +86,23 @@ pub(crate) async fn transaction(
                 .at("Bundle.type"),
         ));
     }
-    let client = facade.client_for(headers, access).await?;
-    admit_entries(facade, access, &client, bundle.document()).await?;
+    let client = cx.facade.client_for(cx.headers, cx.access).await?;
+    admit_entries(cx.facade, cx.access, &client, bundle.document()).await?;
     let resolved =
-        crate::facade::references::resolve_bundle(facade, &client, bundle.document()).await;
+        crate::facade::references::resolve_bundle(cx.facade, &client, bundle.document()).await;
     let bundled = fhirconnect::engine::seam::BundleReferences::new(
         crate::facade::references::entries_of(bundle.document()),
         &resolved,
     );
-    let ingested = crate::facade::handlers::write::ingest_for(facade, access, client, &bundled)
-        .ingest_bundle(
-            bundle.document(),
-            UnmappedEntries::Refuse,
-            &Provenance::EachResource,
-        )
-        .await?;
-    let response = response_bundle(&facade.settings().base_url, &ingested);
+    let ingested =
+        crate::facade::handlers::write::ingest_for(cx.facade, cx.access, client, &bundled)
+            .ingest_bundle(
+                bundle.document(),
+                UnmappedEntries::Refuse,
+                &Provenance::EachResource,
+            )
+            .await?;
+    let response = response_bundle(&cx.facade.settings().base_url, &ingested);
     let body = response.to_json().map_err(|error| {
         reply::refusal(
             StatusCode::INTERNAL_SERVER_ERROR,
