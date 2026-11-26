@@ -14,11 +14,11 @@ use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::Settings;
-use ferrobridge_server::facade::ehr::Policy;
-use ferrobridge_server::facade::identity::store::MemoryStore;
-use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::programs;
 use ferrobridge_server::facade::search;
+use ferrobridge_server::identity::ehr::Policy;
+use ferrobridge_server::identity::store::MemoryStore;
+use ferrobridge_server::identity::store::Store;
 use ferrobridge_server::state::AppState;
 use ferrobridge_testkit::containers;
 use ferrobridge_testkit::fixtures;
@@ -174,7 +174,7 @@ async fn a_crossed_code_and_system_pair_matches_no_composition_on_a_real_cdr()
     )
     .await?;
     assert_eq!(StatusCode::CREATED, status, "{created}");
-    let id = ferrobridge_server::facade::identity::FhirResourceId::new(
+    let id = ferrobridge_server::identity::FhirResourceId::new(
         created["id"].as_str().ok_or("the create carries an id")?,
     )?;
     let binding = memory

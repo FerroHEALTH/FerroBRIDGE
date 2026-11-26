@@ -47,9 +47,6 @@ use crate::facade::handlers::search::total::Accuracy;
 use crate::facade::handlers::search::total::count_all;
 use crate::facade::handlers::search::total::total_of;
 use crate::facade::handlers::write;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::PersonId;
-use crate::facade::identity::record::CompositionBinding;
 use crate::facade::ingest::Refused;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -73,6 +70,9 @@ use crate::facade::search::cursor::Position;
 use crate::facade::search::plan;
 use crate::facade::search::plan::Resolved;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::PersonId;
+use crate::identity::record::CompositionBinding;
 use crate::terminology::Session;
 
 /// `GET [base]/{type}?…`.
@@ -340,7 +340,7 @@ fn start_of(
 /// governs the mapping from a compartment to an EHR: our own design).
 pub(crate) async fn compartment_ehrs(
     facade: &Facade,
-    patients: &crate::facade::subject::Patients<'_>,
+    patients: &crate::facade::patients::Patients<'_>,
     patient: &str,
 ) -> Result<Vec<EhrId>, Refusal> {
     let Some(person) = patients.known_person(patient).await? else {
@@ -361,7 +361,7 @@ pub(crate) async fn compartment_ehrs(
 /// plan reads as a declaration that matches nothing.
 async fn resolve(
     facade: &Facade,
-    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
+    (client, patients): (&CdrClient, &crate::facade::patients::Patients<'_>),
     resource_type: &str,
     criteria: &Criteria,
 ) -> Result<Resolved, Refusal> {
@@ -373,8 +373,8 @@ async fn resolve(
                 Subject::Literal(ref reference) => {
                     // NOTE: no specification governs this: our own design, a reference that
                     // names no person matches none.
-                    let Ok(crate::facade::subject::Subject::Patient(id)) =
-                        crate::facade::subject::patient_of_reference(reference)
+                    let Ok(crate::identity::subject::Subject::Patient(id)) =
+                        crate::identity::subject::patient_of_reference(reference)
                     else {
                         continue;
                     };
@@ -403,7 +403,7 @@ async fn resolve(
                     let Ok(person) = PersonId::new(system, value) else {
                         continue;
                     };
-                    if crate::facade::subject::reference_of(
+                    if crate::facade::patients::reference_of(
                         &facade.settings().subject,
                         facade.store(),
                         &facade.programs(),

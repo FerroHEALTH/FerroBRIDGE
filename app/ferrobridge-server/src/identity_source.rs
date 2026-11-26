@@ -23,7 +23,7 @@ use ihe_iti::pixm::source::PixmSourceClient;
 use ihe_iti::pixm::source::error::SourceError as FeedError;
 use secrecy::{ExposeSecret, SecretString};
 
-use crate::facade::identity::PersonId;
+use crate::identity::PersonId;
 
 /// The identity source, resolved from `[identity_source]`.
 #[derive(Clone)]
@@ -99,7 +99,7 @@ pub enum PseudonymError {
     Upstream(#[source] Box<PixmError>),
     /// The pseudonym cannot be an EHR subject.
     #[error("the pseudonym cannot be an EHR subject")]
-    Subject(#[source] crate::facade::identity::IdError),
+    Subject(#[source] crate::identity::IdError),
 }
 
 impl PseudonymError {

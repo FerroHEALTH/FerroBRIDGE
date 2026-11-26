@@ -21,12 +21,12 @@ use http::StatusCode;
 
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
-use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::request::Inbound;
+use crate::identity::PersonId;
 
 /// Checks that `access` lets `permission` on `resource_type` reach the data
 /// of `person`, the subject the facade resolved, `None` when it resolved none.
@@ -72,7 +72,7 @@ pub async fn admit_person(
 /// subject that cannot be resolved.
 pub async fn admit_inbound(
     (facade, access): (&Facade, &Access),
-    patients: &crate::facade::subject::Patients<'_>,
+    patients: &crate::facade::patients::Patients<'_>,
     permission: Permission,
     inbound: &Inbound,
 ) -> Result<(), Refusal> {

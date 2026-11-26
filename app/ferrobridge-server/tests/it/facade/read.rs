@@ -5,7 +5,7 @@
 //! absent and deleted cases.
 
 use axum::body::Body;
-use ferrobridge_server::facade::identity::store::Store;
+use ferrobridge_server::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use std::error::Error;
@@ -88,13 +88,13 @@ async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
     // A read never answers an instance R4 does not admit: without a person
     // bound to the EHR, Condition.subject (1..1) stays absent.
     let harness = harness().await;
-    let id = ferrobridge_server::facade::identity::FhirResourceId::new("unboundsubject")?;
+    let id = ferrobridge_server::identity::FhirResourceId::new("unboundsubject")?;
     harness
         .store
         .record_binding(
             "Condition",
             &id,
-            &ferrobridge_server::facade::identity::record::CompositionBinding {
+            &ferrobridge_server::identity::record::CompositionBinding {
                 ehr_id: String::from(EHR_ID),
                 versioned_object_uid: String::from(CONTAINER),
                 template_id: String::from("ferrobridge.diagnoses.v1"),
@@ -102,7 +102,7 @@ async fn a_read_whose_ehr_has_no_recorded_person_is_refused_naming_the_element()
                 entry_path: String::from("/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]"),
                 split: 0,
                 context: String::from("ferrobridge_facade.context"),
-                derivation: Some(ferrobridge_server::facade::identity::derive::DERIVATION),
+                derivation: Some(ferrobridge_server::identity::derive::DERIVATION),
                 created: None,
             },
         )
@@ -186,8 +186,8 @@ async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_t
     // A stored binding may hold a version container the openEHR BASE
     // HIER_OBJECT_ID grammar refuses; the read names the resource and the
     // field, and asks the CDR for nothing.
-    let store = ferrobridge_server::facade::identity::store::MemoryStore::default();
-    let binding: ferrobridge_server::facade::identity::record::CompositionBinding =
+    let store = ferrobridge_server::identity::store::MemoryStore::default();
+    let binding: ferrobridge_server::identity::record::CompositionBinding =
         serde_json::from_value(serde_json::json!({
             "ehr_id": EHR_ID,
             "versioned_object_uid": "not a uid",
@@ -202,7 +202,7 @@ async fn a_stored_container_the_uid_grammar_refuses_answers_a_typed_500_naming_t
     store
         .record_binding(
             "Condition",
-            &ferrobridge_server::facade::identity::FhirResourceId::new("badcontainer")?,
+            &ferrobridge_server::identity::FhirResourceId::new("badcontainer")?,
             &binding,
         )
         .await?;

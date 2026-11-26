@@ -18,21 +18,21 @@ use sqlx::Row as _;
 use sqlx::postgres::PgPool;
 
 use crate::cdr::ids::EhrId;
-use crate::facade::identity::ExternalResourceId;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::PersonId;
-use crate::facade::identity::derive::DERIVATION;
-use crate::facade::identity::record::CommittedSource;
-use crate::facade::identity::record::CompositionBinding;
-use crate::facade::identity::record::ConsumedSource;
-use crate::facade::identity::record::EhrSubject;
-use crate::facade::identity::record::Identifier;
-use crate::facade::identity::record::IdentifierQuery;
-use crate::facade::identity::record::SourceVersion;
-use crate::facade::identity::record::SystemMatch;
-use crate::facade::identity::store::Store;
-use crate::facade::identity::store::StoreError;
-use crate::facade::identity::store::identified_id;
+use crate::identity::ExternalResourceId;
+use crate::identity::FhirResourceId;
+use crate::identity::PersonId;
+use crate::identity::derive::DERIVATION;
+use crate::identity::record::CommittedSource;
+use crate::identity::record::CompositionBinding;
+use crate::identity::record::ConsumedSource;
+use crate::identity::record::EhrSubject;
+use crate::identity::record::Identifier;
+use crate::identity::record::IdentifierQuery;
+use crate::identity::record::SourceVersion;
+use crate::identity::record::SystemMatch;
+use crate::identity::store::Store;
+use crate::identity::store::StoreError;
+use crate::identity::store::identified_id;
 use crate::store::seal::{KeyId, SealKeys};
 
 /// The digest purpose of a person identifier.
@@ -571,12 +571,12 @@ mod tests {
 
     use super::{StateStore, version_slot};
     use crate::cdr::ids::EhrId;
-    use crate::facade::identity::record::{
+    use crate::identity::record::{
         CommittedSource, CompositionBinding, ConsumedSource, Identifier, IdentifierQuery,
         SourceVersion, SystemMatch,
     };
-    use crate::facade::identity::store::{Store as _, StoreError};
-    use crate::facade::identity::{ExternalResourceId, FhirResourceId, PersonId};
+    use crate::identity::store::{Store as _, StoreError};
+    use crate::identity::{ExternalResourceId, FhirResourceId, PersonId};
     use crate::store::seal::{KeyId, LookupKey, SealKeys, SealingKey};
 
     /// The base64 of 32 bytes of `A`, made for the tests.

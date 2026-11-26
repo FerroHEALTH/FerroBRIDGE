@@ -4,7 +4,7 @@
 //! A terminology server that fails while an inbound resource is mapped: the
 //! write answers the upstream row, never the caller's fault.
 
-use ferrobridge_server::facade::identity::store::MemoryStore;
+use ferrobridge_server::identity::store::MemoryStore;
 use ferrobridge_testkit::stubs::terminology;
 use http::StatusCode;
 use std::error::Error;

@@ -13,7 +13,6 @@
 //! paths, its values bound as AQL parameters.
 
 use crate::cdr::ids::EhrId;
-use crate::facade::identity::record::CompositionBinding;
 use crate::facade::search::Declared;
 use crate::facade::search::aql;
 use crate::facade::search::aql::Conditions;
@@ -24,6 +23,7 @@ use crate::facade::search::criteria::Filter;
 use crate::facade::search::criteria::Test;
 use crate::facade::search::declaration::Parameter;
 use crate::facade::search::declaration::ParameterType;
+use crate::identity::record::CompositionBinding;
 use fhir_search::date::DateValue;
 use fhir_search::prefix::Prefix;
 use fhir_search::token::{System, Token};
