@@ -1,0 +1,1 @@
+- The book is organised as tutorials, how-to guides, reference, explanation and compliance, with a landing page that sends integrators, mapping authors, operators and compliance readers to their first pages; the FHIR facade and OMOP ETL pages are split by task, and every published address stays.

@@ -129,7 +129,7 @@ essential functionalities and information about the security properties;"
     and audience, and every request then needs a valid SMART App Launch 2.x
     access token or the configured Basic credential of a person. A route under `/fhir` the guard does not
     classify is refused with `403`
-    ([the FHIR facade, security](../integrate/fhir-facade.md#security)).
+    ([the FHIR facade, security](../integrate/facade-security.md#security)).
   - The request log carries the matched route and never a body, and a query
     parameter value reaches it only when you name the parameter
     ([`[telemetry]`](../operate/configuration.md#telemetry)).
