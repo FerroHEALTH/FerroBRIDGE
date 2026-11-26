@@ -99,7 +99,7 @@ name: ferrobridge
 
 services:
   ferrobridge:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.29}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.30}
     container_name: ferrobridge
     restart: unless-stopped
     ports:
@@ -216,7 +216,7 @@ services:
   #
   #   docker compose --profile cdm run --rm cdm-init
   cdm-init:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.29}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.30}
     profiles: [cdm]
     command: ["cdm", "init"]
     restart: "no"
@@ -240,7 +240,7 @@ services:
   #   FERROBRIDGE_VOCAB_DIR=/srv/athena/2026-09 \
   #     docker compose --profile vocab run --rm vocab-load
   vocab-load:
-    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.29}
+    image: ghcr.io/ferrohealth/ferrobridge:${FERROBRIDGE_VERSION:-0.0.30}
     profiles: [vocab]
     command: ["vocab", "load", "/vocabulary", "--schema", "cdm"]
     restart: "no"
@@ -292,7 +292,7 @@ services:
   # turn on [operator] for the mapping files.
   # The image's own HEALTHCHECK runs the binary's `healthcheck` subcommand.
   console:
-    image: ghcr.io/ferrohealth/ferrobridge-console:${FERROBRIDGE_VERSION:-0.0.29}
+    image: ghcr.io/ferrohealth/ferrobridge-console:${FERROBRIDGE_VERSION:-0.0.30}
     profiles: [console]
     restart: unless-stopped
     depends_on:

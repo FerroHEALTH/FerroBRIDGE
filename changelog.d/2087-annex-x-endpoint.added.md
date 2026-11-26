@@ -1,1 +1,0 @@
-- `[facade.endpoint]` serves `Endpoint`, the draft EEHRxF Annex X group EHDSEndpoint, read-only from the configuration: the FHIR base as `Endpoint/fhir` and, under `dicomweb_wado_rs`, the DICOMweb WADO-RS service as `Endpoint/dicom-wado-rs`, with search by `_id`, `connection-type` and `status`.
