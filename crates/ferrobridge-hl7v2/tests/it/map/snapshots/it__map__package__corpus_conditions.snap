@@ -2,14 +2,13 @@
 source: crates/ferrobridge-hl7v2/tests/it/map/package.rs
 expression: "format!(\"computable: {computable}\\nrefused: {refused}\\nnarrative: {narrative}\\n\\\n             defective (no operand):\\n{}unsupported:\\n{}\",\nlist(&defective), list(&unsupported))"
 ---
-computable: 415
-refused: 44
+computable: 417
+refused: 42
 narrative: 210
 defective (no operand):
   2 IF IAM-15 VALUED AND NOT "SEL"
 unsupported:
   2 IF (OBX-2 EQUALS "SN"  AND OBX-5.1  EQUALS "<>"
-  2 IF CX.4 IN http://hl7.org/implement/standards/fhir/identifier-registry.html
   1 IF EVN-4 NOT "U"
   1 IF IN1-17 IS 'patient'
   1 IF IN1-17 IS NOT 'patient'

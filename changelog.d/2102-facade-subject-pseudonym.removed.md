@@ -1,0 +1,1 @@
+- `[facade] subject_namespace`, `subject_id_form` and `subject_type`, with the configured subject link: every EHR subject is the ITI-83 pseudonym in `[identity_source] pseudonym_domain`, a `PARTY_REF` of type `PERSON`. A configuration that still names one of the three keys refuses to start.

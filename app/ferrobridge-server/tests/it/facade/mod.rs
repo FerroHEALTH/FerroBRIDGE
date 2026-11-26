@@ -326,6 +326,7 @@ async fn facade_over(
     translator: Translator,
 ) -> (MockServer, Arc<Facade>) {
     let cdr = MockServer::start().await;
+    let facade_settings = support::served_identity(&cdr, facade_settings).await;
     Mock::given(matchers::method("GET"))
         .and(matchers::path(
             "/definition/template/adl1.4/ferrobridge.diagnose.v1",

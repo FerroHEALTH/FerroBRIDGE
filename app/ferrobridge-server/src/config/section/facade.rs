@@ -22,14 +22,6 @@ pub struct Facade {
     pub base_url: String,
     /// The EHR policy: `existing` or `create_on_first_write`.
     pub ehr_policy: String,
-    /// The namespace a literal subject reference is read in, the
-    /// `PARTY_REF.namespace` of `EHR_STATUS.subject`.
-    pub subject_namespace: String,
-    /// How the id of a literal subject reference is written:
-    /// `reference`, `logical_id` or `uuid`.
-    pub subject_id_form: String,
-    /// The `PARTY_REF.type` of the subject of an EHR the facade creates.
-    pub subject_type: String,
     /// The `Identifier.system` whose identifier a run that offers the subject of
     /// the EHR writes as `EHR_STATUS.subject.external_ref`; empty names none.
     pub ehr_status_identifier_system: String,
@@ -100,9 +92,6 @@ impl Default for Facade {
             enabled: false,
             base_url: String::from("http://127.0.0.1:8080/fhir"),
             ehr_policy: String::from("existing"),
-            subject_namespace: String::from("ferrobridge"),
-            subject_id_form: String::from("reference"),
-            subject_type: String::from("PERSON"),
             ehr_status_identifier_system: String::new(),
             system_id: String::from("FerroBRIDGE"),
             composition_language: String::new(),

@@ -90,3 +90,7 @@ pub const SUBSUMES: &str = "CodeSystem/$subsumes";
 /// The `CodeSystem` search by canonical URL that asks only for the count of
 /// matches (<https://hl7.org/fhir/R4/search.html#summary>).
 pub const CODE_SYSTEM_SEARCH: &str = "CodeSystem?_summary=count";
+
+/// The `NamingSystem` search for the identifier systems registered under a
+/// unique id (<https://hl7.org/fhir/R4/namingsystem.html#search>).
+pub const NAMING_SYSTEM_SEARCH: &str = "NamingSystem?kind=identifier";

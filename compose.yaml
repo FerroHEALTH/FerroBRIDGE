@@ -30,12 +30,19 @@
 # callers' tokens, or say the network is trusted. Each trusted server is a
 # named [auth.issuer.<name>] table naming its issuer, written in a configuration
 # file in the ./config directory beside this one, which FERROBRIDGE_CONFIG
-# names. Its audience is the facade's base_url unless the table sets one:
+# names. Its audience is the facade's base_url unless the table sets one. The
+# facade also needs the identity source (a PIXm Manager such as FerroPIX) that
+# holds each patient's pseudonym, the subject of every EHR:
 #
 #   mkdir -p config
 #   cat > config/ferrobridge.toml <<'TOML'
 #   [facade]
 #   base_url = "https://bridge.example.org/fhir"
+#
+#   [identity_source]
+#   endpoint.url = "https://pix.example.org/fhir"
+#   pseudonym_domain = "https://example.org/fhir/sid/pseudonym"
+#   source_domains = ["http://fhir.nl/fhir/NamingSystem/bsn"]
 #
 #   [auth.issuer.clinic]
 #   issuer = "https://auth.example.org/realms/clinic"

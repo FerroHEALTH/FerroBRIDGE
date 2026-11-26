@@ -61,7 +61,9 @@ async fn a_cdr_refusing_an_identified_party_answers_through_the_422_row_unchange
         .await
         .unwrap_or_default()
         .into_iter()
-        .find(|request| request.method == http::Method::POST)
+        .find(|request| {
+            request.method == http::Method::POST && request.url.path() != crate::support::PIX_PATH
+        })
         .map(|request| String::from_utf8_lossy(&request.body).into_owned())
         .ok_or("the composition reached the CDR")?;
     assert!(

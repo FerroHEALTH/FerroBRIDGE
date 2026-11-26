@@ -119,6 +119,7 @@ pub async fn segment(
     let mut run = run::Run::new(corpus, parsed);
     let root = run.single(index, resource_type)?;
     let translations = run.translate(translator).await?;
+    run.register(translator).await?;
     let (entries, outcomes) = run.resources();
     let mut resource = None;
     let mut created = Vec::new();

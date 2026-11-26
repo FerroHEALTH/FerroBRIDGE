@@ -12,9 +12,10 @@ expression: mapped.counts()
     "unknown-segment": 1,
     "unmapped-component": 2,
     "unmapped-field": 10,
+    "unregistered": 1,
     "unresolved-table": 1,
     "unsupported-assignment": 1,
-    "unsupported-condition": 4,
+    "unsupported-condition": 3,
     "unsupported-target": 1,
     "version-selected": 1,
 }

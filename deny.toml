@@ -98,6 +98,9 @@ exceptions = [
   # under the same licence.
   { allow = ["BUSL-1.1"], crate = "ehds-logging" },
   { allow = ["BUSL-1.1"], crate = "ihe-atna" },
+  # The FerroPIX IHE ITI crate is the identity source's PIXm Consumer and
+  # Patient Identity Source, the same Licensor's crate under the same licence.
+  { allow = ["BUSL-1.1"], crate = "ihe-iti" },
   { allow = ["BUSL-1.1"], crate = "openehr-mapping-core" },
   { allow = ["BUSL-1.1"], crate = "fhirconnect" },
   { allow = ["BUSL-1.1"], crate = "omocl" },

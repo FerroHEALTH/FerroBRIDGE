@@ -137,8 +137,13 @@ async fn referencing_over(fixtures: &str, policy: Policy) -> Harness {
         .expect("the template fetch answers");
     let compiled = programs::compile_set(&set, &templates).expect("the mapping set compiles");
     let store = Arc::new(MemoryStore::default());
-    let facade =
-        Facade::new(compiled, handle(&store), client(&cdr), settings()).with_references(policy);
+    let facade = Facade::new(
+        compiled,
+        handle(&store),
+        client(&cdr),
+        crate::support::served_identity(&cdr, settings()).await,
+    )
+    .with_references(policy);
     Harness {
         cdr,
         store,

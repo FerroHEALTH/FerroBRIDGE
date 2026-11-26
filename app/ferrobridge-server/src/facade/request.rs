@@ -13,65 +13,12 @@ use fhir_types::codec::Value;
 
 use crate::facade::identity::ExternalResourceId;
 use crate::facade::identity::IdError;
-use crate::facade::identity::PersonId;
-use crate::facade::subject::IdForm;
+use crate::facade::subject::Subject;
 use crate::facade::subject::SubjectError;
 use crate::facade::subject::SubjectLink;
 
 /// The resource type that is the subject of its own EHR.
 const PATIENT: &str = "Patient";
-
-/// Returns the person a Patient document names itself by: the first
-/// `identifier` with a `value`, in the namespace of its `system` or, when it
-/// carries none, `namespace`.
-///
-/// `None` when the document carries no identifier with a value.
-// NOTE: no specification governs this: our own design; the first identifier
-// in document order keys the person, as PID-3's first repetition does.
-pub(crate) fn person_by_identifier(
-    document: &Value,
-    namespace: &str,
-) -> Option<Result<PersonId, IdError>> {
-    let identifier = document
-        .get("identifier")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .find(|identifier| identifier.get("value").and_then(Value::as_str).is_some())?;
-    let value = identifier.get("value").and_then(Value::as_str)?;
-    let system = identifier
-        .get("system")
-        .and_then(Value::as_str)
-        .unwrap_or(namespace);
-    Some(PersonId::new(system, value))
-}
-
-/// Returns the person the Patient `document` is, as `link` keys a Patient.
-///
-/// Under [`IdForm::Reference`] a Patient keys its EHR by its first
-/// `identifier` with a value ([`person_by_identifier`]), `None` when it
-/// carries none. Under [`IdForm::LogicalId`] and [`IdForm::Uuid`] it keys its
-/// EHR by its logical id in the link's namespace, the id a `Patient/<id>`
-/// reference of another resource names, so the Patient and the resources
-/// about it find one EHR.
-// NOTE: BASE §5.4.14 leaves namespaces "not yet standardised"; no specification governs this:
-// our own design, a Patient keys its EHR the way the configured link keys a reference to it.
-pub(crate) fn patient_person(
-    document: &Value,
-    link: &SubjectLink,
-) -> Option<Result<PersonId, RequestError>> {
-    match link.form() {
-        IdForm::Reference => person_by_identifier(document, link.namespace())
-            .map(|person| person.map_err(|source| RequestError::Subject { source })),
-        form @ (IdForm::LogicalId | IdForm::Uuid) => {
-            let person = match document.get("id").and_then(Value::as_str) {
-                Some(id) => link.person_of_patient(id),
-                None => Err(SubjectError::NoPatientId { form }),
-            };
-            Some(person.map_err(|source| RequestError::Link { source }))
-        }
-    }
-}
 
 /// Why one inbound document is not a resource this facade can take.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -123,15 +70,8 @@ pub enum RequestError {
         "the resource names no subject; a clinical resource is written into the EHR of its subject"
     )]
     NoSubject,
-    /// The subject the resource names cannot be a person key.
-    #[error("the subject the resource names cannot be a person key")]
-    Subject {
-        /// What the identifier's constructor reported.
-        #[source]
-        source: IdError,
-    },
-    /// The literal subject reference does not fit the configured subject link.
-    #[error("the subject reference does not fit the configured subject link")]
+    /// The subject cannot be read as the identity source keys it.
+    #[error("the subject cannot be keyed by its pseudonym")]
     Link {
         /// What the link reported.
         #[source]
@@ -270,71 +210,84 @@ impl Inbound {
 
     /// Returns the subject the resource names.
     ///
-    /// The EHR one composition is written into is resolved by subject id and
-    /// namespace, the pair the ITS-REST EHR lookup takes
-    /// (`ehr-codegen.openapi.yaml`, `ehr_get_by_subject`). A
-    /// `subject.identifier` carries both halves; a literal
-    /// `subject.reference` is read through `link`, which gives the namespace a
-    /// deployment gives its own references and the form of the id. A `Patient` is the subject itself
-    /// and is keyed as `patient_person` keys it. No specification
-    /// fixes the mapping from a FHIR subject to an openEHR subject: our own
-    /// design.
+    /// A `subject.identifier` names an identifier whose pseudonym the
+    /// identity source holds; a literal `subject.reference` names a
+    /// `Patient` by its logical id; a `Patient` is the subject itself, by its
+    /// identifier in the first accepted domain. No specification fixes the
+    /// mapping from a FHIR subject to an openEHR subject: our own design.
     ///
     /// # Errors
     ///
     /// Returns [`RequestError::NoSubject`] when the resource names none and
-    /// [`RequestError::Subject`] when the value cannot be a person key, and
-    /// [`RequestError::Link`] when a literal reference does not fit `link`.
-    pub fn subject(&self, link: &SubjectLink) -> Result<PersonId, RequestError> {
-        let fallback = link.namespace();
+    /// [`RequestError::Link`] when what it names cannot be keyed.
+    pub fn subject(&self, link: &SubjectLink) -> Result<Subject, RequestError> {
+        let link_error = |source: SubjectError| RequestError::Link { source };
         let named = self
             .document
             .get("subject")
             .or_else(|| self.document.get("patient"));
         let Some(reference) = named else {
             if self.resource_type == PATIENT {
-                return patient_person(&self.document, link).ok_or(RequestError::NoSubject)?;
+                return link.patient(&self.document).map_err(link_error);
             }
             return Err(RequestError::NoSubject);
         };
         if let Some(identifier) = reference.get("identifier") {
-            let system = identifier
-                .get("system")
-                .and_then(Value::as_str)
-                .unwrap_or(fallback);
             let value = identifier
                 .get("value")
                 .and_then(Value::as_str)
                 .ok_or(RequestError::NoSubject)?;
-            return PersonId::new(system, value).map_err(|source| RequestError::Subject { source });
+            let system = identifier.get("system").and_then(Value::as_str);
+            return link.identified(system, value).map_err(link_error);
         }
         let literal = reference
             .get("reference")
             .and_then(Value::as_str)
             .ok_or(RequestError::NoSubject)?;
-        link.person_of_reference(literal)
-            .map_err(|source| RequestError::Link { source })
+        crate::facade::subject::patient_of_reference(literal).map_err(link_error)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Inbound, RequestError};
-    use crate::facade::subject::IdForm;
+    use crate::facade::subject::Subject;
     use crate::facade::subject::SubjectError;
     use crate::facade::subject::SubjectLink;
+    use crate::identity_source::SourceError;
+    use secrecy::ExposeSecret;
 
-    /// The namespace a literal reference falls back to.
-    const FALLBACK: &str = "http://example.org/fhir";
+    /// The first accepted source domain.
+    const MRN: &str = "http://example.org/mrn";
 
-    /// Returns the subject link in [`FALLBACK`] with the id form `form`.
-    fn link_in(form: IdForm) -> SubjectLink {
-        SubjectLink::new(FALLBACK, form, "PERSON").expect("a legal subject link")
+    /// The second accepted source domain.
+    const NATIONAL: &str = "urn:oid:2.999.2";
+
+    /// Returns the subject link accepting [`MRN`] before [`NATIONAL`], over
+    /// an identity source no case reaches.
+    fn link() -> SubjectLink {
+        let section = crate::config::section::identity_source::IdentitySource {
+            endpoint: ferrohealth_smart::config::endpoint::EndpointSection {
+                url: ferrohealth_secret::secret_url::SecretUrl::new("http://127.0.0.1:9/fhir"),
+                ..ferrohealth_smart::config::endpoint::EndpointSection::default()
+            },
+            pseudonym_domain: String::from("urn:oid:2.999.9"),
+            source_domains: vec![String::from(MRN), String::from(NATIONAL)],
+        };
+        SubjectLink::new(std::sync::Arc::new(
+            crate::config::identity_source::resolve(&section).expect("a legal identity source"),
+        ))
     }
 
-    /// Returns the subject link in [`FALLBACK`] with the reference form.
-    fn link() -> SubjectLink {
-        link_in(IdForm::Reference)
+    /// Returns the system and value of an identified subject.
+    fn identified(subject: &Subject) -> (String, String) {
+        let Subject::Identified(source) = subject else {
+            panic!("the subject is named by identifier: {subject:?}");
+        };
+        (
+            source.system().to_owned(),
+            source.value().expose_secret().to_owned(),
+        )
     }
 
     /// Returns the bytes of `value`.
@@ -400,17 +353,19 @@ mod tests {
 
     #[test]
     fn the_subject_reads_from_an_identifier_and_falls_back_to_a_reference() {
-        let identified = Inbound::read(
+        let named = Inbound::read(
             &body(&serde_json::json!({
                 "resourceType": "Condition",
-                "subject": { "identifier": { "system": "http://example.org/mrn", "value": "p-1" } }
+                "subject": { "identifier": { "system": MRN, "value": "p-1" } }
             })),
             "Condition",
         )
         .expect("the resource reads");
-        let subject = identified.subject(&link()).expect("a subject is named");
-        assert_eq!("http://example.org/mrn", subject.namespace());
-        assert_eq!("p-1", subject.id());
+        let subject = named.subject(&link()).expect("a subject is named");
+        assert_eq!(
+            (String::from(MRN), String::from("p-1")),
+            identified(&subject)
+        );
 
         let referenced = Inbound::read(
             &body(&serde_json::json!({
@@ -421,63 +376,96 @@ mod tests {
         )
         .expect("the resource reads");
         let subject = referenced.subject(&link()).expect("a subject is named");
-        assert_eq!(FALLBACK, subject.namespace());
-        assert_eq!("Patient/p-2", subject.id());
-    }
-
-    #[test]
-    fn a_literal_reference_is_read_in_the_configured_id_form() {
-        let referenced = Inbound::read(
-            &body(&serde_json::json!({
-                "resourceType": "Condition",
-                "subject": { "reference": "Patient/p-1" }
-            })),
-            "Condition",
-        )
-        .expect("a resource");
-        let subject = referenced
-            .subject(&link_in(IdForm::LogicalId))
-            .expect("a subject is named");
-        assert_eq!((FALLBACK, "p-1"), (subject.namespace(), subject.id()));
-        assert_eq!(
-            Err(RequestError::Link {
-                source: SubjectError::NotUuid
-            }),
-            referenced.subject(&link_in(IdForm::Uuid))
+        assert!(
+            matches!(subject, Subject::Patient(ref id) if id == "p-2"),
+            "{subject:?}"
         );
     }
 
     #[test]
-    fn a_patient_is_its_own_subject_by_its_first_identifier_with_a_value() {
+    fn an_identifier_outside_the_accepted_domains_names_no_subject() {
+        let named = Inbound::read(
+            &body(&serde_json::json!({
+                "resourceType": "Condition",
+                "subject": { "identifier": { "system": "http://example.org/other", "value": "p-1" } }
+            })),
+            "Condition",
+        )
+        .expect("the resource reads");
+        let error = named
+            .subject(&link())
+            .expect_err("the domain is not accepted");
+        assert!(
+            matches!(
+                error,
+                RequestError::Link {
+                    source: SubjectError::Source(SourceError::NotAccepted { .. })
+                }
+            ),
+            "{error:?}"
+        );
+        let text = ferrohealth_server::run::chain(&error);
+        assert!(text.contains("identity_source.source_domains"), "{text}");
+        assert!(!text.contains("p-1"), "{text}");
+    }
+
+    #[test]
+    fn a_reference_to_another_type_names_no_subject() {
+        let referenced = Inbound::read(
+            &body(&serde_json::json!({
+                "resourceType": "Condition",
+                "subject": { "reference": "Group/g-1" }
+            })),
+            "Condition",
+        )
+        .expect("a resource");
+        assert!(matches!(
+            referenced.subject(&link()),
+            Err(RequestError::Link {
+                source: SubjectError::NotPatient
+            })
+        ));
+    }
+
+    #[test]
+    fn a_patient_is_its_own_subject_by_the_first_accepted_domain_it_carries() {
         let patient = Inbound::read(
             &body(&serde_json::json!({
                 "resourceType": "Patient",
                 "identifier": [
                     { "system": "http://example.org/no-value" },
-                    { "system": "http://example.org/mrn", "value": "p-3" },
-                    { "value": "p-4" }
+                    { "system": "http://example.org/other", "value": "p-2" },
+                    { "system": NATIONAL, "value": "p-4" },
+                    { "system": MRN, "value": "p-3" }
                 ]
             })),
             "Patient",
         )
         .expect("the resource reads");
         let subject = patient.subject(&link()).expect("the Patient names itself");
-        assert_eq!("http://example.org/mrn", subject.namespace());
-        assert_eq!("p-3", subject.id());
+        assert_eq!(
+            (String::from(MRN), String::from("p-3")),
+            identified(&subject),
+            "the order of identity_source.source_domains chooses, not the document order"
+        );
+    }
 
+    #[test]
+    fn a_patient_identifier_without_a_system_is_refused() {
         let unsystemed = Inbound::read(
             &body(&serde_json::json!({
                 "resourceType": "Patient",
-                "identifier": [{ "value": "p-5" }]
+                "identifier": [{ "system": MRN, "value": "p-3" }, { "value": "p-5" }]
             })),
             "Patient",
         )
         .expect("the resource reads");
-        let subject = unsystemed
-            .subject(&link())
-            .expect("the Patient names itself");
-        assert_eq!(FALLBACK, subject.namespace());
-        assert_eq!("p-5", subject.id());
+        assert!(matches!(
+            unsystemed.subject(&link()),
+            Err(RequestError::Link {
+                source: SubjectError::Source(SourceError::NoSystem)
+            })
+        ));
     }
 
     #[test]
@@ -489,65 +477,27 @@ mod tests {
         .expect("the resource reads");
         assert!(matches!(
             patient.subject(&link()),
-            Err(RequestError::NoSubject)
+            Err(RequestError::Link {
+                source: SubjectError::Source(SourceError::NotAccepted { .. })
+            })
         ));
     }
 
-    /// A UUID invented for the tests.
-    const UUID: &str = "2f6c1a7e-3b4d-4e5f-9a0b-1c2d3e4f5a6b";
-
-    /// A Patient with the logical id `id`, when given, and one identifier.
-    fn identified_patient(id: Option<&str>) -> Inbound {
-        let mut document = serde_json::json!({
-            "resourceType": "Patient",
-            "identifier": [{ "system": "http://example.org/mrn", "value": "p-3" }]
-        });
-        if let Some(id) = id {
-            document["id"] = serde_json::json!(id);
-        }
-        Inbound::read(&body(&document), "Patient").expect("the resource reads")
-    }
-
     #[test]
-    fn under_an_owner_link_form_a_patient_is_its_own_subject_by_its_logical_id() {
-        let logical = identified_patient(Some("p-1"))
-            .subject(&link_in(IdForm::LogicalId))
-            .expect("the Patient names itself");
-        assert_eq!((FALLBACK, "p-1"), (logical.namespace(), logical.id()));
-        let uuid = identified_patient(Some(UUID))
-            .subject(&link_in(IdForm::Uuid))
-            .expect("the Patient names itself");
-        assert_eq!((FALLBACK, UUID), (uuid.namespace(), uuid.id()));
-        let reference = identified_patient(Some("p-1"))
-            .subject(&link())
-            .expect("the Patient names itself");
+    fn a_patient_logical_id_plays_no_part_in_its_subject() {
+        let patient = Inbound::read(
+            &body(&serde_json::json!({
+                "resourceType": "Patient",
+                "id": "p-1",
+                "identifier": [{ "system": MRN, "value": "p-3" }]
+            })),
+            "Patient",
+        )
+        .expect("the resource reads");
+        let subject = patient.subject(&link()).expect("the Patient names itself");
         assert_eq!(
-            ("http://example.org/mrn", "p-3"),
-            (reference.namespace(), reference.id()),
-            "the reference form keys the Patient by its identifier as before"
-        );
-    }
-
-    #[test]
-    fn under_an_owner_link_form_a_patient_without_a_logical_id_is_refused_naming_the_key() {
-        for form in [IdForm::LogicalId, IdForm::Uuid] {
-            let error = identified_patient(None)
-                .subject(&link_in(form))
-                .expect_err("the link cannot key the Patient");
-            assert_eq!(
-                RequestError::Link {
-                    source: SubjectError::NoPatientId { form }
-                },
-                error
-            );
-            let text = ferrohealth_server::run::chain(&error);
-            assert!(text.contains("facade.subject_id_form"), "{text}");
-        }
-        assert_eq!(
-            Err(RequestError::Link {
-                source: SubjectError::NotUuid
-            }),
-            identified_patient(Some("p-1")).subject(&link_in(IdForm::Uuid))
+            (String::from(MRN), String::from("p-3")),
+            identified(&subject)
         );
     }
 
