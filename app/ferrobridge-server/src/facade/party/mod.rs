@@ -38,9 +38,7 @@ use ferrohealth_smart::resource::Compartment;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
-use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_mapping_core::party::CanonicalParty;
@@ -51,6 +49,7 @@ use crate::cdr::CdrClient;
 use crate::cdr::demographic::Demographic;
 use crate::cdr::error::Upstream;
 use crate::facade::Facade;
+use crate::facade::context::Context;
 use crate::facade::handlers::Body;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
@@ -123,39 +122,21 @@ pub(crate) fn admit(
     }
 }
 
-/// The request one party interaction serves: the facade, the caller, the
-/// party program of the type and the request's headers and URL.
+/// The request one party interaction serves: its [`Context`] and the party
+/// program of the type.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Call<'a> {
-    /// The facade serving the request.
-    pub(crate) facade: &'a Facade,
-    /// What the layer admitted the caller with.
-    pub(crate) access: &'a Access,
+    /// The request.
+    pub(crate) cx: Context<'a>,
     /// The party program of the type.
     pub(crate) loaded: &'a Loaded,
-    /// The request's headers.
-    pub(crate) headers: &'a HeaderMap,
-    /// The request's URL.
-    pub(crate) uri: &'a Uri,
 }
 
 impl<'a> Call<'a> {
-    /// Returns the call of `facade` for the caller `access` on the party
-    /// program `loaded`, with the request's headers and URL.
+    /// Returns the call of the request `cx` on the party program `loaded`.
     #[must_use]
-    pub(crate) const fn new(
-        facade: &'a Facade,
-        access: &'a Access,
-        loaded: &'a Loaded,
-        (headers, uri): (&'a HeaderMap, &'a Uri),
-    ) -> Self {
-        Self {
-            facade,
-            access,
-            loaded,
-            headers,
-            uri,
-        }
+    pub(crate) const fn new(cx: Context<'a>, loaded: &'a Loaded) -> Self {
+        Self { cx, loaded }
     }
 
     /// Admits the call on the party `id` names and opens the party, the
@@ -182,7 +163,11 @@ impl<'a> Call<'a> {
     /// Returns the [`Refusal`] of the client, of a CDR with no Demographic
     /// API or of a program of no party class.
     pub(crate) async fn connect(&self, uid: HierObjectId) -> Result<Opened, Refusal> {
-        let client = self.facade.client_for(self.headers, self.access).await?;
+        let client = self
+            .cx
+            .facade
+            .client_for(self.cx.headers, self.cx.access)
+            .await?;
         let (_, class) = reach(&client, self.loaded)?;
         Ok(Opened { uid, client, class })
     }
@@ -200,8 +185,8 @@ impl<'a> Call<'a> {
         (resource_type, id): (&str, &str),
         body: Body,
     ) -> Result<HierObjectId, Refusal> {
-        crate::facade::handlers::guard(self.headers, self.uri, body)?;
-        admit(self.access, permission, resource_type, Some(id))?;
+        crate::facade::handlers::guard(self.cx.headers, self.cx.uri, body)?;
+        admit(self.cx.access, permission, resource_type, Some(id))?;
         party_id(resource_type, id)
     }
 }

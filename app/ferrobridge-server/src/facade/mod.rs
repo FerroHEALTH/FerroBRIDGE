@@ -23,6 +23,7 @@ pub mod capability;
 pub mod commit;
 pub mod compartment;
 pub mod consent;
+pub mod context;
 pub mod cors;
 pub mod document;
 pub mod edge;

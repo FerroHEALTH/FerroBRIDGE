@@ -32,7 +32,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axum::extract::Path;
-use axum::extract::State;
 use axum::response::Response;
 use eehrxf::crosswalk::patient_summary::EPS_COMPOSITION;
 use eehrxf::crosswalk::patient_summary::PATIENT_SUMMARY_TEMPLATE;
@@ -65,6 +64,8 @@ use crate::cdr::ids::EhrId;
 use crate::cdr::query::PageSize;
 use crate::facade::Facade;
 use crate::facade::compartment;
+use crate::facade::context::Context;
+use crate::facade::context::Entry;
 use crate::facade::ehr;
 use crate::facade::handlers::Body;
 use crate::facade::media;
@@ -185,39 +186,31 @@ impl Summary {
 }
 
 /// `GET [base]/{type}/{id}/$summary`.
-pub async fn route(
-    State(facade): State<Arc<Facade>>,
-    access: Access,
-    Path((resource_type, id)): Path<(String, String)>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> Response {
-    summarize(&facade, &access, (&resource_type, &id), &headers, &uri)
+pub async fn route(entry: Entry, Path((resource_type, id)): Path<(String, String)>) -> Response {
+    let cx = entry.context();
+    summarize(cx, (&resource_type, &id))
         .await
         .unwrap_or_else(Refusal::into_response)
 }
 
 /// The operation behind [`route`].
 async fn summarize(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
 ) -> Result<Response, Refusal> {
     if resource_type != PATIENT {
         return Err(unsupported(format!(
             "$summary is an operation of Patient, not of {resource_type}"
         )));
     }
-    if facade.summary().is_none() {
+    if cx.facade.summary().is_none() {
         return Err(unsupported(String::from(
             "this server serves no patient summary; GET /fhir/metadata names its operations",
         )));
     }
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    let requested = requested_of(uri)?;
-    let object = document(facade, access, id, headers, requested).await?;
+    crate::facade::handlers::guard(cx.headers, cx.uri, Body::Absent)?;
+    let requested = requested_of(cx.uri)?;
+    let object = document(cx.facade, cx.access, id, cx.headers, requested).await?;
     Ok(reply::resource(StatusCode::OK, &object, &[]))
 }
 

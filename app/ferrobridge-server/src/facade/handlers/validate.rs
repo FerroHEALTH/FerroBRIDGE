@@ -20,19 +20,17 @@
 //! that `build_composition` performs, and the strict RM read. The outcome says
 //! so in `issue.details`.
 
-use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhirconnect::engine::library::Library;
 use fhirconnect::engine::origin::SourceItem;
 use fhirconnect::operations::issues::of_warning;
-use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 use openehr_rm::v1_2::composition::composition::Composition;
 
 use crate::facade::Facade;
 use crate::facade::compartment;
+use crate::facade::context::Context;
 use crate::facade::ehr::Policy;
 use crate::facade::engine;
 use crate::facade::handlers::write;
@@ -46,25 +44,22 @@ use crate::terminology::Direction;
 /// What the outcome names as the validator that ran.
 const VALIDATOR: &str = "the FerroBRIDGE mapping engine, the Web Template validation of the composition build, and the strict openEHR RM reader; openEHR ITS-REST 1.1.0 documents no composition-validation route, and this dry run commits nothing";
 
-/// Who asks for a dry run: the caller's access and the operator scope, which
-/// admits it without a clinical write scope.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Admission<'a> {
-    /// What the layer admitted the caller with.
-    pub(crate) access: &'a Access,
-    /// The operator scope, when inbound authentication is on.
-    pub(crate) operator: Option<&'a str>,
-}
-
 /// `POST [base]/{type}/$validate`.
+///
+/// `operator` is the operator scope when inbound authentication is on, which
+/// admits the dry run without a clinical write scope.
 pub(crate) async fn validate(
-    facade: &Facade,
-    admission: Admission<'_>,
+    cx: Context<'_>,
+    operator: Option<&str>,
     resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<axum::response::Response, Refusal> {
+    let Context {
+        facade,
+        access,
+        headers,
+        uri,
+    } = cx;
     let inbound = crate::facade::handlers::inbound(facade, resource_type, (headers, uri), body)?;
     let program = &write::select_program(facade, &inbound, headers)?;
     let link = &facade.settings().subject;
@@ -81,14 +76,11 @@ pub(crate) async fn validate(
             ));
         }
     };
-    let access = admission.access;
     let client = facade.client_for(headers, access).await?;
     let person = facade.patients(&client, access).person(subject).await?;
     // NOTE: no specification governs this: our own design, a dry run commits
     // nothing, so the operator scope admits it like the guard does.
-    let mut admitted = admission
-        .operator
-        .is_some_and(|operator| access.has_scope(operator));
+    let mut admitted = operator.is_some_and(|operator| access.has_scope(operator));
     for permission in [Permission::Create, Permission::Update] {
         admitted = admitted
             || compartment::admit_person(facade, access, permission, resource_type, Some(&person))

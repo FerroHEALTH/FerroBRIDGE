@@ -37,6 +37,7 @@ use http::Uri;
 use http::header;
 
 use crate::facade::Facade;
+use crate::facade::context::Context;
 use crate::facade::guard;
 use crate::facade::guard::AuditedEntry;
 use crate::facade::guard::Interaction;
@@ -355,37 +356,13 @@ async fn run(
         })?,
         None => Vec::new(),
     };
+    let cx = Context::new(facade, access, (&entry_headers, &uri));
     match call {
-        Call::Read(resource_type, id) => {
-            super::read(facade, access, (resource_type, id), &entry_headers, &uri).await
-        }
-        Call::Vread(resource_type, id, vid) => {
-            super::vread(
-                facade,
-                access,
-                (resource_type, id, vid),
-                &entry_headers,
-                &uri,
-            )
-            .await
-        }
-        Call::Search(resource_type) => {
-            search::search_get(facade, access, resource_type, &entry_headers, &uri).await
-        }
-        Call::Create(resource_type) => {
-            write::create(facade, access, resource_type, &entry_headers, &uri, &body).await
-        }
-        Call::Update(resource_type, id) => {
-            super::update(
-                facade,
-                access,
-                (resource_type, id),
-                &entry_headers,
-                &uri,
-                &body,
-            )
-            .await
-        }
+        Call::Read(resource_type, id) => super::read(cx, (resource_type, id)).await,
+        Call::Vread(resource_type, id, vid) => super::vread(cx, (resource_type, id, vid)).await,
+        Call::Search(resource_type) => search::search_get(cx, resource_type).await,
+        Call::Create(resource_type) => write::create(cx, resource_type, &body).await,
+        Call::Update(resource_type, id) => super::update(cx, (resource_type, id), &body).await,
     }
 }
 

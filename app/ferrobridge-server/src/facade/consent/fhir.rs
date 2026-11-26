@@ -11,11 +11,9 @@
 //! force, one `Consent` each.
 
 use axum::body::Bytes;
-use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Object;
 use fhir_types::codec::Value;
-use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
 use http::header;
@@ -45,6 +43,7 @@ use crate::facade::consent::parse_id;
 use crate::facade::consent::scope_values;
 use crate::facade::consent::state;
 use crate::facade::consent::subject;
+use crate::facade::context::Context;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::write::refuse;
 use crate::facade::identity::FhirResourceId;
@@ -69,25 +68,20 @@ fn now() -> String {
 /// Returns the refusal of the media types, a `Consent` refused at a named
 /// element (`422`), a patient the caller may not reach, and every exchange
 /// failure through `facade::status::consent`.
-pub async fn create(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    body: &Bytes,
-) -> Result<axum::response::Response, Refusal> {
-    let settings = admit(facade, headers, &Uri::from_static("/"), Body::Present)?;
+pub async fn create(cx: Context<'_>, body: &Bytes) -> Result<axum::response::Response, Refusal> {
+    let settings = admit(cx.facade, cx.headers, &Uri::from_static("/"), Body::Present)?;
     let release = crate::facade::consent::release_of(
-        headers,
+        cx.headers,
         &header::CONTENT_TYPE,
         StatusCode::UNSUPPORTED_MEDIA_TYPE,
     )?;
     let document = crate::consent::fhir::read(release, body)
         .map_err(|why| refuse(&of_document_refusal(&why)))?;
-    let client = facade.client_for(headers, access).await?;
+    let client = cx.facade.client_for(cx.headers, cx.access).await?;
     let reached = subject(
-        facade,
+        cx.facade,
         &client,
-        access,
+        cx.access,
         Permission::Create,
         document
             .subject
@@ -95,10 +89,10 @@ pub async fn create(
             .and_then(|subject| subject.reference.as_deref()),
     )
     .await?;
-    let translated = exchange::operations(facade.translator().client(), &document)
+    let translated = exchange::operations(cx.facade.translator().client(), &document)
         .await
         .map_err(|error| refuse(&of_exchange_error(&error)))?;
-    let State { current, policy } = state(facade, &client, &reached.ehr, settings).await?;
+    let State { current, policy } = state(cx.facade, &client, &reached.ehr, settings).await?;
     let operations = |coding: &Code| {
         translated
             .iter()
@@ -116,16 +110,16 @@ pub async fn create(
     )
     .map_err(|why| refuse(&of_document_refusal(&why)))?;
     let Committed { added, ids } =
-        commit(facade, &client, &reached, &current, directives, settings).await?;
-    let base = facade.settings().base_url.trim_end_matches('/');
+        commit(cx.facade, &client, &reached, &current, directives, settings).await?;
+    let base = cx.facade.settings().base_url.trim_end_matches('/');
     let location = ids
         .first()
         .map(|id| reply::Header::location(&format!("{base}/{CONSENT}/{id}")));
     let headers_out: Vec<reply::Header> = location.into_iter().collect();
-    match (media::Prefer::of(headers), added.as_slice()) {
+    match (media::Prefer::of(cx.headers), added.as_slice()) {
         (media::Prefer::Minimal, _) => Ok(reply::minimal(StatusCode::CREATED, &headers_out)),
         (media::Prefer::Representation, [one]) => {
-            let context = export_context(facade, &reached.ehr, policy.as_ref(), now()).await?;
+            let context = export_context(cx.facade, &reached.ehr, policy.as_ref(), now()).await?;
             let body = render(release, one, &context, ids.first().map(String::as_str))?;
             Ok(answer(StatusCode::CREATED, release, &body, &headers_out))
         }
@@ -133,7 +127,7 @@ pub async fn create(
             StatusCode::CREATED,
             &[
                 Issue::information(IssueType::Informational).diagnosing(format!(
-                    "the Consent was committed as {} access directives: {}",
+                    "the Consent was committed as {} cx.access directives: {}",
                     ids.len(),
                     ids.iter()
                         .map(|id| format!("{CONSENT}/{id}"))
@@ -152,15 +146,13 @@ pub async fn create(
 /// Returns `404` for an id this facade never issued or a directive no longer
 /// in force, the `403` of a patient-scoped token for another patient, and
 /// the exchange failures.
-pub async fn read(
-    facade: &Facade,
-    access: &Access,
-    id: &str,
-    headers: &HeaderMap,
-) -> Result<axum::response::Response, Refusal> {
-    let settings = admit(facade, headers, &Uri::from_static("/"), Body::Absent)?;
-    let release =
-        crate::facade::consent::release_of(headers, &header::ACCEPT, StatusCode::NOT_ACCEPTABLE)?;
+pub async fn read(cx: Context<'_>, id: &str) -> Result<axum::response::Response, Refusal> {
+    let settings = admit(cx.facade, cx.headers, &Uri::from_static("/"), Body::Absent)?;
+    let release = crate::facade::consent::release_of(
+        cx.headers,
+        &header::ACCEPT,
+        StatusCode::NOT_ACCEPTABLE,
+    )?;
     let not_found = || {
         reply::refusal(
             StatusCode::NOT_FOUND,
@@ -168,15 +160,16 @@ pub async fn read(
         )
     };
     let (ehr, key) = parse_id(id).ok_or_else(not_found)?;
-    crate::facade::compartment::admit_ehr(facade, access, Permission::Read, CONSENT, &ehr).await?;
-    let client = facade.client_for(headers, access).await?;
-    let State { current, policy } = state(facade, &client, &ehr, settings).await?;
+    crate::facade::compartment::admit_ehr(cx.facade, cx.access, Permission::Read, CONSENT, &ehr)
+        .await?;
+    let client = cx.facade.client_for(cx.headers, cx.access).await?;
+    let State { current, policy } = state(cx.facade, &client, &ehr, settings).await?;
     let directive = current
         .directives()
         .iter()
         .find(|directive| exchange::key(directive) == key)
         .ok_or_else(not_found)?;
-    let context = export_context(facade, &ehr, policy.as_ref(), now()).await?;
+    let context = export_context(cx.facade, &ehr, policy.as_ref(), now()).await?;
     let body = render(release, directive, &context, Some(id))?;
     Ok(answer(StatusCode::OK, release, &body, &[]))
 }
@@ -202,37 +195,37 @@ pub async fn read(
 /// refusals of [`subject`], the exchange failures and every refusal of the
 /// mapped search.
 pub async fn search(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    uri: &Uri,
+    cx: Context<'_>,
     pairs: &[(String, String)],
     lanes: Lanes,
 ) -> Result<axum::response::Response, Refusal> {
     let both = lanes == Lanes::Both;
-    let settings = admit(facade, headers, uri, Body::Absent)?;
-    let release =
-        crate::facade::consent::release_of(headers, &header::ACCEPT, StatusCode::NOT_ACCEPTABLE)?;
+    let settings = admit(cx.facade, cx.headers, cx.uri, Body::Absent)?;
+    let release = crate::facade::consent::release_of(
+        cx.headers,
+        &header::ACCEPT,
+        StatusCode::NOT_ACCEPTABLE,
+    )?;
     if both && release == Release::R5 {
         return Err(reply::refusal(
             StatusCode::NOT_ACCEPTABLE,
             Issue::error(IssueType::NotSupported).diagnosing(format!(
-                "a {CONSENT} search that reaches the advance directives answers FHIR R4; search {SCOPE}=patient-privacy for the access directives in R5"
+                "a {CONSENT} search that reaches the advance directives answers FHIR R4; search {SCOPE}=patient-privacy for the cx.access directives in R5"
             )),
         ));
     }
     let asked = asked(pairs, release, if both { &PAGING } else { &[] })?;
-    let client = facade.client_for(headers, access).await?;
+    let client = cx.facade.client_for(cx.headers, cx.access).await?;
     let reached = subject(
-        facade,
+        cx.facade,
         &client,
-        access,
+        cx.access,
         Permission::Search,
         Some(&asked.patient),
     )
     .await?;
     let entries = if asked.matches {
-        directives(facade, &client, &reached.ehr, settings, release).await?
+        directives(cx.facade, &client, &reached.ehr, settings, release).await?
     } else {
         Vec::new()
     };
@@ -246,7 +239,7 @@ pub async fn search(
                     reply::refusal(
                         StatusCode::BAD_GATEWAY,
                         Issue::error(IssueType::Exception).diagnosing(format!(
-                            "the EHR {} has no UUID id, so its access directives have no {CONSENT} id",
+                            "the EHR {} has no UUID id, so its cx.access directives have no {CONSENT} id",
                             reached.ehr.as_str()
                         )),
                     )
@@ -258,16 +251,16 @@ pub async fn search(
             });
         }
         return crate::facade::handlers::search::search(
-            facade,
-            access,
+            cx.facade,
+            cx.access,
             CONSENT,
-            headers,
+            cx.headers,
             pairs,
             Some(lead),
         )
         .await;
     }
-    let base = facade.settings().base_url.trim_end_matches('/');
+    let base = cx.facade.settings().base_url.trim_end_matches('/');
     let mut query = url::form_urlencoded::Serializer::new(String::new());
     query.append_pair(PATIENT, &asked.patient);
     for scope in &asked.scopes {

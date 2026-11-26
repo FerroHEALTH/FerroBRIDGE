@@ -22,11 +22,10 @@ use fhir_search::token::System;
 use fhir_search::token::Token;
 use fhir_types::codec::Object;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
-use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 
 use crate::facade::Facade;
+use crate::facade::context::Context;
 use crate::facade::handlers::Body;
 use crate::facade::handlers::guard;
 use crate::facade::media;
@@ -168,16 +167,10 @@ fn admit(access: &Access, permission: Permission) -> Result<(), Refusal> {
 /// # Errors
 /// Returns `404` for an id the facade serves no endpoint under, the guard's
 /// refusals and `403` for a caller without `Endpoint` read.
-pub fn read(
-    facade: &Facade,
-    access: &Access,
-    id: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
-) -> Result<axum::response::Response, Refusal> {
-    guard(headers, uri, Body::Absent)?;
-    admit(access, Permission::Read)?;
-    let Some(endpoint) = served(facade).into_iter().find(|served| served.id == id) else {
+pub fn read(cx: Context<'_>, id: &str) -> Result<axum::response::Response, Refusal> {
+    guard(cx.headers, cx.uri, Body::Absent)?;
+    admit(cx.access, Permission::Read)?;
+    let Some(endpoint) = served(cx.facade).into_iter().find(|served| served.id == id) else {
         return Err(reply::refusal(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!("no {ENDPOINT}/{id} is served")),
@@ -185,9 +178,9 @@ pub fn read(
     };
     let resource = endpoint.resource()?;
     Ok(answer(
-        facade,
+        cx.facade,
         StatusCode::OK,
-        headers,
+        cx.headers,
         Written {
             resource_type: ENDPOINT,
             resource: &resource,
@@ -286,24 +279,18 @@ fn coded(token: &Token, system: &str, code: &str) -> bool {
 /// Returns the guard's refusals, `400` for a parameter outside `_id`,
 /// `connection-type` and `status` or a malformed value, and `403` for a
 /// caller without `Endpoint` search.
-pub fn search(
-    facade: &Facade,
-    access: &Access,
-    headers: &HeaderMap,
-    uri: &Uri,
-    body: &[u8],
-) -> Result<axum::response::Response, Refusal> {
-    guard(headers, uri, Body::Absent)?;
-    admit(access, Permission::Search)?;
-    let mut parameters = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+pub fn search(cx: Context<'_>, body: &[u8]) -> Result<axum::response::Response, Refusal> {
+    guard(cx.headers, cx.uri, Body::Absent)?;
+    admit(cx.access, Permission::Search)?;
+    let mut parameters = media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes());
     parameters.extend(media::query_pairs(body));
     let criteria = Criteria::read(&parameters)?;
-    let matched = served(facade)
+    let matched = served(cx.facade)
         .iter()
         .filter(|endpoint| criteria.matches(endpoint))
         .map(Served::resource)
         .collect::<Result<Vec<Object>, Refusal>>()?;
-    searchset(facade, ENDPOINT, uri, matched)
+    searchset(cx.facade, ENDPOINT, cx.uri, matched)
 }
 
 /// Returns the `rest.resource` entry of `Endpoint`.
