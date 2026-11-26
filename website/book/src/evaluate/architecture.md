@@ -30,99 +30,10 @@ graph LR
 Both sides read openEHR content the same way and write to different places. The
 FHIR side answers requests one at a time and keeps no clinical data of its own.
 The OMOP side runs as a batch job, queries the CDR with AQL, and writes rows.
-
-## One foundation, two interpreters, two sinks
-
-FHIRconnect and OMOCL are written by the same author and share one header
-(`grammar`, `type`, `metadata`, `spec`, and `spec.openEhrConfig` pinning the
-archetype and revision). Below that header they are different languages: one is
-bidirectional and tree-shaped against FHIR paths, the other is one-directional
-and flat against CDM columns. FerroBRIDGE shares the header model, the YAML
-loader, the archetype-keyed mapping registry, and the RM-path model, then gives
-each language its own parser, validator, and interpreter. A single intermediate
-representation over both grammars would be the union of two dissimilar
-languages, and it would break the first time either specification moved.
-
-The [two mapping specifications](mapping-specifications.md) page has what each
-language actually says.
-
-## The openEHR side
-
-Mapping paths in both languages are RM and archetype paths such as
-`$archetype/data[at0001]/items[at0077]`, never FLAT paths. A path alone is not
-executable: the leaf RM type and the template-specific identifiers come from the
-Web Template built from the template's operational template. The order is the
-operational template, then the Web Template, then path resolution, then the
-composition. FerroBRIDGE fetches the operational template from the CDR, builds
-the Web Template locally with the published `openehr-*` crates, resolves paths
-against the canonical composition tree, and commits and reads canonical JSON.
-FLAT never crosses the wire.
-
-FHIRconnect requires the context mapping's `start` entry to slot in a reusable
-`COMPOSITION.<archetype>.<Resource>` mapping, and it defaults the
-composition-level fields that have no FHIR counterpart: composer,
-`context/start_time`, `setting`, `language`, `territory`, and `category`.
-FerroBRIDGE follows those defaults and records every defaulted value in the
-composition's `FEEDER_AUDIT`, so a reader can tell a mapped value from a
-defaulted one.
-
-## The FHIR side
-
-FerroBRIDGE exposes a FHIR R4 REST facade and maps each request onto CDR
-operations. It stores no clinical data. A transaction Bundle is all or nothing
-and a batch Bundle answers per entry, as FHIR R4 defines them. Bundles are
-split by the profiles in `meta.profile`, a resource that two mappings both need
-becomes a linked mapping, and unresolved references are fetched from the
-sending site with cycle protection. Beside the facade, the bridge serves the
-two operations the FHIRconnect specification defines in its REST API
-chapter, `$tofhir` and `$toopenehr`, as the engine's own conformance surface;
-the facade is a client of the same in-process engine.
-
-```mermaid
-flowchart LR
-    F["FHIRconnect YAML<br/>model, extension, context"] --> M["model<br/>published schemas exercised,<br/>strict schemas, semantic checks"]
-    M --> R["resolve<br/>one immutable program<br/>per profile and template"]
-    R --> E["engine<br/>one traversal, both directions,<br/>data-type lenses"]
-    T["tree<br/>path model over FHIR JSON<br/>guided by the element table"] --- E
-    W["Web Template index"] --- R
-    E --> O1["$tofhir, $toopenehr"]
-    E --> O2["The facade over the CDR"]
-    E -->|"external codes only"| TS["Terminology server"]
-```
-
-FHIRconnect states that it "does not focus specifically on AQL and FHIRsearch",
-so FHIR search has no specification behind it here. The search design is
-FerroBRIDGE's own: an AQL projection per resource type declared beside the
-context mapping, executed over `POST /query/aql`, with the CapabilityStatement
-naming exactly which search parameters each resource supports and an
-`OperationOutcome` refusing the rest. The [FHIR facade](../integrate/fhir-facade.md)
-page has the detail.
-
-## The OMOP side
-
-OMOP is a relational analytics schema rather than an API, so the deliverable is
-rows in a populated CDM v5.4 database. The OMOP engine is a batch ETL job runner
-over AQL, writing typed CDM rows into a PostgreSQL CDM database built from the
-OHDSI DDLs, with the derived tables generated rather than mapped.
-
-OMOP concept resolution is SQL over the locally loaded OHDSI vocabulary: the
-CONCEPT table, `standard_concept`, the domain, and the CONCEPT_RELATIONSHIP
-"Maps to" traversal. It is never a FHIR terminology operation. An unmapped code
-lands as `concept_id = 0` with the source value kept, which is what the CDM
-means by "no matching concept", and it is never dropped. The
-[OMOP ETL](../integrate/omop-etl.md) page has the detail.
-
-```mermaid
-flowchart TB
-    Q["AQL result set, streamed"] --> C["One composition"]
-    C --> E["omocl engine"]
-    E --> G["Record graph<br/>rows and FACT_RELATIONSHIP links"]
-    G --> R["Concept resolver<br/>SQL over the loaded vocabulary"]
-    R --> K["Side table<br/>natural key, surrogate id, watermark"]
-    K --> W["binary COPY<br/>one composition, all or nothing"]
-    W --> DB[("OMOP CDM v5.4")]
-    W --> REP["Run report<br/>rows, concept 0, refusals"]
-```
+[How FerroBRIDGE maps](../explanation/how-ferrobridge-maps.md) explains each
+part, from mapping files compiled into programs to the facade, the OMOP ETL,
+the inbound engine, the outbound lane and the state store, and which
+specification governs each.
 
 ## Who owns what in the server
 
@@ -215,8 +126,7 @@ specification governs this split: it is FerroBRIDGE's own design.
 Two models are generated, because both are published in machine-readable form
 and a hand-transcribed copy drifts from its source with no way to detect it.
 The FHIR model, the `fhir-types` crate, is emitted by `fhir-codegen` from the
-HL7 FHIR packages; it moves into this repository from the sibling terminology
-server, which then consumes it from crates.io. The OMOP CDM v5.4 row types are
+HL7 FHIR packages and published to crates.io. The OMOP CDM v5.4 row types are
 emitted from the OHDSI `CommonDataModel` field definitions, with the OHDSI
 PostgreSQL DDL vendored verbatim beside them. The openEHR model, and the
 ITS-REST client the bridge calls the CDR through, come from the published
