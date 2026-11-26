@@ -164,3 +164,41 @@ bash scripts/perf/gate.sh run
 `bash scripts/perf/gate.sh --self-test` checks the pin reader, the plan's
 placeholders, the seeded Condition, the base resolution and the two plans'
 idle limits on any machine.
+
+## Per-request budgets
+
+Beside the A/B gate, each hot path has fixed budgets that hold whatever the
+runner. No specification governs them: they are FerroBRIDGE's own design.
+
+- **Allocations and database statements.** The e2e lane runs the
+  `facade::budget` case of the server's test binary
+  (`app/ferrobridge-server/tests/it/facade/budget.rs`). It drives the
+  facade's create, read and search of the synthetic Condition over a
+  `wiremock` CDR, and the outbound lane's delivery of the changed
+  composition, each over a real PostgreSQL state store. For each path it
+  counts the allocations of the thread that polls the request, through
+  `allocation-counter`, and the `sqlx::query` events the request sends.
+  `BUDGETS` in that file holds each path's ceilings.
+- **CPU instructions.** The `hot path instructions (callgrind)` job builds
+  the example `hot_path_instructions` in release and counts, with
+  callgrind, the instructions of each path's in-process work: the facade's
+  mapping of the Condition to its composition and back, and the HL7 v2
+  face's parse and acknowledgment of an ORU^R01. `perf/instructions.ceilings`
+  holds each path's ceiling.
+
+A figure over its ceiling fails the job, which prints every path's figure
+beside its ceiling. Lowering a ceiling is a normal change. Raising one needs
+its cause stated in the pull request.
+
+To run them yourself:
+
+```sh
+# The allocation and statement budgets (starts a PostgreSQL container).
+FERROBRIDGE_E2E=1 cargo nextest run -p ferrobridge-server \
+  -E 'test(/facade::budget::/)' --no-capture
+# The instruction ceilings (Linux, with valgrind installed).
+bash scripts/perf/instructions.sh
+```
+
+Instruction counts differ between platforms, so a ceiling is set from the
+CI run's figures, never from a local one.
