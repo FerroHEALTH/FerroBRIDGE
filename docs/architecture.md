@@ -2527,7 +2527,14 @@ own design on family precedent.
 **The inbound intake.** No specification governs an inbound patient-event
 intake: ITS-REST 1.1.0 defines no change notification in either direction
 (<https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/>), so
-the intake is our own design, built on the standard of each step. Behind
+the intake is our own design, built on the standard of each step.
+`crate::inbound` is the one intake owner for every transport. The HTTP
+intake and the HL7 v2 face prove a sender through one
+`inbound::verify::Proofs` set of `Verifier` proofs, every one of which must
+hold, and either commit a clinical message through `facade::ingest` or
+store a patient event in the inbox for the workers' one `Handler`, where
+every inbound step is written, so a new inbound feature adds a step there
+and never a second pipeline beside it. Behind
 `[inbound]`, `POST /inbound/{source}` serves every webhook source of `0008`.
 The raw body is read within the source's `limits.body_limit` and
 `[inbound] body_limit`. The source's verifier runs over the raw bytes before
