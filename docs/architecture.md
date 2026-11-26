@@ -1078,6 +1078,14 @@ expression is a load error: the reference CDR's connector let `where()` and
   ignored (ITI TF-2: 3.66.4.1.2, 3.67.4.1.2) and named in the searchset, and
   refused under `Prefer: handling=strict` (R4 `search.html`). Both answer in
   FHIR JSON or XML (`facade::mhd`).
+  The `CapabilityStatement` instantiates `IHE.MHD.DocumentResponder` and
+  lists no `Binary` read, which that statement lists: ITI-68 retrieves the
+  document at `DocumentReference.content.attachment.url`, whatever URL it
+  names (ITI TF-2: 3.68.4.1.2), and an R4 server "may actually implement a
+  subset of the capability statement it claims to implement" and states
+  its full capability details (R4 `CapabilityStatement.instantiates`). The
+  facade serves the document only at `$document`, so a second copy under
+  `Binary` would add a URL no description names.
 - **`Patient/$summary` answers the patient summary, validated before it is
   served.** `GET [base]/Patient/[id]/$summary` (HL7 IPS 2.0.1,
   `OperationDefinition/summary`) reads the patient through the `Patient`
