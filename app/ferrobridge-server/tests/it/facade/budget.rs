@@ -85,27 +85,28 @@ struct Budget {
     statements: u64,
 }
 
-// NOTE: no specification governs these ceilings: our own design (#2249).
+// NOTE: no specification governs these ceilings: our own design (#2249); the
+// allocations are the CI figure plus 3%, the statements the CI figure.
 const BUDGETS: [Budget; 4] = [
     Budget {
         path: Path::Create,
-        allocations: 0,
-        statements: 0,
+        allocations: 6_750,
+        statements: 12,
     },
     Budget {
         path: Path::Read,
-        allocations: 0,
-        statements: 0,
+        allocations: 3_450,
+        statements: 4,
     },
     Budget {
         path: Path::Search,
-        allocations: 0,
-        statements: 0,
+        allocations: 3_930,
+        statements: 4,
     },
     Budget {
         path: Path::Outbound,
-        allocations: 0,
-        statements: 0,
+        allocations: 3_330,
+        statements: 5,
     },
 ];
 
