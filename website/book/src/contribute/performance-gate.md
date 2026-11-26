@@ -51,6 +51,13 @@ binaries and builds nothing:
    each at its pin in `docs/VERSIONS.md`, and loads the
    testkit's synthetic `ferrobridge.diagnoses.v1` and
    `ferrobridge.diagnose.v1` templates into each CDR;
+   then starts the head arm's identity source: a FerroPIX over its own
+   PostgreSQL, its tokens signed by a stub OpenID Provider, both at their
+   pins, and feeds it the plan's two subjects over ITI-104. The head's
+   facade asks it over ITI-83 for the pseudonym of every subject it
+   resolves. A base from before the facade needed an identity source asks
+   nothing, so a head-over-base rise in the facade groups then includes
+   that round trip, and the gate's summary says so;
 2. starts each arm's `ferrobridge` in its own tree under that tree's
    configuration contract: its `perf/ferrobridge.toml` and the
    `FERROBRIDGE__` overrides of its `perf/arm.env`, or, in a tree from

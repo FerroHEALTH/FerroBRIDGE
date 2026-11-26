@@ -8,7 +8,11 @@
 # release build of ferrobridge over its own FerroEHR CDR and its own CDR
 # database, at the "FerroEHR CDR image" and "FerroEHR CDR database image"
 # pins of docs/VERSIONS.md, with one RabbitMQ and one FerroTERM terminology
-# server at their pins for both.
+# server at their pins for both. The head arm also asks a FerroPIX identity
+# source, at its pin, for the ITI-83 pseudonym of every subject it resolves,
+# its token signed by a stub OpenID Provider at its pin; a base from before
+# the facade needed one asks nothing, so the head's latency then carries an
+# ITI-83 round trip the base's does not.
 #
 #   scripts/perf/gate.sh build [BASE]
 #       Builds target/release/ferrobridge of the checkout, the head, and of
@@ -69,6 +73,20 @@ readonly NETWORK=ferrobridge-perf
 readonly BROKER_NAME=ferrobridge-perf-broker
 readonly TERMINOLOGY_NAME=ferrobridge-perf-terminology
 readonly TERMINOLOGY=http://127.0.0.1:18100
+# The head arm's identity source, its database and the issuer of its tokens,
+# at the loopback addresses perf/ferrobridge.toml names.
+readonly ISSUER_NAME=ferrobridge-perf-issuer
+readonly ISSUER=http://127.0.0.1:18180/perf
+readonly PIX_NAME=ferrobridge-perf-pix
+readonly PIX_DB_NAME=ferrobridge-perf-pix-db
+readonly PIX_DB_PORT=15452
+readonly PIX=http://127.0.0.1:18110
+# The client FerroPIX trusts as the Source of the subjects' domain, which
+# seeds the two subjects over ITI-104.
+readonly PIX_SOURCE=ferrobridge-perf-source
+# FerroPIX's configuration and its two throwaway secrets, outside $WORK so
+# the server's non-root user reads them.
+readonly PIX_FILES=target/perf-pix
 # The role the CDR database image creates, in the gate's own throwaway
 # containers, which the run removes when it ends.
 readonly CDR_DB_PASSWORD="${PERF_CDR_DB_PASSWORD:-ferroehr}"
@@ -304,7 +322,8 @@ cleanup() {
     "$engine" rm --force "ferrobridge-perf-$arm-cdr" "ferrobridge-perf-$arm-db" \
       "ferrobridge-perf-$arm-state" > /dev/null 2>&1 || true
   done
-  "$engine" rm --force "$BROKER_NAME" "$TERMINOLOGY_NAME" > /dev/null 2>&1 || true
+  "$engine" rm --force "$BROKER_NAME" "$TERMINOLOGY_NAME" "$PIX_NAME" "$PIX_DB_NAME" \
+    "$ISSUER_NAME" > /dev/null 2>&1 || true
   "$engine" network rm "$NETWORK" > /dev/null 2>&1 || true
 }
 
@@ -479,15 +498,102 @@ terminology() {
     --env FERROTERM__USAGE_REPORT__ENABLED=false "$1" > /dev/null
 }
 
+# token CLIENT SCOPE: an access token of the stub issuer for CLIENT with
+# SCOPE, by the client credentials grant (RFC 6749 §4.4).
+token() {
+  curl --fail --silent --data grant_type=client_credentials --data "client_id=$1" \
+    --data client_secret=perf --data-urlencode "scope=$2" "$ISSUER/token" | jq --exit-status --raw-output '.access_token'
+}
+
+# identity ISSUER_IMAGE PIX_IMAGE STATE_IMAGE: starts the stub issuer, the
+# head arm's FerroPIX over its own PostgreSQL, and seeds the two subjects the
+# plan names through the subjects' Source over ITI-104 (PIXm 3.1.0
+# §2:3.104.4.1). FerroPIX joins the host network, since it reads a plain
+# http issuer on loopback alone (RFC 8414 §2).
+identity() {
+  local issuer_image="$1" pix_image="$2" state_image="$3" files="$root/$PIX_FILES" subject bearer status
+  # shellcheck disable=SC2016 # ${clientId} and ${scope} are the issuer's own template
+  "$engine" run --quiet --detach --name "$ISSUER_NAME" --publish 127.0.0.1:18180:8080 \
+    --env SERVER_PORT=8080 \
+    --env 'JSON_CONFIG={"tokenCallbacks":[{"issuerId":"perf","requestMappings":[{"requestParam":"grant_type","match":"client_credentials","typeHeader":"at+jwt","claims":{"sub":"${clientId}","client_id":"${clientId}","aud":["'"$PIX"'/fhir"],"scope":"${scope}"}}]}]}' \
+    "$issuer_image" > /dev/null
+  "$engine" run --quiet --detach --name "$PIX_DB_NAME" --publish "127.0.0.1:$PIX_DB_PORT:5432" \
+    --env POSTGRES_PASSWORD=postgres "$state_image" > /dev/null
+  wait_for "the identity source's PostgreSQL" 120 "$engine" exec "$PIX_DB_NAME" \
+    pg_isready --host 127.0.0.1 --username postgres --dbname postgres
+  wait_for "the stub issuer" 120 curl --fail --silent "$ISSUER/.well-known/openid-configuration"
+  rm -rf "$files"
+  mkdir -p "$files"
+  printf 'postgresql://postgres:postgres@127.0.0.1:%s/postgres?sslmode=disable' "$PIX_DB_PORT" > "$files/db-url"
+  openssl rand -base64 32 | tr -d '\n' > "$files/data-key"
+  cat > "$files/ferropix.toml" <<TOML
+profile = "production"
+public_base_url = "$PIX"
+
+[server]
+listen = "127.0.0.1:18110"
+
+[db]
+url_file = "/run/ferropix/db-url"
+data_key_file = "/run/ferropix/data-key"
+
+[auth.issuer.perf]
+issuer = "$ISSUER"
+
+[[trust.issuer]]
+issuer = "perf"
+clients = ["$PIX_SOURCE"]
+
+[[domain]]
+system = "$SUBJECTS"
+name = "Perf subjects"
+kind = "local"
+identifier_type = "PI"
+source_client_id = "$PIX_SOURCE"
+sensitive = false
+
+[[pseudonym_domain]]
+namespace = "urn:oid:2.999.9"
+name = "Perf pseudonyms"
+consumer_client_id = "ferrobridge-perf"
+
+[usage_report]
+enabled = false
+TOML
+  chmod 0755 "$files"
+  chmod 0644 "$files"/*
+  "$engine" run --quiet --detach --name "$PIX_NAME" --network host \
+    --volume "$files:/run/ferropix:ro" --env FERROPIX_CONFIG=/run/ferropix/ferropix.toml \
+    "$pix_image" > /dev/null
+  wait_for "the identity source" 180 curl --fail --silent "$PIX/health/readiness" ||
+    die "the identity source did not come up: $("$engine" logs --tail 20 "$PIX_NAME" 2>&1)"
+  bearer="$(token "$PIX_SOURCE" system/Patient.cud)" || die "the stub issuer signed no Source token"
+  for subject in synthetic-subject-perf-read synthetic-subject-perf-write; do
+    status="$(jq --null-input --compact-output --arg system "$SUBJECTS" --arg value "$subject" \
+      '{resourceType: "Patient", identifier: [{system: $system, value: $value}],
+        name: [{family: "Perf", given: [$value]}], birthDate: "1980-01-01", gender: "unknown"}' |
+      curl --silent --output "$WORK/head/pix-$subject.json" --write-out '%{http_code}' \
+        --request PUT --header "authorization: Bearer $bearer" \
+        --header 'content-type: application/fhir+json' --data-binary @- \
+        "$PIX/fhir/Patient?identifier=$(jq --raw-input --raw-output '@uri' <<< "$SUBJECTS|$subject")")"
+    [[ "$status" = 200 || "$status" = 201 ]] ||
+      die "the identity source answered $status to the feed of $subject: $(head -c 400 "$WORK/head/pix-$subject.json")"
+  done
+}
+
 start() {
-  local cdr_image db_image broker_image terminology_image state_image arm
+  local cdr_image db_image broker_image terminology_image state_image issuer_image pix_image arm
   cdr_image="$(pin "FerroEHR CDR image")"
   state_image="$(pin "PostgreSQL image")"
   db_image="$(pin "FerroEHR CDR database image")"
   broker_image="$(pin "RabbitMQ image")"
   terminology_image="$(pin "FerroTERM terminology server image")"
+  issuer_image="$(pin "Stub OpenID Provider image")"
+  pix_image="$(pin "FerroPIX identity source image")"
   [[ -n "$cdr_image" && -n "$db_image" && -n "$broker_image" && -n "$terminology_image" && -n "$state_image" ]] ||
     die "docs/VERSIONS.md pins no FerroEHR CDR, CDR database, RabbitMQ, FerroTERM or PostgreSQL image"
+  [[ -n "$issuer_image" && -n "$pix_image" ]] ||
+    die "docs/VERSIONS.md pins no stub OpenID Provider or FerroPIX image"
   [[ -x target/release/ferrobridge ]] || die "target/release/ferrobridge is not built"
   [[ -x "$BASE_TREE/ferrobridge" ]] || die "$BASE_TREE/ferrobridge is not built: run gate.sh build first"
   rm -rf "$WORK"
@@ -510,6 +616,7 @@ start() {
   wait_for "FerroTERM" 300 curl --fail --silent "$TERMINOLOGY/health"
   templates head "$root"
   templates base "$root/$BASE_TREE/src"
+  identity "$issuer_image" "$pix_image" "$state_image"
 
   head_pid="$(serve head "$root/target/release/ferrobridge" "$root")"
   base_pid="$(serve base "$root/$BASE_TREE/ferrobridge" "$root/$BASE_TREE/src")"
@@ -612,7 +719,9 @@ run() {
   search="subject:identifier=$(jq --raw-input --raw-output '@uri' <<< "$SUBJECTS|synthetic-subject-perf-read")"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     printf "The base is \`%s\`.\n\n" "$(< "$BASE_TREE/rev")" >> "$GITHUB_STEP_SUMMARY"
+    printf 'The head arm asks a FerroPIX identity source over ITI-83 for every subject it resolves; a base from before the facade needed one does not, so a head-over-base rise in the facade groups includes that round trip.\n\n' >> "$GITHUB_STEP_SUMMARY"
   fi
+  echo "perf-gate: the head arm asks FerroPIX over ITI-83 for every subject it resolves; a rise over a base without an identity source includes that round trip"
   ferrohealth-perf ab --plan "$PLAN" \
     --base-url "$(facade base)" --base-pid "$base_pid" \
     --base-mllp-address "127.0.0.1:$(port base mllp)" --base-database-url "$(admin_url base)" \
@@ -649,7 +758,7 @@ self_test() {
   check "a pin is read without its backticks" "rabbitmq:1@sha256:00" "$(pin "RabbitMQ image" "$work/matrix.md")"
   check "a missing row reads empty" "" "$(pin "Nothing" "$work/matrix.md")"
   local item
-  for item in "FerroEHR CDR image" "FerroEHR CDR database image" "RabbitMQ image" "FerroTERM terminology server image" "PostgreSQL image"; do
+  for item in "FerroEHR CDR image" "FerroEHR CDR database image" "RabbitMQ image" "FerroTERM terminology server image" "PostgreSQL image" "Stub OpenID Provider image" "FerroPIX identity source image"; do
     check "the $item is pinned by digest" 1 "$([[ "$(pin "$item")" == *@sha256:* ]] && echo 1 || echo 0)"
   done
   printf "path = \"/x/@READ_ID@/@A_1@\"\nbody = 'a@b.org @lower@ @READ_ID@'\n" > "$work/plan.toml"
