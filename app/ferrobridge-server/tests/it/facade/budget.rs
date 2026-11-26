@@ -230,6 +230,39 @@ fn changed(seq: u64) -> Result<Event, Box<dyn Error>> {
     })
 }
 
+/// Returns the synthetic Condition under an identifier of its own, so each
+/// measured create is a new delivery.
+fn identified(attempt: usize) -> serde_json::Value {
+    let mut resource = condition();
+    resource["identifier"] = serde_json::json!([{
+        "system": "http://example.org/fhir/sid/ferrobridge-condition",
+        "value": format!("synthetic-condition-budget-{attempt}")
+    }]);
+    resource
+}
+
+/// Answers every later composition create `201` under a version container
+/// of its own, so each measured create commits a new composition.
+async fn mount_fresh_creates(cdr: &MockServer, body: &serde_json::Value) {
+    let body = body.to_string();
+    let next = AtomicU64::new(1);
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path(format!("/ehr/{EHR_ID}/composition")))
+        .respond_with(move |_: &wiremock::Request| {
+            let n = next.fetch_add(1, Ordering::Relaxed);
+            ResponseTemplate::new(201)
+                .insert_header(
+                    "ETag",
+                    format!("W/\"8849182c-82ad-4088-a07f-{n:012x}::ferrobridge.test::1\""),
+                )
+                .insert_header("Content-Type", "application/json")
+                .set_body_string(body.clone())
+        })
+        .with_priority(1)
+        .mount(cdr)
+        .await;
+}
+
 /// Sends `request` through the facade of `bench` and returns what it cost,
 /// refusing an answer other than `expected`.
 async fn facade_cost(
@@ -261,6 +294,7 @@ async fn measure(
         .as_str()
         .ok_or("the created resource carries an id")?
         .to_owned();
+    mount_fresh_creates(&harness.cdr, &harness.composition()).await;
     let endpoint = MockServer::start().await;
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/fhir"))
@@ -291,7 +325,7 @@ async fn measure(
             let cost = match path {
                 Path::Create => {
                     facade_cost(bench, statements, StatusCode::CREATED, || {
-                        Ok(post_condition(&condition()))
+                        Ok(post_condition(&identified(attempt)))
                     })
                     .await?
                 }
