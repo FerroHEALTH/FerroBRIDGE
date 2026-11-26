@@ -320,13 +320,13 @@ async fn record(
     let patient = patient_of(&rendered)?;
     let compositions =
         match ehr::resolve(client, facade.store(), person, ehr::Policy::Existing).await {
-            Ok(ehr_id) => {
+            Ok(ensured) => {
                 crate::cdr::reach::touched(
                     crate::cdr::reach::Touch::Read,
-                    Some(&ehr_id),
+                    Some(&ensured.id),
                     crate::cdr::reach::canonical(&held.value),
                 );
-                compositions(client, &ehr_id).await?
+                compositions(client, &ensured.id).await?
             }
             // NOTE: no specification governs this: our own design; a patient with no EHR has an
             // empty record, so every section the project feeds is `nilknown`.

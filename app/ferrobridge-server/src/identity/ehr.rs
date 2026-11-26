@@ -94,6 +94,15 @@ pub enum EhrError {
     },
 }
 
+/// The EHR of a person, and whether resolving it created it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ensured {
+    /// The EHR.
+    pub id: EhrId,
+    /// Whether this resolution created it in the CDR.
+    pub created: bool,
+}
+
 /// Returns the EHR of `person`, resolving or creating it per `policy`.
 ///
 /// # Errors
@@ -106,9 +115,9 @@ pub async fn resolve(
     store: &dyn Store,
     person: &PersonId,
     policy: Policy,
-) -> Result<EhrId, EhrError> {
-    if let Some(known) = store.ehr_of(person).await.map_err(store_error)? {
-        return Ok(known);
+) -> Result<Ensured, EhrError> {
+    if let Some(id) = store.ehr_of(person).await.map_err(store_error)? {
+        return Ok(Ensured { id, created: false });
     }
     let subject_id = SubjectId::new(person.id()).map_err(|source| EhrError::Subject {
         subject: person.to_string(),
@@ -123,8 +132,8 @@ pub async fn resolve(
         .ehr_by_subject(&subject_id, &namespace)
         .await
         .map_err(client_error)?;
-    let ehr_id = match found.outcome {
-        EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body)?,
+    let (ehr_id, created) = match found.outcome {
+        EhrGetBySubjectOutcome::Ok { body, .. } => (ehr_id_of(&body)?, false),
         EhrGetBySubjectOutcome::NotFound { .. } => match policy {
             Policy::Existing => {
                 return Err(EhrError::Absent {
@@ -134,7 +143,11 @@ pub async fn resolve(
             Policy::CreateOnFirstWrite => create(client, person, &subject_id, &namespace).await?,
         },
     };
-    store.record_ehr(person, &ehr_id).await.map_err(store_error)
+    let id = store
+        .record_ehr(person, &ehr_id)
+        .await
+        .map_err(store_error)?;
+    Ok(Ensured { id, created })
 }
 
 /// Creates an EHR whose `EHR_STATUS.subject` names `person`, or returns the
@@ -143,13 +156,13 @@ pub async fn resolve(
 /// Under `return=minimal` the service answers `201` or `204`, and the `ETag`
 /// of either names the new `ehr_id`; a `409` means an EHR with that subject
 /// already exists (`ehr-codegen.openapi.yaml`, `ehr_create`), so the subject
-/// is read again.
+/// is read again, and the EHR is answered as not created.
 async fn create(
     client: &CdrClient,
     person: &PersonId,
     subject_id: &SubjectId,
     namespace: &SubjectNamespace,
-) -> Result<EhrId, EhrError> {
+) -> Result<(EhrId, bool), EhrError> {
     let status = status_of(person);
     let answered = client
         .create_ehr(Some(&status), Prefer::Minimal)
@@ -158,10 +171,12 @@ async fn create(
     match answered.outcome {
         EhrCreateOutcome::Created { headers, .. } => {
             crate::cdr::ehr_id_from_etag(StatusCode::CREATED, headers.etag.as_deref())
+                .map(|id| (id, true))
                 .map_err(client_error)
         }
         EhrCreateOutcome::NoContent { headers } => {
             crate::cdr::ehr_id_from_etag(StatusCode::NO_CONTENT, headers.etag.as_deref())
+                .map(|id| (id, true))
                 .map_err(client_error)
         }
         EhrCreateOutcome::BadRequest { body } => Err(EhrError::Refused {
@@ -174,7 +189,7 @@ async fn create(
                 .await
                 .map_err(client_error)?;
             match found.outcome {
-                EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body),
+                EhrGetBySubjectOutcome::Ok { body, .. } => ehr_id_of(&body).map(|id| (id, false)),
                 EhrGetBySubjectOutcome::NotFound { .. } => Err(EhrError::Refused {
                     subject: person.to_string(),
                     detail: crate::cdr::error::diagnostics(StatusCode::CONFLICT, &body),

@@ -273,7 +273,8 @@ impl Ingest<'_> {
         }
         let ehr_id = ehr::resolve(&self.client, self.store, &subject, self.settings.ehr_policy)
             .await
-            .map_err(|error| ehr_refusal(&error))?;
+            .map_err(|error| ehr_refusal(&error))?
+            .id;
         let built = match linking {
             Linking::Commit => self.build_linked(program, inbound, provenance).await?,
             Linking::Refuse => {
