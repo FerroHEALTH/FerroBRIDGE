@@ -447,7 +447,9 @@ async fn binary_read_is_neither_claimed_nor_served() -> Result<(), Box<dyn Error
         .as_array()
         .ok_or("resources")?;
     assert!(
-        resources.iter().all(|resource| resource["type"] != "Binary"),
+        resources
+            .iter()
+            .all(|resource| resource["type"] != "Binary"),
         "{statement}"
     );
     let composition = resources
