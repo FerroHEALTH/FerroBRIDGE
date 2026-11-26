@@ -203,6 +203,10 @@ pub struct Match {
     /// does not know the target code system, so the target is unvalidated
     /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
     pub note: Option<String>,
+    /// `match.normalized-concept`, the target in its code system's normal
+    /// form, which the terminology ecosystem adds when `concept` is not in it
+    /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, §207).
+    pub normalized_concept: Option<Concept>,
     /// `match.product`, the other values the mapping produces.
     pub products: Vec<MatchValue>,
     /// `match.dependsOn`, the other values the mapping depends on (R5 and

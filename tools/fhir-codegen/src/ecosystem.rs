@@ -426,6 +426,13 @@ fn ecosystem_parts(url: &str, usage: ParameterUse, name: &str) -> Vec<OperationP
                 "string",
                 "That the server does not know the target code system, so the target code has not been validated (IG 1.11.0, `$translate`, The result).",
             ),
+            ecosystem_parameter(
+                "normalized-concept",
+                ParameterUse::Out,
+                "1",
+                "Coding",
+                "The target concept in its code system's normal form, the one `$validate-code` reports in `normalized-code`, when `concept` is not in it; `concept` stays the target as the map states it (IG 1.11.0, `$translate`, The result, §207).",
+            ),
         ],
         _ => Vec::new(),
     }

@@ -211,6 +211,7 @@ fn the_translate_match_carries_the_ecosystem_parts_and_pre_adopts_origin_map() {
             ("targetComment", "string"),
             ("noMap", "boolean"),
             ("note", "string"),
+            ("normalized-concept", "Coding"),
         ] {
             assert_eq!(
                 part(name),
