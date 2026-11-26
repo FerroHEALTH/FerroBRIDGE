@@ -28,29 +28,61 @@ die() {
 
 say() { printf '%s: %s\n' "$corpus_script" "$*"; }
 
-# The attempts one registry fetch gets, and the first pause between two of
-# them in seconds, doubled after every failure. A transient error from the
-# registry is retried; one that outlasts the last attempt still fails.
+# The attempts one registry fetch gets, the first pause between two of them
+# in seconds, doubled after every failure, and the longest wait a 429 or 503
+# `Retry-After` may ask for. A failure that outlasts the last attempt fails.
 # shellcheck disable=SC2034 # read by the scripts that source this file
 fetch_attempts=4
 fetch_pause=2
+fetch_wait_cap=120
 
-# Runs the command $2... up to $1 times, pausing with a doubling backoff
-# between attempts, and fails with the status of the last attempt.
-with_retries() {
-  local attempts="$1" pause="$fetch_pause" attempt=1 status
-  shift
+# The delay in seconds a `Retry-After` header in the response headers file $1
+# names, or nothing for an absent header or an HTTP-date (RFC 9110 §10.2.3).
+retry_after_of() {
+  awk 'tolower($1) == "retry-after:" { gsub(/\r/, "", $2); if ($2 ~ /^[0-9]+$/) wait = $2 }
+       END { if (wait != "") print wait }' "$1"
+}
+
+# Downloads the URL $2 into the file $1 with the sourcing script's $ua, up to
+# $fetch_attempts times. A 429 or 503 waits what its `Retry-After` names, at
+# most $fetch_wait_cap seconds; any other failure waits the doubling pause.
+fetch_url() {
+  local out="$1" url="$2" attempt=1 pause="$fetch_pause" wait code status headers
+  headers="$(mktemp)"
   while true; do
-    "$@" && return 0
-    status=$?
-    if [[ "$attempt" -ge "$attempts" ]]; then
-      return "$status"
+    status=0
+    code="$(curl --proto '=https' --tlsv1.2 -sSL -A "${ua:?}" -D "$headers" -o "$out" -w '%{http_code}' "$url")" \
+      || status=$?
+    if [[ "$status" -eq 0 && "$code" == 2[0-9][0-9] ]]; then
+      rm -f "$headers"
+      return 0
     fi
-    echo "   attempt $attempt of $attempts failed with status $status; retrying in ${pause}s" >&2
-    sleep "$pause"
+    wait="$pause"
+    if [[ "$code" == 429 || "$code" == 503 ]]; then
+      wait="$(retry_after_of "$headers")"
+      wait="${wait:-$pause}"
+      [[ "$wait" -le "$fetch_wait_cap" ]] || wait="$fetch_wait_cap"
+    fi
+    if [[ "$attempt" -ge "$fetch_attempts" ]]; then
+      echo "   $url: attempt $attempt of $fetch_attempts failed (curl status $status, HTTP $code)" >&2
+      rm -f "$headers"
+      return 1
+    fi
+    echo "   $url: attempt $attempt of $fetch_attempts failed (curl status $status, HTTP $code); retrying in ${wait}s" >&2
+    sleep "$wait"
     pause=$((pause * 2))
     attempt=$((attempt + 1))
   done
+}
+
+# Prints what fetch_url downloads from the URL $1.
+fetch_text() {
+  local body status=0
+  body="$(mktemp)"
+  fetch_url "$body" "$1" || status=$?
+  [[ "$status" -ne 0 ]] || cat "$body"
+  rm -f "$body"
+  return "$status"
 }
 
 corpus_require() {
