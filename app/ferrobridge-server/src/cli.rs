@@ -140,6 +140,19 @@ pub enum Mapping {
         #[arg(long)]
         vocabulary: bool,
     },
+    /// Writes the logical model of one schema of an `OpenAPI` document, a
+    /// `StructureDefinition` of `kind = logical`, to stdout.
+    LogicalModel {
+        /// The `OpenAPI` document, JSON.
+        #[arg(long, value_name = "FILE")]
+        openapi: PathBuf,
+        /// The schema under `components/schemas`.
+        #[arg(long, value_name = "NAME")]
+        schema: String,
+        /// The canonical URL of the model.
+        #[arg(long, value_name = "URL")]
+        url: String,
+    },
 }
 
 /// How a job writes its report.
@@ -157,6 +170,32 @@ mod tests {
     use clap::Parser;
     use ferrohealth_server::cli::{Common, ConfigCommand};
     use std::path::PathBuf;
+
+    #[test]
+    fn the_logical_model_job_names_its_document_schema_and_url() {
+        let cli = Cli::try_parse_from([
+            "ferrobridge",
+            "mapping",
+            "logical-model",
+            "--openapi",
+            "ons.json",
+            "--schema",
+            "Client",
+            "--url",
+            "urn:m",
+        ])
+        .expect("the subcommand parses");
+        assert_eq!(
+            Command::Mapping {
+                command: Mapping::LogicalModel {
+                    openapi: PathBuf::from("ons.json"),
+                    schema: String::from("Client"),
+                    url: String::from("urn:m"),
+                },
+            },
+            cli.command
+        );
+    }
 
     #[test]
     fn every_documented_subcommand_parses() {

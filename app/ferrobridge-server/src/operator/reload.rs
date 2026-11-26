@@ -82,7 +82,8 @@ pub struct Prepared {
     facade: Option<(Programs, Catalog)>,
     /// The operations lane's programs.
     operations: Option<ProgramSet>,
-    structuremaps: Vec<crate::structuremap::syntax::StructureMap>,
+    /// The maps and logical models the inbound sources run.
+    structuremaps: crate::structuremap::Set,
 }
 
 impl Prepared {
@@ -183,7 +184,7 @@ impl Reloader {
             .map_or_else(BTreeMap::new, |(programs, catalog)| {
                 searches(programs, catalog)
             });
-        let structuremaps = report.structuremaps().to_vec();
+        let structuremaps = report.structuremaps().clone();
         Ok(Prepared {
             snapshot: Snapshot::new(report, searches),
             facade,
