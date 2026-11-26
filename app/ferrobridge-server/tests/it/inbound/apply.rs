@@ -9,7 +9,9 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use ferrobridge_server::cdr::ids::EhrId;
+use ferrobridge_server::cdr::CdrClient;
+use ferrobridge_server::cdr::config::CdrConfig;
+use ferrobridge_server::cdr::ids::{EhrId, SubjectId, SubjectNamespace};
 use ferrobridge_server::identity::PersonId;
 use ferrobridge_server::identity::store::{MemoryStore, Store};
 use ferrobridge_server::inbound::apply::{Apply, Resolve, Resolved, Step};
@@ -18,8 +20,10 @@ use ferrobridge_server::inbound::store::{Claimed, WorkKey};
 use ferrobridge_server::inbound::worker::Handler;
 use ferrobridge_server::sources::Source;
 use ferrobridge_server::sources::document::Tenant;
+use ferrobridge_testkit::containers;
 use ferrobridge_testkit::stubs::its_rest;
 use fhir_types::codec::Value;
+use openehr_its::rest::generated::ehr::client::EhrGetBySubjectOutcome;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 
 use crate::facade::{EHR_ID, client};
@@ -624,5 +628,60 @@ async fn an_hl7v2_merge_carried_in_its_event_reaches_the_identity_source_as_reso
     assert!(condition.contains("local-0001"), "{condition}");
     assert_eq!(statement["link"], patient["link"]);
     assert_eq!(0, upstreams.count("POST", "/ehr").await);
+    Ok(())
+}
+
+#[tokio::test]
+async fn against_the_reference_cdr_an_upsert_ensures_one_ehr_under_the_pseudonym()
+-> Result<(), Box<dyn Error>> {
+    // ITS-REST 1.1.0 ehr.html: the EHR is created with EHR_STATUS.subject.external_ref
+    // naming the pseudonym, and found again by that subject.
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let cdr = containers::cdr().await?;
+    let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?))?;
+    let pix = MockServer::start().await;
+    mount_feed(&pix, 201).await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path(PIX_PATH))
+        .respond_with(pseudonym_answer(DOMAIN, PSEUDONYM))
+        .mount(&pix)
+        .await;
+    let handler = |store: &Arc<MemoryStore>| {
+        let identity = identity_source_accepting(&format!("{}/pix", pix.uri()), DOMAIN, &[LOCAL]);
+        Apply::new(
+            Arc::new(Holding),
+            identity,
+            client.clone(),
+            crate::facade::handle(store),
+        )
+    };
+    let first = Arc::new(MemoryStore::default());
+    handler(&first)
+        .apply(&source(), &item("local-0001", Change::Upsert))
+        .await
+        .map_err(|failed| failed.reason)?;
+    let person = PersonId::new(DOMAIN, PSEUDONYM)?;
+    let created = first.ehr_of(&person).await?.ok_or("the EHR is bound")?;
+    let found = client
+        .ehr_by_subject(&SubjectId::new(PSEUDONYM)?, &SubjectNamespace::new(DOMAIN)?)
+        .await?;
+    let EhrGetBySubjectOutcome::Ok { body, .. } = found.outcome else {
+        return Err("the CDR holds an EHR for the pseudonym".into());
+    };
+    assert_eq!(created.as_str(), body.ehr_id.value());
+    let second = Arc::new(MemoryStore::default());
+    for change in [Change::Upsert, Change::Remove] {
+        handler(&second)
+            .apply(&source(), &item("local-0001", change))
+            .await
+            .map_err(|failed| failed.reason)?;
+    }
+    assert_eq!(
+        Some(created),
+        second.ehr_of(&person).await?,
+        "a replica with an empty identity map finds the one EHR and creates none"
+    );
     Ok(())
 }
