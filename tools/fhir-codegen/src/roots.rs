@@ -5,8 +5,9 @@
 //! Cargo feature of the generated crate.
 //!
 //! Two FHIR root sets are declared, and one HL7 v2 root set. The terminology
-//! set is the resources of the FHIR terminology module
-//! (<https://hl7.org/fhir/R4B/terminology-module.html>) plus the
+//! set is the resources of the FHIR terminology module, `CodeSystem`,
+//! `ValueSet`, `ConceptMap`, `NamingSystem` and `TerminologyCapabilities`
+//! (<https://hl7.org/fhir/R4B/terminology-module.html>), plus the
 //! infrastructure resources its operations exchange, `Provenance` for the
 //! record of who produced or validated a terminology resource
 //! (<https://hl7.org/fhir/R4B/provenance.html>), and the operations
@@ -23,11 +24,12 @@ use crate::package::Package;
 use crate::v2::corpus::{Corpus, Sourced, SourcedMessage};
 
 /// The resource types the terminology root set holds in R4 and later, by name.
-pub const ROOT_RESOURCES: [&str; 9] = [
+pub const ROOT_RESOURCES: [&str; 10] = [
     "Bundle",
     "CapabilityStatement",
     "CodeSystem",
     "ConceptMap",
+    "NamingSystem",
     "OperationOutcome",
     "Parameters",
     "Provenance",
@@ -41,11 +43,12 @@ pub const ROOT_RESOURCES: [&str; 9] = [
 /// the resource set: `$expand` names one by its `uri` and no terminology
 /// operation exchanges the resource
 /// (<https://hl7.org/fhir/STU3/valueset-operations.html#expand>).
-pub const STU3_ROOT_RESOURCES: [&str; 8] = [
+pub const STU3_ROOT_RESOURCES: [&str; 9] = [
     "Bundle",
     "CapabilityStatement",
     "CodeSystem",
     "ConceptMap",
+    "NamingSystem",
     "OperationOutcome",
     "Parameters",
     "Provenance",

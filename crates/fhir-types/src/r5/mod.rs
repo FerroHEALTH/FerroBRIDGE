@@ -258,7 +258,7 @@ pub mod molecular_sequence;
 pub mod monetary_component;
 #[cfg(feature = "terminology")]
 pub mod money;
-#[cfg(any(feature = "resources", feature = "r5-resources"))]
+#[cfg(feature = "terminology")]
 pub mod naming_system;
 #[cfg(feature = "terminology")]
 pub mod narrative;
