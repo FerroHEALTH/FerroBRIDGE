@@ -11,13 +11,13 @@ use fhirconnect::resolve::select::SelectError;
 use http::StatusCode;
 use openehr_rm::v1_2::composition::composition::Composition;
 
-use crate::facade::identity::PersonId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::request::Inbound;
 use crate::facade::request::RequestError;
-use crate::facade::subject::Subject;
-use crate::facade::subject::SubjectLink;
+use crate::identity::PersonId;
+use crate::identity::subject::Subject;
+use crate::identity::subject::SubjectLink;
 use ferrohealth_server::run::chain;
 
 use super::Consumed;
