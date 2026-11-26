@@ -848,6 +848,9 @@ answers all three of its transactions, each Required (ITI TF-1: Table
 33.1-1). It serves `DocumentReference` and `List` itself, and its
 `CapabilityStatement` instantiates
 `https://profiles.ihe.net/ITI/MHD/CapabilityStatement/IHE.MHD.DocumentResponder`.
+That statement also lists `Binary` read, which the facade does not serve: a
+Consumer retrieves each document at the `$document` URL its
+`DocumentReference` names, so the facade's own statement lists no `Binary`.
 
 ```mermaid
 sequenceDiagram
