@@ -91,10 +91,15 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             ));
             state = state.with_access_log(Arc::new(log));
         }
-        let (mounted, counts) =
-            build_facade(settings, &lane, state.terminology().cloned(), state.store())
-                .await
-                .context("starting the FHIR facade")?;
+        let (mounted, counts) = build_facade(
+            settings,
+            &lane,
+            state.cdr(),
+            state.terminology().cloned(),
+            state.store(),
+        )
+        .await
+        .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
@@ -103,6 +108,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     if settings.operator.is_some() {
         let operator = build_operator(
             settings,
+            state.cdr(),
             state.store(),
             state.facade().cloned(),
             state.operations_handle().cloned(),
@@ -311,11 +317,10 @@ async fn start_change_feed(
 ) -> anyhow::Result<(Vec<StartedFeed>, change_feed::report::Report)> {
     use anyhow::Context;
 
-    let cdr = settings
-        .cdr
-        .as_ref()
+    let client = state
+        .cdr()
+        .cloned()
         .context("the change feed reads the CDR, and [cdr] is not set")?;
-    let client = cdr::CdrClient::new(cdr).context("building the CDR client the feed reads")?;
     let store = state.store().cloned().context(
         "the change feed keeps its cursors and dead letters in the state store, and [state] is not set",
     )?;
@@ -652,6 +657,7 @@ async fn start_audit(
 /// runs (no specification governs the operator surface: our own design).
 async fn build_operator(
     settings: &Settings,
+    cdr: Option<&cdr::CdrClient>,
     store: Option<&crate::store::Store>,
     facade: Option<Arc<facade::Facade>>,
     operations: Option<Arc<crate::operations::lane::OperationsLane>>,
@@ -660,13 +666,7 @@ async fn build_operator(
 
     let needs_cdr =
         settings.mappings.is_none() && (settings.mapping_directory.is_some() || store.is_some());
-    let cdr = match settings.cdr.as_ref() {
-        Some(config) if needs_cdr => Some(
-            cdr::CdrClient::new(config)
-                .context("building the CDR client the templates are fetched through")?,
-        ),
-        _ => None,
-    };
+    let cdr = cdr.filter(|_| needs_cdr).cloned();
     let mut roots = Vec::new();
     if let Some(directory) = settings.mapping_directory.as_ref() {
         roots.push(crate::mappings::files::Root::new(
@@ -751,17 +751,15 @@ async fn build_operator(
 async fn build_facade(
     settings: &Settings,
     lane: &config::FacadeSettings,
+    cdr: Option<&cdr::CdrClient>,
     terminology: Option<ferrobridge_term::client::Client>,
     state: Option<&crate::store::Store>,
 ) -> anyhow::Result<(facade::Facade, startup::MappingCounts)> {
     use anyhow::Context;
 
-    let cdr = settings
-        .cdr
-        .as_ref()
+    let client = cdr
+        .cloned()
         .context("the facade needs a [cdr] section: it maps every request onto CDR operations")?;
-    let client =
-        cdr::CdrClient::new(cdr).context("building the CDR client the facade calls through")?;
     let directory = settings
         .mapping_directory
         .as_ref()
