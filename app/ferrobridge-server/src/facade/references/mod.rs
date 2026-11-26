@@ -59,12 +59,12 @@ mod literal;
 use crate::cdr::CdrClient;
 use crate::facade::Facade;
 use crate::facade::handlers::read;
-use crate::facade::identity::FhirResourceId;
 use crate::facade::references::literal::Target;
 use crate::facade::references::literal::references_in;
 use crate::facade::references::literal::target;
 use crate::facade::references::literal::trimmed;
 use crate::facade::references::literal::type_of;
+use crate::identity::FhirResourceId;
 
 /// How many levels of references are followed when the configuration names
 /// none.

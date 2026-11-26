@@ -10,8 +10,8 @@ use std::error::Error;
 use std::sync::Arc;
 
 use ferrobridge_server::cdr::ids::EhrId;
-use ferrobridge_server::facade::identity::PersonId;
-use ferrobridge_server::facade::identity::store::{MemoryStore, Store};
+use ferrobridge_server::identity::PersonId;
+use ferrobridge_server::identity::store::{MemoryStore, Store};
 use ferrobridge_server::inbound::apply::{Apply, Resolve, Step, Undeclared};
 use ferrobridge_server::inbound::event::Change;
 use ferrobridge_server::inbound::store::{Claimed, WorkKey};

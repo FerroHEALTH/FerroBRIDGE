@@ -8,13 +8,13 @@ use super::binding::canonical_of;
 use super::{Consumed, Delivery, Refused, Skipped, Written};
 use crate::cdr::ids::EhrId;
 use crate::facade::commit;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::PersonId;
-use crate::facade::identity::record::CommittedSource;
-use crate::facade::identity::record::ConsumedSource;
 use crate::facade::outcome::Issue;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
+use crate::identity::FhirResourceId;
+use crate::identity::PersonId;
+use crate::identity::record::CommittedSource;
+use crate::identity::record::ConsumedSource;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::subject::SubjectIdentifier;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
@@ -63,7 +63,7 @@ pub(super) enum Scope {
 #[derive(Debug)]
 pub(super) enum Mapping {
     /// The entry mapped, for the subject it names.
-    Mapped(Box<Mapped>, crate::facade::subject::Subject),
+    Mapped(Box<Mapped>, crate::identity::subject::Subject),
     /// No program ran: the skip, and the issue that refuses the Bundle.
     Unmapped(Skipped, Issue),
 }

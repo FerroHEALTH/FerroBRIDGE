@@ -22,10 +22,10 @@ use fhir_types::schema::FieldSchema;
 use fhir_types::schema::Kind;
 use fhir_types::schema::TypeSchema;
 
-use crate::facade::identity::PersonId;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::status;
+use crate::identity::PersonId;
 
 /// The element names a resource names its subject by, in the order the fill
 /// tries them.
@@ -229,7 +229,7 @@ fn holds(value: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{absent_required, fill_subject, reference_to, refusal};
-    use crate::facade::identity::PersonId;
+    use crate::identity::PersonId;
     use fhir_types::codec::Object;
     use fhir_types::codec::Value;
     use http::StatusCode;

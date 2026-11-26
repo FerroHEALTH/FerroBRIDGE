@@ -22,9 +22,9 @@ use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId
 use fhirconnect::engine::identity::deterministic_id;
 use fhirconnect::engine::seam::identity::IdentityRequest;
 
-use crate::facade::identity::ExternalResourceId;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::record::CompositionBinding;
+use crate::identity::ExternalResourceId;
+use crate::identity::FhirResourceId;
+use crate::identity::record::CompositionBinding;
 
 /// The identity derivation this build writes.
 ///
@@ -132,7 +132,7 @@ pub fn created_map_key(id: &FhirResourceId) -> ExternalResourceId {
 #[cfg(test)]
 mod tests {
     use super::{EntryKey, entry_id};
-    use crate::facade::identity::is_fhir_id;
+    use crate::identity::is_fhir_id;
     use openehr_base::v1_3::base_types::identification::hier_object_id::HierObjectId;
 
     /// The version container the cases derive against.
@@ -167,8 +167,8 @@ mod tests {
     }
 
     /// Returns a parent binding of the first entry in [`CONTAINER`].
-    fn parent() -> crate::facade::identity::record::CompositionBinding {
-        crate::facade::identity::record::CompositionBinding {
+    fn parent() -> crate::identity::record::CompositionBinding {
+        crate::identity::record::CompositionBinding {
             ehr_id: String::from("bd6b1e5a-3b9b-4a4a-9e0b-9f4b3a0c9f11"),
             versioned_object_uid: String::from(CONTAINER),
             template_id: String::from("ferrobridge.diagnose.v1"),
@@ -182,7 +182,7 @@ mod tests {
     }
 
     /// Returns the created id of a split occurrence at `position`.
-    fn created_at(position: u32, unique: &[&str]) -> crate::facade::identity::FhirResourceId {
+    fn created_at(position: u32, unique: &[&str]) -> crate::identity::FhirResourceId {
         let request = fhirconnect::engine::seam::identity::IdentityRequest::new(
             "Condition",
             "Condition",

@@ -4,7 +4,7 @@
 //! A single create delivered again: the same source commits nothing, a
 //! later version of it commits a later version of its composition.
 
-use ferrobridge_server::facade::identity::store::Store;
+use ferrobridge_server::identity::store::Store;
 use http::StatusCode;
 use std::error::Error;
 use wiremock::ResponseTemplate;
@@ -123,11 +123,9 @@ async fn a_create_of_a_known_id_at_a_new_version_id_commits_a_later_version()
         writes(&harness).await,
         "one composition POST and one update PUT"
     );
-    let source = ferrobridge_server::facade::identity::record::SourceVersion::new(
+    let source = ferrobridge_server::identity::record::SourceVersion::new(
         "Condition",
-        ferrobridge_server::facade::identity::ExternalResourceId::new(
-            "ferrobridge-synthetic-condition-1",
-        )?,
+        ferrobridge_server::identity::ExternalResourceId::new("ferrobridge-synthetic-condition-1")?,
         Some(String::from("2")),
     );
     assert_eq!(
@@ -193,15 +191,13 @@ async fn a_create_of_an_id_the_map_binds_to_two_compositions_is_refused_and_comm
     let harness = harness().await;
     mount_ehr(&harness.cdr).await;
     let source = |version: &str| -> Result<_, Box<dyn Error>> {
-        Ok(
-            ferrobridge_server::facade::identity::record::SourceVersion::new(
-                "Condition",
-                ferrobridge_server::facade::identity::ExternalResourceId::new(
-                    "ferrobridge-synthetic-condition-1",
-                )?,
-                Some(String::from(version)),
-            ),
-        )
+        Ok(ferrobridge_server::identity::record::SourceVersion::new(
+            "Condition",
+            ferrobridge_server::identity::ExternalResourceId::new(
+                "ferrobridge-synthetic-condition-1",
+            )?,
+            Some(String::from(version)),
+        ))
     };
     for (version, container) in [
         ("1", CONTAINER),
@@ -211,7 +207,7 @@ async fn a_create_of_an_id_the_map_binds_to_two_compositions_is_refused_and_comm
             .store
             .record_consumed(
                 &source(version)?,
-                &ferrobridge_server::facade::identity::record::ConsumedSource {
+                &ferrobridge_server::identity::record::ConsumedSource {
                     ehr_id: String::from(EHR_ID),
                     versioned_object_uid: String::from(container),
                     internal_id: String::from("abc"),
@@ -242,14 +238,14 @@ async fn the_refusal_of_a_split_id_names_the_update_of_each_resource_it_binds()
         harness
             .store
             .record_consumed(
-                &ferrobridge_server::facade::identity::record::SourceVersion::new(
+                &ferrobridge_server::identity::record::SourceVersion::new(
                     "Condition",
-                    ferrobridge_server::facade::identity::ExternalResourceId::new(
+                    ferrobridge_server::identity::ExternalResourceId::new(
                         "ferrobridge-synthetic-condition-1",
                     )?,
                     Some(String::from(version)),
                 ),
-                &ferrobridge_server::facade::identity::record::ConsumedSource {
+                &ferrobridge_server::identity::record::ConsumedSource {
                     ehr_id: String::from(EHR_ID),
                     versioned_object_uid: String::from(container),
                     internal_id: String::from(internal),
