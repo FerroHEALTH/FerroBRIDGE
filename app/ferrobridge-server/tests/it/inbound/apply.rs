@@ -12,7 +12,7 @@ use std::sync::Arc;
 use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::identity::PersonId;
 use ferrobridge_server::identity::store::{MemoryStore, Store};
-use ferrobridge_server::inbound::apply::{Apply, Resolve, Step, Undeclared};
+use ferrobridge_server::inbound::apply::{Apply, Resolve, Resolved, Step};
 use ferrobridge_server::inbound::event::Change;
 use ferrobridge_server::inbound::store::{Claimed, WorkKey};
 use ferrobridge_server::inbound::worker::Handler;
@@ -45,8 +45,18 @@ const FEED_PATH: &str = "/pix/Patient";
 struct Holding;
 
 impl Resolve for Holding {
-    fn patient<'a>(&'a self, _: &'a Source, _: &'a Tenant, entity: &'a str) -> Step<'a, Value> {
-        Box::pin(std::future::ready(Ok(held(entity))))
+    fn patient<'a>(&'a self, _: &'a Source, _: &'a Tenant, entity: &'a str) -> Step<'a, Resolved> {
+        Box::pin(std::future::ready(Ok(Resolved::Patient(held(entity)))))
+    }
+}
+
+/// A source that holds its patient no more.
+#[derive(Debug, Default)]
+struct Gone;
+
+impl Resolve for Gone {
+    fn patient<'a>(&'a self, _: &'a Source, _: &'a Tenant, _: &'a str) -> Step<'a, Resolved> {
+        Box::pin(std::future::ready(Ok(Resolved::Removed)))
     }
 }
 
@@ -56,16 +66,15 @@ impl Resolve for Holding {
 struct Merged;
 
 impl Resolve for Merged {
-    fn patient<'a>(&'a self, _: &'a Source, _: &'a Tenant, entity: &'a str) -> Step<'a, Value> {
+    fn patient<'a>(&'a self, _: &'a Source, _: &'a Tenant, entity: &'a str) -> Step<'a, Resolved> {
         let mut patient = serde_json::to_value(held(entity)).expect("a JSON Patient");
         patient["link"] = serde_json::json!([{
             "other": {"identifier": {"system": LOCAL, "value": "local-0002"}},
             "type": "replaced-by"
         }]);
-        Box::pin(std::future::ready(Ok(serde_json::from_value::<Value>(
-            patient,
-        )
-        .expect("a legal Patient"))))
+        Box::pin(std::future::ready(Ok(Resolved::Patient(
+            serde_json::from_value::<Value>(patient).expect("a legal Patient"),
+        ))))
     }
 }
 
@@ -352,9 +361,29 @@ async fn a_remove_deactivates_the_patient_and_never_touches_an_ehr() -> Result<(
 }
 
 #[tokio::test]
+async fn an_upsert_of_an_entity_the_source_removed_deactivates_it() -> Result<(), Box<dyn Error>> {
+    let upstreams = Upstreams::start().await;
+    let handler = upstreams.handler(Arc::new(Gone));
+    handler
+        .apply(&source(), &item("local-0001", Change::Upsert))
+        .await
+        .map_err(|failed| failed.reason)?;
+    let fed = upstreams.fed().await?;
+    assert_eq!(1, fed.len());
+    assert_eq!(Some(false), fed[0].1["active"].as_bool());
+    assert_eq!(0, upstreams.count("POST", "/ehr").await);
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_source_that_declares_no_resolution_parks_its_items() -> Result<(), Box<dyn Error>> {
     let upstreams = Upstreams::start().await;
-    let handler = upstreams.handler(Arc::new(Undeclared));
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .connect_lazy("postgres://nobody:nothing@127.0.0.1:1/none?sslmode=disable")?;
+    let sources = Arc::new(ferrobridge_server::sources::Sources::new(pool, None));
+    let handler = upstreams.handler(Arc::new(
+        ferrobridge_server::inbound::resolve::Declared::new(sources),
+    ));
     let failed = handler
         .apply(&source(), &item("local-0001", Change::Upsert))
         .await

@@ -9,6 +9,7 @@
 //! idle worker; without one it looks again after the idle interval. No
 //! specification governs an intake's workers: our own design.
 
+use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -23,12 +24,12 @@ use crate::sources::{Source, Sources};
 use crate::store::listen::{INBOUND, Listened, Wake};
 
 /// Why an attempt at a work item failed, in words that name no value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Failed {
     /// Whether a repeat may succeed.
     pub failure: Failure,
-    /// The fixed reason a parked item carries.
-    pub reason: &'static str,
+    /// The reason a parked item carries, which names no value of a record.
+    pub reason: Cow<'static, str>,
 }
 
 /// The future of one attempt.

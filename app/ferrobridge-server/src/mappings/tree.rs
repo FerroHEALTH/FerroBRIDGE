@@ -155,29 +155,42 @@ pub fn omocl_set(tree: &Tree) -> Result<omocl::model::load::MappingSet, Vec<Diag
     })
 }
 
-/// Parses the FHIR Mapping Language maps of `tree`, one map per file.
+/// Parses the FHIR Mapping Language maps of `tree`, one map per `.map`
+/// file, and the logical models they read, one per `.json` file.
 ///
 /// # Errors
 ///
 /// Returns what [`load_texts`] returns: a diagnostic for each map outside the
-/// grammar, at its line and column, and for each map whose URL an earlier
-/// file already carries.
-pub fn structuremap_set(
-    tree: &Tree,
-) -> Result<Vec<crate::structuremap::syntax::StructureMap>, Vec<Diagnostic>> {
+/// grammar, at its line and column, for each map whose URL an earlier file
+/// already carries, and for each JSON file that is no logical model.
+pub fn structuremap_set(tree: &Tree) -> Result<crate::structuremap::Set, Vec<Diagnostic>> {
     load_texts(tree, |texts| {
-        let mut maps: Vec<crate::structuremap::syntax::StructureMap> = Vec::new();
+        let mut set = crate::structuremap::Set::default();
         let mut diagnostics = Vec::new();
         for (path, text) in texts {
+            let logical = path
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"));
+            if logical {
+                if let Err(message) = logical_model(&mut set.logical, text) {
+                    diagnostics.push(crate::mappings::compile::structuremap(
+                        &path,
+                        crate::mappings::compile::STRUCTUREMAP_LOGICAL,
+                        message,
+                    ));
+                }
+                continue;
+            }
             match crate::structuremap::parse::parse(text) {
-                Ok(map) if maps.iter().any(|known| known.url == map.url) => {
+                Ok(map) if set.maps.iter().any(|known| known.url == map.url) => {
                     diagnostics.push(crate::mappings::compile::structuremap(
                         &path,
                         crate::mappings::compile::STRUCTUREMAP_URL,
                         format!("another map already carries the URL {}", map.url),
                     ));
                 }
-                Ok(map) => maps.push(map),
+                Ok(map) => set.maps.push(map),
                 Err(error) => diagnostics.push(
                     crate::mappings::compile::structuremap(
                         &path,
@@ -189,11 +202,24 @@ pub fn structuremap_set(
             }
         }
         if diagnostics.is_empty() {
-            Ok(maps)
+            Ok(set)
         } else {
             Err(diagnostics)
         }
     })
+}
+
+/// Adds the logical model `text` holds to `logical`, or says why it holds
+/// none.
+fn logical_model(
+    logical: &mut crate::structuremap::model::Logical,
+    text: &str,
+) -> Result<(), String> {
+    let json: serde_json::Value =
+        serde_json::from_str(text).map_err(|error| format!("the file is no JSON: {error}"))?;
+    logical
+        .add(&fhir_types::codec::Value::from_serde_json(json))
+        .map_err(|error| error.to_string())
 }
 
 /// Returns the line and column, both from one, of the byte offset `at` in
@@ -260,13 +286,38 @@ mod tests {
                 Arc::from(map.as_bytes()),
             );
         }
-        let maps = structuremap_set(&tree).expect("both maps parse");
+        let set = structuremap_set(&tree).expect("both maps parse");
         assert_eq!(
             vec![
                 "http://example.org/StructureMap/a",
                 "http://example.org/StructureMap/b"
             ],
-            maps.iter().map(|map| map.url.as_str()).collect::<Vec<_>>()
+            set.maps
+                .iter()
+                .map(|map| map.url.as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn a_json_file_is_a_logical_model_or_refused_at_its_file() {
+        use crate::structuremap::model::Structures as _;
+
+        let mut tree = Tree::default();
+        let model = r#"{"resourceType": "StructureDefinition", "kind": "logical",
+            "differential": {"element": [{"path": "Client"},
+            {"path": "Client.name", "max": "1", "type": [{"code": "string"}]}]}}"#;
+        tree.insert("structuremap/client.json", Arc::from(model.as_bytes()));
+        let set = structuremap_set(&tree).expect("the model reads");
+        assert!(set.logical.element("Client", "name").is_some());
+        tree.insert(
+            "structuremap/patient.json",
+            Arc::from(&br#"{"resourceType": "Patient"}"#[..]),
+        );
+        let diagnostics = structuremap_set(&tree).expect_err("a Patient is no model");
+        assert_eq!(
+            Path::new("structuremap/patient.json"),
+            diagnostics[0].file()
         );
     }
 

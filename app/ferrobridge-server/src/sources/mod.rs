@@ -311,6 +311,8 @@ pub struct Sources {
     secrets: Option<SecretDir>,
     /// The thread that reads the directory again, while the sources live.
     watch: Option<ferrohealth_secret::dir::Watch>,
+    /// The maps and logical models a declared resolution renders through.
+    structuremaps: Arc<crate::structuremap::Running>,
 }
 
 impl Sources {
@@ -355,7 +357,23 @@ impl Sources {
             listened,
             secrets,
             watch: None,
+            structuremaps: Arc::default(),
         }
+    }
+
+    /// Returns these sources resolving through the maps of `structuremaps`.
+    #[must_use]
+    pub fn with_structuremaps(self, structuremaps: Arc<crate::structuremap::Running>) -> Self {
+        Self {
+            structuremaps,
+            ..self
+        }
+    }
+
+    /// Returns the maps and logical models of the running mapping revision.
+    #[must_use]
+    pub const fn structuremaps(&self) -> &Arc<crate::structuremap::Running> {
+        &self.structuremaps
     }
 
     /// Returns the listener state the replica's `LISTEN` session carries.
@@ -400,14 +418,20 @@ impl Sources {
     }
 
     /// Reads `value` as a document of `kind`, every secret it names held by
-    /// the `[secrets]` directory.
+    /// the `[secrets]` directory and the map of its resolution in the
+    /// running mapping revision.
     ///
     /// # Errors
     /// Returns [`Invalid`] for a document of another shape, one that breaks
-    /// a rule of its kind, or one naming a secret the directory does not
-    /// hold.
+    /// a rule of its kind, one naming a secret the directory does not hold,
+    /// or one whose resolution names a map the revision does not run.
     pub fn validate(&self, kind: Kind, value: &serde_json::Value) -> Result<Document, Invalid> {
         let document = Document::read(kind, value)?;
+        if let Document::Webhook(webhook) = &document
+            && let Some(resolution) = webhook.resolve.as_ref()
+        {
+            resolution.runs_on(&self.structuremaps.current())?;
+        }
         for name in document.secrets() {
             let held = self
                 .secrets

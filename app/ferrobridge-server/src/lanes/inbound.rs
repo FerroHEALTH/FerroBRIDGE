@@ -26,7 +26,7 @@ pub(super) fn workers(
         return None;
     };
     let handler = crate::inbound::apply::Apply::new(
-        Arc::new(crate::inbound::apply::Undeclared),
+        Arc::new(crate::inbound::resolve::Declared::new(Arc::clone(sources))),
         facade.settings().subject.identity_handle(),
         facade.client().clone(),
         facade.store_handle(),
@@ -48,9 +48,18 @@ pub(super) fn open_sources(settings: &Settings, state: AppState) -> anyhow::Resu
     let Some(store) = state.store() else {
         return Ok(state);
     };
+    let translator = state.terminology().cloned().map(|client| {
+        let translator: Arc<dyn crate::structuremap::engine::translate::Translate> =
+            Arc::new(crate::structuremap::engine::translate::Terminology::new(
+                client,
+                tokio::runtime::Handle::current(),
+            ));
+        translator
+    });
     let sources = Arc::new(
         crate::sources::Sources::open(store, settings.secrets.as_ref())
-            .context("opening the [secrets] directory the inbound sources name")?,
+            .context("opening the [secrets] directory the inbound sources name")?
+            .with_structuremaps(Arc::new(crate::structuremap::Running::new(translator))),
     );
     let intake = settings.inbound.map(|inbound| {
         crate::inbound::intake::Intake::new(

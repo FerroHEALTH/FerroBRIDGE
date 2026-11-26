@@ -8,25 +8,12 @@ use std::path::Path;
 
 use ferrohealth_secret::file::read_secret;
 use ferrohealth_secret::secret::Secret;
-use ferrohealth_smart::client::ClientCredentials;
 use ferrohealth_smart::config::credentials::CredentialsSection;
 use ferrohealth_smart::config::credentials::Outbound;
 use secrecy::SecretString;
 
 use super::error::Error;
-
-/// What a `[<lane>.credentials]` table resolves to.
-pub(super) enum Upstream {
-    /// RFC 7617 basic authentication.
-    Basic {
-        /// The user-id, which is not a secret.
-        user: String,
-        /// The password.
-        password: SecretString,
-    },
-    /// The OAuth 2.0 client credentials grant (RFC 6749 §4.4).
-    OAuth(Box<ClientCredentials>),
-}
+use crate::cdr::config::CdrCredentials;
 
 /// Returns the credential the table `section` holds, or `None` when it names
 /// none.
@@ -42,7 +29,7 @@ pub(super) enum Upstream {
 pub(super) fn resolve_credentials(
     section: &str,
     credentials: &CredentialsSection,
-) -> Result<Option<Upstream>, Error> {
+) -> Result<Option<CdrCredentials>, Error> {
     if credentials.onward.is_some() {
         return Err(Error::OnwardLane {
             section: section.to_owned(),
@@ -56,11 +43,11 @@ pub(super) fn resolve_credentials(
         })?;
     outbound
         .map(|outbound| match outbound {
-            Outbound::Basic(credential) => Ok(Upstream::Basic {
+            Outbound::Basic(credential) => Ok(CdrCredentials::Basic {
                 user: credential.username().to_owned(),
                 password: credential.password().clone(),
             }),
-            Outbound::Oauth(grant) => Ok(Upstream::OAuth(grant)),
+            Outbound::Oauth(grant) => Ok(CdrCredentials::OAuth(grant)),
             // NOTE: no specification governs this: our own design; a form a later
             // ferrohealth-smart adds refuses the start rather than reach the upstream bare.
             _ => Err(Error::CredentialForm {
