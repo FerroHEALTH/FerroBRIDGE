@@ -43,7 +43,7 @@ mod forms;
 #[cfg(feature = "r4")]
 mod lookup;
 #[cfg(all(
-    feature = "naming-system",
+    feature = "client",
     feature = "stu3",
     feature = "r4",
     feature = "r4b"
