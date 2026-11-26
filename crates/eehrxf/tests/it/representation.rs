@@ -88,6 +88,7 @@ fn described(pdf: &PdfA) -> Result<DocumentReference, DocumentError> {
     let priority = None;
     DocumentMetadata::new(String::from("1"), loinc("11502-2"), priority)
         .with_language(String::from("en"))
+        .with_status(String::from("final"))
         .describe_pdf(&header, pdf, "pdf-report")
 }
 
@@ -138,6 +139,9 @@ fn the_pdf_travels_byte_for_byte_with_its_size_and_hash() -> Result<(), Box<dyn 
     assert_eq!(attachment["language"], "en");
     // DocumentReference-minimal on the PDF form too.
     assert!(read["masterIdentifier"]["value"].is_string());
+    // EehrxfMhdDocumentReference holds attachment.data to 0..0, so the PDF form claims it not.
+    assert!(read.get("meta").is_none());
+    assert_eq!(read["docStatus"], "final");
     assert_eq!(read["type"]["coding"][0]["code"], "11502-2");
     assert_eq!(read["subject"]["reference"], "Patient/patient-1");
     assert_eq!(read["date"], "2026-10-25T12:00:00Z");
