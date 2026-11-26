@@ -230,10 +230,11 @@ fn changed(seq: u64) -> Result<Event, Box<dyn Error>> {
     })
 }
 
-/// Returns the synthetic Condition under an identifier of its own, so each
-/// measured create is a new delivery.
+/// Returns the synthetic Condition under a source id and an identifier of
+/// its own, so each measured create is a new delivery.
 fn identified(attempt: usize) -> serde_json::Value {
     let mut resource = condition();
+    resource["id"] = serde_json::json!(format!("ferrobridge-budget-condition-{attempt}"));
     resource["identifier"] = serde_json::json!([{
         "system": "http://example.org/fhir/sid/ferrobridge-condition",
         "value": format!("synthetic-condition-budget-{attempt}")
