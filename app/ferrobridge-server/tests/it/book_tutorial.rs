@@ -32,6 +32,10 @@ const PAGE: &str = include_str!(concat!(
 /// `DIAGNOSE_OPT` reads.
 const TEMPLATE_PATH: &str = "tools/ferrobridge-testkit/fixtures/opt/diagnose.opt";
 
+/// The table that keeps the served page from sending the usage report, which
+/// the page's configuration must carry, since a test server never reports.
+const USAGE_REPORT_OFF: &str = "[usage_report]\nenabled = false";
+
 /// The fewest requests the page holds; a page that loses its steps fails.
 const MIN_REQUESTS: usize = 5;
 
@@ -174,6 +178,10 @@ fn working_directory(tutorial: &Tutorial, root: &Path) -> Result<String, Box<dyn
         }
     }
     let configuration = configuration.ok_or("the page writes ferrobridge.toml")?;
+    assert!(
+        configuration.contains(USAGE_REPORT_OFF),
+        "the page's configuration switches the usage report off"
+    );
     let mut absolute = configuration.clone();
     for (key, directory) in [("directory", "mappings"), ("templates", "templates")] {
         let relative = format!("{key} = \"{directory}\"");
