@@ -12,6 +12,7 @@ mod lease;
 mod listen;
 mod migrate;
 mod owned;
+mod session;
 mod shl;
 
 use std::time::Duration;

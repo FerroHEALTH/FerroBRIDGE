@@ -26,11 +26,20 @@ fn settings(state: &State) -> Result<Settings, Error> {
         tls_ca_file: state.tls_ca_file.as_deref(),
     };
     let ca = keys.ca()?;
-    let connection = omop_cdm::connection::CdmConnection::new(url.expose_secret(), ca.as_deref())
-        .map_err(|source| Error::StateConnection {
-        key: keys.refused(&source),
-        source,
-    })?;
+    let session = omop_cdm::connection::session::Session {
+        statement_timeout: state.statement_timeout.get(),
+        lock_timeout: state.lock_timeout.get(),
+        idle_in_transaction_session_timeout: state.idle_in_transaction_session_timeout.get(),
+        statement_cache_capacity: state.statement_cache_capacity,
+        max_lifetime: state.max_lifetime.get(),
+        idle_timeout: state.idle_timeout.get(),
+    };
+    let connection = keys.connection(
+        url.expose_secret(),
+        ca.as_deref(),
+        session,
+        |key, source| Error::StateConnection { key, source },
+    )?;
     if state.max_connections == 0 {
         return Err(Error::Bound {
             key: String::from("state.max_connections"),
