@@ -23,6 +23,23 @@ directory = "app/ferrobridge-server/tests/it/repeated"
 [operations]
 enabled = false
 
+# The FerroPIX the gate starts for this arm (scripts/perf/gate.sh,
+# identity), asked over ITI-83 for the pseudonym of every subject the facade
+# resolves; its token comes from the gate's stub issuer, whose secret is
+# synthetic and accepted whatever it holds.
+[identity_source]
+pseudonym_domain = "urn:oid:2.999.9"
+source_domains = ["http://example.org/fhir/sid/ferrobridge-subject"]
+
+[identity_source.endpoint]
+url = "http://127.0.0.1:18110/fhir"
+
+[identity_source.endpoint.credentials.oauth]
+issuer = "http://127.0.0.1:18180/perf"
+client_id = "ferrobridge-perf"
+client_secret = "perf"
+scope = "system/Patient.rs"
+
 [facade]
 enabled = true
 base_url = "http://127.0.0.1:18080/fhir"
