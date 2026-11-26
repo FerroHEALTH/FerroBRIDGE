@@ -4,6 +4,7 @@
 //! The forms a document takes: its section slots, the codes it carries, and
 //! the companions and authorship each form names.
 
+use super::language::Language;
 #[cfg(feature = "patient-summary")]
 use super::{
     EPS_BUNDLE, EPS_PATIENT, IPS_BUNDLE, IPS_COMPOSITION, IPS_PATIENT, LOINC, PATIENT_SUMMARY,
@@ -130,6 +131,12 @@ pub enum Authorship {
     /// operator, is the composition's `custodian` unless the document names
     /// one ([`super::Document::with_custodian`]).
     ReportPerformers,
+    /// The authors the record names, each a `Practitioner`,
+    /// `PractitionerRole` or `Organization`, the only targets the MyHealth@EU
+    /// `Composition` profiles allow (`composition-hdr-myhealtheu`
+    /// `Composition.author`); the record's author is
+    /// [`super::authored::recorded_author`]'s.
+    Record,
 }
 
 /// A rule of a form's `Composition` profile over the sections a document
@@ -197,8 +204,8 @@ pub struct Form {
     /// The canonical URL of the `Encounter` profile, when the form requires
     /// the encounter the document is about.
     pub encounter: Option<&'static str>,
-    /// Whether the form requires `Bundle.language`.
-    pub language: bool,
+    /// What the form's profiles ask of the document's language.
+    pub language: Language,
     /// The rules of the `Composition` and `Bundle` profiles over the
     /// sections.
     pub rules: &'static [SectionRule],
@@ -223,7 +230,7 @@ pub const PATIENT_SUMMARY_FORM: Form = Form {
     slots: &SLOTS,
     report: None,
     encounter: None,
-    language: false,
+    language: Language::OPTIONAL,
     // NOTE: composition-eu-eps `ips-comp-1` (error) on these three slices: an entry or an emptyReason.
     rules: &[
         SectionRule::Reasoned {
@@ -258,7 +265,7 @@ pub const IPS_PATIENT_SUMMARY_FORM: Form = Form {
     slots: &IPS_SLOTS,
     report: None,
     encounter: None,
-    language: false,
+    language: Language::OPTIONAL,
     // NOTE: Composition-uv-ips 2.0.1 `ips-comp-1` (error) and `min` 1 on these three slices.
     rules: &[
         SectionRule::Reasoned {

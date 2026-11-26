@@ -18,6 +18,7 @@ use std::error::Error;
 use super::support::annex_iii;
 use eehrxf::document::Document;
 use eehrxf::document::discharge::{DISCHARGE_REPORT_FORM, HDR_SLOTS};
+use eehrxf::document::language::DocumentLanguage;
 use eehrxf::document::section::Section;
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::HDR;
@@ -413,7 +414,7 @@ fn discharge_document(identifier: &str) -> Result<(Document, String, String), Bo
         name: Some("Synthetic operator".into()),
         ..Organization::default()
     })))?;
-    document.with_language(String::from("en"));
+    document.with_language(DocumentLanguage::new("en", "GB")?)?;
     Ok((document, subject, device))
 }
 
