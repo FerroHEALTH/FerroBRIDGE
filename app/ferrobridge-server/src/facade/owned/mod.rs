@@ -294,7 +294,7 @@ fn key_of(resource_type: &str, id: &str) -> String {
 /// Returns `resource` with `id`, `meta.versionId` and `meta.lastUpdated`
 /// written, the rest of `meta` kept.
 fn stamp(mut resource: Object, id: &str, version: u64) -> Object {
-    crate::facade::identity::stamp(
+    crate::identity::stamp(
         &mut resource,
         id,
         &version.to_string(),

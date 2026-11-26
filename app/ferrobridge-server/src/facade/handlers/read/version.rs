@@ -10,6 +10,7 @@ use crate::cdr::ids::entity_tag;
 use crate::facade::Facade;
 use crate::facade::handlers::Refusal;
 use crate::facade::handlers::write;
+use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
@@ -53,7 +54,7 @@ pub(crate) fn canonical(
     ehr_id: &EhrId,
     composition: &Composition,
     template_id: &str,
-) -> Result<CanonicalComposition, Refusal> {
+) -> Result<CanonicalComposition, Refused> {
     crate::cdr::reach::touched(
         crate::cdr::reach::Touch::Read,
         Some(ehr_id),
@@ -61,7 +62,7 @@ pub(crate) fn canonical(
     );
     let text = openehr_its::json::to_canonical_json(composition);
     let value = text.parse::<serde_json::Value>().map_err(|error| {
-        reply::refusal(
+        Refused::new(
             StatusCode::BAD_GATEWAY,
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "the composition the CDR served could not be read back: {error}"
@@ -122,7 +123,7 @@ pub(super) async fn answered_version(
         CompositionGetOutcome::NoContent => Err(reported_deleted()),
         CompositionGetOutcome::NotFound { body } => Err(write::refuse(&status::Answer::new(
             status::NOT_FOUND,
-            status::diagnostics(StatusCode::NOT_FOUND, &body),
+            crate::cdr::error::diagnostics(StatusCode::NOT_FOUND, &body),
         ))),
     }
 }
@@ -154,7 +155,7 @@ pub(crate) async fn followed_version(
             format!(
                 "If-Match names version {}, which the CDR does not hold: {}",
                 version.value(),
-                status::diagnostics(StatusCode::NOT_FOUND, &body)
+                crate::cdr::error::diagnostics(StatusCode::NOT_FOUND, &body)
             ),
         ))),
     }

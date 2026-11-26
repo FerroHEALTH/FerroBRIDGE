@@ -24,7 +24,6 @@ use crate::facade::handlers::complete;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
 use crate::facade::ingest::Refused;
-use crate::facade::reply::Refusal;
 
 /// One resource a composition version maps to.
 #[derive(Debug, Clone)]
@@ -62,14 +61,14 @@ impl Resource {
 ///
 /// Every refusal a read of one of the resources answers, carrying its
 /// status: the identity map, the engine and a terminology server that did
-/// not answer.
+/// not answer. The facade renders it as its `OperationOutcome`.
 pub(crate) async fn resources_of(
     facade: &Facade,
     client: &CdrClient,
     ehr_id: &EhrId,
     version: &ObjectVersionId,
     composition: &Composition,
-) -> Result<Vec<Resource>, Refusal> {
+) -> Result<Vec<Resource>, Refused> {
     let Some(template_id) = composition
         .archetype_details
         .as_ref()
@@ -92,7 +91,7 @@ pub(crate) async fn resources_of(
         let program = loaded.program();
         let resource_type = program.resource().as_str();
         let entries = engine::entry::entries_of(program, loaded.index(), &canonical)
-            .map_err(|error| Refusal::from(Refused::from(error)))?;
+            .map_err(Refused::from)?;
         for entry in entries {
             let (id, _binding) = facade
                 .ingest(client.clone())

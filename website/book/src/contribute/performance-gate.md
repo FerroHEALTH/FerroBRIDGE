@@ -135,16 +135,18 @@ it lands. The job summary
 names each attempt's CPU model, its verdict and why a retry ran, and the
 verdict's summary names each attempt, a cancelled one with why the next ran.
 
-The build job builds four crates at a time (`CARGO_BUILD_JOBS=4`), one per
-core, and the build step logs the runner's used memory, swap and free disk
+The build job builds two crates at a time (`CARGO_BUILD_JOBS=2`), and the
+build step logs the runner's used memory, swap and free disk
 each minute. The hosted runner has 16 GB. A release build of `fhir-types` with
 every resource of all five FHIR releases peaks above it on its own: on #1737
 the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
 and the runner shut down. The bridge therefore compiles only the releases it
 speaks, through the release features of `ferrobridge-term`, and only the
 resources of each release it asks for, through the per-release resources
-features of `fhir-types`. Both builds then peak near 7 GB with no swap in
-use. Nothing is measured on the build runner: each attempt runs on a fresh
+features of `fhir-types`. The bridge still links a second copy of
+`fhir-types` through `ihe-atna` and `ihe-iti`, and four crates at a time
+then peaked at 15 GB with swap in use and lost the runner, so the job builds
+two at a time. Nothing is measured on the build runner: each attempt runs on a fresh
 one and logs its memory before the gate measures anything.
 
 ## Running it yourself

@@ -39,6 +39,7 @@ use http::StatusCode;
 use openehr_its::rest::client::ErrorBody;
 
 use crate::cdr::error::CdrError;
+use crate::cdr::error::diagnostics;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 
@@ -336,42 +337,6 @@ impl Answer {
     pub fn challenge(&self) -> Option<&str> {
         self.challenge.as_deref()
     }
-}
-
-/// Returns the diagnostics text of one `status` answer whose body is `body`.
-///
-/// The openEHR error body travels verbatim: the `message` and every
-/// `validationErrors` entry the CDR sent, or, from a CDR that answers RFC
-/// 9457 problem details, the `title`, the `detail` and every `errors` entry,
-/// and the raw body when the CDR sent something that is neither. It never
-/// reaches the wire as its own document (no specification governs this: our
-/// own design).
-#[must_use]
-pub fn diagnostics(status: StatusCode, body: &ErrorBody) -> String {
-    let mut text = format!("the openEHR service answered {status}");
-    let problem = crate::cdr::error::ProblemDetails::of(body.raw())
-        .map(|problem| problem.words())
-        .filter(|words| !words.is_empty());
-    match (body.error().map(|error| error.message.as_str()), problem) {
-        (Some(message), _) => {
-            text.push_str(": ");
-            text.push_str(message);
-            for entry in body.validation_errors() {
-                text.push_str("; ");
-                text.push_str(entry);
-            }
-        }
-        (None, Some(words)) => {
-            text.push_str(": ");
-            text.push_str(&words);
-        }
-        (None, None) if !body.is_empty() => {
-            text.push_str(": ");
-            text.push_str(&String::from_utf8_lossy(body.raw()));
-        }
-        (None, None) => {}
-    }
-    text
 }
 
 /// Returns the answer one CDR call that reached no usable documented answer

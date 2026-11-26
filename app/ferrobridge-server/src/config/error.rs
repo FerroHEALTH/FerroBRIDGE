@@ -101,7 +101,7 @@ pub enum Error {
         path: PathBuf,
         /// What the store reported.
         #[source]
-        source: Box<crate::facade::identity::store::StoreError>,
+        source: Box<crate::identity::store::StoreError>,
     },
     /// The facade base cannot issue demographic identities.
     #[error("{key} cannot be the issuer of a demographic identity")]

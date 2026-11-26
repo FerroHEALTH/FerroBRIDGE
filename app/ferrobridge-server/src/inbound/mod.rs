@@ -8,11 +8,16 @@
 //! source is answered, and the one `Handler` the workers on every replica
 //! run.
 //!
+//! The workers apply every stored item through one handler,
+//! [`apply::Apply`], which feeds the identity source and ensures the
+//! patient's one EHR.
+//!
 //! Each step is driven by a source's document, so a new source is data and
 //! never code. No specification governs an inbound patient-event intake
 //! (ITS-REST 1.1.0 defines no change notification): our own design, built on
 //! the standard of each step.
 
+pub mod apply;
 mod clients;
 pub mod event;
 pub mod intake;

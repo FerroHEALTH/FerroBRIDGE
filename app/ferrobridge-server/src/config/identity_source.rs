@@ -11,6 +11,7 @@ use ferrohealth_smart::client::outbound::OutboundClient;
 use ferrohealth_smart::config::ServerTls;
 use ihe_iti::pixm::PixmClient;
 use ihe_iti::pixm::identifier::TargetSystem;
+use ihe_iti::pixm::source::PixmSourceClient;
 
 /// Returns the identity source `section` names.
 ///
@@ -62,13 +63,14 @@ pub fn resolve(section: &Section) -> Result<IdentitySource, Error> {
         upstream: "identity_source",
         source: Box::new(source),
     })?;
-    let base = client.url().to_string();
-    let pixm = PixmClient::new(client).map_err(|_not_a_base| Error::FetchBase {
+    let not_a_base = |_invalid| Error::FetchBase {
         key: String::from("identity_source.endpoint.url"),
-        value: base,
-    })?;
+        value: client.url().to_string(),
+    };
+    let feed = PixmSourceClient::new(client.clone()).map_err(not_a_base)?;
+    let pixm = PixmClient::new(client.clone()).map_err(not_a_base)?;
     Ok(IdentitySource::new(
-        pixm,
+        (pixm, feed),
         pseudonym_domain,
         section.source_domains.clone(),
         section.endpoint.timeout.into(),

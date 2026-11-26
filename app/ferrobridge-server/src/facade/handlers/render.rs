@@ -33,15 +33,13 @@ use url::Url;
 use crate::facade::Facade;
 use crate::facade::engine;
 use crate::facade::handlers::complete;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::created::CreatedIdentities;
-use crate::facade::identity::store::Store;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
-use crate::facade::reply;
-use crate::facade::reply::Refusal;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::created::CreatedIdentities;
+use crate::identity::store::Store;
 use crate::terminology::{Direction, Session};
 use ferrohealth_usage_report::window::Window;
 
@@ -62,16 +60,16 @@ pub(crate) struct Rendered {
 /// # Errors
 ///
 /// The refusal an identity-store failure renders as.
-pub(crate) async fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value>, Refusal> {
+pub(crate) async fn subject_of(facade: &Facade, ehr_id: &EhrId) -> Result<Option<Value>, Refused> {
     let person = facade
         .store()
         .person_of(ehr_id)
         .await
-        .map_err(|error| crate::facade::handlers::write::store_refusal(&error))?;
+        .map_err(|error| crate::facade::ingest::refusal::store_refusal(&error))?;
     let Some(person) = person else {
         return Ok(None);
     };
-    let literal = crate::facade::subject::reference_of(
+    let literal = crate::facade::patients::reference_of(
         &facade.settings().subject,
         facade.store(),
         &facade.programs(),
@@ -146,7 +144,7 @@ pub(crate) async fn render(
     composition: &CanonicalComposition,
     origin: Origin<'_>,
     session: &Session<'_>,
-) -> Result<Rendered, Refusal> {
+) -> Result<Rendered, Refused> {
     let resource_type = program.resource().as_str();
     let (value, _created, warnings) =
         produce(program, index, composition, &origin, session).await?;
@@ -179,7 +177,7 @@ pub(crate) async fn render_created(
     origin: Origin<'_>,
     target: (&str, &FhirResourceId),
     session: &Session<'_>,
-) -> Result<Rendered, Refusal> {
+) -> Result<Rendered, Refused> {
     let (resource_type, id) = target;
     let (_value, created, warnings) =
         produce(program, index, composition, &origin, session).await?;
@@ -188,7 +186,7 @@ pub(crate) async fn render_created(
             && resource.get("id").and_then(Value::as_str) == Some(id.as_str())
     });
     let Some(Value::Object(body)) = found else {
-        return Err(reply::refusal(
+        return Err(Refused::new(
             StatusCode::NOT_FOUND,
             Issue::error(IssueType::NotFound).diagnosing(format!(
                 "{resource_type}/{id} names a resource the composition version no longer creates"
@@ -228,7 +226,7 @@ pub(crate) async fn render_units(
     composition: &CanonicalComposition,
     origin: Origin<'_>,
     session: &Session<'_>,
-) -> Result<Units, Refusal> {
+) -> Result<Units, Refused> {
     let resource_type = program.resource().as_str();
     let (own, created) = produce_own(program, index, composition, &origin, session).await?;
     let mut units = Units {
@@ -266,7 +264,7 @@ async fn produce_own(
     composition: &CanonicalComposition,
     origin: &Origin<'_>,
     session: &Session<'_>,
-) -> Result<(Rendered, Vec<Value>), Refusal> {
+) -> Result<(Rendered, Vec<Value>), Refused> {
     let resource_type = program.resource().as_str();
     let (value, created, warnings) = produce(program, index, composition, origin, session).await?;
     let body = resource_object(value, resource_type)?;
@@ -283,9 +281,9 @@ async fn produce_own(
 
 /// Reads the id of a resource the run created as a `kind`, a `500` when it
 /// is outside the R4 grammar.
-fn created_id(text: &str, kind: &str) -> Result<FhirResourceId, Refusal> {
+fn created_id(text: &str, kind: &str) -> Result<FhirResourceId, Refused> {
     FhirResourceId::new(text).map_err(|error| {
-        reply::refusal(
+        Refused::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "a {kind} the mapping created carries an id outside the R4 grammar: {error}"
@@ -309,7 +307,7 @@ pub(crate) async fn render_document(
     composition: &CanonicalComposition,
     origin: Origin<'_>,
     session: &Session<'_>,
-) -> Result<(Rendered, Vec<Rendered>), Refusal> {
+) -> Result<(Rendered, Vec<Rendered>), Refused> {
     let (own, created) = produce_own(program, index, composition, &origin, session).await?;
     let mut parts = Vec::with_capacity(created.len());
     for resource in created {
@@ -340,7 +338,7 @@ async fn produce(
     composition: &CanonicalComposition,
     origin: &Origin<'_>,
     session: &Session<'_>,
-) -> Result<(Value, Vec<Value>, Vec<Warning>), Refusal> {
+) -> Result<(Value, Vec<Value>, Vec<Warning>), Refused> {
     let resolved = session
         .resolve(Direction::ToFhir, |terminology| {
             engine::outbound(
@@ -366,7 +364,7 @@ async fn produce(
     )
     .map_err(|error| {
         crate::usage_report::record_mapping_failure(origin.usage);
-        Refusal::from(Refused::of_answer(&status::of_outbound_refusal(&error)))
+        Refused::of_answer(&status::of_outbound_refusal(&error))
     })?;
     identities
         .persist()
@@ -379,8 +377,8 @@ async fn produce(
 
 /// Returns the `500` a created resource whose identity cannot be recorded
 /// answers.
-fn created_refusal(error: &crate::facade::identity::created::CreatedError) -> Refusal {
-    reply::refusal(
+fn created_refusal(error: &crate::identity::created::CreatedError) -> Refused {
+    Refused::new(
         StatusCode::INTERNAL_SERVER_ERROR,
         Issue::error(IssueType::Exception).diagnosing(format!(
             "a resource the mapping created has no identity: {error}"
@@ -397,7 +395,7 @@ fn decorate(
     origin: &Origin<'_>,
     profile: Option<&str>,
     warnings: Vec<Warning>,
-) -> Result<Rendered, Refusal> {
+) -> Result<Rendered, Refused> {
     let filled: Vec<&'static str> =
         complete::fill_subject(&mut body, resource_type, origin.subject)
             .into_iter()
@@ -433,7 +431,7 @@ fn decorate(
             absent = absent.join(", "),
             "the rendered resource lacks elements R4 requires"
         );
-        return Err(Refusal::from(complete::refusal(resource_type, &absent)));
+        return Err(complete::refusal(resource_type, &absent));
     }
     Ok(Rendered {
         body,
@@ -448,16 +446,16 @@ fn decorate(
 /// the resource type the program maps and the JSON kind the engine produced.
 /// The status is the table's [`status::INTERNAL`] row, because the engine is
 /// the bridge's own.
-fn resource_object(value: Value, resource_type: &str) -> Result<Object, Refusal> {
+fn resource_object(value: Value, resource_type: &str) -> Result<Object, Refused> {
     match value {
         Value::Object(object) => Ok(object),
-        other => Err(Refusal::from(Refused::of_answer(&status::Answer::new(
+        other => Err(Refused::of_answer(&status::Answer::new(
             status::INTERNAL,
             format!(
                 "the engine produced {} where a {resource_type} resource object belongs",
                 json_kind(&other)
             ),
-        )))),
+        ))),
     }
 }
 /// Records what the facade filled on one rendered resource and the declared
@@ -539,14 +537,14 @@ pub(crate) fn composition_url(
     base: &Url,
     ehr_id: &EhrId,
     version: &ObjectVersionId,
-) -> Result<Url, Refusal> {
+) -> Result<Url, Refused> {
     base.join(&format!(
         "ehr/{}/composition/{}",
         ehr_id.as_str(),
         version.value()
     ))
     .map_err(|error| {
-        reply::refusal(
+        Refused::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             Issue::error(IssueType::Exception).diagnosing(format!(
                 "the composition URL could not be built from the configured CDR base: {error}"
@@ -575,7 +573,7 @@ mod tests {
         let produced = Value::Array(vec![Value::String(String::from(MARKER))]);
         let refusal =
             resource_object(produced, "Condition").expect_err("an array is no resource object");
-        let response = refusal.into_response();
+        let response = crate::facade::reply::Refusal::from(refusal).into_response();
         assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, response.status());
         let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024)
             .await
