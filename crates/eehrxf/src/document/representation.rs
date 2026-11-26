@@ -27,7 +27,8 @@ use crate::document::{Document, DocumentError};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Representation {
-    /// Art 3(1)(a): a PDF/A-1 document embedded in a FHIR resource.
+    /// Art 3(1)(a): a PDF document embedded in a FHIR resource, PDF/A-1a or
+    /// PDF/A-1b by Annex II footnote 1.
     Pdf,
     /// Art 3(1)(b): FHIR narrative organised by data group.
     Narrative,

@@ -251,8 +251,8 @@ fn describe(
         .map_err(|error| undescribed(error.to_string()))?;
     let typed = Bundle::from_json(bundle, &mut Path::root("Bundle"))
         .map_err(|error| undescribed(error.to_string()))?;
-    // NOTE: draft EEHRxF Art 14(1): the priority category is the one whose Bundle profile the
-    // document claims; a document of none is described without one.
+    // NOTE: Regulation (EU) 2025/327 Art 14(1): the priority category is the one whose Bundle
+    // profile the document claims; a document of none is described without one.
     let priority = typed.meta.as_ref().and_then(|meta| {
         Category::ENABLED.iter().copied().find(|category| {
             category.profiles().is_some_and(|profiles| {
