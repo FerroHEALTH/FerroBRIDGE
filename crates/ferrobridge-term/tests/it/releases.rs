@@ -195,6 +195,44 @@ fn a_false_result_keeps_its_matches() -> Result<(), Error> {
 }
 
 #[test]
+fn the_ecosystem_error_output_and_match_note_are_read() -> Result<(), Error> {
+    let body = r#"{"resourceType":"Parameters","parameter":[
+        {"name":"result","valueBoolean":false},
+        {"name":"match","part":[
+          {"name":"concept","valueCoding":{"system":"http://example.org/target","code":"code7"}}]},
+        {"name":"match","part":[
+          {"name":"concept","valueCoding":{"system":"http://example.org/unknown","code":"x"}},
+          {"name":"note","valueString":"code system not known, code not validated"}]},
+        {"name":"error","valueString":"code7 is not valid in http://example.org/target"}]}"#;
+    for version in [
+        WireVersion::R4,
+        WireVersion::R4B,
+        WireVersion::R5,
+        WireVersion::R6,
+    ] {
+        let outcome = answer(version, &translation(), &url(), StatusCode::OK, body)?;
+        let BatchOutcome::Translate(TranslateOutcome::NoMatch {
+            matches, errors, ..
+        }) = outcome
+        else {
+            panic!("{version:?}: no match, got {outcome:?}");
+        };
+        assert_eq!(
+            vec!["code7 is not valid in http://example.org/target".to_owned()],
+            errors,
+            "{version:?}"
+        );
+        let notes: Vec<Option<&str>> = matches.iter().map(|found| found.note.as_deref()).collect();
+        assert_eq!(
+            vec![None, Some("code system not known, code not validated")],
+            notes,
+            "{version:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn an_r5_lookup_reads_its_definition() -> Result<(), Error> {
     let lookup = Request::Lookup {
         system: "http://example.org/cs".to_owned(),

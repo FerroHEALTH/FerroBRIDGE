@@ -45,6 +45,7 @@ use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 
 mod assembly;
+pub mod authored;
 #[cfg(feature = "discharge")]
 pub mod discharge;
 pub mod display;
@@ -53,6 +54,7 @@ pub mod form;
 pub mod imaging;
 #[cfg(feature = "laboratory")]
 pub mod laboratory;
+pub mod language;
 #[cfg(feature = "imaging")]
 pub mod manifest;
 mod mapped;
@@ -67,6 +69,7 @@ pub mod vaccination;
 #[cfg(feature = "patient-summary")]
 use form::PATIENT_SUMMARY_FORM;
 use form::{Code, Form};
+use language::{DocumentLanguage, HeldLanguage};
 use section::{Emptied, Section};
 
 /// The `id` a report that carries none is written under.
@@ -95,6 +98,11 @@ pub const IPS_COMPOSITION: &str =
 /// profile.
 #[cfg(feature = "patient-summary")]
 pub const IPS_PATIENT: &str = "http://hl7.org/fhir/uv/ips/StructureDefinition/Patient-uv-ips";
+
+/// The canonical URL of the MyHealth@EU Core `Patient` profile, which the
+/// MyHealth@EU `Bundle` profiles name for their patient entry slice.
+pub const MYHEALTHEU_PATIENT: &str =
+    "http://fhir.ehdsi.eu/core/StructureDefinition/patient-myhealtheu-core";
 
 /// The LOINC code system, which codes the document type and every section.
 pub const LOINC: &str = "http://loinc.org";
@@ -148,6 +156,37 @@ pub enum DocumentError {
         /// The section slice.
         slice: &'static str,
     },
+    /// The form binds the language to a value set no terminology answer
+    /// says holds the language given.
+    #[error(
+        "the document's form binds its language to {value_set}, which no terminology answer says holds the language given"
+    )]
+    UnheldLanguage {
+        /// The value set the form binds the language to.
+        value_set: &'static str,
+    },
+    /// A form whose authors are the record's names an author that is no
+    /// `Practitioner`, `PractitionerRole` or `Organization`
+    /// ([`form::Authorship::Record`]).
+    #[error(
+        "the document's form takes the author {full_url} for none, only a Practitioner, PractitionerRole or Organization"
+    )]
+    Author {
+        /// The author's `fullUrl`.
+        full_url: String,
+    },
+    /// The composition names neither a composer with a name nor a health
+    /// care facility with one, so the record names no author.
+    #[error(
+        "the composition names neither an identified composer nor a health care facility, so it names no author"
+    )]
+    Unauthored,
+    /// An identifier of the recorded author carries no `id`, which openEHR
+    /// RM 1.1.0 `DV_IDENTIFIER` requires.
+    #[error(
+        "an identifier of the composition's author carries no id, which DV_IDENTIFIER requires"
+    )]
+    AuthorIdentifier,
     /// The form requires a part the document was not given.
     #[error("the document's form requires its {part}, which was not given")]
     Missing {
@@ -485,10 +524,39 @@ impl Document {
         Ok(reference)
     }
 
-    /// Sets `language`, a BCP 47 tag, as the document's `Bundle.language` and
-    /// `Composition.language`.
-    pub fn with_language(&mut self, language: String) {
-        self.language = Some(language);
+    /// Sets `language` as the document's `Bundle.language` and
+    /// `Composition.language`, and the language of each data group its
+    /// metadata fills.
+    ///
+    /// # Errors
+    ///
+    /// [`DocumentError::UnheldLanguage`] for a form whose `Composition`
+    /// profile binds the language to a value set
+    /// ([`language::Language::binding`]), which takes only a
+    /// [`HeldLanguage`] ([`Document::with_held_language`]).
+    pub fn with_language(&mut self, language: DocumentLanguage) -> Result<(), DocumentError> {
+        if let Some(value_set) = self.form.language.binding {
+            return Err(DocumentError::UnheldLanguage { value_set });
+        }
+        self.language = Some(language.into_tag());
+        Ok(())
+    }
+
+    /// Sets `language`, which the terminology server answered a value set
+    /// holds, as [`Document::with_language`] sets a language.
+    ///
+    /// # Errors
+    ///
+    /// [`DocumentError::UnheldLanguage`] when the form binds the language to
+    /// another value set than the one that holds it.
+    pub fn with_held_language(&mut self, language: HeldLanguage) -> Result<(), DocumentError> {
+        if let Some(value_set) = self.form.language.binding
+            && value_set != language.value_set()
+        {
+            return Err(DocumentError::UnheldLanguage { value_set });
+        }
+        self.language = Some(language.into_tag());
+        Ok(())
     }
 
     /// Sets `report` as the report the form holds beside the composition.
@@ -611,10 +679,11 @@ impl Document {
     /// language that was not given, [`DocumentError::MissingMetadata`] when
     /// it requires a legal authentication the metadata does not name, and
     /// [`DocumentError::Report`] when the form holds a report and none was
-    /// given. With metadata set
+    /// given, and [`DocumentError::Author`] or [`DocumentError::Unauthored`]
+    /// when a form whose authors are the record's names another author or
+    /// none ([`form::Authorship::Record`]). With metadata set
     /// ([`Document::with_metadata`]), [`DocumentError::DataGroup`] for a data
-    /// group with no subject and [`DocumentError::TooMany`] for a second
-    /// language. For a narrative-only document ([`Document::narrative_only`]),
+    /// group with no subject. For a narrative-only document ([`Document::narrative_only`]),
     /// [`DocumentError::NarrativeOnly`] for a section with an entry.
     pub fn into_bundle(mut self) -> Result<Bundle, DocumentError> {
         self.hold_representation()?;

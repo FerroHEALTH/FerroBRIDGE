@@ -214,7 +214,7 @@ pub mod message_header;
 pub mod meta;
 #[cfg(feature = "terminology")]
 pub mod money;
-#[cfg(any(feature = "resources", feature = "r6-resources"))]
+#[cfg(feature = "terminology")]
 pub mod naming_system;
 #[cfg(feature = "terminology")]
 pub mod narrative;

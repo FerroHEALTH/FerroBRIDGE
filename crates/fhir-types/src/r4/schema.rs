@@ -67974,7 +67974,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "r4-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "NamingSystem",
             path: "NamingSystem",
@@ -68255,7 +68255,7 @@ pub static SCHEMAS: Schemas = Schemas {
                 },
             ],
         },
-        #[cfg(any(feature = "resources", feature = "r4-resources"))]
+        #[cfg(feature = "terminology")]
         TypeSchema {
             name: "NamingSystemUniqueId",
             path: "NamingSystem.uniqueId",
@@ -105060,7 +105060,7 @@ pub static SCHEMAS: Schemas = Schemas {
         "MessageHeader",
         #[cfg(any(feature = "resources", feature = "r4-resources"))]
         "MolecularSequence",
-        #[cfg(any(feature = "resources", feature = "r4-resources"))]
+        #[cfg(feature = "terminology")]
         "NamingSystem",
         #[cfg(any(feature = "resources", feature = "r4-resources"))]
         "NutritionOrder",

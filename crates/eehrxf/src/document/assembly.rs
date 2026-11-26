@@ -12,6 +12,7 @@ use fhir_types::r4::extension::{Extension, ExtensionValue};
 use fhir_types::r4::identifier::Identifier;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::reference::Reference;
+use fhir_types::r4::resource::Resource;
 
 use crate::document::form::{Authorship, Companion, Kind, SectionRule};
 use crate::document::{Document, DocumentError, REPORT_ID, URN_SYSTEM, coding, reference};
@@ -118,19 +119,48 @@ impl Document {
         Ok(())
     }
 
-    /// Holds the document to the parts its form requires: the encounter, the
-    /// language and the legal authentication.
+    /// Holds the document to the parts its form requires: the authors, the
+    /// encounter, the language and the legal authentication.
     pub(super) fn hold_parts(&self) -> Result<(), DocumentError> {
         if self.form.encounter.is_some() && self.encounter.is_none() {
             return Err(DocumentError::Missing { part: "encounter" });
         }
-        if self.form.language && self.language.is_none() {
+        if self.form.authorship == Authorship::Record {
+            self.hold_recorded_authors()?;
+        }
+        if self.form.language.required && self.language.is_none() {
             return Err(DocumentError::Missing { part: "language" });
         }
         if self.form.legal_authentication && !self.legally_authenticated() {
             return Err(DocumentError::MissingMetadata {
                 element: "legalAuthentication",
             });
+        }
+        Ok(())
+    }
+
+    /// Holds the authors of a form whose authors are the record's
+    /// ([`Authorship::Record`]): at least one, and each a `Practitioner`,
+    /// `PractitionerRole` or `Organization`.
+    fn hold_recorded_authors(&self) -> Result<(), DocumentError> {
+        if self.authors.is_empty() {
+            return Err(DocumentError::Unauthored);
+        }
+        for author in &self.authors {
+            let recorded = self.entries.iter().any(|(full_url, resource)| {
+                full_url == author
+                    && matches!(
+                        resource,
+                        Resource::Practitioner(_)
+                            | Resource::PractitionerRole(_)
+                            | Resource::Organization(_)
+                    )
+            });
+            if !recorded {
+                return Err(DocumentError::Author {
+                    full_url: author.clone(),
+                });
+            }
         }
         Ok(())
     }

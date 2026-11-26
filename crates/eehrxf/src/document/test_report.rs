@@ -14,6 +14,7 @@
 
 use crate::document::LOINC;
 use crate::document::form::{Authorship, Code, Companion, Form, Kind, Slot};
+use crate::document::language::Language;
 
 /// The R4 `Bundle` definition the document claims.
 pub const TEST_REPORT_BUNDLE: &str = "http://hl7.org/fhir/StructureDefinition/Bundle";
@@ -65,7 +66,7 @@ pub const TEST_REPORT_FORM: Form = Form {
         back: "http://hl7.org/fhir/5.0/StructureDefinition/extension-DiagnosticReport.composition",
     }),
     encounter: None,
-    language: false,
+    language: Language::OPTIONAL,
     // NOTE: FHIR R4 Composition cmp-1 holds by the narrative every section carries.
     rules: &[],
     legal_authentication: false,
