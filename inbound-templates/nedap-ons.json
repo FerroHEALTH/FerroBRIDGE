@@ -1,0 +1,59 @@
+{
+  "name": "nedap-ons",
+  "kind": "webhook",
+  "enabled": false,
+  "document": {
+    "verify": {
+      "kind": "hmac",
+      "algorithm": "sha512",
+      "header": "X-Signature-SHA512",
+      "encoding": "hex"
+    },
+    "keys": [{"secret": "nedap-ons-connector-secret"}],
+    "events": {
+      "tenant": "/customerCode",
+      "entity": "/id",
+      "rules": [
+        {"when": {"/eventType": "NOP"}, "action": "probe"},
+        {"when": {"/modelType": "client", "/eventType": "CREATE"}, "action": "upsert"},
+        {"when": {"/modelType": "client", "/eventType": "UPDATE"}, "action": "upsert"},
+        {"when": {"/modelType": "client", "/eventType": "DELETE"}, "action": "remove"}
+      ],
+      "otherwise": "ignore",
+      "dedupe": {"pointers": ["/customerCode", "/modelType", "/eventType", "/id", "/timestamp"]},
+      "stamp": "/timestamp"
+    },
+    "tenants": [],
+    "limits": {"concurrency": 4},
+    "recovery": {
+      "redeliver": {
+        "method": "PUT",
+        "url": "https://api.ons.io/webhooks/redeliver",
+        "credentials": {"secret": "nedap-ons-environment-certificate"}
+      },
+      "reconcile": {
+        "every": 900,
+        "overlap": 60,
+        "first": 86400,
+        "polls": [
+          {"url": "https://api.ons.io/v0/xstream/clients/updates", "cursor": "since", "items": "/clients", "entity": "/id", "change": "upsert"},
+          {"url": "https://api.ons.io/v0/xstream/clients/deletes", "cursor": "since", "items": "/clients", "entity": "/id", "change": "remove"}
+        ]
+      }
+    },
+    "resolve": {
+      "calls": [
+        {
+          "path": "/v0/administration/clients/{entity}",
+          "headers": {"X-Field-Whitelist": "id,firstName,lastName,dateOfBirth,gender,deathDate"}
+        },
+        {
+          "path": "/v0/administration/clients/{entity}/bsn",
+          "headers": {"X-Field-Whitelist": "number,idVerified"}
+        }
+      ],
+      "removed_on": 404,
+      "map": "https://ferrobridge.eu/fhir/nedap-ons/StructureMap/client-patient"
+    }
+  }
+}

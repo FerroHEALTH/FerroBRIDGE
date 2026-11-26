@@ -1,0 +1,14 @@
+{
+  "name": "eu.ferrobridge.nedap-ons.values",
+  "version": "0.1.0",
+  "type": "Conformance",
+  "license": "BUSL-1.1",
+  "canonical": "https://ferrobridge.eu/fhir/nedap-ons",
+  "title": "FerroBRIDGE Nedap Ons value maps",
+  "description": "The code system and ConceptMap the Nedap Ons source template's map translates the client's gender through. Load it into the terminology server before a source is created from the template; the map translates every value through ConceptMap/$translate.",
+  "fhirVersions": ["4.0.1"],
+  "dependencies": {
+    "hl7.fhir.r4.core": "4.0.1"
+  },
+  "author": "Cadasto B.V. (FerroBRIDGE)"
+}

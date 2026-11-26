@@ -1,0 +1,673 @@
+{
+  "abstract": false,
+  "kind": "logical",
+  "name": "Client",
+  "resourceType": "StructureDefinition",
+  "snapshot": {
+    "element": [
+      {
+        "id": "Client",
+        "max": "1",
+        "min": 0,
+        "path": "Client",
+        "type": [
+          {
+            "code": "Base"
+          }
+        ]
+      },
+      {
+        "id": "Client.birthName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.birthName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.birthNamePrefix",
+        "max": "1",
+        "min": 0,
+        "path": "Client.birthNamePrefix",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.createdAt",
+        "max": "1",
+        "min": 0,
+        "path": "Client.createdAt",
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      },
+      {
+        "id": "Client.dateOfBirth",
+        "max": "1",
+        "min": 0,
+        "path": "Client.dateOfBirth",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
+        "id": "Client.emailAddress",
+        "max": "1",
+        "min": 0,
+        "path": "Client.emailAddress",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.firstName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.firstName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.freeField1",
+        "max": "1",
+        "min": 0,
+        "path": "Client.freeField1",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.freeField2",
+        "max": "1",
+        "min": 0,
+        "path": "Client.freeField2",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.freeField3",
+        "max": "1",
+        "min": 0,
+        "path": "Client.freeField3",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.freeField4",
+        "max": "1",
+        "min": 0,
+        "path": "Client.freeField4",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.gender",
+        "max": "1",
+        "min": 0,
+        "path": "Client.gender",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.id",
+        "max": "1",
+        "min": 0,
+        "path": "Client.id",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Client.identificationNo",
+        "max": "1",
+        "min": 0,
+        "path": "Client.identificationNo",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.initials",
+        "max": "1",
+        "min": 0,
+        "path": "Client.initials",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.lastName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.lastName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.mobilePhone",
+        "max": "1",
+        "min": 0,
+        "path": "Client.mobilePhone",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.name",
+        "max": "1",
+        "min": 0,
+        "path": "Client.name",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.partnerName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.partnerName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.partnerNamePrefix",
+        "max": "1",
+        "min": 0,
+        "path": "Client.partnerNamePrefix",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.preferredNameType",
+        "max": "1",
+        "min": 0,
+        "path": "Client.preferredNameType",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.prefix",
+        "max": "1",
+        "min": 0,
+        "path": "Client.prefix",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.updatedAt",
+        "max": "1",
+        "min": 0,
+        "path": "Client.updatedAt",
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      },
+      {
+        "id": "Client.addressString",
+        "max": "1",
+        "min": 0,
+        "path": "Client.addressString",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocationBeginDate",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocationBeginDate",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocationEndDate",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocationEndDate",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocationReason",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocationReason",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations",
+        "max": "*",
+        "min": 0,
+        "path": "Client.careAllocations",
+        "type": [
+          {
+            "code": "BackboneElement"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.beginDate",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.beginDate",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.careProviderId",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.careProviderId",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.clientId",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.clientId",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.comments",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.comments",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.destination",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.destination",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.endDate",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.endDate",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.id",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.id",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.reason",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.reason",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.careAllocations.reasonTemporary",
+        "max": "1",
+        "min": 0,
+        "path": "Client.careAllocations.reasonTemporary",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.civilStatus",
+        "max": "1",
+        "min": 0,
+        "path": "Client.civilStatus",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Client.civilStatusDate",
+        "max": "1",
+        "min": 0,
+        "path": "Client.civilStatusDate",
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      },
+      {
+        "id": "Client.deathDate",
+        "max": "1",
+        "min": 0,
+        "path": "Client.deathDate",
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      },
+      {
+        "id": "Client.genderIdentity",
+        "max": "1",
+        "min": 0,
+        "path": "Client.genderIdentity",
+        "type": [
+          {
+            "code": "BackboneElement"
+          }
+        ]
+      },
+      {
+        "id": "Client.genderIdentity.description",
+        "max": "1",
+        "min": 0,
+        "path": "Client.genderIdentity.description",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.genderIdentity.type",
+        "max": "1",
+        "min": 0,
+        "path": "Client.genderIdentity.type",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.genderIdentityType",
+        "max": "1",
+        "min": 0,
+        "path": "Client.genderIdentityType",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.givenName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.givenName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.hometown",
+        "max": "1",
+        "min": 0,
+        "path": "Client.hometown",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.language",
+        "max": "1",
+        "min": 0,
+        "path": "Client.language",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.levelOfEducation",
+        "max": "1",
+        "min": 0,
+        "path": "Client.levelOfEducation",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.livingSituation",
+        "max": "1",
+        "min": 0,
+        "path": "Client.livingSituation",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.match",
+        "max": "1",
+        "min": 0,
+        "path": "Client.match",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.nationality",
+        "max": "1",
+        "min": 0,
+        "path": "Client.nationality",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.preferredName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.preferredName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.pronouns",
+        "max": "1",
+        "min": 0,
+        "path": "Client.pronouns",
+        "type": [
+          {
+            "code": "BackboneElement"
+          }
+        ]
+      },
+      {
+        "id": "Client.pronouns.description",
+        "max": "1",
+        "min": 0,
+        "path": "Client.pronouns.description",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.pronouns.type",
+        "max": "1",
+        "min": 0,
+        "path": "Client.pronouns.type",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.pronounsType",
+        "max": "1",
+        "min": 0,
+        "path": "Client.pronounsType",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.religion",
+        "max": "1",
+        "min": 0,
+        "path": "Client.religion",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.secretClient",
+        "max": "1",
+        "min": 0,
+        "path": "Client.secretClient",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "Client.skn",
+        "max": "1",
+        "min": 0,
+        "path": "Client.skn",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.uuid",
+        "max": "1",
+        "min": 0,
+        "path": "Client.uuid",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      }
+    ]
+  },
+  "status": "draft",
+  "type": "Client",
+  "url": "https://ferrobridge.eu/fhir/nedap-ons/StructureDefinition/Client"
+}

@@ -9,6 +9,7 @@ mod apply;
 mod body;
 mod event;
 pub(crate) mod intake;
+pub(crate) mod nedap_ons;
 mod notification;
 mod proofs;
 pub(crate) mod recover;
