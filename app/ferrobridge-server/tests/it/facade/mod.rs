@@ -13,6 +13,7 @@ mod attestation;
 pub(crate) mod auth;
 pub(crate) mod batch;
 mod bound;
+mod budget;
 mod capability;
 mod conditional;
 mod consent;
