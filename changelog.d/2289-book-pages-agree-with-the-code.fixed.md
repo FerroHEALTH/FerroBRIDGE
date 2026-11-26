@@ -1,0 +1,1 @@
+- The book's configuration example and variable mapping, the settings registers route, the OMOP ETL page's account of the ported Data Quality Dashboard checks and the EHDS readiness row of the patient summary Composition agree with the code.

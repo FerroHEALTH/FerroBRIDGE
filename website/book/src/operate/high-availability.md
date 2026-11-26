@@ -47,7 +47,7 @@ store pins ([`[state.seal]`](configuration.md#stateseal)).
 | The change feed | `[change_feed]` | The watermarks, the parked events and their decisions |
 | The audit outbox | `[audit]` | Each BALP `AuditEvent`, committed before the answer, until the repository takes it |
 | Mapping revisions | `[operator]` | The console's mapping files and every revision of them |
-| Settings registers | `/operator/registers` | Runtime settings such as `audit-categories` |
+| Settings registers | `/operator/registers/{register}` | Runtime settings such as `audit-categories` |
 | Inbound sources | `/operator/sources` | Each source document at every version, with its tenants and HL7 v2 routes |
 | The inbound intake | `[inbound]` | The stored events, one work item per entity, the slots and the recovery cursors |
 
