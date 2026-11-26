@@ -20,6 +20,8 @@ use crate::graph::key::VisitKey;
 pub enum Step {
     /// Reading the server's version after connecting.
     ServerVersion,
+    /// Reading the session settings back after connecting.
+    Session,
     /// Creating the bridge schema and its tables.
     Init,
     /// Opening a transaction.
@@ -54,6 +56,7 @@ impl fmt::Display for Step {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ServerVersion => f.write_str("reading the server version"),
+            Self::Session => f.write_str("reading the session settings"),
             Self::Init => f.write_str("creating the bridge schema"),
             Self::Begin => f.write_str("opening the transaction"),
             Self::Lock => f.write_str("locking the composition"),
@@ -95,6 +98,9 @@ pub enum WriteError {
     /// [`MINIMUM_SERVER_VERSION`](crate::connection::MINIMUM_SERVER_VERSION).
     #[error("the CDM database runs an unsupported PostgreSQL")]
     UnsupportedServer(#[from] UnsupportedServer),
+    /// The server does not hold the session settings the writer sent.
+    #[error("the CDM database does not hold the session settings")]
+    Session(#[from] crate::connection::session::SessionError),
     /// PostgreSQL refused a statement.
     #[error("PostgreSQL refused {step}")]
     Database {

@@ -30,6 +30,20 @@ pub struct State {
     /// How long a request waits for a connection before the store answers
     /// that it is unavailable.
     pub acquire_timeout: Duration,
+    /// The longest one statement runs before the server cancels it; `0s`
+    /// disables it.
+    pub statement_timeout: Duration,
+    /// The longest a statement waits for a lock; `0s` disables it.
+    pub lock_timeout: Duration,
+    /// The longest a session stays idle inside an open transaction; `0s`
+    /// disables it.
+    pub idle_in_transaction_session_timeout: Duration,
+    /// How many prepared statements each pooled connection keeps.
+    pub statement_cache_capacity: usize,
+    /// The longest a pooled connection lives.
+    pub max_lifetime: Duration,
+    /// The longest a pooled connection stays idle.
+    pub idle_timeout: Duration,
     /// The keys stored bodies are sealed under, when any area seals.
     pub seal: Option<StateSeal>,
 }
@@ -43,6 +57,15 @@ impl Default for State {
             tls_ca_file: None,
             max_connections: 10,
             acquire_timeout: Duration::from_secs(5),
+            // NOTE: PostgreSQL 19 docs, "Client Connection Defaults": a state statement is one short
+            // read or write, a held lock waits no longer than a connection does, and an abandoned
+            // transaction releases its locks within a minute.
+            statement_timeout: Duration::from_secs(30),
+            lock_timeout: Duration::from_secs(5),
+            idle_in_transaction_session_timeout: Duration::from_secs(60),
+            statement_cache_capacity: 100,
+            max_lifetime: Duration::from_secs(30 * 60),
+            idle_timeout: Duration::from_secs(10 * 60),
             seal: None,
         }
     }

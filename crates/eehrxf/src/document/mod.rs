@@ -187,6 +187,17 @@ pub enum DocumentError {
         "an identifier of the composition's author carries no id, which DV_IDENTIFIER requires"
     )]
     AuthorIdentifier,
+    /// An entry the record wrote carries no value of an element the form's
+    /// entry profile requires of it ([`form::EntryRule`]).
+    #[error("a {resource} entry carries no {element}, which {profile} requires")]
+    EntryElement {
+        /// The resource type of the entry.
+        resource: &'static str,
+        /// The element the entry carries no value of.
+        element: &'static str,
+        /// The canonical URL of the profile that requires it.
+        profile: &'static str,
+    },
     /// The form requires a part the document was not given.
     #[error("the document's form requires its {part}, which was not given")]
     Missing {
@@ -681,12 +692,15 @@ impl Document {
     /// [`DocumentError::Report`] when the form holds a report and none was
     /// given, and [`DocumentError::Author`] or [`DocumentError::Unauthored`]
     /// when a form whose authors are the record's names another author or
-    /// none ([`form::Authorship::Record`]). With metadata set
+    /// none ([`form::Authorship::Record`]), [`DocumentError::EntryElement`]
+    /// for an entry that carries no value of an element the form's entry
+    /// profile requires ([`form::EntryRule`]). With metadata set
     /// ([`Document::with_metadata`]), [`DocumentError::DataGroup`] for a data
     /// group with no subject. For a narrative-only document ([`Document::narrative_only`]),
     /// [`DocumentError::NarrativeOnly`] for a section with an entry.
     pub fn into_bundle(mut self) -> Result<Bundle, DocumentError> {
         self.hold_representation()?;
+        self.hold_entry_rules()?;
         self.fill_data_groups()?;
         let held: BTreeSet<&str> = self.entries.iter().map(|(url, _)| url.as_str()).collect();
         let mut sections = Vec::with_capacity(self.sections.len());

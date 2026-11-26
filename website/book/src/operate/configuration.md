@@ -491,6 +491,12 @@ indicator that reports whether the database answers.
 | `schema` | `cdm` | no | The schema the CDM tables live in, an unquoted lower-case identifier |
 | `bridge_schema` | `ferrobridge` | no | The schema the bridge keeps its natural-key side table, id sequences and watermarks in |
 | `person_policy` | `create_on_first_sight` | no | For a person no mapping writes a `PERSON` row for: `create_on_first_sight` gives the EHR a `person_id` and a placeholder `PERSON` row (concepts 0, `year_of_birth` 0) the first time a row refers to it; `existing` refuses a row whose EHR has no `PERSON` row ([The PERSON row](../integrate/omop-etl.md#the-person-row)) |
+| `statement_timeout` | `0s` | no | The longest one statement runs before the server cancels it; `0s`, the default, sets none, because a vocabulary load or a derived table build runs one statement for minutes |
+| `lock_timeout` | `60s` | no | The longest a statement waits for a lock; `0s` waits without limit |
+| `idle_in_transaction_session_timeout` | `10m` | no | The longest a session stays idle inside an open transaction before the server ends it; `0s` sets none |
+| `statement_cache_capacity` | `100` | no | How many prepared statements each connection of the concept resolver's pool keeps; `0` keeps none |
+| `max_lifetime` | `30m` | no | The longest a pooled connection lives before the pool replaces it; more than `0s` |
+| `idle_timeout` | `10m` | no | The longest a pooled connection stays idle before the pool closes it; more than `0s` |
 
 Two clients open the database: the concept resolver's pool and the CDM
 writer's own connection. Both read the `sslmode` of `url` and the CA from
@@ -531,6 +537,22 @@ both is refused. A typical production URL, with the CA mounted beside it:
 url_file = "/run/secrets/cdm_url"   # postgres://bridge:...@cdm.internal:5432/omop?sslmode=verify-full
 tls_ca_file = "/run/secrets/cdm_ca.pem"
 ```
+
+Both clients start every session with the three timeouts, sent in the
+startup packet's `options` parameter as `-c name=value`
+(<https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNECT-OPTIONS>),
+so the timeouts hold before the first statement runs. A URL that carries its
+own `options` is refused: the timeouts come from the configuration alone.
+Once a client connects, it reads the three settings back from `pg_settings`
+and refuses a server that does not hold them, which is what a connection
+pooler that drops startup options looks like. A pooler between the bridge
+and the server must pass `options` through; one that lists it in PgBouncer's
+`ignore_startup_parameters` drops it, and the bridge refuses to start. In
+transaction pooling mode, PgBouncer 1.21 or newer with
+`max_prepared_statements` keeps the prepared statements of
+`statement_cache_capacity` working
+(<https://www.pgbouncer.org/config.html#max_prepared_statements>), and
+`statement_cache_capacity = 0` turns them off.
 
 ### What `cdm init` does
 
@@ -594,10 +616,17 @@ lock, so replicas that start together migrate once; readiness carries a
 | `tls_ca_file` | none | no | A file holding that CA, read at boot |
 | `max_connections` | `10` | no | The most connections the pool holds, at least 1 |
 | `acquire_timeout` | `5s` | no | How long a request waits for a connection before the store answers that it is unavailable; more than `0s` |
+| `statement_timeout` | `30s` | no | The longest one statement runs before the server cancels it; `0s` sets none |
+| `lock_timeout` | `5s` | no | The longest a statement waits for a lock, no longer than a request waits for a connection; `0s` waits without limit |
+| `idle_in_transaction_session_timeout` | `60s` | no | The longest a session stays idle inside an open transaction, so an abandoned transaction releases its locks; `0s` sets none |
+| `statement_cache_capacity` | `100` | no | How many prepared statements each pooled connection keeps; `0` keeps none |
+| `max_lifetime` | `30m` | no | The longest a pooled connection lives before the pool replaces it; more than `0s` |
+| `idle_timeout` | `10m` | no | The longest a pooled connection stays idle before the pool closes it; more than `0s` |
 
 The URL and the CA follow the rules of `[cdm]` above: the same four
-`sslmode` values, the same refusals of `prefer`, `allow`, a missing mode and
-any other `ssl` parameter, and the same relay for TLS. Give the bridge a
+`sslmode` values, the same refusals of `prefer`, `allow`, a missing mode,
+`options` and any other `ssl` parameter, the same relay for TLS, and the same
+session timeouts, read back once the store connects. Give the bridge a
 role that owns the database it migrates. When a role named
 `ferrobridge_state_reader` exists, the migrations grant it read access to
 every table of the store, for a support account that must never write.

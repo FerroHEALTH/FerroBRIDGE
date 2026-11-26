@@ -9,10 +9,12 @@
 //! reports on, in the language `Bundle.language` states. The MyHealth@EU
 //! form, which a national contact point sends, narrows it: its
 //! `composition-hdr-myhealtheu` requires `Composition.language` from the
-//! eHDSILanguage value set and allows only the authors the record names.
+//! eHDSILanguage value set and allows only the authors the record names, and
+//! its `medicationRequest-hdr-myhealtheu` requires each order's authoring
+//! time and requester.
 
 use crate::crosswalk::discharge::HDR_COMPOSITION;
-use crate::document::form::{Authorship, Code, Form, Kind, SectionRule, Slot};
+use crate::document::form::{Authorship, Code, EntryRule, Form, Kind, SectionRule, Slot};
 use crate::document::language::{EHDSI_LANGUAGE, Language};
 use crate::document::{EU_CORE_PATIENT, LOINC, MYHEALTHEU_PATIENT};
 
@@ -39,6 +41,12 @@ pub const MYHEALTHEU_HDR_COMPOSITION: &str =
 /// encounter.
 pub const MYHEALTHEU_HDR_ENCOUNTER: &str =
     "http://fhir.ehdsi.eu/hdr/StructureDefinition/encounter-hdr-myhealtheu";
+
+/// The canonical URL of the MyHealth@EU Hospital Discharge Report
+/// `MedicationRequest` profile, which `composition-hdr-myhealtheu` names for
+/// the discharge medications section's entries.
+pub const MYHEALTHEU_HDR_MEDICATION_REQUEST: &str =
+    "http://fhir.ehdsi.eu/hdr/StructureDefinition/medicationRequest-hdr-myhealtheu";
 
 /// The LOINC code `composition-eu-hdr` fixes as `Composition.type`, a
 /// discharge summary.
@@ -108,6 +116,7 @@ pub const DISCHARGE_REPORT_FORM: Form = Form {
         invariant: "cmp-hdr-2",
         slices: &["sectionDischargeSummary", "sectionHospitalCourse"],
     }],
+    entries: &[],
     legal_authentication: false,
 };
 
@@ -125,5 +134,11 @@ pub const MYHEALTHEU_DISCHARGE_REPORT_FORM: Form = Form {
     },
     // NOTE: composition-hdr-myhealtheu Composition.author: practitioner, practitionerRole or organization.
     authorship: Authorship::Record,
+    // NOTE: medicationRequest-hdr-myhealtheu MedicationRequest.authoredOn and requester, each 1..1.
+    entries: &[EntryRule {
+        resource: "MedicationRequest",
+        profile: MYHEALTHEU_HDR_MEDICATION_REQUEST,
+        elements: &["authoredOn", "requester"],
+    }],
     ..DISCHARGE_REPORT_FORM
 };

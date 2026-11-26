@@ -69,5 +69,6 @@ pub const VACCINATION_HISTORY_FORM: Form = Form {
             slice: "immunisations",
         },
     ],
+    entries: &[],
     legal_authentication: true,
 };
