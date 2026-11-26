@@ -278,7 +278,7 @@ fetch_one() {
     [[ "$pinned_sha256" =~ ^[0-9a-f]{64}$ ]] || die "the $ref pin names the tarball $tarball_url and no sha256"
   else
     origin="the FHIR package registry, $registry/$pkg"
-    meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$registry/$pkg")" \
+    meta="$(fetch_text "$registry/$pkg")" \
       || die "cannot read registry metadata for $pkg"
     shasum="$(jq -r --arg v "$ver" '.versions[$v].dist.shasum // empty' <<< "$meta")"
     tarball_url="$(jq -r --arg v "$ver" '.versions[$v].dist.tarball // empty' <<< "$meta")"
@@ -287,7 +287,7 @@ fetch_one() {
   fi
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"; trap - RETURN' RETURN
-  with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" -o "$tmp/pkg.tgz" "$tarball_url" \
+  fetch_url "$tmp/pkg.tgz" "$tarball_url" \
     || die "download of $pkg $ver failed"
   sha256="$(shasum -a 256 "$tmp/pkg.tgz" | cut -d' ' -f1)"
   if [[ -n "$pinned_sha256" ]]; then
@@ -358,7 +358,7 @@ resolve_ranges() {
     [[ -n "$dep" ]] || continue
     range="${dep#*#}"
     is_range "$range" || continue
-    meta="$(with_retries "${fetch_attempts:?}" curl --proto '=https' --tlsv1.2 -fsSL -A "$ua" "$registry/${dep%%#*}")" \
+    meta="$(fetch_text "$registry/${dep%%#*}")" \
       || die "cannot read registry metadata for ${dep%%#*}"
     best="$(jq -r '.versions // {} | keys[]' <<< "$meta" | highest_match "$range")"
     [[ -n "$best" ]] || die "the registry lists no version of ${dep%%#*} in the range $range"
@@ -676,18 +676,25 @@ resolved_fixture() {
   printf -- '- Resolved ranges (x): %s\n' "$3" > "$1/$2/PROVENANCE.md"
 }
 
-# Counts one attempt in the file $1 and fails while the count is at most $2,
-# standing in for a fetch that fails $2 times and then answers.
-flaky() {
-  local tries
-  tries=$(($(cat "$1") + 1))
-  printf '%s' "$tries" > "$1"
-  [[ "$tries" -gt "$2" ]]
-}
-
-# Fails with the status $1, standing in for a fetch that never answers.
-failing_with() {
-  return "$1"
+# Stands in for curl in the self-test: answers each call with the next line
+# of $answers (an HTTP status and an optional `Retry-After`), writing the
+# headers to the -D file, and counts the calls in $tries.
+fake_curl() {
+  local headers="" out="" line code retry
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      -D) headers="$2"; shift ;;
+      -o) out="$2"; shift ;;
+    esac
+    shift
+  done
+  printf 'x' >> "${tries:?}"
+  line="$(sed -n "$(wc -c < "$tries" | tr -d ' ')p" "${answers:?}")"
+  read -r code retry <<< "$line"
+  printf 'HTTP/1.1 %s\r\n' "$code" > "$headers"
+  [[ -z "$retry" ]] || printf 'Retry-After: %s\r\n' "$retry" >> "$headers"
+  printf 'body' > "$out"
+  printf '%s' "$code"
 }
 
 self_test() {
@@ -854,22 +861,31 @@ PINS
   mkdir -p "$work/listed/.verified" "$work/listed/a.pkg#1.0.0"
   [[ "$(vendored_refs "$work/listed")" = "a.pkg#1.0.0" ]] || die "self-test: the stamp directory is listed as a tree"
 
-  # A fetch that fails twice and then answers is retried to success; one that
-  # never answers fails after the last attempt with its own status.
-  # shellcheck disable=SC2034 # read by with_retries in lib/corpus.sh
-  fetch_pause=0
-  printf '0' > "$work/tries"
-  with_retries 4 flaky "$work/tries" 2 2> "$work/out" \
-    || die "self-test: a fetch that answers on its third attempt fails: $(cat "$work/out")"
-  [[ "$(cat "$work/tries")" = "3" ]] || die "self-test: the flaky fetch ran $(cat "$work/tries") times, not 3"
-  printf '0' > "$work/tries"
-  if with_retries 4 flaky "$work/tries" 99 2> "$work/out"; then
+  # A 429 waits what its Retry-After names, capped, and an absent or
+  # HTTP-date Retry-After waits the doubling pause; one that never answers
+  # fails after the last attempt.
+  # shellcheck disable=SC2034 # read by fetch_url in lib/corpus.sh
+  local tries="$work/tries" answers="$work/answers" ua=self-test fetch_pause=2 fetch_wait_cap=120
+  curl() { fake_curl "$@"; }
+  sleep() { printf '%s ' "$1" >> "$work/slept"; }
+  printf '429 7\n429 600\n503\n200\n' > "$answers"
+  : > "$tries"
+  : > "$work/slept"
+  fetch_url "$work/got" "https://example.invalid/p" 2> "$work/out" \
+    || die "self-test: a fetch that answers on its fourth attempt fails: $(cat "$work/out")"
+  [[ "$(cat "$work/slept")" = "7 120 8 " ]] || die "self-test: the fetch waited $(cat "$work/slept"), not 7 120 8"
+  printf '200\n' > "$answers"
+  : > "$tries"
+  [[ "$(fetch_text "https://example.invalid/p")" = "body" ]] || die "self-test: fetch_text prints no body"
+  printf '429 Wed, 21 Oct 2026 07:28:00 GMT\n500\n500\n500\n' > "$answers"
+  : > "$tries"
+  : > "$work/slept"
+  if fetch_url "$work/got" "https://example.invalid/p" 2> "$work/out"; then
     die "self-test: a fetch that never answers passes"
   fi
-  [[ "$(cat "$work/tries")" = "4" ]] || die "self-test: the failing fetch ran $(cat "$work/tries") times, not 4"
-  local status=0
-  with_retries 2 failing_with 7 2> "$work/out" || status=$?
-  [[ "$status" -eq 7 ]] || die "self-test: a persistent failure ends with status $status, not the fetch's 7"
+  [[ "$(wc -c < "$tries" | tr -d ' ')" = "4" ]] || die "self-test: the failing fetch ran $(wc -c < "$tries") times, not 4"
+  [[ "$(cat "$work/slept")" = "2 4 8 " ]] || die "self-test: the failing fetch waited $(cat "$work/slept"), not 2 4 8"
+  unset -f curl sleep
   # The rendered provenance names no figure of the whole set, which every
   # pin that moves would leave stale in the files whose own pin did not.
   local pkg=example.dep ver=2.0.0 origin=o tarball_url=t shasum=s sha256=h license=CC0-1.0
