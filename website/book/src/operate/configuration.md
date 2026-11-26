@@ -41,8 +41,8 @@ levels. Case does not matter; single underscores inside a key name stay as
 they are.
 
 ```text
-FERROBRIDGE__SERVER__LISTEN            -> [server] listen
-FERROBRIDGE__CDR__ENDPOINT__URL             -> [cdr] base_url
+FERROBRIDGE__SERVER__LISTEN                      -> [server] listen
+FERROBRIDGE__CDR__ENDPOINT__URL                  -> [cdr] endpoint.url
 FERROBRIDGE__CDR__ENDPOINT__RETRY__MAX_ATTEMPTS  -> [cdr.endpoint.retry] max_attempts
 ```
 
@@ -1805,7 +1805,19 @@ name = "Example Hospital"
 identifier_system = "urn:oid:2.999.1.1"
 identifier_value = "example-hospital"
 
-[auth]
+[state]
+url_file = "/run/secrets/state-url"
+
+[state.seal]
+lookup_key_file = "/run/secrets/state-lookup-key"
+
+[[state.seal.keys]]
+id = "2026-11"
+key_file = "/run/secrets/state-seal-2026-11"
+
+[auth.issuer.clinic]
 issuer = "https://auth.example.org/realms/clinic"
-audience = ["https://bridge.example.org/fhir"]
 ```
+
+The issuer's tokens are for the facade when their `aud` names
+`[facade] base_url`, the default `audience` of an issuer table.
