@@ -346,7 +346,7 @@ fn described_pdf(
         let Some(path) = DESCRIBED
             .iter()
             .find(|(held, _)| *held == element)
-            .and_then(|(_, path)| *path)
+            .and_then(|(_, path)| path.ok())
         else {
             *unmapped += 1;
             continue;
@@ -689,7 +689,7 @@ fn every_data_group_has_a_slice_row() -> Result<(), Box<dyn Error>> {
 #[test]
 fn every_described_path_is_a_document_reference_element() {
     for (element, path) in DESCRIBED {
-        let Some(path) = path else { continue };
+        let Ok(path) = path else { continue };
         assert!(
             fhir_types::r4::schema::SCHEMAS.element(path).is_some(),
             "{element}: {path} is no element of the R4 DocumentReference"
