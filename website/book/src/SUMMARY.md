@@ -5,6 +5,10 @@
 
 [Introduction](introduction.md)
 
+# Tutorials
+
+- [Your first mapping](tutorials/first-mapping.md)
+
 # Evaluate
 
 - [Architecture](evaluate/architecture.md)
@@ -20,6 +24,10 @@
   - [Discharge reports from openEHR](evaluate/discharge-mapping.md)
 - [Licensing](evaluate/licensing.md)
 - [CRA information for users](evaluate/cra-user-information.md)
+
+# Reference
+
+- [Command-line reference](reference/cli.md)
 
 # Explanation
 
