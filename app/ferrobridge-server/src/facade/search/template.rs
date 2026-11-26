@@ -109,28 +109,6 @@ fn stepped<'i>(
         .collect()
 }
 
-/// Whether `path` below `root` names the instant of an RM attribute the Web
-/// Template leaves out: `ACTION.time` and `HISTORY.origin`, each a
-/// `DV_DATE_TIME` that occurs once (openEHR RM EHR Information Model, the
-/// `ACTION` and `HISTORY` classes).
-// TODO(#2122): delete once openehr-sdt places both instants (FerroHEALTH/FerroEHR#6566).
-fn rm_instant(index: &WebTemplateIndex, root: &ResolvedNode, path: &str) -> bool {
-    let base = root.aql_path().as_str();
-    match root.rm_type() {
-        "ACTION" => path == "time/value",
-        "OBSERVATION" => path
-            .strip_suffix("/origin/value")
-            .filter(|history| history.starts_with("data[") && !history.contains('/'))
-            .is_some_and(|history| {
-                let events = format!("{base}/{history}/events[");
-                index
-                    .nodes()
-                    .any(|node| node.aql_path().as_str().starts_with(&events))
-            }),
-        _ => false,
-    }
-}
-
 /// Whether `target` names a string attribute of the structural `node` the
 /// Simplified Formats write as its family, such as `EVENT_CONTEXT.location`
 /// ([`fhirconnect::engine::rm::FAMILY_TEXTS`]).
@@ -170,11 +148,7 @@ fn place(
         }
     }
     let Some(value) = deepest else {
-        return if kind == ParameterType::Date && rm_instant(index, root, path) {
-            Ok(None)
-        } else {
-            Err(format!("the template holds no node at {target}"))
-        };
+        return Err(format!("the template holds no node at {target}"));
     };
     match kind {
         ParameterType::Token => {
