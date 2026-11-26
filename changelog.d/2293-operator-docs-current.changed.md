@@ -1,0 +1,1 @@
+- The book's operator pages describe the current release: an upgrade page (the configuration and mapping checks, the state store migrations at start and how to roll back), the stores the bridge keeps on the deployment page, and the IPS and MyHealth@EU Core patient summary compositions in the EHDS readiness matrix.
