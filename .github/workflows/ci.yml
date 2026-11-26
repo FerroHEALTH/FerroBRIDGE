@@ -932,13 +932,18 @@ jobs:
             cargo test --doc -p "$package" --all-features --locked
           done
       # The EEHRxF draft corpora (#2084) measure the documents the eehrxf suites
-      # wrote above against the draft annexes, so they run after those suites.
+      # write against the draft annexes. The step writes them first with the
+      # eehrxf suites, in a pull request and in the merge group alike, so it
+      # never reads a directory another step may not have written (#2236).
       - name: The EEHRxF draft corpora hold their pass lists
         if: ${{ contains(matrix.packages, 'eehrxf') }}
         env:
-          EEHRXF_DRAFT_CORPUS_DIR: ${{ runner.temp }}/eehrxf-documents
+          EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-draft-corpus
+          EEHRXF_DRAFT_CORPUS_DIR: ${{ runner.temp }}/eehrxf-draft-corpus
         run: |
           set -euo pipefail
+          cargo nextest run -p eehrxf --all-features --locked \
+            -E 'not test(=draft_corpus::conformance_the_eehrxf_draft_corpus_measures_the_emitted_documents)'
           cargo nextest run -p eehrxf --all-features --locked \
             -E 'test(=draft_corpus::conformance_the_eehrxf_draft_corpus_measures_the_emitted_documents)'
           status=0
