@@ -61,6 +61,10 @@ const PROFILE: &str = "http://example.org/fhir/StructureDefinition/ferrobridge-h
 const CONTAINERS: &[&str] = &[
     "3c9d6a70-0000-4000-8000-00000000001e",
     "3c9d6a70-0000-4000-8000-00000000001f",
+    "3c9d6a70-0000-4000-8000-000000000020",
+    "3c9d6a70-0000-4000-8000-000000000021",
+    "3c9d6a70-0000-4000-8000-000000000022",
+    "3c9d6a70-0000-4000-8000-000000000023",
 ];
 
 /// The control id of the synthetic message.
