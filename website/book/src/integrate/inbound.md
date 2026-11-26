@@ -173,7 +173,13 @@ as data: no source has code of its own in the bridge.
   a `404` reads as removed. Ons allows 4 parallel requests per certificate,
   the template's `limits.concurrency`.
 - `recovery.redeliver` is `PUT https://api.ons.io/webhooks/redeliver` with
-  the environment certificate.
+  the environment certificate, and `recovery.reconcile` polls
+  `/v0/xstream/clients/updates` and `/v0/xstream/clients/deletes` with
+  `since` every 15 minutes, each answer's `clients` array read by `id`.
+- The logical models are generated from `components/schemas/Client` and
+  `components/schemas/Bsn` of the Ons API OpenAPI document
+  (<https://ons-api.nl/assets/openapi.json>), and the gender ConceptMap maps
+  the four values of `components/schemas/ons_administration.Gender`.
 
 Before you create a source from it:
 

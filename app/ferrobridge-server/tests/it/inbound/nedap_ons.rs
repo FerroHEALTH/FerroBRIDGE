@@ -81,6 +81,22 @@ fn the_template_is_an_inert_webhook_that_declares_its_resolution() -> Result<(),
     let resolve = webhook.resolve.as_ref().ok_or("a resolution")?;
     assert_eq!(Some(404), resolve.removed_on);
     assert_eq!(4, webhook.limits.concurrency);
+    let reconcile = webhook
+        .recovery
+        .reconcile
+        .as_ref()
+        .ok_or("the xstream polls")?;
+    assert_eq!(
+        vec![
+            "https://api.ons.io/v0/xstream/clients/updates",
+            "https://api.ons.io/v0/xstream/clients/deletes"
+        ],
+        reconcile
+            .polls
+            .iter()
+            .map(|poll| poll.url.as_str())
+            .collect::<Vec<_>>()
+    );
     let document = Document::Webhook(Box::new(webhook.clone()));
     assert_eq!(
         vec![

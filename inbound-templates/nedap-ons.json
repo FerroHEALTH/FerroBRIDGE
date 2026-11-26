@@ -30,6 +30,15 @@
         "method": "PUT",
         "url": "https://api.ons.io/webhooks/redeliver",
         "credentials": {"secret": "nedap-ons-environment-certificate"}
+      },
+      "reconcile": {
+        "every": 900,
+        "overlap": 60,
+        "first": 86400,
+        "polls": [
+          {"url": "https://api.ons.io/v0/xstream/clients/updates", "cursor": "since", "items": "/clients", "entity": "/id", "change": "upsert"},
+          {"url": "https://api.ons.io/v0/xstream/clients/deletes", "cursor": "since", "items": "/clients", "entity": "/id", "change": "remove"}
+        ]
       }
     },
     "resolve": {
