@@ -28,6 +28,7 @@
 - [The FHIRconnect operations](integrate/operations.md)
 - [The OMOP ETL](integrate/omop-etl.md)
 - [The inbound intake](integrate/inbound.md)
+  - [Inbound sources](integrate/inbound-sources.md)
 - [The change feed](integrate/change-feed.md)
   - [The events lane](integrate/events.md)
   - [The outbound FHIR lane](integrate/fhir-outbound.md)
@@ -37,6 +38,9 @@
 
 - [What FerroBRIDGE runs beside](operate/deployment-shape.md)
 - [Configuring the server](operate/configuration.md)
+  - [Named secrets](operate/secrets.md)
+- [The state store and high availability](operate/high-availability.md)
+- [Upgrading to the state store](operate/upgrade-state-store.md)
   - [Running behind FerroSMART](operate/behind-ferrosmart.md)
 - [The HL7 v2 face](operate/hl7v2-face.md)
 - [The access record](operate/access-record.md)
