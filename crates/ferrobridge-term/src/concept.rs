@@ -199,6 +199,10 @@ pub struct Match {
     pub source_comment: Option<String>,
     /// `match.targetComment`.
     pub target_comment: Option<String>,
+    /// `match.note`, which the terminology ecosystem adds where the server
+    /// does not know the target code system, so the target is unvalidated
+    /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+    pub note: Option<String>,
     /// `match.product`, the other values the mapping produces.
     pub products: Vec<MatchValue>,
     /// `match.dependsOn`, the other values the mapping depends on (R5 and

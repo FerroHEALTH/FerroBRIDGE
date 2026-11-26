@@ -117,7 +117,7 @@ macro_rules! equivalence_match {
 }
 
 /// Returns `$base` with the match parts R4 to R6 declare alike: `originMap`,
-/// `noMap`, `sourceConcept` and the two comments.
+/// `noMap`, `sourceConcept`, the two comments and `note`.
 #[cfg(any(feature = "r4", feature = "r4b", feature = "r5", feature = "r6"))]
 macro_rules! match_notes {
     ($found:expr, $base:expr) => {
@@ -133,6 +133,7 @@ macro_rules! match_notes {
                 .target_comment
                 .as_ref()
                 .and_then(|text| text.value.clone()),
+            note: $found.note.as_ref().and_then(|text| text.value.clone()),
             ..$base
         }
     };
@@ -248,6 +249,15 @@ macro_rules! modern_contracts {
                 .used_conceptmap
                 .iter()
                 .filter_map(|uri| uri.value.clone())
+                .collect()
+        }
+
+        /// Returns every `error` of a `$translate` answer.
+        fn target_errors(answer: &ConceptMapTranslateResponse) -> Vec<String> {
+            answer
+                .error
+                .iter()
+                .filter_map(|text| text.value.clone())
                 .collect()
         }
 
@@ -575,6 +585,11 @@ macro_rules! stu3_contracts {
 
         /// Returns no `used-conceptmap`, which STU3 does not declare.
         const fn used_maps(_answer: &ConceptMapTranslateResponse) -> Vec<String> {
+            Vec::new()
+        }
+
+        /// Returns no `error`, which STU3 does not declare.
+        const fn target_errors(_answer: &ConceptMapTranslateResponse) -> Vec<String> {
             Vec::new()
         }
 

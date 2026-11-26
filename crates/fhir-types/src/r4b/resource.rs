@@ -293,7 +293,7 @@ pub enum Resource {
     #[cfg(any(feature = "resources", feature = "r4b-resources"))]
     MolecularSequence(Box<super::molecular_sequence::MolecularSequence>),
     /// A `NamingSystem` resource.
-    #[cfg(any(feature = "resources", feature = "r4b-resources"))]
+    #[cfg(feature = "terminology")]
     NamingSystem(Box<super::naming_system::NamingSystem>),
     /// A `NutritionOrder` resource.
     #[cfg(any(feature = "resources", feature = "r4b-resources"))]
@@ -656,7 +656,7 @@ impl super::super::codec::Json for Resource {
             Self::MessageHeader(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(any(feature = "resources", feature = "r4b-resources"))]
             Self::MolecularSequence(inner) => super::super::codec::Json::to_json(inner.as_ref()),
-            #[cfg(any(feature = "resources", feature = "r4b-resources"))]
+            #[cfg(feature = "terminology")]
             Self::NamingSystem(inner) => super::super::codec::Json::to_json(inner.as_ref()),
             #[cfg(any(feature = "resources", feature = "r4b-resources"))]
             Self::NutritionOrder(inner) => super::super::codec::Json::to_json(inner.as_ref()),
@@ -1076,7 +1076,7 @@ impl super::super::codec::Json for Resource {
             "MolecularSequence" => Ok(Self::MolecularSequence(super::super::codec::boxed(
                 object, path,
             )?)),
-            #[cfg(any(feature = "resources", feature = "r4b-resources"))]
+            #[cfg(feature = "terminology")]
             "NamingSystem" => Ok(Self::NamingSystem(super::super::codec::boxed(
                 object, path,
             )?)),
@@ -1519,7 +1519,7 @@ impl serde::Serialize for Resource {
             Self::MolecularSequence(inner) => {
                 serde::Serialize::serialize(inner.as_ref(), serializer)
             }
-            #[cfg(any(feature = "resources", feature = "r4b-resources"))]
+            #[cfg(feature = "terminology")]
             Self::NamingSystem(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
             #[cfg(any(feature = "resources", feature = "r4b-resources"))]
             Self::NutritionOrder(inner) => serde::Serialize::serialize(inner.as_ref(), serializer),
