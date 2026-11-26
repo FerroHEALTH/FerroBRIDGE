@@ -977,7 +977,8 @@ jobs:
 
   # HL7's FHIR Validator over the patient summary, laboratory and imaging report
   # documents the eehrxf suites write, and the patient summaries the server's
-  # Patient/$summary and SMART Health Link suites serve (#1318, #2015; no
+  # Patient/$summary and SMART Health Link suites serve, the link ones from
+  # the e2e job, which may be skipped (#1318, #2015, #2243; no
   # specification governs the lane: our own design), each patient summary also
   # with the xShare Yellow Button guide 0.3.0 loaded against the Patient Summary
   # content it names (#2029), the evidence the component's page cites for the
@@ -988,8 +989,8 @@ jobs:
   # shipped.
   fhir-validator:
     name: fhir-validator (eehrxf documents)
-    needs: [detect, test]
-    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && (contains(needs.detect.outputs.test-matrix, 'eehrxf') || contains(needs.detect.outputs.test-matrix, 'ferrobridge-server'))
+    needs: [detect, test, e2e]
+    if: "!cancelled() && needs.test.result == 'success' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') && github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true' && (contains(needs.detect.outputs.test-matrix, 'eehrxf') || contains(needs.detect.outputs.test-matrix, 'ferrobridge-server'))"
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -1203,14 +1204,26 @@ jobs:
       # step and never a test (#2043).
       - name: Pull the pinned container images
         run: bash scripts/e2e-images.sh
+      # The SMART Health Link suites, which open the patient summary through a
+      # link only behind FERROBRIDGE_E2E, write it under EEHRXF_EMIT_DIR for
+      # the fhir-validator job (#2243).
       - env:
           PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
+          EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
           set -euo pipefail
           read -ra packages <<<"$PACKAGES"
           args=()
           for package in "${packages[@]}"; do args+=(-p "$package"); done
           cargo nextest run --locked "${args[@]}" --no-tests=pass
+      - name: Upload the documents the link suites opened
+        if: contains(needs.detect.outputs.e2e-packages, 'ferrobridge-server')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eehrxf-documents-e2e
+          path: ${{ runner.temp }}/eehrxf-documents/
+          if-no-files-found: error
+          retention-days: 7
 
   # The sqlx query metadata of omop-cdm (#89). The crate's queries compile
   # offline from crates/omop-cdm/.sqlx/; this job builds the CDM schema from
