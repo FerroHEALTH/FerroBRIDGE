@@ -18,7 +18,7 @@
 [[category]]
 article = "14(1)(a)"
 name = "Patient summaries"
-note = "HL7 Europe Patient Summary 1.0.0-ballot is pinned for the profile validator; no context maps its Composition yet. The Base and Core profiles below are its building blocks."
+note = "The interoperability component (`eehrxf`) maps HL7 Europe Patient Summary 1.0.0-ballot over FerroBRIDGE's patient summary template, a template over published CKM archetypes, because the openEHR international CKM publishes no patient summary template; the facade serves it as `Patient/$summary`. The Base and Core profiles below are its building blocks."
 
 [[category.row]]
 target = "patient-eu-core"
@@ -48,9 +48,13 @@ context = "crates/fhirconnect/tests/fixtures/projects/ferrobridge/eu_test_result
 test = "crates/fhirconnect/tests/it/eu_test_result.rs::the_profile_elements_of_the_test_result_survive_the_round_trip"
 
 [[category.row]]
-target = "Patient summary Composition"
+target = "composition-eu-eps"
+profile = "http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps"
 package = "hl7.fhir.eu.eps 1.0.0-ballot"
-gap = "no patient summary template in the openEHR international CKM"
+template = "FerroBRIDGE patient summary template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_patient_summary.adlt"
+context = "crates/eehrxf/mappings/eps/ferrobridge_eu_eps.context.yml"
+test = "crates/eehrxf/tests/it/eps_mapped.rs::the_summary_holds_the_medicine_and_the_vaccine_in_their_sections"
 
 [[category]]
 article = "14(1)(b)"

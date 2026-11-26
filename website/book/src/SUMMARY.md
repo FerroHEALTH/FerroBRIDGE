@@ -21,6 +21,10 @@
 - [Licensing](evaluate/licensing.md)
 - [CRA information for users](evaluate/cra-user-information.md)
 
+# Explanation
+
+- [How FerroBRIDGE maps](explanation/how-ferrobridge-maps.md)
+
 # Integrate
 
 - [The FHIR facade](integrate/fhir-facade.md)
