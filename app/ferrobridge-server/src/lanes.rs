@@ -91,15 +91,9 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             ));
             state = state.with_access_log(Arc::new(log));
         }
-        let (mounted, counts) = build_facade(
-            settings,
-            &lane,
-            state.cdr(),
-            state.terminology().cloned(),
-            state.store(),
-        )
-        .await
-        .context("starting the FHIR facade")?;
+        let (mounted, counts) = build_facade(settings, &lane, &state)
+            .await
+            .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
@@ -751,13 +745,12 @@ async fn build_operator(
 async fn build_facade(
     settings: &Settings,
     lane: &config::FacadeSettings,
-    cdr: Option<&cdr::CdrClient>,
-    terminology: Option<ferrobridge_term::client::Client>,
-    state: Option<&crate::store::Store>,
+    app: &AppState,
 ) -> anyhow::Result<(facade::Facade, startup::MappingCounts)> {
     use anyhow::Context;
 
-    let client = cdr
+    let client = app
+        .cdr()
         .cloned()
         .context("the facade needs a [cdr] section: it maps every request onto CDR operations")?;
     let directory = settings
@@ -802,7 +795,7 @@ async fn build_facade(
         templates: templates.len(),
     };
     let search = facade::search::load(directory, &programs).context("reading the searches")?;
-    let state = state.context(
+    let state = app.store().context(
         "the facade needs a [state] section: every replica resolves its identities in the state store",
     )?;
     let store = crate::identity::state::StateStore::open(state)
@@ -821,7 +814,8 @@ async fn build_facade(
     };
     let built = facade::Facade::new(programs, Arc::new(store), client, lane.settings.clone())
         .with_translator(
-            Translator::new(terminology).with_display_fallback(settings.display_fallback),
+            Translator::new(app.terminology().cloned())
+                .with_display_fallback(settings.display_fallback),
         );
     Ok((
         built
