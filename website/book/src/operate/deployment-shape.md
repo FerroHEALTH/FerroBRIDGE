@@ -36,10 +36,11 @@ holding the patient identifier to `ehr_id` relation, the external to internal
 resource id relation and the resource id to composition relation; and, on the
 OMOP side, a side table in its own schema beside the CDM that maps each source
 record to its rows, which is what makes a re-run replace rather than
-duplicate. The bridge's own working state moves, area by area, into one
-PostgreSQL database that every replica shares, the `[state]` store, which
-the bridge migrates at start and which stays apart from the CDM database
-([`[state]`](configuration.md#state)). Everything else it holds is configuration: the loaded
+duplicate. The bridge's own working state lives in one PostgreSQL database
+that every replica shares, the `[state]` store, which the bridge migrates at
+start and which stays apart from the CDM database
+([The state store and high availability](high-availability.md)). Everything
+else it holds is configuration: the loaded
 mapping files, the terminology server address, and the CDR address.
 
 ## What it asks of the CDR
