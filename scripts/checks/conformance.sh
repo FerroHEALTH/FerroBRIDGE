@@ -273,20 +273,10 @@ pinned_version() {
     }' docs/VERSIONS.md
 }
 
-# The badge colour of k passing out of n: the share in quarters.
+# The badge colour of k passing out of n, by the shared rule (owner decision,
+# 2026-11-25): green when all pass, yellow when some do, red when none do.
 colour_of() {
-  local passed="$1" total="$2" share
-  if [[ "$total" -eq 0 ]]; then
-    echo lightgrey
-    return
-  fi
-  share=$((passed * 100 / total))
-  if [[ "$passed" -eq "$total" ]]; then echo brightgreen
-  elif [[ "$share" -ge 75 ]]; then echo green
-  elif [[ "$share" -ge 50 ]]; then echo yellow
-  elif [[ "$share" -ge 25 ]]; then echo orange
-  else echo red
-  fi
+  badge_count_color "$1" "$2"
 }
 
 # The badge JSON of a label, k passing out of n, and logo $4, the message
@@ -598,7 +588,8 @@ elif [[ "$(sed -n '/^<!-- badges:begin -->$/,/^<!-- badges:end -->$/p' README.md
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
-if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md || ! badge_caption_check README.md; then
+if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md || ! badge_caption_check README.md ||
+  ! badge_color_check "$BADGES"/*.json; then
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
