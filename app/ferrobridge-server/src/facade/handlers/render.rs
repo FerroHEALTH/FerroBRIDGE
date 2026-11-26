@@ -23,6 +23,7 @@ use fhirconnect::engine::outcome::SkipReason;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::identity::DerivedIdentity;
 use fhirconnect::resolve::program::Program;
+use fhirconnect::tree::json_kind;
 use http::StatusCode;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -438,18 +439,16 @@ fn decorate(
 /// The status is the table's [`status::INTERNAL`] row, because the engine is
 /// the bridge's own.
 fn resource_object(value: Value, resource_type: &str) -> Result<Object, Refusal> {
-    let kind = match value {
-        Value::Object(object) => return Ok(object),
-        Value::Null => "null",
-        Value::Bool(_) => "a boolean",
-        Value::Number(_) => "a number",
-        Value::String(_) => "a string",
-        Value::Array(_) => "an array",
-    };
-    Err(Refusal::from(Refused::of_answer(&status::Answer::new(
-        status::INTERNAL,
-        format!("the engine produced {kind} where a {resource_type} resource object belongs"),
-    ))))
+    match value {
+        Value::Object(object) => Ok(object),
+        other => Err(Refusal::from(Refused::of_answer(&status::Answer::new(
+            status::INTERNAL,
+            format!(
+                "the engine produced {} where a {resource_type} resource object belongs",
+                json_kind(&other)
+            ),
+        )))),
+    }
 }
 /// Records what the facade filled on one rendered resource and the declared
 /// set of losses its outbound run took.
