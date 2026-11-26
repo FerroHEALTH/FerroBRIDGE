@@ -521,17 +521,19 @@ identity() {
     --env POSTGRES_PASSWORD=postgres "$state_image" > /dev/null
   wait_for "the identity source's PostgreSQL" 120 "$engine" exec "$PIX_DB_NAME" \
     pg_isready --host 127.0.0.1 --username postgres --dbname postgres
+  # FerroPIX refuses a superuser, so it connects as a role that owns its
+  # database alone.
+  "$engine" exec "$PIX_DB_NAME" psql --quiet --username postgres --set ON_ERROR_STOP=1 \
+    --command "CREATE ROLE ferropix LOGIN PASSWORD 'ferropix'" \
+    --command "CREATE DATABASE ferropix OWNER ferropix" > /dev/null
   wait_for "the stub issuer" 120 curl --fail --silent "$ISSUER/.well-known/openid-configuration"
   rm -rf "$files"
   mkdir -p "$files"
-  printf 'postgresql://postgres:postgres@127.0.0.1:%s/postgres?sslmode=disable' "$PIX_DB_PORT" > "$files/db-url"
+  printf 'postgresql://ferropix:ferropix@127.0.0.1:%s/ferropix?sslmode=disable' "$PIX_DB_PORT" > "$files/db-url"
   openssl rand -base64 32 | tr -d '\n' > "$files/data-key"
   cat > "$files/ferropix.toml" <<TOML
 profile = "production"
 public_base_url = "$PIX"
-
-[server]
-listen = "127.0.0.1:18110"
 
 [db]
 url_file = "/run/ferropix/db-url"
@@ -564,9 +566,14 @@ TOML
   chmod 0644 "$files"/*
   "$engine" run --quiet --detach --name "$PIX_NAME" --network host \
     --volume "$files:/run/ferropix:ro" --env FERROPIX_CONFIG=/run/ferropix/ferropix.toml \
-    "$pix_image" > /dev/null
-  wait_for "the identity source" 180 curl --fail --silent "$PIX/health/readiness" ||
-    die "the identity source did not come up: $("$engine" logs --tail 20 "$PIX_NAME" 2>&1)"
+    --env FERROPIX__SERVER__LISTEN=127.0.0.1:18110 "$pix_image" > /dev/null
+  local tries=0
+  until curl --fail --silent "$PIX/health/readiness" > /dev/null 2>&1; do
+    tries=$((tries + 1))
+    [[ "$tries" -lt 180 ]] ||
+      die "the identity source did not come up: $("$engine" logs --tail 20 "$PIX_NAME" 2>&1)"
+    sleep 1
+  done
   bearer="$(token "$PIX_SOURCE" system/Patient.cud)" || die "the stub issuer signed no Source token"
   for subject in synthetic-subject-perf-read synthetic-subject-perf-write; do
     status="$(jq --null-input --compact-output --arg system "$SUBJECTS" --arg value "$subject" \
