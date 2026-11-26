@@ -81,9 +81,13 @@ readonly PIX_NAME=ferrobridge-perf-pix
 readonly PIX_DB_NAME=ferrobridge-perf-pix-db
 readonly PIX_DB_PORT=15452
 readonly PIX=http://127.0.0.1:18110
-# The client FerroPIX trusts as the Source of the subjects' domain, which
-# seeds the two subjects over ITI-104.
+# The client FerroPIX trusts as the Source of the subjects' domains, which
+# seeds the plan's subjects over ITI-104.
 readonly PIX_SOURCE=ferrobridge-perf-source
+# The domain of the ORU^R01's PID-3, whose assigning authority is an ISO OID.
+readonly V2_SUBJECTS=urn:oid:2.999.1.7
+# The pseudonym domain the head arm's EHRs are keyed in.
+readonly PSEUDONYMS=urn:oid:2.999.9
 # FerroPIX's configuration and its two throwaway secrets, outside $WORK so
 # the server's non-root user reads them.
 readonly PIX_FILES=target/perf-pix
@@ -506,10 +510,10 @@ token() {
 }
 
 # identity ISSUER_IMAGE PIX_IMAGE STATE_IMAGE: starts the stub issuer, the
-# head arm's FerroPIX over its own PostgreSQL, and seeds the two subjects the
-# plan names through the subjects' Source over ITI-104 (PIXm 3.1.0
-# §2:3.104.4.1). FerroPIX joins the host network, since it reads a plain
-# http issuer on loopback alone (RFC 8414 §2).
+# head arm's FerroPIX over its own PostgreSQL, and seeds the subjects the
+# plan names through their Source over ITI-104 (PIXm 3.1.0 §2:3.104.4.1).
+# FerroPIX joins the host network, since it reads a plain http issuer on
+# loopback alone (RFC 8414 §2).
 identity() {
   local issuer_image="$1" pix_image="$2" state_image="$3" files="$root/$PIX_FILES" subject bearer status
   # shellcheck disable=SC2016 # ${clientId} and ${scope} are the issuer's own template
@@ -554,8 +558,16 @@ identifier_type = "PI"
 source_client_id = "$PIX_SOURCE"
 sensitive = false
 
+[[domain]]
+system = "$V2_SUBJECTS"
+name = "Perf laboratory subjects"
+kind = "local"
+identifier_type = "MR"
+source_client_id = "$PIX_SOURCE"
+sensitive = false
+
 [[pseudonym_domain]]
-namespace = "urn:oid:2.999.9"
+namespace = "$PSEUDONYMS"
 name = "Perf pseudonyms"
 consumer_client_id = "ferrobridge-perf"
 
@@ -575,17 +587,33 @@ TOML
     sleep 1
   done
   bearer="$(token "$PIX_SOURCE" system/Patient.cud)" || die "the stub issuer signed no Source token"
-  for subject in synthetic-subject-perf-read synthetic-subject-perf-write; do
-    status="$(jq --null-input --compact-output --arg system "$SUBJECTS" --arg value "$subject" \
+  for subject in "$SUBJECTS|synthetic-subject-perf-read" "$SUBJECTS|synthetic-subject-perf-write" \
+    "$V2_SUBJECTS|synthetic-subject-perf-v2"; do
+    status="$(jq --null-input --compact-output --arg system "${subject%|*}" --arg value "${subject##*|}" \
       '{resourceType: "Patient", identifier: [{system: $system, value: $value}],
         name: [{family: "Perf", given: [$value]}], birthDate: "1980-01-01", gender: "unknown"}' |
-      curl --silent --output "$WORK/head/pix-$subject.json" --write-out '%{http_code}' \
+      curl --silent --output "$WORK/head/pix-feed.json" --write-out '%{http_code}' \
         --request PUT --header "authorization: Bearer $bearer" \
         --header 'content-type: application/fhir+json' --data-binary @- \
-        "$PIX/fhir/Patient?identifier=$(jq --raw-input --raw-output '@uri' <<< "$SUBJECTS|$subject")")"
+        "$PIX/fhir/Patient?identifier=$(jq --raw-input --raw-output '@uri' <<< "$subject")")"
     [[ "$status" = 200 || "$status" = 201 ]] ||
-      die "the identity source answered $status to the feed of $subject: $(head -c 400 "$WORK/head/pix-$subject.json")"
+      die "the identity source answered $status to the feed of ${subject##*|}: $(head -c 400 "$WORK/head/pix-feed.json")"
   done
+}
+
+# pseudonym VALUE: the head arm's pseudonym of the subject VALUE of the
+# subjects' domain, asked over ITI-83 as the head's facade asks it (PIXm
+# 3.1.0 §2:3.83.4.1.2), which the head's search names its subject by.
+pseudonym() {
+  local bearer
+  bearer="$(token ferrobridge-perf system/Patient.rs)" || die "the stub issuer signed no Consumer token"
+  jq --null-input --compact-output --arg source "$SUBJECTS|$1" --arg target "$PSEUDONYMS" \
+    '{resourceType: "Parameters", parameter: [{name: "sourceIdentifier", valueString: $source},
+      {name: "targetSystem", valueString: $target}]}' |
+    curl --fail --silent --header "authorization: Bearer $bearer" \
+      --header 'content-type: application/fhir+json' --data-binary @- "$PIX/fhir/Patient/\$ihe-pix" |
+    jq --exit-status --raw-output --arg target "$PSEUDONYMS" \
+      '.parameter[] | select(.name == "targetIdentifier") | .valueIdentifier | select(.system == $target) | .value'
 }
 
 start() {
@@ -719,11 +747,13 @@ run() {
   command -v ferrohealth-perf > /dev/null || die "ferrohealth-perf is not on PATH"
   trap cleanup EXIT
   start
-  local head_id base_id body search code=0 arm
+  local head_id base_id body search head_search code=0 arm
   head_id="$(seed head)" || exit 2
   base_id="$(seed base)" || exit 2
   body="$(condition synthetic-subject-perf-write)"
   search="subject:identifier=$(jq --raw-input --raw-output '@uri' <<< "$SUBJECTS|synthetic-subject-perf-read")"
+  # NOTE: R4 search.html §3.1.1.4.12; the head renders its subject as a pseudonym reference with no identifier, so its search names that reference.
+  head_search="subject=Patient/$(pseudonym synthetic-subject-perf-read)" || exit 2
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     printf "The base is \`%s\`.\n\n" "$(< "$BASE_TREE/rev")" >> "$GITHUB_STEP_SUMMARY"
     printf 'The head arm asks a FerroPIX identity source over ITI-83 for every subject it resolves; a base from before the facade needed one does not, so a head-over-base rise in the facade groups includes that round trip.\n\n' >> "$GITHUB_STEP_SUMMARY"
@@ -735,7 +765,7 @@ run() {
     --base-var "READ_ID=$base_id" --base-var "CREATE_BODY=$body" --base-var "SEARCH=$search" \
     --head-url "$(facade head)" --head-pid "$head_pid" \
     --head-mllp-address "127.0.0.1:$(port head mllp)" --head-database-url "$(admin_url head)" \
-    --head-var "READ_ID=$head_id" --head-var "CREATE_BODY=$body" --head-var "SEARCH=$search" \
+    --head-var "READ_ID=$head_id" --head-var "CREATE_BODY=$body" --head-var "SEARCH=$head_search" \
     --out-dir target/perf || code=$?
   busy_loop || { [[ "$code" -ne 0 ]] || code=1; }
   if [[ "$code" -ne 0 ]]; then

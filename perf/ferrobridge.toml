@@ -29,7 +29,7 @@ enabled = false
 # synthetic and accepted whatever it holds.
 [identity_source]
 pseudonym_domain = "urn:oid:2.999.9"
-source_domains = ["http://example.org/fhir/sid/ferrobridge-subject"]
+source_domains = ["http://example.org/fhir/sid/ferrobridge-subject", "urn:oid:2.999.1.7"]
 
 [identity_source.endpoint]
 url = "http://127.0.0.1:18110/fhir"
