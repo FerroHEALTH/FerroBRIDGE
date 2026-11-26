@@ -225,9 +225,10 @@ async fn each_patient_trigger_is_stored_and_answered_aa_after_the_commit()
             name: String::from("northlab-adt"),
             kind: ferrobridge_operator_api::sources::Kind::Mllp,
             enabled: true,
-            document: serde_json::json!({"routes": [
-                super::route("ADT", "NORTHLAB", Some(super::NORTHLAB_SUBJECT), &[])
-            ]}),
+            document: serde_json::json!({
+                "routes": [super::route("ADT", "NORTHLAB", Some(super::NORTHLAB_SUBJECT), &[])],
+                "profiles": {"Observation": super::PROFILE}
+            }),
         },
     )
     .await?;
