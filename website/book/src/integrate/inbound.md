@@ -85,6 +85,58 @@ applies it through one handler, which feeds the identity source and ensures
 the patient's one EHR. [Inbound sources](inbound-sources.md) describes the
 resolution and the source templates.
 
+## Source templates
+
+A template is a source document ready to create through
+`POST /operator/sources`, shipped inert (`enabled: false`) under
+`inbound-templates/`. Each one is the source's published behaviour written
+as data: no source has code of its own in the bridge.
+
+### Nedap Ons
+
+`inbound-templates/nedap-ons.json` reads the Ons API webhooks
+(<https://ons-api.nl/english/technical/Webhooks.html>):
+
+- One URL per stage serves every customer, so the tenant is the
+  notification's `customerCode`.
+- The verifier is the HMAC-SHA512 of the body with the connector secret, in
+  lowercase hex in `X-Signature-SHA512`. The NOP pair Ons sends when you
+  configure the URL is answered as a probe: `200` for the good signature and
+  `401` for the bad one.
+- A `client` `CREATE` or `UPDATE` is an upsert and a `DELETE` a remove; every
+  other model and event is ignored. A notification carries no event id, so
+  the de-duplication key covers `customerCode`, `modelType`, `eventType`,
+  `id` and `timestamp`.
+- The resolution reads `/v0/administration/clients/{id}` and its `/bsn` below
+  the tenant's `base` with an `X-Field-Whitelist` of the identity fields, and
+  a `404` reads as removed. Ons allows 4 parallel requests per certificate,
+  the template's `limits.concurrency`.
+- `recovery.redeliver` is `PUT https://api.ons.io/webhooks/redeliver` with
+  the environment certificate, and `recovery.reconcile` polls
+  `/v0/xstream/clients/updates` and `/v0/xstream/clients/deletes` with
+  `since` every 15 minutes, each answer's `clients` array read by `id`.
+- The logical models are generated from `components/schemas/Client` and
+  `components/schemas/Bsn` of the Ons API OpenAPI document
+  (<https://ons-api.nl/assets/openapi.json>), and the gender ConceptMap maps
+  the four values of `components/schemas/ons_administration.Gender`.
+
+Before you create a source from it:
+
+1. Put the connector secret and each certificate in the `[secrets]`
+   directory under the names the template uses
+   (`nedap-ons-connector-secret`, `nedap-ons-environment-certificate`) and
+   one per tenant for its `credentials`.
+2. Load the FHIR package `terminology/nedap-ons-values/` into the
+   terminology server: the map translates the client's gender through its
+   ConceptMap.
+3. Save the map `inbound-templates/nedap-ons/client-patient.map` and the
+   logical models `client.json` and `bsn.json` under the `structuremap` root
+   of the mapping revision.
+4. Add each customer as a tenant with its `identifier_system`, `base`
+   (`https://api.ons.io` for production, `https://api-staging.ons.io` for a
+   customer's test environment) and `credentials`, set `enabled`, and create
+   the source.
+
 ## Retry, park and replay
 
 A transient failure (the network, a `5xx`, `429` or `423`) runs again after
