@@ -149,6 +149,10 @@ readonly MANIFEST_IG="hl7.fhir.eu.imaging-manifest#1.0.0-ballot"
 # The discharge report document a run validates over the Hospital Discharge
 # Report guide.
 readonly HDR_BUNDLE="http://hl7.eu/fhir/hdr/StructureDefinition/bundle-eu-hdr"
+
+# The discharge report in the MyHealth@EU form, which a run validates over
+# the MyHealth@EU Hospital Discharge Report CI build docs/VERSIONS.md pins.
+readonly MYHEALTHEU_HDR_BUNDLE="http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu"
 readonly HDR_IG="hl7.fhir.eu.hdr#1.0.0"
 
 # The MyHealth@EU vaccination history a run validates over the MyHealth@EU
@@ -326,7 +330,7 @@ run() {
     tar -xzf "$MVC" -C "$CACHE/$name"
   fi
   mkdir -p "$out/xshare-yb"
-  local docs=() general=() imaging=() manifest=() discharge=() euvac=() summaries=() doc copies
+  local docs=() general=() imaging=() manifest=() discharge=() myhealtheu=() euvac=() summaries=() doc copies
   copies="$(cd "$out/xshare-yb" && pwd)"
   for doc in "$documents"/*.json; do
     [[ -f "$doc" ]] || continue
@@ -342,6 +346,8 @@ run() {
       manifest+=("$doc")
     elif jq -e --arg bundle "$HDR_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       discharge+=("$doc")
+    elif jq -e --arg bundle "$MYHEALTHEU_HDR_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
+      myhealtheu+=("$doc")
     elif jq -e --arg bundle "$EUVAC_BUNDLE" '(.meta.profile // []) | index($bundle) != null' "$doc" > /dev/null 2>&1; then
       euvac+=("$doc")
     else
@@ -371,6 +377,17 @@ run() {
   if [[ "${#discharge[@]}" -gt 0 ]]; then
     validate "$out" discharge "${discharge[@]}" -- "$HDR_IG" "$name" > "$out/discharge.bundle.json" || return 1
     parts+=("$out/discharge.bundle.json")
+  fi
+  if [[ "${#myhealtheu[@]}" -gt 0 ]]; then
+    local hdr_ci
+    hdr_ci="$(ci_build_version myhealth.eu.fhir.hdr)"
+    [[ -n "$hdr_ci" ]] || {
+      echo "::error::docs/VERSIONS.md pins no MyHealth@EU CI build of myhealth.eu.fhir.hdr" >&2
+      return 1
+    }
+    validate "$out" myhealtheu-discharge "${myhealtheu[@]}" -- "myhealth.eu.fhir.hdr#$hdr_ci" "$name" \
+      > "$out/myhealtheu-discharge.bundle.json" || return 1
+    parts+=("$out/myhealtheu-discharge.bundle.json")
   fi
   if [[ "${#euvac[@]}" -gt 0 ]]; then
     validate "$out" euvac "${euvac[@]}" -- "$EUVAC_IG" > "$out/euvac.bundle.json" || return 1
@@ -484,6 +501,8 @@ myhealth_eu() {
       jq --arg p "http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/laboratory/$stem.json"
     elif jq -e --arg b "$HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
       jq --arg p "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/hdr/$stem.json"
+    elif jq -e --arg b "$MYHEALTHEU_HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+      cp "$doc" "$out/hdr/$stem.json"
     elif jq -e --arg b "$EUVAC_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
       cp "$doc" "$out/euvac/$stem.json"
     fi
