@@ -8,6 +8,7 @@
 mod apply;
 mod event;
 pub(crate) mod intake;
+pub(crate) mod nedap_ons;
 mod notification;
 pub(crate) mod recover;
 mod resolve;

@@ -1,0 +1,46 @@
+{
+  "abstract": false,
+  "kind": "logical",
+  "name": "Bsn",
+  "resourceType": "StructureDefinition",
+  "snapshot": {
+    "element": [
+      {
+        "id": "Bsn",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn",
+        "type": [
+          {
+            "code": "Base"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.idVerified",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.idVerified",
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "Bsn.number",
+        "max": "1",
+        "min": 0,
+        "path": "Bsn.number",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      }
+    ]
+  },
+  "status": "draft",
+  "type": "Bsn",
+  "url": "https://ferrobridge.eu/fhir/nedap-ons/StructureDefinition/Bsn"
+}

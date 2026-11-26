@@ -1,0 +1,90 @@
+{
+  "abstract": false,
+  "kind": "logical",
+  "name": "Client",
+  "resourceType": "StructureDefinition",
+  "snapshot": {
+    "element": [
+      {
+        "id": "Client",
+        "max": "1",
+        "min": 0,
+        "path": "Client",
+        "type": [
+          {
+            "code": "Base"
+          }
+        ]
+      },
+      {
+        "id": "Client.dateOfBirth",
+        "max": "1",
+        "min": 0,
+        "path": "Client.dateOfBirth",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      },
+      {
+        "id": "Client.deathDate",
+        "max": "1",
+        "min": 0,
+        "path": "Client.deathDate",
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      },
+      {
+        "id": "Client.firstName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.firstName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.gender",
+        "max": "1",
+        "min": 0,
+        "path": "Client.gender",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      },
+      {
+        "id": "Client.id",
+        "max": "1",
+        "min": 0,
+        "path": "Client.id",
+        "type": [
+          {
+            "code": "integer"
+          }
+        ]
+      },
+      {
+        "id": "Client.lastName",
+        "max": "1",
+        "min": 0,
+        "path": "Client.lastName",
+        "type": [
+          {
+            "code": "string"
+          }
+        ]
+      }
+    ]
+  },
+  "status": "draft",
+  "type": "Client",
+  "url": "https://ferrobridge.eu/fhir/nedap-ons/StructureDefinition/Client"
+}

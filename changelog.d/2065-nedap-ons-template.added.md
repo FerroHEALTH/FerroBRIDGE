@@ -1,0 +1,1 @@
+- The Nedap Ons source template, `inbound-templates/nedap-ons.json`: the Ons API webhook verifier, event map, resolution and redelivery as data, with its map and logical models under `inbound-templates/nedap-ons/` and the gender ConceptMap as the FHIR package `terminology/nedap-ons-values/`.

@@ -1,0 +1,19 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "gender",
+  "url": "https://ferrobridge.eu/fhir/nedap-ons/CodeSystem/gender",
+  "name": "NedapOnsGender",
+  "title": "Nedap Ons client gender",
+  "status": "active",
+  "experimental": true,
+  "publisher": "Cadasto B.V. (FerroBRIDGE)",
+  "description": "The values of the gender field of an Ons API client, as the Nedap Ons source template reads them.",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {"code": "M", "display": "Man"},
+    {"code": "F", "display": "Vrouw"},
+    {"code": "X", "display": "Anders"},
+    {"code": "U", "display": "Onbekend"}
+  ]
+}
