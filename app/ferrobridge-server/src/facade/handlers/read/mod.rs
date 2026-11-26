@@ -33,8 +33,6 @@ use crate::facade::handlers::Body;
 use crate::facade::handlers::render;
 use crate::facade::handlers::write;
 use crate::facade::handlers::{readable, supported};
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::record::CompositionBinding;
 use crate::facade::ingest::Refused;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -43,6 +41,8 @@ use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::record::CompositionBinding;
 
 pub(crate) mod version;
 
@@ -418,14 +418,14 @@ pub(crate) async fn render_bound(
 ) -> Result<render::Rendered, Refusal> {
     let (resource_type, internal, binding) = bound;
     let Some(ref created) = binding.created else {
-        return render::render(
+        return Ok(render::render(
             program.program(),
             program.index(),
             composition,
             origin,
             &facade.translator().session(),
         )
-        .await;
+        .await?);
     };
     let parent = created
         .parent()
@@ -445,7 +445,7 @@ pub(crate) async fn render_bound(
             )),
         ));
     }
-    render::render_created(
+    Ok(render::render_created(
         program.program(),
         program.index(),
         composition,
@@ -456,7 +456,7 @@ pub(crate) async fn render_bound(
         (resource_type, internal),
         &facade.translator().session(),
     )
-    .await
+    .await?)
 }
 
 /// Returns the internal id and the binding of `target`, a read's first
@@ -615,7 +615,7 @@ async fn history(
         VersionedCompositionRevisionHistoryOutcome::NotFound { body } => {
             Err(write::refuse(&status::Answer::new(
                 status::NOT_FOUND,
-                status::diagnostics(StatusCode::NOT_FOUND, &body),
+                crate::cdr::error::diagnostics(StatusCode::NOT_FOUND, &body),
             )))
         }
     }

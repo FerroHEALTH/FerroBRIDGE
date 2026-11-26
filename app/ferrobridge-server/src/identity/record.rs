@@ -13,10 +13,10 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::cdr::ids::EhrId;
-use crate::facade::identity::ExternalResourceId;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::IdError;
-use crate::facade::identity::store::StoreError;
+use crate::identity::ExternalResourceId;
+use crate::identity::FhirResourceId;
+use crate::identity::IdError;
+use crate::identity::store::StoreError;
 
 /// Where one FHIR resource lives in the CDR.
 ///
@@ -42,7 +42,7 @@ pub struct CompositionBinding {
     /// The `metadata.name` of the context mapping that produced the resource.
     pub context: String,
     /// The identity derivation that wrote [`entry_path`](Self::entry_path),
-    /// [`derive::DERIVATION`](crate::facade::identity::derive::DERIVATION) for
+    /// [`derive::DERIVATION`](crate::identity::derive::DERIVATION) for
     /// this build, and `None` for a binding a build up to 0.0.6 wrote.
     pub derivation: Option<u32>,
     /// The resource whose outbound run creates this one, when the binding is
@@ -519,7 +519,7 @@ pub fn external_key(resource_type: &str, id: &ExternalResourceId) -> String {
 #[cfg(test)]
 mod tests {
     use super::{SourceVersion, external_key, internal_key};
-    use crate::facade::identity::{ExternalResourceId, FhirResourceId};
+    use crate::identity::{ExternalResourceId, FhirResourceId};
 
     #[test]
     fn a_source_key_separates_its_three_parts() {
@@ -662,7 +662,7 @@ mod tests {
     #[test]
     fn a_stored_id_the_grammar_refuses_is_refused_naming_its_record() {
         use super::ConsumedSource;
-        use crate::facade::identity::store::StoreError;
+        use crate::identity::store::StoreError;
         let consumed = ConsumedSource {
             ehr_id: String::from("not/an/ehr"),
             versioned_object_uid: String::from("not a uid"),

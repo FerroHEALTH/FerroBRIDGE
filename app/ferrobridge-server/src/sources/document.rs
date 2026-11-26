@@ -241,10 +241,10 @@ impl Mllp {
     /// Returns the EHR policy the senders' messages commit under, `None` for
     /// the facade's.
     #[must_use]
-    pub fn policy(&self) -> Option<crate::facade::ehr::Policy> {
+    pub fn policy(&self) -> Option<crate::identity::ehr::Policy> {
         match self.ehr_policy.as_deref() {
-            Some("existing") => Some(crate::facade::ehr::Policy::Existing),
-            Some("create_on_first_write") => Some(crate::facade::ehr::Policy::CreateOnFirstWrite),
+            Some("existing") => Some(crate::identity::ehr::Policy::Existing),
+            Some("create_on_first_write") => Some(crate::identity::ehr::Policy::CreateOnFirstWrite),
             _ => None,
         }
     }

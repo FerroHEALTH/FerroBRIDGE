@@ -7,7 +7,7 @@
 
 use crate::support;
 use axum::body::Body;
-use ferrobridge_server::facade::ehr::Policy;
+use ferrobridge_server::identity::ehr::Policy;
 use http::Request;
 use http::StatusCode;
 use http::header;

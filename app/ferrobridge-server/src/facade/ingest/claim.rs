@@ -6,12 +6,12 @@
 
 use http::StatusCode;
 
-use crate::facade::identity::claims::Claim;
-use crate::facade::identity::claims::Contended;
-use crate::facade::identity::record::SourceVersion;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::request::Inbound;
+use crate::identity::claims::Claim;
+use crate::identity::claims::Contended;
+use crate::identity::record::SourceVersion;
 
 use super::Ingest;
 use super::Mapped;

@@ -144,8 +144,7 @@ async fn over_summary(
     let term = wiremock::MockServer::start().await;
     let client =
         ferrobridge_server::cdr::CdrClient::new(&world.cdr_config.clone().with_demographic(true))?;
-    let store =
-        std::sync::Arc::new(ferrobridge_server::facade::identity::store::MemoryStore::default());
+    let store = std::sync::Arc::new(ferrobridge_server::identity::store::MemoryStore::default());
     let Some(facade) = summary::summary_facade(
         &world.harness.cdr,
         client,

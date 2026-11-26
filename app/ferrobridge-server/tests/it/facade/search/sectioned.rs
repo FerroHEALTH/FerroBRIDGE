@@ -8,10 +8,10 @@
 //! IDs).
 
 use ferrobridge_server::cdr::ids::EhrId;
-use ferrobridge_server::facade::identity::FhirResourceId;
-use ferrobridge_server::facade::identity::PersonId;
-use ferrobridge_server::facade::identity::store::Store;
 use ferrobridge_server::facade::search::Limits;
+use ferrobridge_server::identity::FhirResourceId;
+use ferrobridge_server::identity::PersonId;
+use ferrobridge_server::identity::store::Store;
 use http::StatusCode;
 use std::error::Error;
 

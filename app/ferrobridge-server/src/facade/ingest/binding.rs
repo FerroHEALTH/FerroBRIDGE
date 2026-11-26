@@ -19,18 +19,18 @@ use crate::cdr::Returned;
 use crate::cdr::ids::EhrId;
 use crate::facade::commit;
 use crate::facade::engine;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::derive;
-use crate::facade::identity::derive::EntryKey;
-use crate::facade::identity::record::CompositionBinding;
-use crate::facade::identity::record::ConsumedSource;
-use crate::facade::identity::record::Identifier;
-use crate::facade::identity::record::SourceVersion;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::derive;
+use crate::identity::derive::EntryKey;
+use crate::identity::record::CompositionBinding;
+use crate::identity::record::ConsumedSource;
+use crate::identity::record::Identifier;
+use crate::identity::record::SourceVersion;
 use crate::terminology::Direction;
 use ferrohealth_server::run::chain;
 
@@ -64,7 +64,7 @@ pub(super) fn resource_source(inbound: &Inbound) -> Option<SourceVersion> {
 /// (<https://hl7.org/fhir/R4/search.html#token>), so an `Identifier` with no
 /// `value` can answer no search and has nothing to record.
 fn identifiers_of(inbound: &Inbound) -> Vec<Identifier> {
-    crate::facade::subject::identifiers_of(inbound.document())
+    crate::identity::subject::identifiers_of(inbound.document())
         .into_iter()
         .map(|(system, value)| Identifier::new(system, value))
         .collect()

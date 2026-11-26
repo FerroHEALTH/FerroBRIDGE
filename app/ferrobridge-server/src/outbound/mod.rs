@@ -7,7 +7,7 @@
 //!
 //! An event names the compositions a contribution changed. For each one the
 //! lane reads the latest version over ITS-REST 1.1.0 `composition_get` and
-//! maps it as the facade's read does (`facade::handlers::emit`),
+//! maps it as the facade's read does (`facade::emit`),
 //! each resource carrying its `id`, `meta.versionId` and `meta.source`. A
 //! `204` (a deletion) and an erasure retract every resource the composition
 //! was last delivered as, and an update retracts the ones its new version no
@@ -104,7 +104,7 @@ pub enum OutboundError {
     },
     /// The identity map could not be read.
     #[error("the identity map could not be read")]
-    Identity(#[source] crate::facade::identity::store::StoreError),
+    Identity(#[source] crate::identity::store::StoreError),
     /// The Bundle could not be written as JSON.
     #[error("the transaction Bundle could not be written as JSON")]
     Encode(#[source] serde_json::Error),
@@ -244,17 +244,12 @@ impl Outbound {
                 what: format!("the EHR {}", ehr.as_str()),
             });
         }
-        let resources = crate::facade::handlers::emit::resources_of(
-            &self.facade,
-            &self.cdr,
-            ehr,
-            &version,
-            &composition,
-        )
-        .await
-        .map_err(|refusal| OutboundError::Mapping {
-            status: refusal.into_response().status(),
-        })?;
+        let resources =
+            crate::facade::emit::resources_of(&self.facade, &self.cdr, ehr, &version, &composition)
+                .await
+                .map_err(|refused| OutboundError::Mapping {
+                    status: refused.status(),
+                })?;
         let mut standing = BTreeSet::new();
         for resource in resources {
             // NOTE: no specification governs this: our own design; a clinical resource with no

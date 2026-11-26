@@ -19,9 +19,8 @@
 //! refuses it with `500`.
 
 mod batch;
-mod complete;
+pub(crate) mod complete;
 mod conditional;
-pub(crate) mod emit;
 pub(crate) mod read;
 pub(crate) mod render;
 pub(crate) mod search;
@@ -562,7 +561,7 @@ async fn admit_existing(
     resource_type: &str,
     id: &str,
 ) -> Result<(), Refusal> {
-    let Ok(internal) = crate::facade::identity::FhirResourceId::new(id) else {
+    let Ok(internal) = crate::identity::FhirResourceId::new(id) else {
         return Ok(());
     };
     let Some(binding) = read::binding(facade, resource_type, &internal).await? else {

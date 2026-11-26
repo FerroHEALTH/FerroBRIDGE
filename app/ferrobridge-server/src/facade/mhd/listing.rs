@@ -19,11 +19,11 @@ use crate::cdr::query::PageSize;
 use crate::facade::Facade;
 use crate::facade::handlers::read::COMPOSITION;
 use crate::facade::handlers::write::refuse;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::record::CompositionBinding;
 use crate::facade::programs::Loaded;
 use crate::facade::reply::Refusal;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::record::CompositionBinding;
 
 /// The latest version of every composition of one template in one EHR.
 // NOTE: AQL 1.1.0 §6 `versionPredicate`: under `VERSION [LATEST_VERSION]` no superseded or deleted

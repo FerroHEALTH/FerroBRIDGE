@@ -11,7 +11,7 @@
 //! class), so which identifier it holds is the deployment's:
 //! `[facade] ehr_status_identifier_system` names its `system`. The reference
 //! takes the shape the facade gives the subject of an EHR it creates
-//! (`facade::ehr::status_of`), namespace and scheme from `system`. The write
+//! (`identity::ehr::status_of`), namespace and scheme from `system`. The write
 //! is `ehr_status_update` with `If-Match` on the version just read
 //! (`ehr-codegen.openapi.yaml`), before the composition is committed, so a
 //! refused write commits nothing. No specification governs the selection or
@@ -37,6 +37,7 @@ use crate::facade::status;
 use super::Ingest;
 use super::Refused;
 use super::refusal::cdr_refusal;
+use super::refusal::precondition_refusal;
 use super::refusal::upstream_refusal;
 
 /// The configuration key that names the identifier system.
@@ -138,7 +139,7 @@ impl Ingest<'_> {
         let Wanted::Reference(reference) = wanted(
             offered,
             self.settings.ehr_status_system.as_deref(),
-            crate::facade::subject::PARTY_TYPE,
+            crate::identity::subject::PARTY_TYPE,
         )?
         else {
             return Ok(());
@@ -193,17 +194,7 @@ impl Ingest<'_> {
         match answered.outcome {
             EhrStatusUpdateOutcome::Ok { .. } | EhrStatusUpdateOutcome::NoContent { .. } => Ok(()),
             EhrStatusUpdateOutcome::PreconditionFailed { body, headers } => {
-                let latest =
-                    crate::cdr::optional_version_from_etag(UPDATE, headers.etag.as_deref())
-                        .map_err(|error| cdr_refusal(&error))?;
-                let mut answer = status::Answer::new(
-                    status::PRECONDITION_FAILED,
-                    status::diagnostics(StatusCode::PRECONDITION_FAILED, &body),
-                );
-                if let Some(latest) = latest {
-                    answer = answer.with_entity_tag(String::from(latest.version_tree_id().value()));
-                }
-                Err(Refused::of_answer(&answer))
+                Err(precondition_refusal(UPDATE, headers.etag.as_deref(), &body))
             }
             EhrStatusUpdateOutcome::NotFound { body } => Err(upstream_refusal(
                 status::NOT_FOUND,

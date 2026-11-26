@@ -11,11 +11,11 @@
 
 use fhir_types::codec::Value;
 
-use crate::facade::identity::ExternalResourceId;
-use crate::facade::identity::IdError;
-use crate::facade::subject::Subject;
-use crate::facade::subject::SubjectError;
-use crate::facade::subject::SubjectLink;
+use crate::identity::ExternalResourceId;
+use crate::identity::IdError;
+use crate::identity::subject::Subject;
+use crate::identity::subject::SubjectError;
+use crate::identity::subject::SubjectLink;
 
 /// The resource type that is the subject of its own EHR.
 const PATIENT: &str = "Patient";
@@ -244,16 +244,16 @@ impl Inbound {
             .get("reference")
             .and_then(Value::as_str)
             .ok_or(RequestError::NoSubject)?;
-        crate::facade::subject::patient_of_reference(literal).map_err(link_error)
+        crate::identity::subject::patient_of_reference(literal).map_err(link_error)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Inbound, RequestError};
-    use crate::facade::subject::Subject;
-    use crate::facade::subject::SubjectError;
-    use crate::facade::subject::SubjectLink;
+    use crate::identity::subject::Subject;
+    use crate::identity::subject::SubjectError;
+    use crate::identity::subject::SubjectLink;
     use crate::identity_source::SourceError;
     use secrecy::ExposeSecret;
 
@@ -313,8 +313,7 @@ mod tests {
         assert_eq!("Condition", read.resource_type());
         assert_eq!(
             Some("c-1"),
-            read.id()
-                .map(crate::facade::identity::ExternalResourceId::as_str)
+            read.id().map(crate::identity::ExternalResourceId::as_str)
         );
         assert_eq!(Some("2"), read.version_id());
         assert_eq!(

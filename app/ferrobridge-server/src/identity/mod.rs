@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The identity layer: the typed identifiers, the derivation and the store.
+//! The identity map, the subject link and the EHR resolution, which the
+//! facade, the HL7 v2 face, the outbound lane and the inbound engine share.
+//!
+//! This module owns the identity tables of the state store ([`state`]): no
+//! other module reads or writes them. A FHIR subject reaches its EHR through
+//! the subject link ([`subject`]) and the EHR resolution ([`ehr`]).
 //!
 //! No specification governs the shape: our own design. A FHIR resource id
 //! derives from the entry's `LOCATABLE.uid` when the entry carries one and
@@ -18,9 +23,11 @@
 pub mod claims;
 pub mod created;
 pub mod derive;
+pub mod ehr;
 pub mod record;
 pub mod state;
 pub mod store;
+pub mod subject;
 
 use core::fmt;
 

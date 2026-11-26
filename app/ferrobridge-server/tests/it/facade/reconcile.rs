@@ -5,7 +5,7 @@
 //! the retry after a binding failed.
 
 use axum::body::Body;
-use ferrobridge_server::facade::identity::store::Store;
+use ferrobridge_server::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -133,11 +133,9 @@ async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(),
         diagnostics.contains(CONTRIBUTION) && diagnostics.contains("matches 0"),
         "the failure names the contribution and the unmatched version: {body}"
     );
-    let source = ferrobridge_server::facade::identity::record::SourceVersion::new(
+    let source = ferrobridge_server::identity::record::SourceVersion::new(
         "Condition",
-        ferrobridge_server::facade::identity::ExternalResourceId::new(
-            "ferrobridge-synthetic-condition-1",
-        )?,
+        ferrobridge_server::identity::ExternalResourceId::new("ferrobridge-synthetic-condition-1")?,
         None,
     );
     assert_eq!(
@@ -149,17 +147,13 @@ async fn a_committed_version_that_matches_no_entry_binds_nothing() -> Result<(),
 }
 
 /// Returns the consumed-source key of the synthetic Condition.
-fn condition_source()
--> Result<ferrobridge_server::facade::identity::record::SourceVersion, Box<dyn Error>> {
-    Ok(
-        ferrobridge_server::facade::identity::record::SourceVersion::new(
-            "Condition",
-            ferrobridge_server::facade::identity::ExternalResourceId::new(
-                "ferrobridge-synthetic-condition-1",
-            )?,
-            None,
-        ),
-    )
+fn condition_source() -> Result<ferrobridge_server::identity::record::SourceVersion, Box<dyn Error>>
+{
+    Ok(ferrobridge_server::identity::record::SourceVersion::new(
+        "Condition",
+        ferrobridge_server::identity::ExternalResourceId::new("ferrobridge-synthetic-condition-1")?,
+        None,
+    ))
 }
 
 #[tokio::test]
@@ -264,7 +258,7 @@ async fn bound(
 ) -> Result<
     (
         String,
-        ferrobridge_server::facade::identity::record::CompositionBinding,
+        ferrobridge_server::identity::record::CompositionBinding,
     ),
     Box<dyn Error>,
 > {
@@ -273,7 +267,7 @@ async fn bound(
         .strip_prefix(&format!("{BASE_URL}/Condition/"))
         .and_then(|rest| rest.split('/').next())
         .ok_or(format!("{location} is no Condition location"))?;
-    let internal = ferrobridge_server::facade::identity::FhirResourceId::new(id)?;
+    let internal = ferrobridge_server::identity::FhirResourceId::new(id)?;
     let binding = harness
         .store
         .binding_of("Condition", &internal)

@@ -19,13 +19,13 @@ use fhir_types::codec::Value;
 use http::StatusCode;
 
 use crate::facade::handlers::render::Rendered;
-use crate::facade::identity::FhirResourceId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::search::bundle::Inclusion;
 use crate::facade::search::criteria::Included;
+use crate::identity::FhirResourceId;
 
 /// Returns the resources of `created` that `matched` references through each
 /// of `includes`, each once, in the order `created` holds them.

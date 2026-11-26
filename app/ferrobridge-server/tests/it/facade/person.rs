@@ -7,8 +7,8 @@
 use axum::body::Body;
 use ferrobridge_server::facade::Facade;
 use ferrobridge_server::facade::Settings;
-use ferrobridge_server::facade::identity::store::MemoryStore;
 use ferrobridge_server::facade::programs;
+use ferrobridge_server::identity::store::MemoryStore;
 use http::Request;
 use http::StatusCode;
 use http::header;

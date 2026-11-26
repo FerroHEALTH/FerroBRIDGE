@@ -4,7 +4,7 @@
 //! The conditional create, `If-None-Exist`.
 
 use axum::body::Body;
-use ferrobridge_server::facade::identity::store::Store;
+use ferrobridge_server::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -72,7 +72,7 @@ async fn if_none_exist_answers_four_hundred_and_twelve_when_several_match()
 -> Result<(), Box<dyn Error>> {
     let harness = harness().await;
     let first = create_one(&harness).await?;
-    let second = ferrobridge_server::facade::identity::FhirResourceId::new("secondmatch")?;
+    let second = ferrobridge_server::identity::FhirResourceId::new("secondmatch")?;
     harness
         .store
         .record_binding(
@@ -82,7 +82,7 @@ async fn if_none_exist_answers_four_hundred_and_twelve_when_several_match()
                 .store
                 .binding_of(
                     "Condition",
-                    &ferrobridge_server::facade::identity::FhirResourceId::new(&first)?,
+                    &ferrobridge_server::identity::FhirResourceId::new(&first)?,
                 )
                 .await?
                 .expect("the first create recorded a binding"),
