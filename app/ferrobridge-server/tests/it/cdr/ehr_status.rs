@@ -10,8 +10,8 @@ use std::error::Error;
 
 use ferrobridge_server::cdr::Prefer;
 use ferrobridge_server::cdr::ids::EhrId;
-use ferrobridge_server::facade::ehr::status_of;
-use ferrobridge_server::facade::identity::PersonId;
+use ferrobridge_server::identity::PersonId;
+use ferrobridge_server::identity::ehr::status_of;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::ehr::client::EhrStatusGetAtTimeOutcome;
 use openehr_its::rest::generated::ehr::client::EhrStatusUpdateOutcome;

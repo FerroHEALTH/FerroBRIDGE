@@ -38,7 +38,7 @@ fn an_enabled_facade_resolves_its_policy() -> Result<(), Box<dyn std::error::Err
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!("https://bridge.invalid/fhir", facade.settings.base_url);
     assert_eq!(
-        ferrobridge_server::facade::ehr::Policy::CreateOnFirstWrite,
+        ferrobridge_server::identity::ehr::Policy::CreateOnFirstWrite,
         facade.settings.ehr_policy
     );
     assert_eq!("en", facade.settings.language);

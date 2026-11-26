@@ -14,10 +14,10 @@ use std::error::Error;
 use ferrobridge_server::cdr::CdrClient;
 use ferrobridge_server::cdr::config::CdrConfig;
 use ferrobridge_server::facade::Settings;
-use ferrobridge_server::facade::ehr;
-use ferrobridge_server::facade::ehr::Policy;
-use ferrobridge_server::facade::identity::PersonId;
-use ferrobridge_server::facade::identity::store::MemoryStore;
+use ferrobridge_server::identity::PersonId;
+use ferrobridge_server::identity::ehr;
+use ferrobridge_server::identity::ehr::Policy;
+use ferrobridge_server::identity::store::MemoryStore;
 use http::StatusCode;
 use wiremock::Mock;
 use wiremock::MockServer;
@@ -340,8 +340,8 @@ async fn two_concurrent_creates_for_one_subject_converge_on_one_ehr() -> Result<
         ehr::resolve(&client, &first_store, &person, Policy::CreateOnFirstWrite),
         ehr::resolve(&client, &second_store, &person, Policy::CreateOnFirstWrite),
     );
-    assert_eq!(EHR_ID, first?.as_str());
-    assert_eq!(EHR_ID, second?.as_str());
+    assert_eq!(EHR_ID, first?.id.as_str());
+    assert_eq!(EHR_ID, second?.id.as_str());
     let creates = ehr_calls(&cdr)
         .await
         .into_iter()

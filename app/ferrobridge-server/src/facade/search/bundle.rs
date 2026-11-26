@@ -23,9 +23,9 @@ use fhir_types::r4::bundle::BundleLink;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::resource::Resource;
 
-use crate::facade::identity::FhirResourceId;
 use crate::facade::outcome::Issue;
 use crate::facade::search::criteria::CURSOR;
+use crate::identity::FhirResourceId;
 
 /// The `Bundle.type` a search answers.
 const SEARCHSET: &str = "searchset";

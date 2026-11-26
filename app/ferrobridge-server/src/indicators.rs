@@ -153,13 +153,13 @@ impl HealthIndicator for State {
 #[derive(Debug, Clone)]
 pub struct IdentityStore {
     /// The store the probe reads.
-    store: std::sync::Arc<dyn crate::facade::identity::store::Store>,
+    store: std::sync::Arc<dyn crate::identity::store::Store>,
 }
 
 impl IdentityStore {
     /// Returns a probe over `store`.
     #[must_use]
-    pub const fn new(store: std::sync::Arc<dyn crate::facade::identity::store::Store>) -> Self {
+    pub const fn new(store: std::sync::Arc<dyn crate::identity::store::Store>) -> Self {
         Self { store }
     }
 }
@@ -174,7 +174,7 @@ impl HealthIndicator for IdentityStore {
             // NOTE: no specification governs a health probe: our own design,
             // and the read asks a key the map never holds, so the probe reads
             // the store without touching a recorded identity.
-            let probe = crate::facade::identity::ExternalResourceId::new("ferrobridge-readiness");
+            let probe = crate::identity::ExternalResourceId::new("ferrobridge-readiness");
             match probe {
                 Err(error) => Outcome::down(reason(error)),
                 Ok(key) => match self.store.internal_of("OperationOutcome", &key).await {

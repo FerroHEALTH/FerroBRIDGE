@@ -8,7 +8,7 @@
 //! (`crate::facade::search::identifier`). Each party it finds is the patient
 //! whose logical id is the party's uid, and that patient's EHR comes from the
 //! identity map or the CDR's lookup by subject, as every subject of the
-//! facade does (`crate::facade::ehr`). A bare value matches every patient
+//! facade does (`crate::identity::ehr`). A bare value matches every patient
 //! that carries it (<https://hl7.org/fhir/R4/search.html>, §3.1.1.4.10), and
 //! a chain answers the resources of every matching target (§3.1.1.4.15), so
 //! the search reads the EHR of each party. An identifier no party carries,
@@ -20,7 +20,6 @@ use http::StatusCode;
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
-use crate::facade::ehr;
 use crate::facade::handlers::write;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
@@ -28,13 +27,14 @@ use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::search::identifier;
 use crate::facade::status;
+use crate::identity::ehr;
 use fhir_search::token::Token;
 
 /// Returns the EHRs of every patient one identifier value of the chained
 /// parameter `name` names, in the order the identifier query returns them.
 pub(crate) async fn ehrs_of(
     facade: &Facade,
-    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
+    (client, patients): (&CdrClient, &crate::facade::patients::Patients<'_>),
     name: &str,
     token: &Token,
 ) -> Result<Vec<EhrId>, Refusal> {
@@ -76,7 +76,7 @@ pub(crate) async fn ehrs_of(
 /// the CDR holds none.
 pub(crate) async fn ehr_of_party(
     facade: &Facade,
-    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
+    (client, patients): (&CdrClient, &crate::facade::patients::Patients<'_>),
     party: &str,
 ) -> Result<Option<EhrId>, Refusal> {
     // NOTE: no specification governs this: our own design, a party that names no
@@ -85,7 +85,7 @@ pub(crate) async fn ehr_of_party(
         return Ok(None);
     };
     match ehr::resolve(client, facade.store(), &person, ehr::Policy::Existing).await {
-        Ok(found) => Ok(Some(found)),
+        Ok(found) => Ok(Some(found.id)),
         Err(ehr::EhrError::Absent { .. }) => Ok(None),
         Err(ehr::EhrError::Client { ref source }) => {
             Err(write::refuse(&status::of_client_error(source)))

@@ -34,13 +34,12 @@ use ferrohealth_smart::resource::Compartment;
 use ferrohealth_smart::scope::Permission;
 use fhir_types::codec::Object;
 use fhir_types::r4::capability_statement::CapabilityStatementRestResource;
-use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 
 use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::facade::Facade;
+use crate::facade::context::Context;
 use crate::facade::handlers::format_of;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -86,18 +85,12 @@ pub fn serves(facade: &Facade, resource_type: &str) -> bool {
 /// Returns `406` for a format neither FHIR JSON nor XML, `403` for a caller
 /// without read on the type, `404` for an id that names nothing served, and
 /// the refusal a CDR answer renders as.
-pub async fn read(
-    facade: &Facade,
-    access: &Access,
-    (resource_type, id): (&str, &str),
-    headers: &HeaderMap,
-    uri: &Uri,
-) -> Result<Response, Refusal> {
-    let format = format_of(headers, uri)?;
-    let client = facade.client_for(headers, access).await?;
+pub async fn read(cx: Context<'_>, (resource_type, id): (&str, &str)) -> Result<Response, Refusal> {
+    let format = format_of(cx.headers, cx.uri)?;
+    let client = cx.facade.client_for(cx.headers, cx.access).await?;
     let resource = match resource_type {
-        DOCUMENT_REFERENCE => reference::read(facade, access, &client, id).await?,
-        _ => list::read(facade, access, &client, id).await?,
+        DOCUMENT_REFERENCE => reference::read(cx.facade, cx.access, &client, id).await?,
+        _ => list::read(cx.facade, cx.access, &client, id).await?,
     };
     Ok(reply::formatted(StatusCode::OK, &resource, format, &[]))
 }
@@ -112,26 +105,25 @@ pub async fn read(
 /// server does not support, `403` for a caller without search on the type,
 /// and the refusal a CDR answer renders as.
 pub async fn search(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<Response, Refusal> {
-    let format = format_of(headers, uri)?;
+    let format = format_of(cx.headers, cx.uri)?;
     if !body.is_empty() {
-        crate::facade::handlers::search::form::check_form(headers)?;
+        crate::facade::handlers::search::form::check_form(cx.headers)?;
     }
-    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    let mut pairs = media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes());
     pairs.extend(media::query_pairs(body));
-    let strict = params::strict(headers);
-    let client = facade.client_for(headers, access).await?;
+    let strict = params::strict(cx.headers);
+    let client = cx.facade.client_for(cx.headers, cx.access).await?;
     let found = match resource_type {
-        DOCUMENT_REFERENCE => reference::search(facade, access, &client, &pairs, strict).await?,
-        _ => list::search(facade, access, &client, &pairs, strict).await?,
+        DOCUMENT_REFERENCE => {
+            reference::search(cx.facade, cx.access, &client, &pairs, strict).await?
+        }
+        _ => list::search(cx.facade, cx.access, &client, &pairs, strict).await?,
     };
-    let bundle = found.searchset(facade, resource_type)?;
+    let bundle = found.searchset(cx.facade, resource_type)?;
     Ok(reply::formatted(StatusCode::OK, &bundle, format, &[]))
 }
 
@@ -250,7 +242,7 @@ async fn scoped(
 /// reference to another server names no patient of this one.
 async fn patients(
     facade: &Facade,
-    resolver: (&CdrClient, &crate::facade::subject::Patients<'_>),
+    resolver: (&CdrClient, &crate::facade::patients::Patients<'_>),
     request: &params::Read,
 ) -> Result<Option<Vec<EhrId>>, Refusal> {
     let mut named: Option<Vec<EhrId>> = None;
@@ -320,7 +312,7 @@ fn patient_id(facade: &Facade, reference: &str) -> Option<String> {
 /// our own design).
 async fn reach(
     facade: &Facade,
-    (access, patients): (&Access, &crate::facade::subject::Patients<'_>),
+    (access, patients): (&Access, &crate::facade::patients::Patients<'_>),
     resource_type: &str,
     named: Option<Vec<EhrId>>,
 ) -> Result<Vec<EhrId>, Refusal> {

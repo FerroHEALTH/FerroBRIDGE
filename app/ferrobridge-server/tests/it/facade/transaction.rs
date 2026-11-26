@@ -5,7 +5,7 @@
 //! overlap.
 
 use axum::body::Body;
-use ferrobridge_server::facade::identity::store::Store;
+use ferrobridge_server::identity::store::Store;
 use http::Request;
 use http::StatusCode;
 use http::header;
@@ -167,7 +167,7 @@ async fn each_transaction_entry_answers_the_location_and_etag_a_create_answers()
         .strip_prefix(&format!("{BASE_URL}/Condition/"))
         .and_then(|rest| rest.strip_suffix("/_history/1"))
         .ok_or(format!("{location} is no [base]/Condition/[id]/_history/1"))?;
-    let internal = ferrobridge_server::facade::identity::FhirResourceId::new(id)?;
+    let internal = ferrobridge_server::identity::FhirResourceId::new(id)?;
     let binding = harness
         .store
         .binding_of("Condition", &internal)

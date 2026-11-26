@@ -28,7 +28,6 @@ use ferrohealth_smart::resource::Compartment;
 use ferrohealth_smart::scope::Permission;
 use http::HeaderMap;
 use http::StatusCode;
-use http::Uri;
 use openehr_base::v1_3::base_types::identification::object_version_id::ObjectVersionId;
 use openehr_its::rest::generated::query::ResultSetRow;
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -38,6 +37,7 @@ use crate::cdr::CdrClient;
 use crate::cdr::ids::EhrId;
 use crate::cdr::query::QueryPageError;
 use crate::facade::Facade;
+use crate::facade::context::Context;
 use crate::facade::engine;
 use crate::facade::engine::entry::Entry;
 use crate::facade::handlers::Body;
@@ -47,9 +47,6 @@ use crate::facade::handlers::search::total::Accuracy;
 use crate::facade::handlers::search::total::count_all;
 use crate::facade::handlers::search::total::total_of;
 use crate::facade::handlers::write;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::PersonId;
-use crate::facade::identity::record::CompositionBinding;
 use crate::facade::ingest::Refused;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -73,35 +70,45 @@ use crate::facade::search::cursor::Position;
 use crate::facade::search::plan;
 use crate::facade::search::plan::Resolved;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::PersonId;
+use crate::identity::record::CompositionBinding;
 use crate::terminology::Session;
 
 /// `GET [base]/{type}?…`.
-pub(crate) async fn search_get(
-    facade: &Facade,
-    access: &Access,
-    resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
-) -> Result<Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    let pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
-    search(facade, access, resource_type, headers, &pairs, None).await
+pub(crate) async fn search_get(cx: Context<'_>, resource_type: &str) -> Result<Response, Refusal> {
+    crate::facade::handlers::guard(cx.headers, cx.uri, Body::Absent)?;
+    let pairs = media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes());
+    search(
+        cx.facade,
+        cx.access,
+        resource_type,
+        cx.headers,
+        &pairs,
+        None,
+    )
+    .await
 }
 
 /// `POST [base]/{type}/_search`, the parameters in the URL and the form body.
 pub(crate) async fn search_post(
-    facade: &Facade,
-    access: &Access,
+    cx: Context<'_>,
     resource_type: &str,
-    headers: &HeaderMap,
-    uri: &Uri,
     body: &[u8],
 ) -> Result<Response, Refusal> {
-    crate::facade::handlers::guard(headers, uri, Body::Absent)?;
-    form::check_form(headers)?;
-    let mut pairs = media::query_pairs(uri.query().unwrap_or_default().as_bytes());
+    crate::facade::handlers::guard(cx.headers, cx.uri, Body::Absent)?;
+    form::check_form(cx.headers)?;
+    let mut pairs = media::query_pairs(cx.uri.query().unwrap_or_default().as_bytes());
     pairs.extend(media::query_pairs(body));
-    search(facade, access, resource_type, headers, &pairs, None).await
+    search(
+        cx.facade,
+        cx.access,
+        resource_type,
+        cx.headers,
+        &pairs,
+        None,
+    )
+    .await
 }
 
 /// Runs one search, its searchset opened with `lead` when another lane of
@@ -340,7 +347,7 @@ fn start_of(
 /// governs the mapping from a compartment to an EHR: our own design).
 pub(crate) async fn compartment_ehrs(
     facade: &Facade,
-    patients: &crate::facade::subject::Patients<'_>,
+    patients: &crate::facade::patients::Patients<'_>,
     patient: &str,
 ) -> Result<Vec<EhrId>, Refusal> {
     let Some(person) = patients.known_person(patient).await? else {
@@ -361,7 +368,7 @@ pub(crate) async fn compartment_ehrs(
 /// plan reads as a declaration that matches nothing.
 async fn resolve(
     facade: &Facade,
-    (client, patients): (&CdrClient, &crate::facade::subject::Patients<'_>),
+    (client, patients): (&CdrClient, &crate::facade::patients::Patients<'_>),
     resource_type: &str,
     criteria: &Criteria,
 ) -> Result<Resolved, Refusal> {
@@ -373,8 +380,8 @@ async fn resolve(
                 Subject::Literal(ref reference) => {
                     // NOTE: no specification governs this: our own design, a reference that
                     // names no person matches none.
-                    let Ok(crate::facade::subject::Subject::Patient(id)) =
-                        crate::facade::subject::patient_of_reference(reference)
+                    let Ok(crate::identity::subject::Subject::Patient(id)) =
+                        crate::identity::subject::patient_of_reference(reference)
                     else {
                         continue;
                     };
@@ -403,7 +410,7 @@ async fn resolve(
                     let Ok(person) = PersonId::new(system, value) else {
                         continue;
                     };
-                    if crate::facade::subject::reference_of(
+                    if crate::facade::patients::reference_of(
                         &facade.settings().subject,
                         facade.store(),
                         &facade.programs(),

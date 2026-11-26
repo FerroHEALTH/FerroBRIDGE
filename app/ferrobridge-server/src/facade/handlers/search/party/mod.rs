@@ -32,7 +32,6 @@ use openehr_its::rest::generated::query::ResultSetRow;
 use crate::cdr::CdrClient;
 use crate::facade::Facade;
 use crate::facade::handlers::write;
-use crate::facade::identity::FhirResourceId;
 use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::party;
@@ -50,6 +49,7 @@ use crate::facade::search::party::IDENTIFIER;
 use crate::facade::search::party::NAME;
 use crate::facade::search::party::PartyQueries;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
 
 use request::Criterion;
 use request::Request;

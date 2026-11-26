@@ -254,10 +254,12 @@ where
         }
         Err(error) => return Err(error),
     };
-    let followers = crate::lanes::spawn_followers(started.feeds, &started.state, settings, &stop);
+    let workers = started.workers.as_ref().map(|workers| workers.listened());
+    let running = (started.feeds, started.workers);
+    let followers = crate::lanes::spawn_followers(running, &started.state, settings, &stop);
     let state = Arc::new(started.state.with_lanes(started.lanes));
     let delivery = state.access_log().map(|log| log.spawn());
-    listen(&state);
+    listen(&state, workers);
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let report =
         crate::usage_report::start(&settings.usage_report, state.reported(), began, ci).await;
@@ -321,9 +323,9 @@ where
 }
 
 /// Starts the replica's one `LISTEN` session, carrying the channel of every
-/// copy it holds in memory: the inbound sources, the settings registers and
-/// the running mapping revision.
-fn listen(state: &crate::state::AppState) {
+/// copy it holds in memory (the inbound sources, the settings registers and
+/// the running mapping revision) and the inbound `workers`' wake channel.
+fn listen(state: &crate::state::AppState, workers: Option<Arc<crate::store::listen::Listened>>) {
     let Some(store) = state.store() else {
         return;
     };
@@ -331,6 +333,7 @@ fn listen(state: &crate::state::AppState) {
         state.sources().map(|sources| sources.listened()),
         state.registers().map(|registers| registers.listened()),
         state.operator().and_then(crate::operator::watch::start),
+        workers,
     ]
     .into_iter()
     .flatten()
