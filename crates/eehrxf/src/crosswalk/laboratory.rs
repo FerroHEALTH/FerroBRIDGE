@@ -20,6 +20,8 @@ use crate::crosswalk::Crosswalk;
 use crate::crosswalk::EhnElement;
 use crate::crosswalk::Populate;
 use crate::crosswalk::Row;
+use crate::crosswalk::ehn;
+use crate::crosswalk::row;
 
 /// The canonical URL of the HL7 Europe Laboratory Report composition profile.
 pub const LAB_COMPOSITION: &str =
@@ -394,25 +396,3 @@ const ROWS: &[Row] = &[
         ASSEMBLED,
     ),
 ];
-
-/// Builds one eHealth Network catalogue entry.
-const fn ehn(id: &'static str, name: &'static str) -> EhnElement {
-    EhnElement { id, name }
-}
-
-/// Builds one row.
-const fn row(
-    path: &'static str,
-    ehn: &'static [&'static str],
-    producer: Option<Populate>,
-    eps: &'static str,
-    contexts: &'static [&'static str],
-) -> Row {
-    Row {
-        path,
-        ehn,
-        producer,
-        eps,
-        contexts,
-    }
-}

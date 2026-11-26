@@ -19,6 +19,8 @@ use crate::crosswalk::EhnElement;
 use crate::crosswalk::Gap;
 use crate::crosswalk::Populate;
 use crate::crosswalk::Row;
+use crate::crosswalk::ehn;
+use crate::crosswalk::row;
 
 /// The canonical URL of the HL7 Europe Patient Summary composition profile.
 pub const EPS_COMPOSITION: &str = "http://hl7.eu/fhir/eps/StructureDefinition/composition-eu-eps";
@@ -620,25 +622,3 @@ const ROWS: &[Row] = &[
     ),
     note!("carePlans", None, "sectionPlanOfCare"),
 ];
-
-/// Builds one eHealth Network catalogue entry.
-const fn ehn(id: &'static str, name: &'static str) -> EhnElement {
-    EhnElement { id, name }
-}
-
-/// Builds one row.
-const fn row(
-    path: &'static str,
-    ehn: &'static [&'static str],
-    producer: Option<Populate>,
-    eps: &'static str,
-    contexts: &'static [&'static str],
-) -> Row {
-    Row {
-        path,
-        ehn,
-        producer,
-        eps,
-        contexts,
-    }
-}

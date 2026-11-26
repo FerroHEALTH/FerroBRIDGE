@@ -15,6 +15,62 @@
 use std::fmt;
 use std::str::FromStr;
 
+/// Implements the text accessors and conversions of a value kept as the
+/// text it was given, each conversion through the type's checking `new`.
+macro_rules! text_value {
+    ([$($generics:tt)*] $ty:ty) => {
+        impl<$($generics)*> $ty {
+            /// Returns the value.
+            #[must_use]
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+
+            /// Returns the owned value.
+            #[must_use]
+            pub fn into_inner(self) -> String {
+                self.0
+            }
+        }
+
+        impl<$($generics)*> fmt::Display for $ty {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(&self.0)
+            }
+        }
+
+        impl<$($generics)*> AsRef<str> for $ty {
+            fn as_ref(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl<$($generics)*> FromStr for $ty {
+            type Err = ValueError;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                Self::new(value)
+            }
+        }
+
+        impl<$($generics)*> TryFrom<String> for $ty {
+            type Error = ValueError;
+
+            fn try_from(value: String) -> Result<Self, Self::Error> {
+                Self::new(value)
+            }
+        }
+
+        impl<$($generics)*> TryFrom<&str> for $ty {
+            type Error = ValueError;
+
+            fn try_from(value: &str) -> Result<Self, Self::Error> {
+                Self::new(value)
+            }
+        }
+    };
+}
+
 /// A value the CDM's column type refuses.
 ///
 /// The variants carry the shape of the offending value, never the value
@@ -69,55 +125,9 @@ impl<const N: usize> Varchar<N> {
         }
         Ok(Self(value))
     }
-
-    /// Returns the value.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Returns the owned value.
-    #[must_use]
-    pub fn into_inner(self) -> String {
-        self.0
-    }
 }
 
-impl<const N: usize> fmt::Display for Varchar<N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl<const N: usize> AsRef<str> for Varchar<N> {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<const N: usize> FromStr for Varchar<N> {
-    type Err = ValueError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::new(value)
-    }
-}
-
-impl<const N: usize> TryFrom<String> for Varchar<N> {
-    type Error = ValueError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
-
-impl<const N: usize> TryFrom<&str> for Varchar<N> {
-    type Error = ValueError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
+text_value!([const N: usize] Varchar<N>);
 
 /// A calendar date in the ISO 8601 extended form `YYYY-MM-DD`: the CDM's
 /// `date`.
@@ -158,55 +168,9 @@ impl CdmDate {
             Err(ValueError::NotADate)
         }
     }
-
-    /// Returns the value.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Returns the owned value.
-    #[must_use]
-    pub fn into_inner(self) -> String {
-        self.0
-    }
 }
 
-impl fmt::Display for CdmDate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl AsRef<str> for CdmDate {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl FromStr for CdmDate {
-    type Err = ValueError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::new(value)
-    }
-}
-
-impl TryFrom<String> for CdmDate {
-    type Error = ValueError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
-
-impl TryFrom<&str> for CdmDate {
-    type Error = ValueError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
+text_value!([] CdmDate);
 
 /// A date and time in the ISO 8601 extended form `YYYY-MM-DDThh:mm:ss`: the
 /// CDM's `datetime`.
@@ -249,55 +213,9 @@ impl CdmDatetime {
             Err(ValueError::NotADatetime)
         }
     }
-
-    /// Returns the value.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Returns the owned value.
-    #[must_use]
-    pub fn into_inner(self) -> String {
-        self.0
-    }
 }
 
-impl fmt::Display for CdmDatetime {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl AsRef<str> for CdmDatetime {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl FromStr for CdmDatetime {
-    type Err = ValueError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::new(value)
-    }
-}
-
-impl TryFrom<String> for CdmDatetime {
-    type Error = ValueError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
-
-impl TryFrom<&str> for CdmDatetime {
-    type Error = ValueError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
+text_value!([] CdmDatetime);
 
 /// The length of `YYYY-MM-DD`.
 const DATE_LENGTH: usize = 10;
