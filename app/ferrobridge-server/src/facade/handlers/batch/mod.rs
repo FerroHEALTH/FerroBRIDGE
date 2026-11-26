@@ -139,7 +139,7 @@ pub(crate) async fn batch(
     let mut answered: Vec<Option<BundleEntry>> = vec![None; entries.len()];
     for entry in in_processing_order(&entries) {
         let started = Instant::now();
-        let (call, response) = process(facade, access, headers, entry, &full_urls).await;
+        let (call, response) = Box::pin(process(facade, access, headers, entry, &full_urls)).await;
         let status = response.status();
         // NOTE: no specification governs this: our own design, each entry is
         // one access to one record, so each writes its own audit line (EHDS

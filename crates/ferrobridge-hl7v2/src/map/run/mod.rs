@@ -17,6 +17,7 @@ mod datum;
 mod endpoint;
 mod finish;
 mod grouping;
+mod registry;
 mod resource;
 mod segment;
 mod sibling;
@@ -211,6 +212,10 @@ enum Pending {
         request: usize,
         part: Part,
     },
+    /// The identifier system the registry search `lookup` answers.
+    Registry {
+        lookup: usize,
+    },
     /// A reference to the `label` sibling of the family `anchor` heads, settled
     /// when the run finishes ([`Run::siblings`]), since only then is it known
     /// which siblings a value reached.
@@ -289,12 +294,24 @@ struct Request {
     answer: Option<ferrobridge_term::concept::Concept>,
 }
 
+/// One identifier registry search the walk asks for: the assigning
+/// authority, and the system the registry holds for it.
+#[derive(Debug, Clone)]
+struct Lookup {
+    authority: String,
+    at: Location,
+    row: RowRef,
+    answer: Option<String>,
+}
+
 /// The lengths of a run's records at one point: the writes per resource,
-/// whose count is the resource count, the requests and the outcomes.
+/// whose count is the resource count, the requests, the registry searches
+/// and the outcomes.
 #[derive(Debug)]
 struct Mark {
     writes: Vec<usize>,
     requests: usize,
+    lookups: usize,
     outcomes: usize,
 }
 
@@ -326,6 +343,7 @@ struct Recorded {
     slots: Vec<Slot>,
     value: Option<Value>,
     translation: Option<(String, String, Part)>,
+    registry: Option<String>,
 }
 
 /// A run in progress.
@@ -335,6 +353,7 @@ pub(in crate::map) struct Run<'a> {
     parsed: &'a Parsed,
     resources: Vec<Resource>,
     requests: Vec<Request>,
+    lookups: Vec<Lookup>,
     outcomes: Vec<Outcome>,
     /// The id of every map the run applied.
     applied: BTreeSet<String>,
@@ -351,6 +370,7 @@ impl<'a> Run<'a> {
             parsed,
             resources: Vec::new(),
             requests: Vec::new(),
+            lookups: Vec::new(),
             outcomes: parsed
                 .unplaced()
                 .iter()
@@ -499,7 +519,9 @@ mod tests {
                 let path: Vec<&str> = write.slots.iter().map(|slot| slot.name.as_str()).collect();
                 match &write.value {
                     Pending::Ready(value) => Some((path.join("."), value.clone())),
-                    Pending::Translation { .. } | Pending::Sibling { .. } => None,
+                    Pending::Translation { .. }
+                    | Pending::Registry { .. }
+                    | Pending::Sibling { .. } => None,
                 }
             })
             .collect()

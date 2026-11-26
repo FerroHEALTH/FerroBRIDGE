@@ -40,6 +40,7 @@ use fhirconnect::operations::contract::CompositionPayload;
 use fhirconnect::operations::contract::Format;
 use fhirconnect::operations::contract::ToFhirRequest;
 use fhirconnect::operations::contract::ToOpenehrRequest;
+use fhirconnect::operations::contract::parameters;
 use fhirconnect::operations::error::OperationError;
 use fhirconnect::operations::issues;
 use fhirconnect::operations::run;
@@ -318,8 +319,7 @@ async fn tofhir_answer(
     query: &OperationQuery,
     body: &str,
 ) -> Result<Response, OperationError> {
-    let mut parameters =
-        fhirconnect::operations::contract::parameters::parameters_from_json(TO_FHIR, body)?;
+    let mut parameters = parameters::parameters_from_json(TO_FHIR, body)?;
     merge_query(&mut parameters, query);
     let request = ToFhirRequest::from_parameters(&parameters)?;
     let answer = run_to_fhir(lane, settings, &request).await?;
@@ -355,26 +355,15 @@ fn toopenehr_request(
 ) -> Result<ToOpenehrRequest, OperationError> {
     // NOTE: `engine/rest-api.adoc` §$toopenehr Input and `ToOpenEhr.fsh`
     // describe two different bodies, so both are read (#192).
-    let value: serde_json::Value =
-        serde_json::from_str(body).map_err(|source| OperationError::Payload { source })?;
-    let fhir_types::codec::Value::Object(object) = fhir_types::codec::Value::from_serde_json(value)
-    else {
-        return Err(OperationError::NotAnObject { what: "body" });
-    };
+    let object = parameters::body_object(body)?;
     let is_parameters = matches!(
         object.get("resourceType"),
         Some(fhir_types::codec::Value::String(name)) if name == "Parameters"
     );
     let request = if is_parameters {
-        let parameters =
-            Parameters::from_json(&object, &mut Path::root("Parameters")).map_err(|source| {
-                OperationError::Body {
-                    operation: TO_OPENEHR,
-                    expected: "Parameters",
-                    source: Box::new(source),
-                }
-            })?;
-        ToOpenehrRequest::from_parameters(&parameters)?
+        ToOpenehrRequest::from_parameters(&parameters::parameters_from_object(
+            TO_OPENEHR, &object,
+        )?)?
     } else {
         let bundle = fhir_types::r4::bundle::Bundle::from_json(&object, &mut Path::root("Bundle"))
             .map_err(|source| OperationError::Body {

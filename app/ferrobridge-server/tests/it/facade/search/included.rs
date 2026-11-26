@@ -35,7 +35,8 @@ const CATEGORY: &str = "http://terminology.hl7.org/CodeSystem/condition-category
 /// Returns a harness over the include fixture, its subject bound.
 async fn including() -> Harness {
     let harness = harness_built(INCLUDED, settings(), Some(Limits::default())).await;
-    let person = PersonId::new("http://example.org/fhir", SUBJECT).expect("a legal person key");
+    let person =
+        PersonId::new("http://example.org/fhir", super::PSEUDONYM).expect("a legal person key");
     harness
         .store
         .record_ehr(

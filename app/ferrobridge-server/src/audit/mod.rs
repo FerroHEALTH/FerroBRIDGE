@@ -153,8 +153,8 @@ impl AccessLog {
 
     /// Returns the recorder a record of the system's own is stored through.
     #[must_use]
-    pub fn recorder(&self) -> &dyn AuditRecorder {
-        self.recorder.as_ref()
+    pub const fn recorder(&self) -> &Arc<dyn AuditRecorder> {
+        &self.recorder
     }
 
     /// Returns the address the facade's requests arrive at.

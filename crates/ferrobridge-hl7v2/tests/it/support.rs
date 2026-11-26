@@ -204,9 +204,32 @@ impl Tables {
     }
 }
 
+/// Mounts the identifier registry: the `NamingSystem` search answers one
+/// identifier `NamingSystem` per `(assigning authority, uri)` in
+/// `registered`, and none for any other authority.
+pub(crate) async fn mount_registry(server: &MockServer, registered: &[(&str, &str)]) {
+    for (authority, uri) in registered {
+        Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/r4/NamingSystem"))
+            .and(wiremock::matchers::query_param("value", *authority))
+            .respond_with(terminology::naming_systems(&[(authority, uri)]))
+            .with_priority(1)
+            .mount(server)
+            .await;
+    }
+    Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path("/r4/NamingSystem"))
+        .respond_with(terminology::naming_systems(&[]))
+        .with_priority(2)
+        .mount(server)
+        .await;
+}
+
 /// Mounts `stub` on `server` for `ConceptMap/$translate` and for a `batch`
-/// at the R4 base.
+/// at the R4 base, beside an identifier registry that registers no
+/// assigning authority.
 pub(crate) async fn mount_translate<R: Respond + Clone + 'static>(server: &MockServer, stub: R) {
+    mount_registry(server, &[]).await;
     Mock::given(wiremock::matchers::method("POST"))
         .and(wiremock::matchers::path("/r4/ConceptMap/$translate"))
         .respond_with(stub.clone())

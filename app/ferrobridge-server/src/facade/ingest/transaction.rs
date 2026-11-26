@@ -301,7 +301,10 @@ impl Ingest<'_> {
             .get("entry")
             .and_then(Value::as_array)
             .unwrap_or_default();
-        let partition = self.map_entries(entries, unmapped, provenance).await;
+        let mut partition = self.map_entries(entries, unmapped, provenance).await;
+        if let Some(refused) = partition.refused.take() {
+            return Err(refused);
+        }
         if !partition.failures.is_empty() {
             // NOTE: no specification governs this: our own design, an entry that failed
             // upstream (a reference fetch) answers the bundle as the `UPSTREAM` row does.
@@ -353,15 +356,9 @@ impl Ingest<'_> {
         if seen.contains(&true) {
             return Err(partly_consumed(&partition.mapped, &seen));
         }
-        let ehr_id = ehr::resolve(
-            &self.client,
-            self.store,
-            subject,
-            &self.settings.subject,
-            self.settings.ehr_policy,
-        )
-        .await
-        .map_err(|error| ehr_refusal(&error))?;
+        let ehr_id = ehr::resolve(&self.client, self.store, subject, self.settings.ehr_policy)
+            .await
+            .map_err(|error| ehr_refusal(&error))?;
         let preceding = self.preceding(&ehr_id, &partition.mapped, &revised).await?;
         let offered: Vec<SubjectIdentifier> = partition
             .mapped

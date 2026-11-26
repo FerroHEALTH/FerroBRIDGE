@@ -67,11 +67,7 @@ async fn a_read_names_the_subject_the_identity_map_binds_to_the_ehr() -> Result<
     assert_eq!(StatusCode::OK, status, "{body}");
     assert_eq!(
         serde_json::json!({
-            "type": "Patient",
-            "identifier": {
-                "system": "http://example.org/fhir/sid/ferrobridge-subject",
-                "value": "synthetic-subject-0001"
-            }
+            "reference": format!("Patient/{}", crate::support::PSEUDONYM)
         }),
         body["subject"],
         "{body}"

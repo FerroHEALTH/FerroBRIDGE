@@ -16,12 +16,18 @@
 use std::error::Error;
 
 use super::support::annex_iii;
+use crate::terminology::{Script, Scripted};
 use eehrxf::document::Document;
-use eehrxf::document::discharge::{DISCHARGE_REPORT_FORM, HDR_SLOTS};
+use eehrxf::document::authored::recorded_author;
+use eehrxf::document::discharge::{
+    DISCHARGE_REPORT_FORM, HDR_SLOTS, MYHEALTHEU_DISCHARGE_REPORT_FORM,
+};
 use eehrxf::document::language::DocumentLanguage;
+use eehrxf::document::language::EHDSI_LANGUAGE;
 use eehrxf::document::section::Section;
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::HDR;
+use eehrxf::terminology::Terminology;
 use ferrobridge_testkit::fixtures::{
     CKM_DISCHARGE_ARCHETYPES, CKM_MEDICATION_ARCHETYPES, FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE,
     FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE_ID,
@@ -41,6 +47,7 @@ use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
 use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
+use std::sync::Arc;
 
 /// The one context of the HDR project.
 const CONTEXT: &str = "ferrobridge_eu_hdr.context";
@@ -484,6 +491,64 @@ fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String
     )?;
     // NOTE: composition-eu-hdr cmp-hdr-2 requires the discharge summary or the hospital course; the
     // crosswalk has the document assembly write the course's narrative, which the system supplies.
+    let course = HDR_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "sectionHospitalCourse")
+        .ok_or("the hospital course slot")?;
+    document.with_section(Section::new(
+        course,
+        vec![String::from("A synthetic hospital course.")],
+    ))?;
+    for section in document.with_mapped_composition(run.bundle())? {
+        let paragraph = format!("{}.", section.slot.title);
+        document.with_section(section.into_section(vec![paragraph]))?;
+    }
+    document.with_metadata(annex_iii("18842-5"));
+    Ok(serde_json::to_string(&document.into_bundle()?)?)
+}
+
+/// The discharge report of `composition` in the MyHealth@EU form, named
+/// `identifier`: its author the one the record names and its language held
+/// to eHDSILanguage by a terminology server that answers it holds it.
+async fn sent_myhealtheu(
+    mapping: &Mapping,
+    composition: &str,
+    identifier: &str,
+) -> Result<String, Box<dyn Error>> {
+    let mut document = Document::of(
+        &MYHEALTHEU_DISCHARGE_REPORT_FORM,
+        BASE,
+        identifier.to_owned(),
+        String::from(NOW),
+        String::from("Discharge report"),
+    );
+    let subject = document.with_patient(Patient {
+        id: Some(String::from("synthetic-patient")),
+        name: vec![HumanName {
+            family: Some("Synthetic".into()),
+            ..HumanName::default()
+        }],
+        birth_date: Some("1970-01-01".into()),
+        ..Patient::default()
+    })?;
+    // NOTE: eHDSILanguage holds en-GB and no en-NL, so the record is one written in the United Kingdom.
+    let mut record: Value = serde_json::from_str(composition)?;
+    record["territory"]["code_string"] = Value::from("GB");
+    let composition = &serde_json::to_string(&record)?;
+    let author = document.with_author(&recorded_author(&record)?)?;
+    let terminology = Terminology::server(Arc::new(Scripted(Script::Valid(true))));
+    document.with_held_language(
+        DocumentLanguage::of_composition(&record)?
+            .held(&terminology, EHDSI_LANGUAGE)
+            .await?,
+    )?;
+    let run = mapping.to_fhir_with(
+        composition,
+        &Settings::new(author.clone(), NOW),
+        CallContext::new()
+            .with_patient(reference(&subject))
+            .with_who(reference(&author)),
+    )?;
     let course = HDR_SLOTS
         .iter()
         .find(|slot| slot.slice == "sectionHospitalCourse")

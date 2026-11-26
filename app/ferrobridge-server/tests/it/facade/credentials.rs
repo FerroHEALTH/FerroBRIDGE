@@ -64,7 +64,12 @@ async fn app_over(cdr: &MockServer, authorization: &str) -> Result<axum::Router,
     let oauth =
         CdrClient::new(&CdrConfig::new(format!("{}/", cdr.uri()).parse()?).with_oauth(grant))?;
     let store = Arc::new(MemoryStore::default());
-    let facade = Arc::new(Facade::new(compiled, handle(&store), oauth, settings()));
+    let facade = Arc::new(Facade::new(
+        compiled,
+        handle(&store),
+        oauth,
+        crate::support::served_identity(cdr, settings()).await,
+    ));
     let state = AppState::with_health(Registry::default()).with_facade(facade);
     Ok(ferrobridge_server::router(
         Arc::new(state),

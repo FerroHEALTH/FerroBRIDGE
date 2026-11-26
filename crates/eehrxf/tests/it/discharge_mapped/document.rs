@@ -27,7 +27,7 @@ use std::error::Error;
 
 use super::{
     ADMITTED, DIAGNOSIS, NOW, composition, diagnosis, discharge_document, full_report, mapping,
-    sent,
+    sent, sent_myhealtheu,
 };
 #[test]
 fn the_mapped_report_is_a_discharge_document_its_profiles_constrain() -> Result<(), Box<dyn Error>>
@@ -233,5 +233,26 @@ fn the_mapped_report_validates_against_bundle_eu_hdr() -> Result<(), Box<dyn Err
     runtime
         .block_on(document.validate(set, HDR_BUNDLE, None::<&Client>))
         .map_err(|error| format!("{error:?}"))?;
+    Ok(())
+}
+
+// NOTE: MyHealth@EU HDR 9.2.0 bundle-hdr-myhealtheu: the report a national contact point sends,
+// which the validator lane holds to the MyHealth@EU guide.
+#[tokio::test]
+async fn the_mapped_report_is_written_in_the_myhealtheu_form() -> Result<(), Box<dyn Error>> {
+    let text = sent_myhealtheu(
+        &mapping()?,
+        &composition(&[diagnosis()]),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000d103",
+    )
+    .await?;
+    let root: Value = serde_json::from_str(&text)?;
+    let composition = &root["entry"][0]["resource"];
+    assert_eq!(composition["language"], "en-GB");
+    let author = composition["author"][0]["reference"]
+        .as_str()
+        .ok_or("the composition names its author")?;
+    assert!(author.contains("/Practitioner/"), "{author}");
+    emit("eehrxf-discharge-myhealtheu", &text)?;
     Ok(())
 }

@@ -8,6 +8,10 @@ eehrxf-discharge-mapped.0.Composition
 eehrxf-discharge-mapped.1.Patient
 eehrxf-discharge-mapped.3.Organization
 eehrxf-discharge-mapped.5.Condition
+eehrxf-discharge-myhealtheu.0.Composition
+eehrxf-discharge-myhealtheu.1.Patient
+eehrxf-discharge-myhealtheu.2.Practitioner
+eehrxf-discharge-myhealtheu.4.Condition
 eehrxf-eps-summary-problem-allergy-procedure.0.Composition
 eehrxf-eps-summary-problem-allergy-procedure.1.Patient
 eehrxf-eps-summary-problem-allergy-procedure.3.Condition
@@ -66,4 +70,4 @@ eehrxf-test-report-ecg.4.Organization
 eehrxf-test-report-spirometry.1.DiagnosticReport
 eehrxf-test-report-spirometry.2.Patient
 eehrxf-test-report-spirometry.4.Organization
-total 70
+total 74

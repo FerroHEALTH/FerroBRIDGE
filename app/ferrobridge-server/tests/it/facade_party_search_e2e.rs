@@ -51,10 +51,12 @@ const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/it/fixtures_d
 /// The base URL the facade writes into its links.
 const BASE_URL: &str = "http://ferrobridge.invalid/fhir";
 
-/// The identifier system every synthetic party carries.
+/// The identifier system the synthetic practitioner, organization and role
+/// carry.
 const SYSTEM: &str = "http://example.org/fhir/sid/synthetic";
 
-/// The identifier the two synthetic patients share.
+/// The identifier value the two synthetic patients share, each in a system of
+/// its own, so the identity source gives each its own pseudonym.
 const PATIENT_IDENTIFIER: &str = "SYN-PAT-0001";
 
 /// The identifier of the synthetic practitioner.
@@ -127,8 +129,12 @@ async fn started() -> Result<Cdr, Box<dyn Error>> {
     Ok(cdr)
 }
 
-/// Returns a facade over `cdr` searching as `search` configures.
-async fn facade_over(cdr: &Cdr, search: PartySearch) -> Result<Arc<Facade>, Box<dyn Error>> {
+/// Returns the stub identity source and a facade over `cdr` asking it,
+/// searching as `search` configures.
+async fn facade_over(
+    cdr: &Cdr,
+    search: PartySearch,
+) -> Result<(wiremock::MockServer, Arc<Facade>), Box<dyn Error>> {
     let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?).with_demographic(true))?;
     let set = programs::read_set(std::path::Path::new(FIXTURES))?;
     let templates = programs::fetch_templates(&set, &client).await?;
@@ -136,26 +142,29 @@ async fn facade_over(cdr: &Cdr, search: PartySearch) -> Result<Arc<Facade>, Box<
     programs::check_parties(&compiled, true)?;
     programs::check_party_search(&compiled, Some(&search))?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (pix, subject) = crate::support::per_identifier(&[]).await;
     let settings = Settings {
         base_url: String::from(BASE_URL),
         ehr_policy: Policy::Existing,
-        subject: crate::support::subject_link("http://example.org/fhir"),
+        subject,
         system_id: String::from("ferrobridge.e2e"),
         language: String::from("en"),
         territory: String::from("GB"),
         ehr_status_system: None,
         custodian: crate::facade::custodian(),
     };
-    Ok(Arc::new(
-        Facade::new(compiled, store, client, settings).with_party_search(Some(search)),
+    Ok((
+        pix,
+        Arc::new(Facade::new(compiled, store, client, settings).with_party_search(Some(search))),
     ))
 }
 
-/// Returns a `Patient` or `Practitioner` carrying `identifier` and `name`.
-fn person(resource_type: &str, identifier: &str, name: &str) -> serde_json::Value {
+/// Returns a `Patient` or `Practitioner` carrying `identifier` in `system`
+/// and `name`.
+fn person(resource_type: &str, system: &str, identifier: &str, name: &str) -> serde_json::Value {
     serde_json::json!({
         "resourceType": resource_type,
-        "identifier": [{"system": SYSTEM, "value": identifier}],
+        "identifier": [{"system": system, "value": identifier}],
         "name": [{"text": name}]
     })
 }
@@ -266,17 +275,32 @@ struct Seeded {
 async fn seed(facade: &Arc<Facade>) -> Result<Seeded, Box<dyn Error>> {
     let alpha = create(
         facade,
-        &person("Patient", PATIENT_IDENTIFIER, "Alpha Synthetic"),
+        &person(
+            "Patient",
+            crate::support::SOURCE_DOMAIN,
+            PATIENT_IDENTIFIER,
+            "Alpha Synthetic",
+        ),
     )
     .await?;
     let bravo = create(
         facade,
-        &person("Patient", PATIENT_IDENTIFIER, "Bravo Synthetic"),
+        &person(
+            "Patient",
+            crate::support::PATIENT_SYSTEM,
+            PATIENT_IDENTIFIER,
+            "Bravo Synthetic",
+        ),
     )
     .await?;
     let charlie = create(
         facade,
-        &person("Practitioner", PRACTITIONER_IDENTIFIER, "Charlie Synthetic"),
+        &person(
+            "Practitioner",
+            SYSTEM,
+            PRACTITIONER_IDENTIFIER,
+            "Charlie Synthetic",
+        ),
     )
     .await?;
     let organization = create(
@@ -314,7 +338,7 @@ async fn the_party_searches_find_the_parties_the_reference_cdr_holds() -> Result
         return Ok(());
     }
     let cdr = started().await?;
-    let facade = facade_over(&cdr, searching(&SEARCHED)?).await?;
+    let (_pix, facade) = facade_over(&cdr, searching(&SEARCHED)?).await?;
     let Seeded {
         alpha,
         bravo,
@@ -422,7 +446,7 @@ async fn a_root_the_reference_cdr_refuses_answers_501() -> Result<(), Box<dyn Er
     }
     let cdr = started().await?;
     for class in ["GROUP", "AGENT", "PARTY_RELATIONSHIP"] {
-        let facade = facade_over(&cdr, searching(&[("Organization", class)])?).await?;
+        let (_pix, facade) = facade_over(&cdr, searching(&[("Organization", class)])?).await?;
         let (status, body) = get(
             &facade,
             &format!("Organization?identifier={ORGANIZATION_IDENTIFIER}"),

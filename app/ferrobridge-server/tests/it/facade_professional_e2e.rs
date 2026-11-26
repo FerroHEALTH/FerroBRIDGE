@@ -77,6 +77,7 @@ async fn a_practitioner_round_trips_over_the_reference_cdrs_professional_person(
     let compiled = programs::compile_set(&set, &templates)?;
     programs::check_parties(&compiled, true)?;
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let (_pix, subject) = crate::support::per_identifier(&[]).await;
     let facade = Arc::new(Facade::new(
         compiled,
         store,
@@ -84,7 +85,7 @@ async fn a_practitioner_round_trips_over_the_reference_cdrs_professional_person(
         Settings {
             base_url: String::from("http://ferrobridge.invalid/fhir"),
             ehr_policy: Policy::Existing,
-            subject: crate::support::subject_link("http://example.org/fhir"),
+            subject,
             system_id: String::from("ferrobridge.e2e"),
             language: String::from("en"),
             territory: String::from("GB"),

@@ -1,0 +1,1 @@
+- `fhir-types` 0.3.0 puts `NamingSystem` in the `terminology` root set, as a resource of the FHIR terminology module, so `naming_system` and `Resource::NamingSystem` of every version build under the `terminology` feature without `resources`. The new `Resource` variant breaks an exhaustive match.

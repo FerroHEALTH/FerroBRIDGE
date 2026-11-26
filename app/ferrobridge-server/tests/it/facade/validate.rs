@@ -146,7 +146,7 @@ async fn validate_names_the_template_and_the_ehr_disposition() -> Result<(), Box
     assert!(
         information.iter().any(|issue| issue["diagnostics"]
             .as_str()
-            .is_some_and(|text| text.contains("synthetic-subject-0001")
+            .is_some_and(|text| text.contains(crate::support::PSEUDONYM)
                 && text.contains("writes into an existing EHR only"))),
         "an information issue names the subject and the EHR policy: {body}"
     );

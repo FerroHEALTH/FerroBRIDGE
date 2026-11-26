@@ -474,7 +474,9 @@ async fn a_telecom_writes_its_system_as_the_coded_name_of_its_address() -> Resul
     let requests = harness.cdr.received_requests().await.unwrap_or_default();
     let sent = requests
         .iter()
-        .find(|request| request.method.as_str() == "POST")
+        .find(|request| {
+            request.method.as_str() == "POST" && request.url.path() == "/demographic/person"
+        })
         .ok_or("the CDR received the person")?;
     let sent: serde_json::Value = serde_json::from_slice(&sent.body)?;
     let address = sent["contacts"][0]["addresses"]

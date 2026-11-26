@@ -110,8 +110,13 @@ async fn linking(base: &str, committing: Committing) -> Result<Harness, Box<dyn 
     let compiled = programs::compile_set(&set, &templates)?;
     let store = Arc::new(MemoryStore::default());
     let policy = Policy::new(vec![base.parse()?], 2, Duration::from_secs(5))?;
-    let facade =
-        Facade::new(compiled, handle(&store), client(&cdr), settings()).with_references(policy);
+    let facade = Facade::new(
+        compiled,
+        handle(&store),
+        client(&cdr),
+        crate::support::served_identity(&cdr, settings()).await,
+    )
+    .with_references(policy);
     Ok(Harness {
         cdr,
         store,

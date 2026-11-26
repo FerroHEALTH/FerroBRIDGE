@@ -41,8 +41,10 @@ use core::fmt;
 
 use fhir_types::codec::Value;
 
-/// Names the JSON kind a value has, for a diagnostic that reports a shape.
-const fn json_kind(value: &Value) -> &'static str {
+/// Names the JSON kind a value has, for a diagnostic that reports a shape
+/// without its content.
+#[must_use]
+pub const fn json_kind(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(_) => "a boolean",

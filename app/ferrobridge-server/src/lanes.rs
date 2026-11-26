@@ -78,17 +78,22 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
     state = open_sources(settings, state)?;
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
+        let mut lane = lane.clone();
+        if let Some(audit) = settings.audit.as_ref() {
+            let log = start_audit(audit, settings, &lane, &state).await?;
+            let identity = lane.settings.subject.identity().clone();
+            lane.settings.subject = facade::subject::SubjectLink::new(Arc::new(
+                identity.audited(Arc::clone(log.recorder())),
+            ));
+            state = state.with_access_log(Arc::new(log));
+        }
         let (mounted, counts) =
-            build_facade(settings, lane, state.terminology().cloned(), state.store())
+            build_facade(settings, &lane, state.terminology().cloned(), state.store())
                 .await
                 .context("starting the FHIR facade")?;
         let mounted = mounted.with_usage(Arc::clone(state.usage_window()));
         state = state.with_facade(Arc::new(mounted));
         set_counts(&mut lanes, "facade", counts);
-    }
-    if let (Some(audit), Some(mounted)) = (settings.audit.as_ref(), state.facade()) {
-        let log = start_audit(audit, mounted, &state).await?;
-        state = state.with_access_log(Arc::new(log));
     }
     state = start_links(settings, state)?;
     if settings.operator.is_some() {
@@ -625,31 +630,32 @@ fn operation_counts(lane: &crate::operations::lane::OperationsLane) -> startup::
     }
 }
 
-/// Opens the access-record lane `audit` describes for the facade `mounted`,
-/// its outbox and its category register in the state store of `state`.
+/// Opens the access-record lane `audit` describes for the facade `lane` over
+/// the CDR of `settings`, its outbox and its category register in the state
+/// store of `state`.
 async fn start_audit(
     audit: &crate::audit::Settings,
-    mounted: &facade::Facade,
+    settings: &Settings,
+    lane: &config::FacadeSettings,
     state: &AppState,
 ) -> anyhow::Result<crate::audit::AccessLog> {
     use anyhow::Context;
 
-    let base = url::Url::parse(&mounted.settings().base_url)
+    let base = url::Url::parse(&lane.settings.base_url)
         .context("reading [facade] base_url as the address the access records name")?;
+    let cdr = settings
+        .cdr
+        .as_ref()
+        .context("the facade needs a [cdr] section: it maps every request onto CDR operations")?;
     let store = state.store().context(
         "the access-record lane keeps its outbox in the state store, and [state] is not set",
     )?;
     let registers = state.registers().cloned().context(
         "the access records are classified by a settings register, and [state] is not set",
     )?;
-    let log = crate::audit::AccessLog::open(
-        audit,
-        (&base, mounted.client().base_url()),
-        store,
-        registers,
-    )
-    .await
-    .context("reading the audit-categories register the access records are classified by")?;
+    let log = crate::audit::AccessLog::open(audit, (&base, &cdr.base_url), store, registers)
+        .await
+        .context("reading the audit-categories register the access records are classified by")?;
     tracing::info!(
         lane = "audit",
         repository = %startup::host_of(audit.feed.endpoint()).unwrap_or_default(),

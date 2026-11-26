@@ -16,8 +16,12 @@ use openehr_rm::draft::access_control::terminology::AccessDefault;
 use openehr_rm::draft::access_control::terminology::TERMINOLOGY_ID_ACCESS;
 use openehr_rm::draft::access_control::terminology::Term;
 
-/// Returns the facade settings `facade` describes.
-fn settings(facade: &Facade) -> Result<FacadeSettings, Error> {
+/// Returns the facade settings `facade` describes, asking `identity` for
+/// every EHR subject.
+fn settings(
+    facade: &Facade,
+    identity: std::sync::Arc<crate::identity_source::IdentitySource>,
+) -> Result<FacadeSettings, Error> {
     let ehr_policy = ehr_policy_of("facade.ehr_policy", &facade.ehr_policy)?;
     for (key, value) in [
         ("facade.base_url", &facade.base_url),
@@ -52,7 +56,7 @@ fn settings(facade: &Facade) -> Result<FacadeSettings, Error> {
         settings: crate::facade::Settings {
             base_url: facade.base_url.clone(),
             ehr_policy,
-            subject: subject_link(facade)?,
+            subject: crate::facade::subject::SubjectLink::new(identity),
             system_id: facade.system_id.clone(),
             language: facade.composition_language.clone(),
             territory: facade.composition_territory.clone(),
@@ -262,28 +266,6 @@ fn party_search(
     Ok(Some(crate::facade::search::party::PartySearch::new(types)))
 }
 
-/// Returns the subject link `facade` configures.
-fn subject_link(facade: &Facade) -> Result<crate::facade::subject::SubjectLink, Error> {
-    const FORM: &str = "facade.subject_id_form";
-    let form = crate::facade::subject::IdForm::parse(&facade.subject_id_form).ok_or_else(|| {
-        Error::SubjectIdForm {
-            key: String::from(FORM),
-            value: facade.subject_id_form.clone(),
-        }
-    })?;
-    crate::facade::subject::SubjectLink::new(&facade.subject_namespace, form, &facade.subject_type)
-        .map_err(|source| {
-            let key = match source {
-                crate::facade::subject::SubjectError::PartyType { .. } => "facade.subject_type",
-                _ => "facade.subject_namespace",
-            };
-            Error::Subject {
-                key: String::from(key),
-                source: Box::new(source),
-            }
-        })
-}
-
 /// Returns the reference policy `facade` configures.
 ///
 /// Every fetch base is an absolute http or https URL with no query and no
@@ -358,9 +340,12 @@ fn ehr_policy_of(key: &str, value: &str) -> Result<crate::facade::ehr::Policy, E
 /// # Errors
 ///
 /// Returns the [`Error`] of the section's first fault.
-pub(in crate::config) fn resolve(config: &Config) -> Result<Option<FacadeSettings>, Error> {
-    if !config.facade.enabled {
-        return Ok(None);
+pub(in crate::config) fn resolve(
+    config: &Config,
+    identity: Option<std::sync::Arc<crate::identity_source::IdentitySource>>,
+) -> Result<Option<FacadeSettings>, Error> {
+    match (config.facade.enabled, identity) {
+        (true, Some(identity)) => settings(&config.facade, identity).map(Some),
+        _ => Ok(None),
     }
-    settings(&config.facade).map(Some)
 }

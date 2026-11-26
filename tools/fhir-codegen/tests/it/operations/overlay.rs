@@ -210,6 +210,7 @@ fn the_translate_match_carries_the_ecosystem_parts_and_pre_adopts_origin_map() {
             ("sourceComment", "string"),
             ("targetComment", "string"),
             ("noMap", "boolean"),
+            ("note", "string"),
         ] {
             assert_eq!(
                 part(name),
@@ -217,7 +218,11 @@ fn the_translate_match_carries_the_ecosystem_parts_and_pre_adopts_origin_map() {
                 "{module}: {name}"
             );
         }
-        for name in ["used-conceptmap", "used-system"] {
+        for (name, type_code) in [
+            ("used-conceptmap", "uri"),
+            ("used-system", "uri"),
+            ("error", "string"),
+        ] {
             let field = translate
                 .outputs
                 .iter()
@@ -225,7 +230,7 @@ fn the_translate_match_carries_the_ecosystem_parts_and_pre_adopts_origin_map() {
                 .expect(name);
             assert_eq!(
                 (field.type_code.as_deref(), field.source),
-                (Some("uri"), ParameterSource::Ecosystem),
+                (Some(type_code), ParameterSource::Ecosystem),
                 "{module}: {name}"
             );
         }

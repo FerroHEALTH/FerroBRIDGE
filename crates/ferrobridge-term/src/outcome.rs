@@ -54,6 +54,10 @@ pub enum TranslateOutcome {
         message: Option<String>,
         /// Every `used-conceptmap`, the maps the server consulted.
         used_maps: Vec<String>,
+        /// Every `error`, one per returned target code the server found not
+        /// valid in its code system
+        /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+        errors: Vec<String>,
     },
     /// `result` was `false`: the server found no acceptable match.
     NoMatch {
@@ -64,6 +68,10 @@ pub enum TranslateOutcome {
         matches: Vec<Match>,
         /// Every `used-conceptmap`, the maps the server consulted.
         used_maps: Vec<String>,
+        /// Every `error`, one per returned target code the server found not
+        /// valid in its code system
+        /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+        errors: Vec<String>,
     },
 }
 
@@ -321,6 +329,7 @@ mod tests {
             ],
             message: None,
             used_maps: Vec::new(),
+            errors: Vec::new(),
         };
         let accepted: Vec<Option<String>> = outcome
             .accepted()
@@ -351,6 +360,7 @@ mod tests {
             ],
             message: None,
             used_maps: Vec::new(),
+            errors: Vec::new(),
         };
         assert_eq!(1, outcome.accepted().count());
     }
@@ -361,6 +371,7 @@ mod tests {
             message: Some("no map".to_owned()),
             matches: vec![found("equivalent", "same")],
             used_maps: Vec::new(),
+            errors: Vec::new(),
         };
         assert_eq!(0, outcome.accepted().count());
     }

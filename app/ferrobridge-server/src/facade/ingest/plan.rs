@@ -63,7 +63,7 @@ pub(super) enum Scope {
 #[derive(Debug)]
 pub(super) enum Mapping {
     /// The entry mapped, for the subject it names.
-    Mapped(Box<Mapped>, PersonId),
+    Mapped(Box<Mapped>, crate::facade::subject::Subject),
     /// No program ran: the skip, and the issue that refuses the Bundle.
     Unmapped(Skipped, Issue),
 }
@@ -90,6 +90,9 @@ pub(super) struct Partition {
     pub(super) failures: Vec<Issue>,
     /// The one subject every mapped entry names.
     pub(super) subject: Option<PersonId>,
+    /// The refusal of the identity source, which answers the Bundle with its
+    /// own status.
+    pub(super) refused: Option<Refused>,
 }
 
 /// Where one committed entry stands.

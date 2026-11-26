@@ -11,6 +11,7 @@ mod endpoint;
 mod inverse;
 mod outcome;
 mod package;
+mod registry;
 mod single;
 
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};

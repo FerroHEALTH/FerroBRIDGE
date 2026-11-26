@@ -34,15 +34,211 @@ pub(crate) fn basic_authorization(user: &str, password: &str) -> String {
     )
 }
 
-/// Returns the subject link in `namespace` with the reference id form and the
-/// `PERSON` type, the facade's defaults.
-pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subject::SubjectLink {
-    ferrobridge_server::facade::subject::SubjectLink::new(
-        namespace,
-        ferrobridge_server::facade::subject::IdForm::Reference,
-        "PERSON",
+/// The smallest `[identity_source]` table, which an enabled facade needs.
+pub(crate) const IDENTITY_SOURCE: &str = "[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\n\n[identity_source.endpoint]\nurl = \"http://127.0.0.1:9/fhir\"\n\n";
+
+/// The identifier system the test patients' source identifiers are in.
+pub(crate) const SOURCE_DOMAIN: &str = "urn:oid:2.999.1";
+
+/// The identifier system of the testkit's synthetic patients.
+pub(crate) const PATIENT_SYSTEM: &str = "http://example.org/fhir/sid/ferrobridge-patient";
+
+/// The identifier system the testkit's synthetic resources name their
+/// subject in.
+pub(crate) const SUBJECT_SYSTEM: &str = "http://example.org/fhir/sid/ferrobridge-subject";
+
+/// Returns the identity source at `base` whose pseudonyms are in `domain`,
+/// accepting source identifiers in [`SOURCE_DOMAIN`], [`PATIENT_SYSTEM`],
+/// [`SUBJECT_SYSTEM`] and `domain`, in that order.
+pub(crate) fn identity_source(
+    base: &str,
+    domain: &str,
+) -> Arc<ferrobridge_server::identity_source::IdentitySource> {
+    identity_source_accepting(
+        base,
+        domain,
+        &[SOURCE_DOMAIN, PATIENT_SYSTEM, SUBJECT_SYSTEM, domain],
     )
-    .expect("a legal subject link")
+}
+
+/// Returns the identity source at `base` whose pseudonyms are in `domain`,
+/// accepting source identifiers in `accepted`, in that order.
+pub(crate) fn identity_source_accepting(
+    base: &str,
+    domain: &str,
+    accepted: &[&str],
+) -> Arc<ferrobridge_server::identity_source::IdentitySource> {
+    let section = ferrobridge_server::config::section::identity_source::IdentitySource {
+        endpoint: ferrohealth_smart::config::endpoint::EndpointSection {
+            url: ferrohealth_secret::secret_url::SecretUrl::new(base),
+            ..ferrohealth_smart::config::endpoint::EndpointSection::default()
+        },
+        pseudonym_domain: String::from(domain),
+        source_domains: accepted.iter().copied().map(String::from).collect(),
+    };
+    Arc::new(
+        ferrobridge_server::config::identity_source::resolve(&section)
+            .expect("a legal identity source"),
+    )
+}
+
+/// Returns the subject link whose pseudonyms are in `namespace`, over an
+/// identity source no case reaches.
+pub(crate) fn subject_link(namespace: &str) -> ferrobridge_server::facade::subject::SubjectLink {
+    subject_link_at("http://127.0.0.1:9/fhir", namespace)
+}
+
+/// Returns the subject link whose pseudonyms are in `namespace`, over the
+/// identity source at `base`.
+pub(crate) fn subject_link_at(
+    base: &str,
+    namespace: &str,
+) -> ferrobridge_server::facade::subject::SubjectLink {
+    ferrobridge_server::facade::subject::SubjectLink::new(identity_source(base, namespace))
+}
+
+/// The pseudonym the stub identity source answers every patient with.
+pub(crate) const PSEUDONYM: &str = "synthetic-pseudonym-1";
+
+/// The path of the stub identity source's `$ihe-pix` operation.
+pub(crate) const PIX_PATH: &str = "/pix/Patient/$ihe-pix";
+
+/// Returns the ITI-83 answer naming `pseudonym` in `domain`
+/// (`PIXm` 3.1.0 §2:3.83.4.2.2.1).
+pub(crate) fn pseudonym_answer(domain: &str, pseudonym: &str) -> wiremock::ResponseTemplate {
+    wiremock::ResponseTemplate::new(200)
+        .insert_header("Content-Type", "application/fhir+json")
+        .set_body_json(serde_json::json!({
+            "resourceType": "Parameters",
+            "parameter": [
+                {
+                    "name": "targetIdentifier",
+                    "valueIdentifier": {"system": domain, "value": pseudonym}
+                },
+                {"name": "targetId", "valueReference": {"reference": format!("Patient/{pseudonym}")}}
+            ]
+        }))
+}
+
+/// Returns `settings` asking the identity source served by `server` under
+/// `/pix`, which answers every patient with [`PSEUDONYM`].
+pub(crate) async fn served_identity(
+    server: &MockServer,
+    settings: ferrobridge_server::facade::Settings,
+) -> ferrobridge_server::facade::Settings {
+    let domain = settings.subject.namespace().to_owned();
+    served_identity_accepting(
+        server,
+        settings,
+        &[
+            SOURCE_DOMAIN,
+            PATIENT_SYSTEM,
+            SUBJECT_SYSTEM,
+            domain.as_str(),
+        ],
+    )
+    .await
+}
+
+/// Mounts on `server` an identity source under `/pix` that answers every
+/// patient with [`PSEUDONYM`] in `domain`.
+pub(crate) async fn mount_pseudonym(server: &MockServer, domain: &str) {
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path(PIX_PATH))
+        .respond_with(pseudonym_answer(domain, PSEUDONYM))
+        .with_priority(10)
+        .mount(server)
+        .await;
+}
+
+/// Returns `settings` asking the identity source served by `server` under
+/// `/pix`, which answers every patient with [`PSEUDONYM`] and accepts source
+/// identifiers in `accepted`.
+pub(crate) async fn served_identity_accepting(
+    server: &MockServer,
+    settings: ferrobridge_server::facade::Settings,
+    accepted: &[&str],
+) -> ferrobridge_server::facade::Settings {
+    let domain = settings.subject.namespace().to_owned();
+    mount_pseudonym(server, &domain).await;
+    let base = format!("{}/pix", server.uri());
+    ferrobridge_server::facade::Settings {
+        subject: ferrobridge_server::facade::subject::SubjectLink::new(identity_source_accepting(
+            &base, &domain, accepted,
+        )),
+        ..settings
+    }
+}
+
+/// The domain the per-identifier stub identity source mints pseudonyms in.
+pub(crate) const PSEUDONYM_DOMAIN: &str = "urn:oid:2.999.9";
+
+/// Returns the pseudonym the per-identifier stub identity source answers the
+/// source identifier `system` and `value` with, for a value no FHIR search
+/// escape changes.
+pub(crate) fn pseudonym_of(system: &str, value: &str) -> String {
+    token_pseudonym(&format!("{system}|{value}"))
+}
+
+/// Returns the pseudonym of the `sourceIdentifier` token `token`: distinct
+/// tokens get distinct pseudonyms.
+fn token_pseudonym(token: &str) -> String {
+    use sha2::Digest as _;
+    let digest = sha2::Sha256::digest(token.as_bytes());
+    let mut head = [0_u8; 16];
+    head.copy_from_slice(&digest[..16]);
+    format!("pseudonym-{:032x}", u128::from_be_bytes(head))
+}
+
+/// A stub `$ihe-pix` that answers each `sourceIdentifier` of an ITI-83 `POST`
+/// with its own pseudonym in `domain`.
+struct PerIdentifier {
+    /// The pseudonym domain.
+    domain: String,
+}
+
+impl wiremock::Respond for PerIdentifier {
+    fn respond(&self, request: &wiremock::Request) -> wiremock::ResponseTemplate {
+        let token = serde_json::from_slice::<serde_json::Value>(&request.body)
+            .ok()
+            .and_then(|parameters| {
+                parameters["parameter"]
+                    .as_array()?
+                    .iter()
+                    .find(|parameter| parameter["name"] == "sourceIdentifier")?["valueString"]
+                    .as_str()
+                    .map(str::to_owned)
+            });
+        match token {
+            Some(token) => pseudonym_answer(&self.domain, &token_pseudonym(&token)),
+            None => wiremock::ResponseTemplate::new(400),
+        }
+    }
+}
+
+/// Returns a stub identity source and the subject link over it, minting in
+/// [`PSEUDONYM_DOMAIN`] and accepting [`SOURCE_DOMAIN`], [`PATIENT_SYSTEM`]
+/// and [`SUBJECT_SYSTEM`] then `more`: each source identifier gets its own
+/// pseudonym ([`pseudonym_of`]), so each subject keeps its own EHR.
+pub(crate) async fn per_identifier(
+    more: &[&str],
+) -> (MockServer, ferrobridge_server::facade::subject::SubjectLink) {
+    let server = MockServer::start().await;
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path(PIX_PATH))
+        .respond_with(PerIdentifier {
+            domain: String::from(PSEUDONYM_DOMAIN),
+        })
+        .mount(&server)
+        .await;
+    let mut accepted = vec![SOURCE_DOMAIN, PATIENT_SYSTEM, SUBJECT_SYSTEM];
+    accepted.extend_from_slice(more);
+    let link = ferrobridge_server::facade::subject::SubjectLink::new(identity_source_accepting(
+        &format!("{}/pix", server.uri()),
+        PSEUDONYM_DOMAIN,
+        &accepted,
+    ));
+    (server, link)
 }
 
 /// A `tracing` writer that keeps every line in memory.

@@ -10,10 +10,12 @@ use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::facade::endpoint::Endpoints;
 
+use crate::support::IDENTITY_SOURCE;
+
 /// An enabled facade with `endpoint` as its `[facade.endpoint]` table.
 fn with_endpoint(endpoint: &str) -> String {
     format!(
-        "[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[facade.endpoint]\n{endpoint}"
+        "{IDENTITY_SOURCE}[cdr]\nendpoint.url = \"http://cdr.invalid/v1\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n[facade.endpoint]\n{endpoint}"
     )
 }
 
