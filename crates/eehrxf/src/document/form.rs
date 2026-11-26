@@ -177,6 +177,19 @@ pub enum SectionRule {
     },
 }
 
+/// Elements an entry profile of a form requires of every entry of one
+/// resource type, which [`super::Document::into_bundle`] holds the document's
+/// entries to as the record wrote them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntryRule {
+    /// The resource type of the entries the rule holds.
+    pub resource: &'static str,
+    /// The canonical URL of the profile that requires the elements.
+    pub profile: &'static str,
+    /// The elements the profile requires (`min` 1), by name.
+    pub elements: &'static [&'static str],
+}
+
 /// The form of one category's document: its HL7 Europe profiles, its
 /// document type and its sections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -209,6 +222,9 @@ pub struct Form {
     /// The rules of the `Composition` and `Bundle` profiles over the
     /// sections.
     pub rules: &'static [SectionRule],
+    /// The elements the form's entry profiles require of the entries the
+    /// record writes.
+    pub entries: &'static [EntryRule],
     /// Whether the form requires a legal authentication, the `attester` of
     /// mode `legal` the document's metadata names
     /// ([`super::metadata::DocumentMetadata::with_legal_authentication`]).
@@ -247,6 +263,7 @@ pub const PATIENT_SUMMARY_FORM: Form = Form {
             ],
         },
     ],
+    entries: &[],
     legal_authentication: false,
 };
 
@@ -276,5 +293,6 @@ pub const IPS_PATIENT_SUMMARY_FORM: Form = Form {
             slices: &["sectionProblems", "sectionAllergies", "sectionMedications"],
         },
     ],
+    entries: &[],
     legal_authentication: false,
 };

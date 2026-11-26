@@ -5,7 +5,8 @@
 # entry the Hospital Discharge Report's discharge medications section takes:
 # the medication item, the overall directions, route and start of the
 # order's dosage and the comment of the order's activity, each element the
-# profile has a place for; a run out of openEHR declares every other
+# profile has a place for, and the order's authoring time and author, which
+# the composition carries; a run out of openEHR declares every other
 # element the composition holds. As in the MPD project, an INSTRUCTION records no request status,
 # so the resource says `unknown`, and it is always an `order` (no
 # specification governs the two fixed values: our own design).
@@ -52,6 +53,20 @@ mappings:
         fhir:
           - path: "intent"
             value: "order"
+
+  # NOTE: MyHealth@EU HDR 9.2.0 medicationRequest-hdr-myhealtheu authoredOn and requester 1..1; the
+  # order is authored with the report at the end of the stay (context/end_time) by its composer.
+  - name: "authoredOn"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.authoredOn"
+      openehr: "$composition/context/end_time"
+
+  - name: "requester"
+    unidirectional: "openEHR->fhir"
+    with:
+      fhir: "$resource.requester"
+      openehr: "$composition/composer"
 
   - name: "order"
     with:

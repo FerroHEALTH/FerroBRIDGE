@@ -191,7 +191,9 @@ impl CdmWriter {
     /// refuses the login, or fails the TLS handshake,
     /// [`WriteError::Database`] when its version cannot be read, and
     /// [`WriteError::UnsupportedServer`] when it runs a PostgreSQL older than
-    /// [`MINIMUM_SERVER_VERSION`](crate::connection::MINIMUM_SERVER_VERSION).
+    /// [`MINIMUM_SERVER_VERSION`](crate::connection::MINIMUM_SERVER_VERSION),
+    /// and [`WriteError::Session`] when it does not hold the session
+    /// settings `connection` sends.
     pub async fn connect_with(
         connection: &CdmConnection,
         cdm: SchemaName,
@@ -199,6 +201,7 @@ impl CdmWriter {
         policy: PersonPolicy,
     ) -> Result<Self, WriteError> {
         let (config, tls) = connection.writer();
+        let session = *connection.session();
         let (client, connection) = config
             .connect(tls)
             .await
@@ -213,6 +216,19 @@ impl CdmWriter {
                 source,
             })?;
         supported(found)?;
+        let held = client
+            .query(crate::connection::session::SESSION_QUERY, &[])
+            .await
+            .and_then(|rows| {
+                rows.iter()
+                    .map(|row| Ok((row.try_get(0)?, row.try_get(1)?)))
+                    .collect::<Result<Vec<(String, String)>, tokio_postgres::Error>>()
+            })
+            .map_err(|source| WriteError::Database {
+                step: Step::Session,
+                source,
+            })?;
+        session.verify(&held)?;
         Ok(Self {
             client,
             connection,

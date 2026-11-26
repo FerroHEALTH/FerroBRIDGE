@@ -62,6 +62,9 @@ pub enum StoreError {
     /// A migration failed.
     #[error("the state database could not be migrated")]
     Migrate(#[from] sqlx::migrate::MigrateError),
+    /// The database does not hold the session settings the store sent.
+    #[error("the state database does not hold the session settings")]
+    Session(#[from] omop_cdm::connection::session::SessionError),
     /// The database runs a PostgreSQL older than the store supports.
     #[error(
         "the state database runs PostgreSQL server_version_num {found}, and FerroBRIDGE needs {required} or newer"
@@ -111,22 +114,27 @@ impl Store {
     ///
     /// # Errors
     /// Returns [`StoreError::Connection`] when the TLS relay cannot start,
-    /// [`StoreError::Database`] when the database cannot be reached and
-    /// [`StoreError::UnsupportedServer`] when it runs an older PostgreSQL.
+    /// [`StoreError::Database`] when the database cannot be reached,
+    /// [`StoreError::UnsupportedServer`] when it runs an older PostgreSQL and
+    /// [`StoreError::Session`] when it does not hold the session settings.
     pub async fn connect(settings: &Settings) -> Result<Self, StoreError> {
         let options = settings
             .connection
             .pool_options()?
             .application_name(APPLICATION_NAME);
+        let session = settings.connection.session();
         let pool = PgPoolOptions::new()
             .max_connections(settings.max_connections)
             .acquire_timeout(settings.acquire_timeout)
+            .max_lifetime(session.max_lifetime)
+            .idle_timeout(session.idle_timeout)
             .connect_with(options.clone())
             .await?;
         let found: i32 = sqlx::query_scalar("SELECT current_setting('server_version_num')::int")
             .fetch_one(&pool)
             .await?;
         supported(found)?;
+        session.held_by(&pool).await?;
         Ok(Self {
             pool,
             options,
