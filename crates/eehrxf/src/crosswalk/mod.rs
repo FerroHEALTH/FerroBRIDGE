@@ -123,6 +123,44 @@ pub(crate) const fn uncontexted(
     }
 }
 
+#[cfg(any(
+    feature = "patient-summary",
+    feature = "prescription",
+    feature = "dispensation",
+    feature = "imaging",
+    feature = "laboratory",
+    feature = "discharge"
+))]
+/// The eHealth Network catalogue entry `id`, `name`.
+pub(crate) const fn ehn(id: &'static str, name: &'static str) -> EhnElement {
+    EhnElement { id, name }
+}
+
+#[cfg(any(
+    feature = "patient-summary",
+    feature = "imaging",
+    feature = "laboratory",
+    feature = "discharge"
+))]
+/// The row of `path`, its eHealth Network ids, its producer obligation, the
+/// profile element that carries it and the profiles of the contexts that
+/// feed it.
+pub(crate) const fn row(
+    path: &'static str,
+    ehn: &'static [&'static str],
+    producer: Option<Populate>,
+    eps: &'static str,
+    contexts: &'static [&'static str],
+) -> Row {
+    Row {
+        path,
+        ehn,
+        producer,
+        eps,
+        contexts,
+    }
+}
+
 /// One element of the eHealth Network guideline's dataset, by its id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EhnElement {
