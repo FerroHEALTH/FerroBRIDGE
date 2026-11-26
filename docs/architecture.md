@@ -2717,6 +2717,40 @@ engine stays synchronous behind a `Translate` seam: the lane runs it with
 call waits with `Handle::block_on`. `dateOp` and `escape`, which R4 leaves
 undocumented, are refused.
 
+**One owner per concern (#2148, #2247).** Each concern of the server has
+exactly one module under `app/ferrobridge-server/src` that owns it, named in
+that module's doc. The book's architecture page lists each owner with its
+callers. No specification governs the split: our own design.
+
+- **Requests:** the FHIR facade `facade` (its route permissions in
+  `facade::guard`, the write in `facade::ingest`); the FHIRconnect operations
+  `operations`; the operator API `operator`; the HL7 v2 face `hl7v2`; every
+  inbound transport `inbound`; SMART Health Links `shl`; access tokens
+  `smart`; assurance levels `assurance`; problem details `problem`; shared
+  routes `mount`.
+- **State:** the pool, migrations, row claims, lane leases and change
+  notification `store`; the identity map, subject link and EHR resolution
+  `identity`; owned resources `facade::owned`; the delivery record
+  `outbound::delivered`; watermarks and dead letters `change_feed`; inbound
+  sources `sources`; the inbox, work items, slots and cursors
+  `inbound::store`; mapping revisions `mappings::revisions`; settings
+  registers `settings`; link records `shl::store`; the audit outbox
+  `audit::outbox`.
+- **Outbound calls:** the CDR `cdr`, one `CdrClient` per process that every
+  lane shares; the bridge's own token `credentials`; terminology
+  `terminology`; the identity source `identity_source`; FHIR delivery
+  `outbound::sink`; the ITI-20 feed `audit::feed`; inbound recovery calls
+  `inbound::clients`; the CDM database `etl`.
+- **Background work:** lane start `lanes`; boot `boot`; the change feed
+  `change_feed`; the events lane `events`; the outbound lane `outbound`;
+  inbound workers `inbound::worker`; the ETL `etl`; batch jobs `jobs`;
+  backoff and the retry or park verdict `retry`.
+- **Configuration:** the typed tree `config`; checked AQL `aql`; the mapping
+  load path `mappings::compile`; the directory walk `walk`; the mapping
+  checker `check`.
+- **Audit and reporting:** the access record `audit`; the usage report
+  `usage_report`; the startup summary `startup`; the boot banner `banner`.
+
 ## 8. What each seam carries
 
 - `openehr-mapping-core` to both language crates: a parsed header, a YAML
