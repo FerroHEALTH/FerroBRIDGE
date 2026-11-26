@@ -194,10 +194,12 @@ fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState
         return Ok(state);
     };
     let translator = state.terminology().cloned().map(|client| {
-        Arc::new(crate::structuremap::engine::translate::Terminology::new(
-            client,
-            tokio::runtime::Handle::current(),
-        )) as Arc<dyn crate::structuremap::engine::translate::Translate>
+        let translator: Arc<dyn crate::structuremap::engine::translate::Translate> =
+            Arc::new(crate::structuremap::engine::translate::Terminology::new(
+                client,
+                tokio::runtime::Handle::current(),
+            ));
+        translator
     });
     let sources = Arc::new(
         crate::sources::Sources::open(store, settings.secrets.as_ref())

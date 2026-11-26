@@ -2666,10 +2666,16 @@ source's own JSON as FHIR R4: a map in the R4 language
 runs over an instance of a logical model, a `StructureDefinition` of `kind =
 logical`, which `structuremap::openapi` generates from the schema a
 source's `OpenAPI` document publishes. The maps are console files of the
-mapping revision under the `structuremap` root, one `.map` file per map: a
-save or an apply parses every one, refuses a map outside the grammar or a
-URL two maps carry, and a reload on any replica swaps the parsed maps in
-with the rest of the set. FHIRconnect maps openEHR to FHIR and
+mapping revision under the `structuremap` root, one `.map` file per map
+and one JSON `StructureDefinition` per logical model: a save or an apply
+reads every one, refuses a map outside the grammar, a URL two maps carry or
+a JSON file that is no logical model, and the boot load and a reload on any
+replica swap the engine over them in with the rest of the set. A webhook
+source's `resolve` (#2225, `inbound::resolve`) names the map that renders
+its `GET` answers as the `Patient` `inbound::apply::Apply` feeds; each call
+is a path below the tenant's `base` with only `{entity}` substituted, and a
+source write naming a map the running revision does not hold is refused
+(our own design). FHIRconnect maps openEHR to FHIR and
 cannot describe another source, so this second language serves the inbound
 sources. The grammar leaves `fhirPath` a placeholder, so an embedded
 expression is parenthesized or runs to the next clause, as the tutorial

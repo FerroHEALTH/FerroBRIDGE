@@ -292,7 +292,10 @@ mod tests {
                 "http://example.org/StructureMap/a",
                 "http://example.org/StructureMap/b"
             ],
-            set.maps.iter().map(|map| map.url.as_str()).collect::<Vec<_>>()
+            set.maps
+                .iter()
+                .map(|map| map.url.as_str())
+                .collect::<Vec<_>>()
         );
     }
 
@@ -312,7 +315,10 @@ mod tests {
             Arc::from(&br#"{"resourceType": "Patient"}"#[..]),
         );
         let diagnostics = structuremap_set(&tree).expect_err("a Patient is no model");
-        assert_eq!(Path::new("structuremap/patient.json"), diagnostics[0].file());
+        assert_eq!(
+            Path::new("structuremap/patient.json"),
+            diagnostics[0].file()
+        );
     }
 
     #[test]

@@ -208,6 +208,12 @@ impl Engine {
         self
     }
 
+    /// Returns the maps, in path order.
+    #[must_use]
+    pub fn maps(&self) -> &[StructureMap] {
+        &self.maps
+    }
+
     /// Returns the map whose canonical URL is `url`.
     #[must_use]
     pub fn map(&self, url: &str) -> Option<&StructureMap> {

@@ -93,7 +93,7 @@ impl Resolution {
         if let Some(status) = self.removed_on {
             let refusal = http::StatusCode::from_u16(status)
                 .ok()
-                .filter(|status| status.is_client_error())
+                .filter(http::StatusCode::is_client_error)
                 .filter(|status| super::STATUSES.failure(*status) == Failure::Poisoned);
             if refusal.is_none() {
                 return Err(Invalid(format!(
@@ -244,15 +244,15 @@ fn call_url(base: &url::Url, path: &str, entity: &str) -> Option<url::Url> {
 /// Returns `text` with every byte outside the RFC 3986 §2.3 unreserved set,
 /// and `.`, percent-encoded (RFC 3986 §2.1).
 fn encoded(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for byte in text.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'~') {
-            out.push(char::from(byte));
-        } else {
-            out.push_str(&format!("%{byte:02X}"));
-        }
-    }
-    out
+    text.bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'~') {
+                char::from(byte).to_string()
+            } else {
+                format!("%{byte:02X}")
+            }
+        })
+        .collect()
 }
 
 /// The resolution every source runs: its declared calls and map, or a park

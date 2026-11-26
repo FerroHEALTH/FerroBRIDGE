@@ -78,6 +78,74 @@ The remote calls in flight per source and tenant are bounded by
 `limits.concurrency` across every replica: each call holds one leased slot
 row in the state store, taken and given back in two short statements.
 
+## Resolve the entity
+
+A notification names only the entity that changed, so a webhook source
+declares under `resolve` how the worker reads it and renders it as an R4
+`Patient`. No specification governs an inbound resolution: it is
+FerroBRIDGE's own design.
+
+```json
+{
+  "tenants": [{
+    "tenant": "t1",
+    "identifier_system": "urn:oid:2.16.840.1.113883.2.4.3.11.999.1",
+    "base": "https://api.example/t1",
+    "credentials": {"secret": "ons-t1-client"}
+  }],
+  "resolve": {
+    "calls": [
+      {"path": "/v0/administration/clients/{entity}",
+       "headers": {"X-Field-Whitelist": "id,firstName,lastName,dateOfBirth,gender,deathDate"}},
+      {"path": "/v0/administration/clients/{entity}/bsn"}
+    ],
+    "removed_on": 404,
+    "map": "https://example.org/StructureMap/ons-client-patient",
+    "answer_limit": 262144
+  }
+}
+```
+
+- Each call is a `GET` of a path below the tenant's `base`. Only
+  `{entity}` is replaced, percent-encoded (RFC 3986 §2.1), so a write whose
+  call would leave the base's scheme, host or path is refused. A `base`
+  carries no credentials, query or fragment.
+- A call presents the tenant's client certificate, the PEM certificate and
+  key in the secret `credentials` names. A credential is never written in
+  the document: a call that names an `Authorization`, `Proxy-Authorization`,
+  `Cookie` or `X-Api-Key` header is refused.
+- Each answer is read as JSON up to `answer_limit` bytes, 256 KiB when left
+  out. The answers are the sources of the map's first group, in call order,
+  and its one target is the `Patient`.
+- `removed_on` on the first call reads as the entity removed: the item
+  applies as a remove.
+- A `5xx`, `429`, `423` or no answer runs the item again. Any other status
+  parks it as `source-answered-<status>`, and an answer past the limit or not
+  JSON parks it too.
+- `map` is the canonical URL of a FHIR Mapping Language map of the running
+  mapping revision. A write naming a map the revision does not run is
+  refused, and an item whose map a later revision dropped parks as
+  `map-unknown`.
+
+A source without `resolve` parks every item as `resolution-undeclared`.
+
+### Logical models
+
+A map reads the source's JSON through logical models, one
+`StructureDefinition` of `kind = logical` per JSON file under the
+`structuremap` root of the mapping revision, beside the `.map` files. Every
+replica loads them at boot and on every reload. When the source publishes an
+OpenAPI document, generate a model from one of its schemas:
+
+```sh
+ferrobridge mapping logical-model --openapi ons-openapi.json \
+  --schema Client --url https://example.org/StructureDefinition/Client \
+  > client.json
+```
+
+The job reads no configuration and writes the model to stdout. Save it
+through the operator console or `PUT /operator/mappings/structuremap/client.json`.
+
 ## Retry, park and replay
 
 A transient failure (the network, a `5xx`, `429` or `423`) runs again after

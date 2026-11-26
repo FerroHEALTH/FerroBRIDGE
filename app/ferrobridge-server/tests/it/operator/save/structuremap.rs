@@ -22,6 +22,7 @@ group tutorial(source src : TLeft, target tgt : TRight) {\n  src.a as a -> tgt.a
 fn running(case: &Case) -> Vec<String> {
     case.structuremaps
         .current()
+        .maps()
         .iter()
         .map(|map| map.url.clone())
         .collect()

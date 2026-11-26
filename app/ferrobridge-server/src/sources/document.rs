@@ -660,55 +660,6 @@ mod tests {
                 Kind::Webhook,
                 json!({"verify": {"kind": "mtls", "subjects": ["CN=a"]}, "keys": key, "events": events}),
             ),
-            (
-                Kind::Webhook,
-                resolving(
-                    json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m"}),
-                    None,
-                ),
-            ),
-            (
-                Kind::Webhook,
-                resolving(
-                    json!({"calls": [{"path": "/c/{entity}/{other}"}], "map": "urn:m"}),
-                    Some("https://api.example"),
-                ),
-            ),
-            (
-                Kind::Webhook,
-                resolving(
-                    json!({"calls": [{"path": "https://evil.example/{entity}"}], "map": "urn:m"}),
-                    Some("https://api.example"),
-                ),
-            ),
-            (
-                Kind::Webhook,
-                resolving(
-                    json!({"calls": [{"path": "/c/{entity}", "headers": {"Authorization": "Basic x"}}], "map": "urn:m"}),
-                    Some("https://api.example"),
-                ),
-            ),
-            (
-                Kind::Webhook,
-                resolving(
-                    json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m", "removed_on": 503}),
-                    Some("https://api.example"),
-                ),
-            ),
-            (
-                Kind::Webhook,
-                resolving(
-                    json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m"}),
-                    Some("https://user:secret@api.example"),
-                ),
-            ),
-            (
-                Kind::Webhook,
-                resolving(
-                    json!({"calls": [], "map": "urn:m"}),
-                    Some("https://api.example"),
-                ),
-            ),
             (Kind::Mllp, json!({"routes": []})),
             (
                 Kind::Mllp,
@@ -723,8 +674,48 @@ mod tests {
         }
     }
 
+    #[test]
+    fn each_broken_resolution_rule_is_refused() {
+        for (resolve, base) in [
+            (
+                json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m"}),
+                None,
+            ),
+            (
+                json!({"calls": [{"path": "/c/{entity}/{other}"}], "map": "urn:m"}),
+                Some("https://api.example"),
+            ),
+            (
+                json!({"calls": [{"path": "https://evil.example/{entity}"}], "map": "urn:m"}),
+                Some("https://api.example"),
+            ),
+            (
+                json!({"calls": [{"path": "/c/{entity}", "headers": {"Authorization": "Basic x"}}], "map": "urn:m"}),
+                Some("https://api.example"),
+            ),
+            (
+                json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m", "removed_on": 503}),
+                Some("https://api.example"),
+            ),
+            (
+                json!({"calls": [{"path": "/c/{entity}"}], "map": "urn:m"}),
+                Some("https://user:secret@api.example"),
+            ),
+            (
+                json!({"calls": [], "map": "urn:m"}),
+                Some("https://api.example"),
+            ),
+        ] {
+            let document = resolving(&resolve, base);
+            assert!(
+                Document::read(Kind::Webhook, &document).is_err(),
+                "{document}"
+            );
+        }
+    }
+
     /// Returns an mTLS webhook declaring `resolve`, its tenant below `base`.
-    fn resolving(resolve: serde_json::Value, base: Option<&str>) -> serde_json::Value {
+    fn resolving(resolve: &serde_json::Value, base: Option<&str>) -> serde_json::Value {
         json!({
             "verify": {"kind": "mtls", "subjects": ["CN=a"]},
             "events": {"entity": "/id", "dedupe": {"pointers": ["/id"]}},
@@ -738,7 +729,7 @@ mod tests {
         let document = Document::read(
             Kind::Webhook,
             &resolving(
-                json!({"calls": [{"path": "/v0/clients/{entity}?fields=id", "headers": {"X-Field-Whitelist": "id"}}], "map": "urn:m", "removed_on": 404}),
+                &json!({"calls": [{"path": "/v0/clients/{entity}?fields=id", "headers": {"X-Field-Whitelist": "id"}}], "map": "urn:m", "removed_on": 404}),
                 Some("https://api.example/t"),
             ),
         );

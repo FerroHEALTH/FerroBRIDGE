@@ -92,10 +92,7 @@ fn running() -> Result<Arc<Sources>, Box<dyn Error>> {
 async fn mount_client(server: &MockServer) {
     Mock::given(matchers::method("GET"))
         .and(matchers::path("/t1/v0/clients/4711"))
-        .and(matchers::header(
-            "X-Field-Whitelist",
-            "id,firstName,lastName,dateOfBirth,gender,deathDate",
-        ))
+        .and(matchers::header_exists("X-Field-Whitelist"))
         .and(matchers::header("Accept", "application/json"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "id": 4711, "firstName": "Testa", "lastName": "Voorbeeld",
@@ -138,6 +135,15 @@ async fn the_calls_below_the_tenant_base_render_a_patient() -> Result<(), Box<dy
             "gender": "female"
         }),
         serde_json::to_value(&patient)?
+    );
+    let requests = server.received_requests().await.unwrap_or_default();
+    let whitelist = requests
+        .first()
+        .and_then(|request| request.headers.get("X-Field-Whitelist"))
+        .and_then(|value| value.to_str().ok());
+    assert_eq!(
+        Some("id,firstName,lastName,dateOfBirth,gender,deathDate"),
+        whitelist
     );
     Ok(())
 }
