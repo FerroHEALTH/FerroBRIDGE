@@ -242,7 +242,7 @@ async fn scoped(
 /// reference to another server names no patient of this one.
 async fn patients(
     facade: &Facade,
-    resolver: (&CdrClient, &crate::facade::subject::Patients<'_>),
+    resolver: (&CdrClient, &crate::facade::patients::Patients<'_>),
     request: &params::Read,
 ) -> Result<Option<Vec<EhrId>>, Refusal> {
     let mut named: Option<Vec<EhrId>> = None;
@@ -312,7 +312,7 @@ fn patient_id(facade: &Facade, reference: &str) -> Option<String> {
 /// our own design).
 async fn reach(
     facade: &Facade,
-    (access, patients): (&Access, &crate::facade::subject::Patients<'_>),
+    (access, patients): (&Access, &crate::facade::patients::Patients<'_>),
     resource_type: &str,
     named: Option<Vec<EhrId>>,
 ) -> Result<Vec<EhrId>, Refusal> {

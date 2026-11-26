@@ -66,7 +66,6 @@ use crate::facade::Facade;
 use crate::facade::compartment;
 use crate::facade::context::Context;
 use crate::facade::context::Entry;
-use crate::facade::ehr;
 use crate::facade::handlers::Body;
 use crate::facade::media;
 use crate::facade::outcome::Issue;
@@ -74,6 +73,7 @@ use crate::facade::outcome::IssueType;
 use crate::facade::party;
 use crate::facade::reply;
 use crate::facade::reply::Refusal;
+use crate::identity::ehr;
 
 /// The resource type the operation is defined on.
 pub const PATIENT: &str = "Patient";
@@ -298,7 +298,7 @@ async fn record(
     facade: &Facade,
     client: &CdrClient,
     loaded: &crate::facade::programs::Loaded,
-    (id, person): (&str, &crate::facade::identity::PersonId),
+    (id, person): (&str, &crate::identity::PersonId),
 ) -> Result<(Patient, Vec<String>), Refusal> {
     let uid = party::party_id(PATIENT, id)?;
     let (demographic, class) = party::reach(client, loaded)?;

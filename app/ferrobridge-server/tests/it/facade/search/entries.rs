@@ -9,9 +9,9 @@
 //! diagnosis with its own id. The stub CDR evaluates no AQL, so each row
 //! names the node that matched as the real CDR would.
 
-use ferrobridge_server::facade::identity::FhirResourceId;
-use ferrobridge_server::facade::identity::derive;
-use ferrobridge_server::facade::identity::store::Store;
+use ferrobridge_server::identity::FhirResourceId;
+use ferrobridge_server::identity::derive;
+use ferrobridge_server::identity::store::Store;
 use http::StatusCode;
 use std::collections::BTreeSet;
 use std::error::Error;

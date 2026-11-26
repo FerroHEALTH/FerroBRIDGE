@@ -46,9 +46,6 @@ use crate::facade::handlers::Body;
 use crate::facade::handlers::conditional;
 use crate::facade::handlers::read;
 use crate::facade::handlers::render;
-use crate::facade::identity::FhirResourceId;
-use crate::facade::identity::record::CompositionBinding;
-use crate::facade::identity::record::ConsumedSource;
 use crate::facade::ingest;
 use crate::facade::ingest::Ingest;
 use crate::facade::ingest::Provenance;
@@ -66,6 +63,9 @@ use crate::facade::reply;
 use crate::facade::reply::Refusal;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::identity::FhirResourceId;
+use crate::identity::record::CompositionBinding;
+use crate::identity::record::ConsumedSource;
 
 /// Returns the ingest over `client` that writes for the caller `access`
 /// names, resolving references through `references`.
@@ -79,7 +79,7 @@ pub(crate) fn ingest_for<'a>(
         .ingest(client)
         .with_references(references)
         .with_originating_system(crate::facade::commit::originating_system(access))
-        .with_on_behalf(crate::facade::subject::on_behalf(access))
+        .with_on_behalf(crate::facade::patients::on_behalf(access))
 }
 
 /// `POST [base]/{type}`.
@@ -456,7 +456,7 @@ pub(crate) fn refuse(answer: &status::Answer) -> Refusal {
 }
 
 /// Returns the refusal an identity-store failure renders as.
-pub(crate) fn store_refusal(error: &crate::facade::identity::store::StoreError) -> Refusal {
+pub(crate) fn store_refusal(error: &crate::identity::store::StoreError) -> Refusal {
     Refusal::from(ingest::refusal::store_refusal(error))
 }
 

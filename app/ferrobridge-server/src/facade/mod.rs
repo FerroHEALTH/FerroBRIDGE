@@ -6,8 +6,8 @@
 //! FerroBRIDGE stores no clinical data of its own: every interaction here maps
 //! onto CDR operations through a compiled FHIRconnect program
 //! (no specification governs this: our own design). What the facade keeps is identity, in the
-//! store of [`identity`], so a re-sent resource updates the composition it
-//! already produced and a read resolves a FHIR id back to one entry.
+//! store of [`crate::identity`], so a re-sent resource updates the composition
+//! it already produced and a read resolves a FHIR id back to one entry.
 //!
 //! Two rules run through every module. A status is a `StatusCode`, mapped from
 //! the CDR's own outcome by the one table in [`status`]. Everything the facade
@@ -27,12 +27,11 @@ pub mod context;
 pub mod cors;
 pub mod document;
 pub mod edge;
-pub mod ehr;
+pub mod emit;
 pub mod endpoint;
 pub mod engine;
 pub mod guard;
 pub mod handlers;
-pub mod identity;
 pub mod ingest;
 pub mod launch_task;
 pub mod media;
@@ -40,13 +39,13 @@ pub mod mhd;
 pub mod outcome;
 pub mod owned;
 pub mod party;
+pub mod patients;
 pub mod programs;
 pub mod references;
 pub mod reply;
 pub mod request;
 pub mod search;
 pub mod status;
-pub mod subject;
 pub mod summary;
 
 use std::sync::Arc;
@@ -61,9 +60,9 @@ use axum::routing::post;
 use axum::routing::put;
 
 use crate::cdr::CdrClient;
-use crate::facade::identity::claims::Claims;
-use crate::facade::identity::store::Store;
 use crate::facade::programs::Programs;
+use crate::identity::claims::Claims;
+use crate::identity::store::Store;
 use crate::mount::BASE_PATH;
 use crate::terminology::Translator;
 use ferrohealth_usage_report::window::Window;
@@ -109,10 +108,10 @@ pub struct Settings {
     /// `Location` is written under this.
     pub base_url: String,
     /// Whether an unknown subject gets an EHR on its first write.
-    pub ehr_policy: ehr::Policy,
+    pub ehr_policy: crate::identity::ehr::Policy,
     /// The link between a FHIR subject and its EHR: the namespace, the id
     /// form and the `PARTY_REF.type`.
-    pub subject: subject::SubjectLink,
+    pub subject: crate::identity::subject::SubjectLink,
     /// The `AUDIT_DETAILS.system_id` every commit records.
     pub system_id: String,
     /// The `COMPOSITION.language` the facade writes, an ISO 639-1 code.
@@ -426,14 +425,14 @@ impl Facade {
         &'a self,
         client: &'a CdrClient,
         access: &ferrohealth_smart::resource::Access,
-    ) -> subject::Patients<'a> {
-        subject::Patients {
+    ) -> patients::Patients<'a> {
+        patients::Patients {
             link: &self.settings.subject,
             store: self.store.as_ref(),
             programs: self.programs(),
             client,
             renders: self.renders(),
-            on_behalf: subject::on_behalf(access),
+            on_behalf: patients::on_behalf(access),
         }
     }
 

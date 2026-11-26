@@ -468,7 +468,7 @@ fn claim(resource: &mut Object, profile: &str) {
 
 /// Writes the id and `meta.versionId` a party version gives its resource.
 pub(crate) fn stamp(resource: &mut Object, version: &ObjectVersionId) {
-    crate::facade::identity::stamp(
+    crate::identity::stamp(
         resource,
         version.versioned_object_id().value(),
         version.version_tree_id().value(),
