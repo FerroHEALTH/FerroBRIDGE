@@ -24,7 +24,7 @@
 //! | author\[x\] | `author` | `author` |
 //! | date | `date` | `date` |
 //! | attestation | `attester`, mode `professional` | none in R4 |
-//! | status | `status` | none: `EehrxfMhdDocumentReference` holds `docStatus` to 0 |
+//! | status | `status` | `docStatus` in the PDF form; none in a listing, since `EehrxfMhdDocumentReference` holds `docStatus` to 0 |
 //! | language | `language` | `content.attachment.language` |
 //! | documentCategory | `category`, and the report's `category` on a laboratory or test report; not on an imaging report, whose form fixes it | `category`, one concept with the Art 14(1) priority category beside it |
 //! | documentType | `type` | `type` |
@@ -78,6 +78,11 @@ pub const DOCUMENT_REFERENCE_VERSION: &str =
 /// profile every description claims.
 pub const EEHRXF_MHD_DOCUMENT_REFERENCE: &str =
     "http://hl7.eu/fhir/health-data-api/StructureDefinition/EehrxfMhdDocumentReference";
+
+/// The IHE MHD code system of identifier types
+/// (`IHE.MHD.MHDIdentifierType`).
+pub const MHD_IDENTIFIER_TYPE: &str =
+    "https://profiles.ihe.net/ITI/MHD/CodeSystem/IHE.MHD.MHDIdentifierType";
 
 /// The media type of a PDF document (RFC 8118).
 pub const PDF: &str = "application/pdf";
@@ -286,6 +291,11 @@ impl DocumentMetadata {
     /// PDF/A-1 document `pdf`, its bytes unchanged in the attachment with
     /// their size and SHA-1, described by `header` and this metadata.
     ///
+    /// It carries what [`DocumentMetadata::describe_at`] writes and every
+    /// element MyHealth@EU DocumentReference-minimal requires, and claims no
+    /// `EehrxfMhdDocumentReference`, which holds `attachment.data` to 0..0
+    /// and so has no place for the embedded PDF the act asks for.
+    ///
     /// # Errors
     ///
     /// [`DocumentError::TooMany`] for more than one service specialty,
@@ -302,9 +312,12 @@ impl DocumentMetadata {
             size: pdf.bytes().len(),
             source,
         })?;
-        self.describe_at(
+        // NOTE: draft EEHRxF Art 3(1)(a) embeds the PDF/A, which EehrxfMhdDocumentReference forbids
+        // (attachment.data 0..0, url 1..1), so the act wins and the PDF form claims it not (#2235).
+        self.reference(
             header,
             id,
+            None,
             Attachment {
                 content_type: Some(PDF.into()),
                 data: Some(STANDARD.encode(pdf.bytes()).into()),
@@ -344,6 +357,18 @@ impl DocumentMetadata {
         &self,
         header: &Header,
         id: &str,
+        attachment: Attachment,
+    ) -> Result<DocumentReference, DocumentError> {
+        self.reference(header, id, Some(EEHRXF_MHD_DOCUMENT_REFERENCE), attachment)
+    }
+
+    /// The `DocumentReference` of [`DocumentMetadata::describe_at`], claiming
+    /// `claimed` when it is given.
+    fn reference(
+        &self,
+        header: &Header,
+        id: &str,
+        claimed: Option<&'static str>,
         mut attachment: Attachment,
     ) -> Result<DocumentReference, DocumentError> {
         let practice_setting = at_most_one("serviceSpecialty", &self.specialties)?.cloned();
@@ -374,19 +399,33 @@ impl DocumentMetadata {
             });
         Ok(DocumentReference {
             id: Some(id.to_owned()),
+            // NOTE: R4 Element ele-1: a meta with neither a profile nor a source is left out.
             meta: Some(Meta {
-                profile: vec![EEHRXF_MHD_DOCUMENT_REFERENCE.into()],
+                profile: claimed.into_iter().map(Into::into).collect(),
                 source: self.source.as_ref().map(|source| source.as_str().into()),
                 ..Meta::default()
-            }),
+            })
+            .filter(|meta| *meta != Meta::default()),
             extension: vec![version_extension(DOCUMENT_REFERENCE_VERSION, &self.version)],
-            // NOTE: IHE MHD 4.2.2 IHE.MHD.UniqueIdIdentifier: the unique id's use is `usual`.
+            // NOTE: IHE MHD 4.2.5 IHE.MHD.UniqueIdIdentifier: use `usual`, type MHDIdentifierType#uniqueId.
             master_identifier: Some(Identifier {
                 r#use: Some("usual".into()),
+                r#type: Some(CodeableConcept {
+                    coding: vec![Coding {
+                        system: Some(MHD_IDENTIFIER_TYPE.into()),
+                        code: Some("uniqueId".into()),
+                        ..Coding::default()
+                    }],
+                    ..CodeableConcept::default()
+                }),
                 ..header.identifier.clone()
             }),
             identifier: header.composition.iter().cloned().collect(),
             status: "current".into(),
+            // NOTE: EehrxfMhdDocumentReference holds docStatus to 0..0; the unclaimed PDF form keeps it.
+            doc_status: Some(self.status.as_str())
+                .filter(|status| claimed.is_none() && !status.is_empty())
+                .map(Into::into),
             r#type: Some(header.kind.clone()),
             category: vec![category],
             subject: Some(header.subject.clone()),
