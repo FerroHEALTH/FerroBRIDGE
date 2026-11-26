@@ -352,6 +352,13 @@ fn ecosystem_parameters(url: &str) -> Vec<OperationParameter> {
                 "uri",
                 "A code system version the translation drew on, one parameter per system.",
             ),
+            ecosystem_parameter(
+                "error",
+                ParameterUse::Out,
+                "*",
+                "string",
+                "That a returned target code is not valid in its code system, one parameter per such target; the match is still returned as the map states it (IG 1.11.0, `$translate`, The result).",
+            ),
         ],
         CODE_SYSTEM_LOOKUP => vec![
             ecosystem_parameter(
@@ -411,6 +418,13 @@ fn ecosystem_parts(url: &str, usage: ParameterUse, name: &str) -> Vec<OperationP
                 "1",
                 "boolean",
                 "Whether the source element is explicitly not mapped.",
+            ),
+            ecosystem_parameter(
+                "note",
+                ParameterUse::Out,
+                "1",
+                "string",
+                "That the server does not know the target code system, so the target code has not been validated (IG 1.11.0, `$translate`, The result).",
             ),
         ],
         _ => Vec::new(),

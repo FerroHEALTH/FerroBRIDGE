@@ -4,8 +4,9 @@ Per-version FHIR types and terminology operation contracts.
 
 Generated Rust types for the FHIR STU3 (3.0.2), R4 (4.0.1), R4B (4.3.0), R5
 (5.0.0), and R6 (6.0.0-snapshot1) terminology surface: `CodeSystem`, `ValueSet`,
-`ConceptMap`, `Parameters`, `OperationOutcome`, `CapabilityStatement`,
-`TerminologyCapabilities` (R4 and later; STU3 defines none), `Bundle`, the
+`ConceptMap`, `NamingSystem`, `Parameters`, `OperationOutcome`,
+`CapabilityStatement`, `TerminologyCapabilities` (R4 and later; STU3 defines
+none), `Bundle`, `Provenance`, the
 datatypes and primitives they reach,
 a JSON codec, and typed request and response contracts for `$lookup`,
 `$validate-code`, `$expand`, `$subsumes`, and `$translate` per version, each
@@ -22,10 +23,10 @@ uses it:
 
 ```toml
 [dependencies]
-fhir-types = "0.2"
+fhir-types = "0.3"
 ```
 
-Name a patch (`"0.2.N"`) when you need the first release that carries what
+Name a patch (`"0.3.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## Features

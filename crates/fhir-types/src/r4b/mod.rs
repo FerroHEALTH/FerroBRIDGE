@@ -236,7 +236,7 @@ pub mod meta;
 pub mod molecular_sequence;
 #[cfg(feature = "terminology")]
 pub mod money;
-#[cfg(any(feature = "resources", feature = "r4b-resources"))]
+#[cfg(feature = "terminology")]
 pub mod naming_system;
 #[cfg(feature = "terminology")]
 pub mod narrative;
