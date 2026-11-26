@@ -5,12 +5,7 @@
 //!
 //! It holds what a sender must prove (`verify`, for the HTTP intake and the
 //! HL7 v2 face alike), what its event says, where it is stored before the
-//! source is answered, and the one handler (`apply`) the workers on every
-//! replica run.
-//!
-//! The workers apply every stored item through one handler,
-//! [`apply::Apply`], which feeds the identity source and ensures the
-//! patient's one EHR.
+//! source is answered, and how the workers on every replica apply it.
 //!
 //! The workers apply every stored item through one handler,
 //! [`apply::Apply`], which feeds the identity source and ensures the
