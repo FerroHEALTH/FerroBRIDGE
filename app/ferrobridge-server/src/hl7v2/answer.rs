@@ -17,7 +17,7 @@
 use std::collections::BTreeMap;
 
 use ferrobridge_hl7v2::ack::{Code, Error};
-use ferrobridge_hl7v2::map::MapError;
+use ferrobridge_hl7v2::map::{MapError, Outcome};
 use ferrobridge_hl7v2::parse::ErrorCode;
 use http::StatusCode;
 
@@ -53,6 +53,66 @@ pub enum Settled {
     Address,
     /// The routes could not be read, so the message may be sent again.
     Routes,
+    /// PID-3 names an assigning authority whose identifier system the
+    /// terminology server's registry does not settle, so the patient carries
+    /// an identifier with no system.
+    Unregistered(Vec<Unsettled>),
+}
+
+/// A PID-3 assigning authority the identifier registry did not settle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unsettled {
+    /// The assigning authority searched.
+    pub authority: String,
+    /// The `uri` of each registration: none, or more than one.
+    pub systems: Vec<String>,
+}
+
+/// Returns each PID-3 assigning authority the registry left unsettled in a
+/// run's `outcomes`, each once.
+///
+/// The patient's identifier is the source identifier the identity source is
+/// asked by, so one with no system refuses the message before the ingest.
+#[must_use]
+pub fn unsettled(outcomes: &[Outcome]) -> Vec<Unsettled> {
+    let mut found: Vec<Unsettled> = Vec::new();
+    for outcome in outcomes {
+        let (at, authority, systems) = match outcome {
+            Outcome::Unregistered { at, authority, .. } => (at, authority, Vec::new()),
+            Outcome::RegistryAmbiguous {
+                at,
+                authority,
+                systems,
+                ..
+            } => (at, authority, systems.clone()),
+            _ => continue,
+        };
+        let unsettled = Unsettled {
+            authority: authority.clone(),
+            systems,
+        };
+        if at.segment == "PID" && at.field == Some(3) && !found.contains(&unsettled) {
+            found.push(unsettled);
+        }
+    }
+    found
+}
+
+impl Unsettled {
+    /// Returns what PID-3 lacks, for an `ERR` text.
+    fn text(&self) -> String {
+        if self.systems.is_empty() {
+            return format!(
+                "PID-3 names the assigning authority {}, which no identifier NamingSystem on the terminology server registers, so the patient identifier has no system",
+                self.authority
+            );
+        }
+        format!(
+            "PID-3 names the assigning authority {}, which more than one identifier NamingSystem on the terminology server registers ({}), so the patient identifier has no system",
+            self.authority,
+            self.systems.join(", ")
+        )
+    }
 }
 
 /// What one settled message produced, for the log.
@@ -125,6 +185,19 @@ pub fn acknowledgment(settled: &Settled) -> (Code, Vec<Error>) {
             None,
             ErrorCode::Application,
             String::from("the message could not be recorded in the audit trail"),
+        ),
+        Settled::Unregistered(unsettled) => (
+            Code::Error,
+            unsettled
+                .iter()
+                .map(|authority| Error {
+                    location: Some(
+                        ferrobridge_hl7v2::parse::Location::segment("PID", 1).with_field(3),
+                    ),
+                    code: ErrorCode::Application,
+                    text: authority.text(),
+                })
+                .collect(),
         ),
         Settled::Unkeyed => one(
             Code::Error,
@@ -208,7 +281,9 @@ fn error_of(issue: &Issue) -> Error {
 fn of_map_error(error: &MapError) -> (Code, Vec<Error>) {
     let (code, error_code, location) = match error {
         MapError::NoMessageMap { .. } => (Code::Reject, ErrorCode::UnsupportedMessageType, None),
-        MapError::Terminology { .. } => (Code::Reject, ErrorCode::Application, None),
+        MapError::Terminology { .. } | MapError::Registry { .. } => {
+            (Code::Reject, ErrorCode::Application, None)
+        }
         MapError::Stopped { at, .. } => (
             Code::Error,
             ErrorCode::RequiredFieldMissing,

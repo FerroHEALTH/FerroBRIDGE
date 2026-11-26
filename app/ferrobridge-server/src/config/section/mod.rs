@@ -13,6 +13,7 @@ pub mod events;
 pub mod facade;
 pub mod fhir_outbound;
 pub mod hl7v2;
+pub mod identity_source;
 pub mod inbound;
 pub mod mappings;
 pub mod omop_incremental;

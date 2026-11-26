@@ -238,7 +238,7 @@ async fn annex_x_over(
     let compiled = programs::compile_set(&set, &templates)?;
     let store = Arc::new(MemoryStore::default());
     programs::check_parties(&compiled, true)?;
-    let built = Facade::new(compiled, handle(&store), client, settings());
+    let built = Facade::new(compiled, handle(&store), client, served(&cdr).await);
     let catalog = ferrobridge_server::facade::search::load(directory, &built.programs())?;
     let facade = Arc::new(
         built
@@ -246,9 +246,33 @@ async fn annex_x_over(
             .with_endpoints(Some(endpoints))
             .with_consent(consent),
     );
-    let person = PersonId::new("http://example.org/fhir", SUBJECT)?;
-    store.record_ehr(&person, &EhrId::new(EHR_ID)?).await?;
+    bind(&store).await?;
     Ok(Harness { cdr, store, facade })
+}
+
+/// Binds the synthetic patient's pseudonym to [`EHR_ID`] and to the party
+/// [`SUBJECT`] names in `store`.
+async fn bind(store: &MemoryStore) -> Result<(), Box<dyn Error>> {
+    let person = PersonId::new("http://example.org/fhir", super::PSEUDONYM)?;
+    store.record_ehr(&person, &EhrId::new(EHR_ID)?).await?;
+    let party = SUBJECT.trim_start_matches("Patient/");
+    store.record_party(party, &person).await?;
+    Ok(())
+}
+
+/// The identifier system the synthetic patients' national ids are in, an
+/// accepted source domain of the stub identity source.
+const NATIONAL_ID: &str = "http://example.org/fhir/sid/synthetic-national-id";
+
+/// Returns the facade settings asking the stub identity source on `cdr`,
+/// which accepts the synthetic patients' national ids.
+async fn served(cdr: &MockServer) -> ferrobridge_server::facade::Settings {
+    let accepted = [
+        crate::support::SOURCE_DOMAIN,
+        NATIONAL_ID,
+        "http://example.org/fhir",
+    ];
+    crate::support::served_identity_accepting(cdr, settings(), &accepted).await
 }
 
 /// One Annex X group served as a resource: its context, a resource it maps,

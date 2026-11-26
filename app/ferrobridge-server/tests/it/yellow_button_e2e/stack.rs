@@ -3,7 +3,7 @@
 
 //! The platform the journey runs on: the reference CDR (its `main` image),
 //! FerroSMART on the host network with a stub upstream OpenID Provider, a
-//! stub terminology server and Audit Record Repository, two PostgreSQL
+//! stub terminology server, identity source and Audit Record Repository, two PostgreSQL
 //! databases, and the bridge's own configuration, which the journey serves
 //! in process on a real listener. No specification governs the harness: our
 //! own design.
@@ -79,6 +79,8 @@ pub(super) struct Stack {
     pub(super) listener: Option<TcpListener>,
     /// The terminology server, kept for the run's length.
     _terminology: MockServer,
+    /// The identity source, kept for the run's length.
+    _identity: MockServer,
     /// FerroSMART's database, kept for the run's length.
     _smart_database: Postgres,
     /// The bridge's state store, kept for the run's length.
@@ -104,6 +106,12 @@ impl Stack {
         upstream.publish_metadata().await;
         let terminology = MockServer::start().await;
         mount_terminology(&terminology).await;
+        let identity = MockServer::start().await;
+        wiremock::Mock::given(matchers::method("POST"))
+            .and(matchers::path(crate::support::PIX_PATH))
+            .respond_with(SubjectPseudonym)
+            .mount(&identity)
+            .await;
         let arr = MockServer::start().await;
         wiremock::Mock::given(matchers::method("POST"))
             .and(matchers::path("/AuditEvent"))
@@ -132,6 +140,7 @@ impl Stack {
             cdr: cdr.base_url(),
             smart: smart.issuer(),
             terminology: &terminology.uri(),
+            identity: &format!("{}/pix", identity.uri()),
             arr: &arr.uri(),
             state: state.url(),
             operator: &password_hash(&password)?,
@@ -149,10 +158,38 @@ impl Stack {
             settings,
             listener: Some(listener),
             _terminology: terminology,
+            _identity: identity,
             _smart_database: smart_database,
             _state: state,
             operator: (String::from(OPERATOR), password),
         })
+    }
+}
+
+/// A stub `$ihe-pix` that answers each `sourceIdentifier` of an ITI-83
+/// `POST` with its own value as the pseudonym in [`NAMESPACE`], so each
+/// patient's pseudonym is the subject id its EHR was created with.
+struct SubjectPseudonym;
+
+impl wiremock::Respond for SubjectPseudonym {
+    fn respond(&self, request: &wiremock::Request) -> ResponseTemplate {
+        let value = serde_json::from_slice::<serde_json::Value>(&request.body)
+            .ok()
+            .and_then(|parameters| {
+                let token = parameters["parameter"]
+                    .as_array()?
+                    .iter()
+                    .find(|parameter| parameter["name"] == "sourceIdentifier")?["valueString"]
+                    .as_str()?
+                    .to_owned();
+                token
+                    .strip_prefix(&format!("{SUBJECT_SYSTEM}|"))
+                    .map(str::to_owned)
+            });
+        match value {
+            Some(value) => crate::support::pseudonym_answer(NAMESPACE, &value),
+            None => ResponseTemplate::new(400),
+        }
     }
 }
 
@@ -295,6 +332,8 @@ struct BridgeConfig<'a> {
     smart: &'a str,
     /// The terminology server.
     terminology: &'a str,
+    /// The identity source's FHIR base.
+    identity: &'a str,
     /// The Audit Record Repository.
     arr: &'a str,
     /// The state store's URL.
@@ -312,6 +351,7 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
         cdr,
         smart,
         terminology,
+        identity,
         arr,
         state,
         operator,
@@ -331,8 +371,9 @@ fn bridge_config(config: &BridgeConfig<'_>) -> Result<String, Box<dyn Error>> {
          [mappings]\ndirectory = {FIXTURES:?}\n\n\
          [cdr]\nendpoint.url = \"{cdr}/\"\ndemographic = true\n\n\
          [terminology]\nendpoint.url = \"{terminology}/r4\"\n\n\
+         [identity_source]\npseudonym_domain = {NAMESPACE:?}\nsource_domains = [{SUBJECT_SYSTEM:?}]\n\
+         endpoint.url = {identity:?}\n\n\
          [facade]\nenabled = true\nbase_url = \"{origin}/fhir\"\n\
-         subject_namespace = {NAMESPACE:?}\nsubject_id_form = \"logical_id\"\nsubject_type = \"PERSON\"\n\
          composition_language = \"en\"\ncomposition_territory = \"NL\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n\
          [facade.summary]\nenabled = true\noperator = \"Synthetic operator\"\npackages = [{packages}]\n\n\
          [auth.issuer.ferrosmart]\nissuer = {smart:?}\n\n\

@@ -34,7 +34,7 @@ impl<'a> Run<'a> {
                 });
                 Ok(false)
             }
-            Condition::Unsupported { text, .. } => {
+            Condition::Unsupported { text, .. } | Condition::Registry { text, .. } => {
                 self.outcomes.push(Outcome::UnsupportedCondition {
                     at: scope.at.clone(),
                     row: reference.clone(),

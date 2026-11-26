@@ -83,7 +83,11 @@ async fn every_translation_of_a_message_goes_in_one_request() {
         .await
         .expect("the message maps");
     let received = server.received_requests().await.unwrap_or_default();
-    assert_eq!(1, received.len(), "one batch");
+    let translating = received
+        .iter()
+        .filter(|request| request.method == wiremock::http::Method::POST)
+        .count();
+    assert_eq!(1, translating, "one batch");
     assert_eq!(mapped.translations(), tables.asked().len());
     assert!(mapped.translations() > 1);
 }

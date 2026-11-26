@@ -16,9 +16,7 @@ use crate::facade::outcome::Issue;
 use crate::facade::outcome::IssueType;
 use crate::facade::request::Inbound;
 use crate::facade::request::RequestError;
-use crate::facade::request::patient_person;
-use crate::facade::request::person_by_identifier;
-use crate::facade::subject::IdForm;
+use crate::facade::subject::Subject;
 use crate::facade::subject::SubjectLink;
 use ferrohealth_server::run::chain;
 
@@ -38,22 +36,20 @@ use super::linked::InBundle;
 use super::linked::bundle_link;
 
 /// Returns the subject a Bundle-local reference of `inbound` names: the
-/// person the entry it references is, as [`patient_person`] keys a Patient
-/// under `link`, or by that entry's first `identifier` with a value when it
-/// carries no logical id.
+/// Patient entry it references, by that entry's identifier in the first
+/// accepted domain.
 ///
 /// A reference whose value is another entry's `fullUrl` resolves to that
 /// entry (R4 `Bundle.entry.fullUrl`; <https://hl7.org/fhir/R4/bundle.html#references>),
 /// so a `urn:uuid` a message Bundle allocates per message never becomes a
 /// person key of its own. `None` when `inbound` names its subject by
-/// identifier, when the reference names no entry of the Bundle, or when that
-/// entry carries neither a logical id the link keys by nor an identifier with
-/// a value; the reference is then read as [`Inbound::subject`] reads it.
+/// identifier or the reference names no entry of the Bundle; the reference
+/// is then read as [`Inbound::subject`] reads it.
 fn local_subject(
     inbound: &Inbound,
     locals: &BTreeMap<&str, &Value>,
     link: &SubjectLink,
-) -> Option<Result<PersonId, RequestError>> {
+) -> Option<Result<Subject, RequestError>> {
     let document = inbound.document();
     let reference = document
         .get("subject")
@@ -62,13 +58,10 @@ fn local_subject(
         return None;
     }
     let target = locals.get(reference.get("reference")?.as_str()?)?;
-    // NOTE: no specification governs this: our own design; an entry with no logical id (an HL7 v2
-    // message's Patient) keeps the identifier key, so only an id the link can read changes it.
-    if link.form() == IdForm::Reference || target.get("id").is_none() {
-        return person_by_identifier(target, link.namespace())
-            .map(|person| person.map_err(|source| RequestError::Subject { source }));
-    }
-    patient_person(target, link)
+    Some(
+        link.patient(target)
+            .map_err(|source| RequestError::Link { source }),
+    )
 }
 
 /// One entry's `fullUrl`, its resource and what mapping it produced.
@@ -183,6 +176,7 @@ impl Ingest<'_> {
             results.push((full_url, resource, result));
         }
         let consumers = consumers_of(&results);
+        let mut known = BTreeMap::new();
         for (full_url, resource, result) in results {
             if let Some(by) =
                 resource.and_then(|resource| consumer(&consumers, &full_url, resource))
@@ -199,7 +193,14 @@ impl Ingest<'_> {
                 continue;
             }
             match result {
-                Ok(Mapping::Mapped(one, person)) => {
+                Ok(Mapping::Mapped(one, subject)) => {
+                    let person = match self.memoized(&mut known, subject).await {
+                        Ok(person) => person,
+                        Err(refused) => {
+                            partition.refused.get_or_insert(refused);
+                            continue;
+                        }
+                    };
                     match partition.subject {
                         None => partition.subject = Some(person),
                         Some(ref held) if held == &person => {}
@@ -228,6 +229,30 @@ impl Ingest<'_> {
             }
         }
         partition
+    }
+
+    /// Returns the person `subject` is, asking the identity source once per
+    /// identifier of one Bundle.
+    async fn memoized(
+        &self,
+        known: &mut BTreeMap<(String, String), PersonId>,
+        subject: Subject,
+    ) -> Result<PersonId, Refused> {
+        use secrecy::ExposeSecret;
+
+        let Subject::Identified(ref source) = subject else {
+            return self.person_of(subject).await;
+        };
+        let key = (
+            source.system().to_owned(),
+            source.value().expose_secret().to_owned(),
+        );
+        if let Some(person) = known.get(&key) {
+            return Ok(person.clone());
+        }
+        let person = self.person_of(subject).await?;
+        known.insert(key, person.clone());
+        Ok(person)
     }
 
     /// Maps one Bundle entry, naming it by its `fullUrl` on refusal.

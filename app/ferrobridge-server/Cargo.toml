@@ -79,6 +79,8 @@ ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
 # spooled and sent over the ITI-20 ATX: FHIR Feed. Only this crate links them.
 ehds-logging = { workspace = true, features = ["balp"] }
 ihe-atna = { workspace = true, features = ["balp", "feed"] }
+# The PIXm Consumer of the identity source (ITI-83).
+ihe-iti = { workspace = true, features = ["pixm", "balp"] }
 # The AMQP publisher of the events lane.
 lapin.workspace = true
 # The AOM2 operational template the adl2 route serves, and the HRID parser an

@@ -49,8 +49,9 @@ const SYSTEM_QUERY: &str = "SELECT p/uid/value FROM PERSON p WHERE p/details/ite
 /// The party the synthetic identifier names, as a versioned uid.
 const PARTY: &str = "0f1e2d3c-4b5a-4968-8776-655443322110::cdr.example.org::1";
 
-/// The patient that party is, as the identity map keys a literal reference.
-const PATIENT: &str = "Patient/0f1e2d3c-4b5a-4968-8776-655443322110";
+/// The pseudonym that party is keyed by where no `Patient` party context is
+/// loaded: its uid.
+const PATIENT: &str = "0f1e2d3c-4b5a-4968-8776-655443322110";
 
 /// The namespace the suite's subject link reads a reference in.
 const NAMESPACE: &str = "http://example.org/fhir";
@@ -195,7 +196,7 @@ async fn an_identifier_two_parties_carry_matches_the_resources_of_both()
     harness
         .store
         .record_ehr(
-            &PersonId::new(NAMESPACE, &format!("Patient/{OTHER_PARTY}"))?,
+            &PersonId::new(NAMESPACE, OTHER_PARTY)?,
             &EhrId::new(OTHER_EHR)?,
         )
         .await?;

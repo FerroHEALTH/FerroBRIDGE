@@ -34,6 +34,15 @@ CREATE TABLE ehr_subject (
     person_sealed bytea NOT NULL
 );
 
+CREATE TABLE party_person (
+    party_uid text PRIMARY KEY,
+    namespace text NOT NULL,
+    id_hmac bytea NOT NULL,
+    key_id text NOT NULL,
+    person_sealed bytea NOT NULL,
+    CONSTRAINT party_person_person UNIQUE (namespace, id_hmac)
+);
+
 CREATE TABLE external_internal (
     resource_type text NOT NULL,
     external_id text NOT NULL,
@@ -80,4 +89,5 @@ CREATE TABLE resource_identifier (
 
 COMMENT ON TABLE person_ehr IS 'The EHR of each person, keyed by the HMAC of the person identifier. No specification governs the storage: our own design.';
 COMMENT ON TABLE ehr_subject IS 'The person each EHR was first recorded for, sealed. No specification governs the storage: our own design.';
+COMMENT ON TABLE party_person IS 'The pseudonym of each Patient party, sealed, keyed by the party''s versioned_object_uid and found again by the HMAC of the pseudonym. No specification governs the storage: our own design.';
 COMMENT ON TABLE resource_identifier IS 'Each Resource.identifier a committed resource carries, its value as an HMAC, for the identifier search. No specification governs the storage: our own design.';

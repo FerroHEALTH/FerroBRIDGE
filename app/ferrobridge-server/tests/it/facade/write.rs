@@ -614,12 +614,12 @@ async fn an_ehr_created_on_first_sight_names_the_subject_in_the_namespace()
     let reference = &subject["external_ref"];
     assert_eq!(Some("PARTY_REF"), reference["_type"].as_str(), "{subject}");
     assert_eq!(
-        Some("http://example.org/fhir/sid/ferrobridge-subject"),
+        Some("http://example.org/fhir"),
         reference["namespace"].as_str()
     );
     assert_eq!(Some("GENERIC_ID"), reference["id"]["_type"].as_str());
     assert_eq!(
-        Some("synthetic-subject-0001"),
+        Some(crate::support::PSEUDONYM),
         reference["id"]["value"].as_str()
     );
     assert_eq!(

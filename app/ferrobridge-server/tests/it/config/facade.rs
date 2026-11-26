@@ -1,14 +1,13 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `[facade]` section: off until present, its policy, its store, its
-//! subject link, and its refusals.
+//! The `[facade]` section: off until present, its policy, its store, the
+//! identity source its subject link asks, and its refusals.
 
+use crate::support::IDENTITY_SOURCE;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
-use ferrobridge_server::facade::subject::IdForm;
-use ferrobridge_server::facade::subject::SubjectError;
 use std::collections::BTreeMap;
 
 #[test]
@@ -24,15 +23,18 @@ fn the_facade_is_off_until_its_section_turns_it_on() -> Result<(), Box<dyn std::
 
 #[test]
 fn an_enabled_facade_resolves_its_policy() -> Result<(), Box<dyn std::error::Error>> {
-    let text = concat!(
-        "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
-        "[auth]\nenabled = false\n\n[facade]\nenabled = true\n",
-        "base_url = \"https://bridge.invalid/fhir\"\n",
-        "ehr_policy = \"create_on_first_write\"\n",
-        "composition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n",
+    let text = format!(
+        "{IDENTITY_SOURCE}{}",
+        concat!(
+            "[mappings]\ndirectory = \"/srv/mappings\"\ntemplates = \"/srv/templates\"\n\n",
+            "[auth]\nenabled = false\n\n[facade]\nenabled = true\n",
+            "base_url = \"https://bridge.invalid/fhir\"\n",
+            "ehr_policy = \"create_on_first_write\"\n",
+            "composition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n",
+        )
     );
 
-    let settings = Config::from_sources(Some(text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     assert_eq!("https://bridge.invalid/fhir", facade.settings.base_url);
     assert_eq!(
@@ -51,12 +53,15 @@ fn an_enabled_facade_resolves_its_policy() -> Result<(), Box<dyn std::error::Err
 #[test]
 fn an_ehr_policy_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
 {
-    let text = concat!(
-        "[auth]\nenabled = false\n\n[facade]\nenabled = true\nehr_policy = \"whatever\"\n",
-        "composition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n",
+    let text = format!(
+        "{IDENTITY_SOURCE}{}",
+        concat!(
+            "[auth]\nenabled = false\n\n[facade]\nenabled = true\nehr_policy = \"whatever\"\n",
+            "composition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n",
+        )
     );
 
-    let error = Config::from_sources(Some(text), &BTreeMap::new())?
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve(Process::Server)
         .expect_err("the policy is one of two values");
     match &error {
@@ -72,9 +77,11 @@ fn an_ehr_policy_the_facade_does_not_know_refuses_to_boot() -> Result<(), Box<dy
 #[test]
 fn an_enabled_facade_without_a_composition_language_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
-    let text = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n";
+    let text = format!(
+        "{IDENTITY_SOURCE}[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n"
+    );
 
-    let error = Config::from_sources(Some(text), &BTreeMap::new())?
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
         .resolve(Process::Server)
         .expect_err("a clinical record has no default language");
     match &error {
@@ -115,7 +122,7 @@ fn an_enabled_facade_without_each_custodian_key_refuses_to_boot()
 }
 
 /// The smallest enabled facade section.
-pub(super) const ENABLED: &str = "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n";
+pub(super) const ENABLED: &str = "[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\n\n[identity_source.endpoint]\nurl = \"http://127.0.0.1:9/fhir\"\n\n[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n";
 
 #[test]
 fn the_search_page_sizes_default_and_resolve_as_configured()
@@ -430,39 +437,146 @@ fn an_unknown_party_search_key_refuses_to_boot() {
 /// The `[facade]` section `extra` adds to, with the two required fields set.
 fn facade_with(extra: &str) -> String {
     format!(
-        "[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n{extra}"
+        "{IDENTITY_SOURCE}[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n{extra}"
+    )
+}
+
+/// Returns the facade with the `[identity_source]` table `identity`.
+fn facade_under(identity: &str) -> String {
+    format!(
+        "{identity}[auth]\nenabled = false\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n"
+    )
+}
+
+/// Returns the `[identity_source]` table with `domains` as its body.
+fn identity(domains: &str) -> String {
+    format!(
+        "[identity_source]\n{domains}\n[identity_source.endpoint]\nurl = \"http://127.0.0.1:9/fhir\"\n\n"
     )
 }
 
 #[test]
-fn the_subject_link_defaults_to_the_reference_form_and_a_person()
+fn an_enabled_facade_without_an_identity_source_refuses_to_boot()
 -> Result<(), Box<dyn std::error::Error>> {
-    let settings =
-        Config::from_sources(Some(&facade_with("")), &BTreeMap::new())?.resolve(Process::Server)?;
-    let facade = settings.facade.ok_or("the facade lane is on")?;
-    let link = &facade.settings.subject;
-    assert_eq!("ferrobridge", link.namespace());
-    assert_eq!(IdForm::Reference, link.form());
-    assert_eq!("PERSON", link.party_type());
+    let error = Config::from_sources(Some(&facade_under("")), &BTreeMap::new())?
+        .resolve(Process::Server)
+        .expect_err("every EHR subject is a pseudonym the identity source holds");
+    match &error {
+        Error::Needs { key, needs } => {
+            assert_eq!("facade.enabled", key);
+            assert_eq!("[identity_source]", needs);
+        }
+        other => return Err(format!("expected a needs error, got {other:?}").into()),
+    }
     Ok(())
 }
 
 #[test]
-fn the_subject_link_takes_the_cdr_owners_namespace_form_and_type()
+fn the_subject_link_names_the_pseudonym_domain_and_the_source_domains_in_order()
 -> Result<(), Box<dyn std::error::Error>> {
-    let text = facade_with(concat!(
-        "subject_namespace = \"fhir_facade\"\n",
-        "subject_id_form = \"logical_id\"\n",
-        "subject_type = \"PARTY\"\n",
-    ));
+    let text = facade_under(&identity(concat!(
+        "pseudonym_domain = \"urn:oid:2.999.9\"\n",
+        "source_domains = [\"urn:oid:2.999.2\", \"urn:oid:2.999.1\"]\n",
+    )));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let facade = settings.facade.ok_or("the facade lane is on")?;
     let link = &facade.settings.subject;
-    assert_eq!("fhir_facade", link.namespace());
-    assert_eq!(IdForm::LogicalId, link.form());
-    assert_eq!("PARTY", link.party_type());
-    let person = link.person_of_patient("p-1")?;
-    assert_eq!(("fhir_facade", "p-1"), (person.namespace(), person.id()));
+    assert_eq!("urn:oid:2.999.9", link.namespace());
+    assert_eq!(
+        ["urn:oid:2.999.2", "urn:oid:2.999.1"],
+        link.identity().source_domains()
+    );
+    let identity = settings
+        .identity_source
+        .ok_or("the identity source is resolved")?;
+    assert_eq!("urn:oid:2.999.9", identity.pseudonym_domain());
+    Ok(())
+}
+
+#[test]
+fn an_identity_source_without_its_domains_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
+{
+    for (body, key) in [
+        (
+            "source_domains = [\"urn:oid:2.999.1\"]\n",
+            "identity_source.pseudonym_domain",
+        ),
+        (
+            "pseudonym_domain = \"urn:oid:2.999.9\"\n",
+            "identity_source.source_domains",
+        ),
+    ] {
+        let error = Config::from_sources(Some(&facade_under(&identity(body))), &BTreeMap::new())?
+            .resolve(Process::Server)
+            .expect_err("both domains are required");
+        match &error {
+            Error::Missing { key: missing } => assert_eq!(key, missing),
+            other => return Err(format!("expected a missing key, got {other:?}").into()),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn an_identity_domain_that_is_no_absolute_uri_refuses_to_boot()
+-> Result<(), Box<dyn std::error::Error>> {
+    let text = facade_under(&identity(concat!(
+        "pseudonym_domain = \"urn:oid:2.999.9\"\n",
+        "source_domains = [\"local-mrn\"]\n",
+    )));
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve(Process::Server)
+        .expect_err("an identifier system is an absolute URI");
+    match &error {
+        Error::IdentityDomain { key, value } => {
+            assert_eq!("identity_source.source_domains", key);
+            assert_eq!("local-mrn", value);
+        }
+        other => return Err(format!("expected an identity domain error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn a_source_domain_named_twice_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>> {
+    let text = facade_under(&identity(concat!(
+        "pseudonym_domain = \"urn:oid:2.999.9\"\n",
+        "source_domains = [\"urn:oid:2.999.1\", \"urn:oid:2.999.1\"]\n",
+    )));
+    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
+        .resolve(Process::Server)
+        .expect_err("the order of the domains is the choice, so each is named once");
+    match &error {
+        Error::Duplicate { key, value } => {
+            assert_eq!("identity_source.source_domains", key);
+            assert_eq!("urn:oid:2.999.1", value);
+        }
+        other => return Err(format!("expected a duplicate error, got {other:?}").into()),
+    }
+    Ok(())
+}
+
+#[test]
+fn the_removed_subject_link_keys_refuse_to_boot() {
+    for key in ["subject_namespace", "subject_id_form", "subject_type"] {
+        let text = facade_with(&format!("{key} = \"x\"\n"));
+        assert!(
+            Config::from_sources(Some(&text), &BTreeMap::new()).is_err(),
+            "facade.{key} is no key"
+        );
+    }
+}
+
+#[test]
+fn the_pseudonym_domain_is_set_from_the_environment() -> Result<(), Box<dyn std::error::Error>> {
+    let environment = BTreeMap::from([(
+        String::from("FERROBRIDGE__IDENTITY_SOURCE__PSEUDONYM_DOMAIN"),
+        String::from("urn:oid:2.999.7"),
+    )]);
+    let settings =
+        Config::from_sources(Some(&facade_with("")), &environment)?.resolve(Process::Server)?;
+    let facade = settings.facade.ok_or("the facade lane is on")?;
+    assert_eq!("urn:oid:2.999.7", facade.settings.subject.namespace());
     Ok(())
 }
 
@@ -480,81 +594,6 @@ fn the_ehr_status_identifier_system_is_unset_until_a_deployment_names_one()
         Some("urn:oid:2.999.1"),
         facade.settings.ehr_status_system.as_deref()
     );
-    Ok(())
-}
-
-#[test]
-fn a_subject_type_outside_type_validity_refuses_to_boot() -> Result<(), Box<dyn std::error::Error>>
-{
-    // BASE base_types PARTY_REF §Invariants, Type_validity: PATIENT is no party type.
-    let text = facade_with("subject_type = \"PATIENT\"\n");
-    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve(Process::Server)
-        .expect_err("the type is one of the BASE party types");
-    match &error {
-        Error::Subject { key, source } => {
-            assert_eq!("facade.subject_type", key);
-            assert!(matches!(
-                source.as_ref(),
-                SubjectError::PartyType { value, .. } if value == "PATIENT"
-            ));
-        }
-        other => return Err(format!("expected a subject link error, got {other:?}").into()),
-    }
-    Ok(())
-}
-
-#[test]
-fn a_subject_namespace_breaking_the_object_ref_rule_refuses_to_boot()
--> Result<(), Box<dyn std::error::Error>> {
-    let text = facade_with("subject_namespace = \"9-local\"\n");
-    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve(Process::Server)
-        .expect_err("the namespace starts with a letter");
-    match &error {
-        Error::Subject { key, source } => {
-            assert_eq!("facade.subject_namespace", key);
-            assert!(matches!(source.as_ref(), SubjectError::Namespace { .. }));
-        }
-        other => return Err(format!("expected a subject link error, got {other:?}").into()),
-    }
-    Ok(())
-}
-
-#[test]
-fn a_subject_id_form_the_facade_does_not_know_refuses_to_boot()
--> Result<(), Box<dyn std::error::Error>> {
-    let text = facade_with("subject_id_form = \"pseudonym\"\n");
-    let error = Config::from_sources(Some(&text), &BTreeMap::new())?
-        .resolve(Process::Server)
-        .expect_err("the form is one of three values");
-    match &error {
-        Error::SubjectIdForm { key, value } => {
-            assert_eq!("facade.subject_id_form", key);
-            assert_eq!("pseudonym", value);
-        }
-        other => return Err(format!("expected a subject id form error, got {other:?}").into()),
-    }
-    Ok(())
-}
-
-#[test]
-fn the_subject_link_keys_are_set_from_the_environment() -> Result<(), Box<dyn std::error::Error>> {
-    let environment = BTreeMap::from([
-        (
-            String::from("FERROBRIDGE__FACADE__SUBJECT_ID_FORM"),
-            String::from("uuid"),
-        ),
-        (
-            String::from("FERROBRIDGE__FACADE__SUBJECT_TYPE"),
-            String::from("GROUP"),
-        ),
-    ]);
-    let settings =
-        Config::from_sources(Some(&facade_with("")), &environment)?.resolve(Process::Server)?;
-    let facade = settings.facade.ok_or("the facade lane is on")?;
-    assert_eq!(IdForm::Uuid, facade.settings.subject.form());
-    assert_eq!("GROUP", facade.settings.subject.party_type());
     Ok(())
 }
 

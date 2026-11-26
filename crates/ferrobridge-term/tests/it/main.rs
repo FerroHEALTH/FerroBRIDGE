@@ -42,6 +42,13 @@ mod expand;
 mod forms;
 #[cfg(feature = "r4")]
 mod lookup;
+#[cfg(all(
+    feature = "naming-system",
+    feature = "stu3",
+    feature = "r4",
+    feature = "r4b"
+))]
+mod naming_system;
 #[cfg(feature = "r4")]
 mod oauth;
 mod pins;

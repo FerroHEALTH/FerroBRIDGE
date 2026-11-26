@@ -263,21 +263,16 @@ impl Ingest<'_> {
                     .at(format!("{}.subject", inbound.resource_type())),
             )
         })?;
+        let subject = self.person_of(subject).await?;
         if let Some(written) = self
             .reconcile_resource(inbound, program, provenance)
             .await?
         {
             return Ok(written);
         }
-        let ehr_id = ehr::resolve(
-            &self.client,
-            self.store,
-            &subject,
-            &self.settings.subject,
-            self.settings.ehr_policy,
-        )
-        .await
-        .map_err(|error| ehr_refusal(&error))?;
+        let ehr_id = ehr::resolve(&self.client, self.store, &subject, self.settings.ehr_policy)
+            .await
+            .map_err(|error| ehr_refusal(&error))?;
         let built = match linking {
             Linking::Commit => self.build_linked(program, inbound, provenance).await?,
             Linking::Refuse => {

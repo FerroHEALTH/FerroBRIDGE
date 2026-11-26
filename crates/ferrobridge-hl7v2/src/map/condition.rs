@@ -370,6 +370,26 @@ pub fn parse(text: &str, source: Option<&Operand>) -> Result<Expr, ConditionErro
         })
 }
 
+/// The FHIR identifier registry the guide's `IN` condition names as a URL
+/// (`datatype-cx-to-identifier`, CX.4 to `system`).
+pub const IDENTIFIER_REGISTRY: &str =
+    "http://hl7.org/implement/standards/fhir/identifier-registry.html";
+
+/// Returns the operand of `IF <operand> IN <identifier registry>`, the
+/// condition no list of literals states, when `text` is one.
+#[must_use]
+pub fn registry(text: &str) -> Option<Operand> {
+    let rest = text.trim();
+    let rest = rest
+        .get(..3)
+        .filter(|head| head.eq_ignore_ascii_case("IF "))
+        .and_then(|_| rest.get(3..))?;
+    let (operand, list) = rest.rsplit_once(" IN ")?;
+    (list.trim() == IDENTIFIER_REGISTRY)
+        .then(|| source_operand(operand.trim()))
+        .flatten()
+}
+
 /// Returns the operand a row's source code names.
 ///
 /// That is a field for `MSH-24`, a component for `HD.3`, a segment for `PID`,

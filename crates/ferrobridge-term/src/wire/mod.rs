@@ -366,6 +366,17 @@ pub(crate) fn search_total(version: WireVersion, body: &str) -> Result<u32, Body
     dispatch!(version, search_total(body))
 }
 
+/// Returns the `uri` of every identifier `NamingSystem` the `searchset`
+/// `body` carries under the unique id `value`.
+#[cfg(feature = "naming-system")]
+pub(crate) fn identifier_systems(
+    version: WireVersion,
+    body: &str,
+    value: &str,
+) -> Result<Vec<String>, BodyError> {
+    dispatch!(version, identifier_systems(body, value))
+}
+
 #[cfg(test)]
 #[cfg(all(feature = "r4", feature = "client"))]
 mod tests {

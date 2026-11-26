@@ -539,6 +539,30 @@ pub enum Outcome {
         /// Why.
         error: WriteError,
     },
+    /// A row gated by the identifier registry whose assigning authority no
+    /// identifier `NamingSystem` on the terminology server registers, so
+    /// the system stays unwritten.
+    Unregistered {
+        /// Where.
+        at: Location,
+        /// The row.
+        row: RowRef,
+        /// The assigning authority searched.
+        authority: String,
+    },
+    /// A row gated by the identifier registry whose assigning authority more
+    /// than one identifier `NamingSystem` registers, so the system stays
+    /// unwritten.
+    RegistryAmbiguous {
+        /// Where.
+        at: Location,
+        /// The row.
+        row: RowRef,
+        /// The assigning authority searched.
+        authority: String,
+        /// The `uri` of each registration.
+        systems: Vec<String>,
+    },
 }
 
 impl Outcome {
@@ -591,6 +615,8 @@ impl Outcome {
             Self::Undecodable { .. } => "undecodable",
             Self::DanglingReference { .. } => "dangling-reference",
             Self::EntryUnwritable { .. } => "entry-unwritable",
+            Self::Unregistered { .. } => "unregistered",
+            Self::RegistryAmbiguous { .. } => "registry-ambiguous",
         }
     }
 }
@@ -634,6 +660,16 @@ pub enum MapError {
         /// The outcome that left the `MessageHeader` out, `None` when the run
         /// created none.
         dropped: Option<Box<Outcome>>,
+    },
+    /// The terminology server refused the identifier registry search for an
+    /// assigning authority or could not be reached.
+    #[error("the identifier registry search for the assigning authority {authority} failed")]
+    Registry {
+        /// The assigning authority searched.
+        authority: String,
+        /// The cause, with the upstream status and body.
+        #[source]
+        source: Box<ferrobridge_term::error::Error>,
     },
 }
 
@@ -744,6 +780,7 @@ pub async fn map(
     let mut run = run::Run::new(maps, parsed);
     run.message()?;
     let translations = run.translate(terminology).await?;
+    run.register(terminology).await?;
     let applied = run.take_applied();
     let (bundle, outcomes) = run.finish()?;
     Ok(Mapped {

@@ -170,15 +170,23 @@ impl<'a> Run<'a> {
         for (index, resource) in self.resources.iter().enumerate() {
             let start = mark.writes.get(index).copied().unwrap_or(0);
             for write in resource.writes.get(start..).unwrap_or_default() {
-                let (value, translation) = match &write.value {
-                    Pending::Ready(value) => (Some(value.clone()), None),
+                let (value, translation, registry) = match &write.value {
+                    Pending::Ready(value) => (Some(value.clone()), None, None),
                     Pending::Translation { request, part } => (
                         None,
                         self.requests
                             .get(*request)
                             .map(|asked| (asked.url.clone(), asked.code.clone(), *part)),
+                        None,
                     ),
-                    Pending::Sibling { .. } => (None, None),
+                    Pending::Registry { lookup } => (
+                        None,
+                        None,
+                        self.lookups
+                            .get(*lookup)
+                            .map(|asked| asked.authority.clone()),
+                    ),
+                    Pending::Sibling { .. } => (None, None, None),
                 };
                 recorded.push(Recorded {
                     resource: index,
@@ -186,6 +194,7 @@ impl<'a> Run<'a> {
                     slots: write.slots.clone(),
                     value,
                     translation,
+                    registry,
                 });
             }
         }

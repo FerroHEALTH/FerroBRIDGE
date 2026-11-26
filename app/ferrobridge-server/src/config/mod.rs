@@ -17,6 +17,7 @@ mod credentials;
 pub mod document;
 pub mod error;
 pub mod hl7v2;
+pub mod identity_source;
 mod resolve;
 pub mod section;
 
@@ -48,6 +49,7 @@ use section::events::Events;
 use section::facade::Facade;
 use section::fhir_outbound::FhirOutbound;
 use section::hl7v2::Hl7v2;
+use section::identity_source::IdentitySource;
 use section::inbound::Inbound;
 use section::mappings::Mappings;
 use section::omop_incremental::OmopIncremental;
@@ -104,6 +106,9 @@ pub struct Config {
     pub cdr: Option<Cdr>,
     /// The FHIR terminology server, when one is configured.
     pub terminology: Option<Terminology>,
+    /// The identity source every EHR subject is asked of, when one is
+    /// configured.
+    pub identity_source: Option<IdentitySource>,
     /// The OMOP CDM database, when one is configured.
     pub cdm: Option<Cdm>,
     /// The PostgreSQL state store, when one is configured.
@@ -329,11 +334,13 @@ impl Config {
         self.onward_guarded(serves)?;
         self.assurance_guarded(serves)?;
         self.consent_onward()?;
+        let identity_source = resolve::identity_source::resolve(self)?;
         Ok(Settings {
             server: self.server.clone(),
             telemetry: self.telemetry.clone(),
             cdr: resolve::cdr::resolve(self)?,
             terminology: resolve::terminology::resolve(self)?,
+            identity_source: identity_source.clone(),
             display_fallback: self
                 .terminology
                 .as_ref()
@@ -345,7 +352,7 @@ impl Config {
             mapping_directory: self.mappings.directory.clone(),
             omocl_directory: self.mappings.omocl.clone(),
             mappings: resolve::mappings::resolve(self)?,
-            facade: resolve::facade::resolve(self)?,
+            facade: resolve::facade::resolve(self, identity_source)?,
             auth: if serves && self.guards_a_surface() {
                 resolve::auth::resolve(self)?
             } else {
@@ -443,6 +450,9 @@ pub struct Settings {
     pub cdr: Option<crate::cdr::config::CdrConfig>,
     /// The terminology client, when the lane is on.
     pub terminology: Option<ferrobridge_term::client::Client>,
+    /// The identity source every EHR subject is asked of, when one is
+    /// configured.
+    pub identity_source: Option<std::sync::Arc<crate::identity_source::IdentitySource>>,
     /// Whether a code the terminology server does not know takes its code as
     /// display (`[terminology] display_fallback`).
     pub display_fallback: bool,

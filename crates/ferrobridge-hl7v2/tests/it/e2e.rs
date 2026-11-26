@@ -37,7 +37,9 @@ async fn a_pid_maps_and_writes_back_through_the_reference_terminology_server()
     }
     let server = containers::v2_terminology().await?;
     let client = Client::new(Config::new(server.base_url("r4").parse()?, WireVersion::R4))?;
-    let pid: &[u8] = b"PID|1||PAT-1^^^EAST||Doe^Ann^^^^^L||19800229|F|||||^PRS^CP^^^^^^^^^+31600000000~^WPN^PH^^^^^^^^^+31207654321";
+    // An ISO OID authority needs no identifier registry lookup, so the case
+    // rests on `$translate` alone.
+    let pid: &[u8] = b"PID|1||PAT-1^^^&2.999.1&ISO||Doe^Ann^^^^^L||19800229|F|||||^PRS^CP^^^^^^^^^+31600000000~^WPN^PH^^^^^^^^^+31207654321";
     let parsed = support::parsed(&fixtures::message(&[
         b"MSH|^~\\&|ADT|EAST|PIX|NORTH|20261025100000||ADT^A01^ADT_A01|M-1|P|2.5",
         b"EVN||20261025100000",

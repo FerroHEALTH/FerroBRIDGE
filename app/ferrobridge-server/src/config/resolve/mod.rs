@@ -18,6 +18,7 @@ pub(super) mod events;
 pub(super) mod facade;
 pub(super) mod fhir_outbound;
 pub(super) mod hl7v2;
+pub(super) mod identity_source;
 pub(super) mod inbound;
 pub(super) mod mappings;
 pub(super) mod omop_incremental;
