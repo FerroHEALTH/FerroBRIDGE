@@ -469,17 +469,20 @@ macro_rules! per_release {
                 let message = answer.message.as_ref().and_then(|text| text.value.clone());
                 let matches = answer.r#match.iter().map(translate_match).collect::<Result<Vec<_>, BodyError>>()?;
                 let used_maps = used_maps(&answer);
+                let errors = target_errors(&answer);
                 if super::required_flag(answer.result.value, "result")? {
                     return Ok(TranslateOutcome::Translated {
                         matches,
                         message,
                         used_maps,
+                        errors,
                     });
                 }
                 Ok(TranslateOutcome::NoMatch {
                     message,
                     matches,
                     used_maps,
+                    errors,
                 })
             }
 

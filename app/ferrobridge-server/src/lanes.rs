@@ -14,6 +14,8 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
+mod inbound;
+
 use crate::config::{self, Settings};
 use crate::serve_until;
 use crate::state::AppState;
@@ -77,7 +79,7 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
             );
         }
     }
-    state = open_sources(settings, state)?;
+    state = inbound::open_sources(settings, state)?;
     let mut lanes = startup::lanes(settings);
     if let Some(lane) = settings.facade.as_ref() {
         let mut lane = lane.clone();
@@ -142,77 +144,13 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         state = state.with_change_feed(report);
         feeds = started;
     }
-    let workers = inbound_workers(settings, &state);
+    let workers = inbound::workers(settings, &state);
     Ok(Started {
         state,
         lanes,
         face,
         feeds,
         workers,
-    })
-}
-
-/// Returns the inbound workers of `state`, applying each item with the one
-/// handler over the facade's identity source, CDR client and identity map,
-/// when both the intake and the facade run.
-fn inbound_workers(
-    settings: &Settings,
-    state: &AppState,
-) -> Option<Arc<crate::inbound::worker::Pool>> {
-    let (Some(inbound), Some(store), Some(sources), Some(facade)) = (
-        settings.inbound,
-        state.store(),
-        state.sources(),
-        state.facade(),
-    ) else {
-        return None;
-    };
-    let inbox = crate::inbound::store::InboxStore::new(store.pool().clone())
-        .with_seal(store.seal().cloned());
-    let handler = crate::inbound::apply::Apply::new(
-        Arc::new(crate::inbound::apply::Undeclared),
-        facade.settings().subject.identity_handle(),
-        facade.client().clone(),
-        facade.store_handle(),
-    )
-    .with_access_log(state.access_log().cloned())
-    .with_inbox(Some(inbox.clone()));
-    Some(Arc::new(crate::inbound::worker::Pool::new(
-        inbox,
-        Arc::clone(sources),
-        Arc::new(handler),
-        inbound.workers,
-    )))
-}
-
-/// Returns `state` serving the inbound sources of its state store, the
-/// `[secrets]` directory they name opened.
-fn open_sources(settings: &Settings, state: AppState) -> anyhow::Result<AppState> {
-    use anyhow::Context;
-
-    let Some(store) = state.store() else {
-        return Ok(state);
-    };
-    let sources = Arc::new(
-        crate::sources::Sources::open(store, settings.secrets.as_ref())
-            .context("opening the [secrets] directory the inbound sources name")?,
-    );
-    let intake = settings.inbound.map(|inbound| {
-        crate::inbound::intake::Intake::new(
-            Arc::clone(&sources),
-            crate::inbound::store::InboxStore::new(store.pool().clone()),
-            inbound.body_limit,
-        )
-        .with_recoverer(Arc::new(crate::inbound::recover::Recoverer::new(
-            store.clone(),
-            Arc::clone(&sources),
-            inbound.workers.lease,
-        )))
-    });
-    let state = state.with_sources(sources);
-    Ok(match intake {
-        Some(intake) => state.with_intake(Arc::new(intake)),
-        None => state,
     })
 }
 

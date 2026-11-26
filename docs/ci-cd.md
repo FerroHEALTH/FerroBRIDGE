@@ -34,7 +34,7 @@ the committed guards, so both are live code from day one and both need a gate.
 | `container-config` | `docker compose --profile console config` and the same over every profile, with empty secret files, then `docker buildx build --check` and a one-platform build with no output of `docker/console/Dockerfile` over placeholder files at the staged paths |
 | `comment-style` | `scripts/checks/comment-style.sh --all` |
 | `versions` | `scripts/checks/versions.sh`, and `scripts/checks/changelog-released.sh`: every released `CHANGELOG.md` section from 0.0.9 on reads as it does at its tag; the changelog structure, the `--self-test`, `--check` and `--check-preview` of `scripts/release/changelog.sh` (every fragment under `changelog.d/` well formed, and the structure and Security rules over `[Unreleased]` with the fragments folded in) |
-| `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too |
+| `profile-packages` | `scripts/vendor/profile-packages.sh` over a cache keyed on `--cache-key` (the profile packages fetched at build time and never committed, each checked at its pinned count and digest), then `--self-test` and `--check`: every `PROVENANCE.md` against its pin, no unpinned tree, and every `dependencies` entry of every fetched `package.json` pinned too. It is the one job that fetches on a cache miss; `test`, `conformance`, `e2e` and `fhir-validator` need it, restore its entry with `fail-on-cache-miss` and check each tree's count and digest without a request. A registry `429` or `503` is retried after the delay its `Retry-After` names, at most 120 seconds |
 | `favicon-sync` | `scripts/checks/favicon-sync.sh` |
 | `usage-report-off` | `scripts/checks/usage-report-off.sh --self-test`, then the guard itself: every launcher of the server in a script, a workflow or a Rust test switches the usage report off |
 | `todo-issues` | `scripts/checks/todo-issues.sh` with the job token at `issues: read`: every `TODO(#N)` names an open issue |
@@ -251,13 +251,15 @@ carries.
 The README shows each badge through
 `https://img.shields.io/endpoint?url=<raw URL of the badge JSON on main>`, the
 shields.io endpoint schema (<https://shields.io/badges/endpoint-badge>):
-`schemaVersion` 1, a label, the message `k / n`, a colour by share, and a
-logo. A badge measured against an EU act shows the EU emblem (`namedLogo`
+`schemaVersion` 1, a label, the message `k / n`, a colour by the count
+(`brightgreen` when all pass, `yellow` when some do, `red` when none do),
+and a logo. A badge measured against an EU act shows the EU emblem (`namedLogo`
 `europeanunion`) on an EU blue label; every other badge shows a pictogram
 from the FerroHEALTH badge set under `scripts/checks/badge-logos/` as
 `logoSvg`, whose master copy lives in FerroSMART. Every static badge in the
 README carries a `logo=` parameter, and `--check` fails a badge without a
-logo. No specification governs the gate: our own design, following the
+logo, as does a counted badge in a colour its count does not give. No
+specification governs the gate: our own design, following the
 sibling terminology server's pass lists.
 
 ## The sqlx query metadata

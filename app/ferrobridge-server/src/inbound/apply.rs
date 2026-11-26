@@ -430,8 +430,9 @@ fn ehr_failed(error: &EhrError) -> Failed {
     }
 }
 
-/// Returns `patient` holding only the [`KEPT`] elements, with the tenant's
-/// local identifier for `entity` among its identifiers.
+/// Returns `patient` holding only its identifiers, names, birth date, gender
+/// and deceased status, with the tenant's local identifier for `entity`
+/// among its identifiers.
 #[must_use]
 pub fn minimised(patient: &Value, tenant: &Tenant, entity: &str) -> Value {
     let mut kept = fhir_types::codec::Object::new();

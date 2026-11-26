@@ -1507,7 +1507,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "eehrxf"
-version = "0.42.0"
+version = "0.44.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -1536,9 +1536,9 @@ dependencies = [
 
 [[package]]
 name = "ehds-logging"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0595ae20c8fae9c1892db05bb3acbee4c9230305e6d705d9c2504c841718b8e5"
+checksum = "508774fb89a4b12baeee286c02cbd66d56f27ceab722ca8797af0bdc7cf88e1c"
 dependencies = [
  "async-trait",
  "ihe-atna",
@@ -1713,7 +1713,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-fhirpath"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.23.1",
  "chumsky",
@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-hl7v2"
-version = "0.36.0"
+version = "0.37.0"
 dependencies = [
  "bytes",
  "chumsky",
@@ -1849,7 +1849,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.21.1"
+version = "0.22.1"
 dependencies = [
  "async-trait",
  "backon",
@@ -1912,7 +1912,7 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-validator"
-version = "0.22.1"
+version = "0.23.1"
 dependencies = [
  "ferrobridge-fhirpath",
  "ferrobridge-term",
@@ -2160,7 +2160,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "quick-xml",
  "regex",
@@ -2170,7 +2170,7 @@ dependencies = [
 
 [[package]]
 name = "fhirconnect"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "base64 0.23.1",
  "ferrobridge-testkit",
@@ -3053,9 +3053,9 @@ dependencies = [
 
 [[package]]
 name = "ihe-atna"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e80c1964088be423a90645f4c67b62b8b833238e7988f1f5eb4a42010ae003fc"
+checksum = "8d2336f698e982694f0be37d9930046ecca8578400a8d2a382bbd1d67256a87c"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -3074,9 +3074,9 @@ dependencies = [
 
 [[package]]
 name = "ihe-iti"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "886980ff59cfe1fa8a30516fe083618ffb9a05119ed045e3485c6b24efbb7a5b"
+checksum = "7136caa6c87ba1ea1ad8e48d0dc31faf5976cf1d4c5d7f02edce4645bb6ece77"
 dependencies = [
  "ferrohealth-smart",
  "fhir-search",
@@ -3897,9 +3897,9 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openehr-adl"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33630e4c07d9d4e12ef6558775e9c4ef9c56d38b1090962433a359271d48ec67"
+checksum = "809018872956d0c99d69cd4960703abecfd76b15fcce1d289667f328d504a28a"
 dependencies = [
  "indexmap 2.14.2",
  "jiff",
@@ -3917,9 +3917,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-am"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "412c9f5c644dd93c9c4f661c576c65a38f23f996ef4b269e4b092d28b7f4671f"
+checksum = "138792b75cc6f46a36063b220ce7ca35c3f6e2ac2b890b764fdfafa651fc9053"
 dependencies = [
  "indexmap 2.14.2",
  "openehr-base",
@@ -3930,9 +3930,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-base"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9d4d74e13ef65be1efa0ffc79f58e97489698f8931bf5d5665154430ba6a088"
+checksum = "87e0ab607b2cd02194045773ceecf8ad7e01c3f8df36a1ed1eb64d125a7d76dd"
 dependencies = [
  "serde",
  "serde_json",
@@ -3942,9 +3942,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-its"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ba1e2e5d7825606a2366bbcb32de6055d446fb717ba0bdda54733597f103da1"
+checksum = "0543e2dca717e7484b321f4e57538369169c06d29c4c995b2a796c595c613c3e"
 dependencies = [
  "async-trait",
  "backon",
@@ -3971,9 +3971,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-lang"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfcb55ba0e9a39e1336aa5edaea40e17e329bc2656d915e8ae7150a34ac41e1a"
+checksum = "a29bb9be71f3fd737aa2e535c848db3f9f65a640d304b182313c7b66a73c432e"
 dependencies = [
  "chumsky",
  "indexmap 2.14.2",
@@ -3986,7 +3986,7 @@ dependencies = [
 
 [[package]]
 name = "openehr-mapping-core"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "ferrobridge-testkit",
  "insta",
@@ -4006,9 +4006,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-query"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5bfc2d14927d1f5c547d2fa4788e3df7c992fcacfd7dc0d2ca7bbf5c576e272"
+checksum = "c5fd9d76db5f4338bdc121ad4aacb62bc9231c161d9d0e3c712e1477b1c4091f"
 dependencies = [
  "chumsky",
  "logos",
@@ -4017,9 +4017,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-rm"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e69a9276e338def304e9c686e3defae2f8c6063080ce2a907a2f834a678238c5"
+checksum = "873eca9df1f0b8da55565f3406182ce4c639ce609c338003ba4ed840da3dbef1"
 dependencies = [
  "openehr-base",
  "openehr-term",
@@ -4034,9 +4034,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-sdt"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e06dc25a2d8a36782cc78114412fcf87c5aef0b7ae61ee402226788e2634dab"
+checksum = "004b1a96d8bad3de956c79dbb8dcb73886dff2ca91ee2603f32301d742739dc5"
 dependencies = [
  "fancy-regex",
  "indexmap 2.14.2",
@@ -4054,9 +4054,9 @@ dependencies = [
 
 [[package]]
 name = "openehr-term"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77d4df185ffd5855033291ea140d79a4f05e78e97ae17dd4ce448424c22095ef"
+checksum = "d5f8ad1afa7bde6ae6e9383041c4175d7f6f6c1cb71b5dd16df4c638ad96bae1"
 dependencies = [
  "openehr-base",
  "roxmltree",

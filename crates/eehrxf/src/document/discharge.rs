@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The discharge report in the HL7 Europe Hospital Discharge Report 1.0.0
-//! form (feature `discharge`).
+//! form and in the MyHealth@EU Hospital Discharge Report 9.2.0 form (feature
+//! `discharge`).
 //!
 //! A `bundle-eu-hdr` whose `composition-eu-hdr` names the encounter it
-//! reports on, in the language `Bundle.language` states.
+//! reports on, in the language `Bundle.language` states. The MyHealth@EU
+//! form, which a national contact point sends, narrows it: its
+//! `composition-hdr-myhealtheu` requires `Composition.language` from the
+//! eHDSILanguage value set and allows only the authors the record names.
 
 use crate::crosswalk::discharge::HDR_COMPOSITION;
 use crate::document::form::{Authorship, Code, Form, Kind, SectionRule, Slot};
-use crate::document::{EU_CORE_PATIENT, LOINC};
+use crate::document::language::{EHDSI_LANGUAGE, Language};
+use crate::document::{EU_CORE_PATIENT, LOINC, MYHEALTHEU_PATIENT};
 
 /// The canonical URL of the HL7 Europe Hospital Discharge Report `Bundle`
 /// profile.
@@ -18,6 +23,22 @@ pub const HDR_BUNDLE: &str = "http://hl7.eu/fhir/hdr/StructureDefinition/bundle-
 /// The canonical URL of the HL7 Europe Hospital Discharge Report
 /// `Encounter` profile, the one `composition-eu-hdr` takes as its encounter.
 pub const HDR_ENCOUNTER: &str = "http://hl7.eu/fhir/hdr/StructureDefinition/encounter-eu-hdr";
+
+/// The canonical URL of the MyHealth@EU Hospital Discharge Report `Bundle`
+/// profile.
+pub const MYHEALTHEU_HDR_BUNDLE: &str =
+    "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu";
+
+/// The canonical URL of the MyHealth@EU Hospital Discharge Report
+/// `Composition` profile.
+pub const MYHEALTHEU_HDR_COMPOSITION: &str =
+    "http://fhir.ehdsi.eu/hdr/StructureDefinition/composition-hdr-myhealtheu";
+
+/// The canonical URL of the MyHealth@EU Hospital Discharge Report
+/// `Encounter` profile, the one `composition-hdr-myhealtheu` takes as its
+/// encounter.
+pub const MYHEALTHEU_HDR_ENCOUNTER: &str =
+    "http://fhir.ehdsi.eu/hdr/StructureDefinition/encounter-hdr-myhealtheu";
 
 /// The LOINC code `composition-eu-hdr` fixes as `Composition.type`, a
 /// discharge summary.
@@ -81,11 +102,28 @@ pub const DISCHARGE_REPORT_FORM: Form = Form {
     slots: &HDR_SLOTS,
     report: None,
     encounter: Some(HDR_ENCOUNTER),
-    language: true,
+    language: Language::REQUIRED,
     // NOTE: composition-eu-hdr `cmp-hdr-2` (error): a discharge summary or a hospital course section.
     rules: &[SectionRule::OneOf {
         invariant: "cmp-hdr-2",
         slices: &["sectionDischargeSummary", "sectionHospitalCourse"],
     }],
     legal_authentication: false,
+};
+
+/// The discharge report in the MyHealth@EU Hospital Discharge Report 9.2.0
+/// form, the HL7 Europe form narrowed by `composition-hdr-myhealtheu`.
+pub const MYHEALTHEU_DISCHARGE_REPORT_FORM: Form = Form {
+    bundle: MYHEALTHEU_HDR_BUNDLE,
+    composition: MYHEALTHEU_HDR_COMPOSITION,
+    patient: MYHEALTHEU_PATIENT,
+    encounter: Some(MYHEALTHEU_HDR_ENCOUNTER),
+    // NOTE: composition-hdr-myhealtheu Composition.language 1..1, bound required to eHDSILanguage.
+    language: Language {
+        required: true,
+        binding: Some(EHDSI_LANGUAGE),
+    },
+    // NOTE: composition-hdr-myhealtheu Composition.author: practitioner, practitionerRole or organization.
+    authorship: Authorship::Record,
+    ..DISCHARGE_REPORT_FORM
 };

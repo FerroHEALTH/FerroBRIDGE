@@ -29,6 +29,7 @@ pub(crate) fn root_set_files(package: &str) -> Vec<PathBuf> {
                     "ValueSet-",
                     "CodeSystem-",
                     "ConceptMap-",
+                    "NamingSystem-",
                     "CapabilityStatement-",
                     "TerminologyCapabilities-",
                     "OperationOutcome-",

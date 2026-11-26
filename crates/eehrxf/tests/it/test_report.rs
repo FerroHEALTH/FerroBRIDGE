@@ -17,6 +17,7 @@ use std::error::Error;
 use eehrxf::category::{Category, PRIORITY_SYSTEM};
 use eehrxf::crosswalk::test_report::{NON_LABORATORY_PROFILE, TEST_REPORT_ROWS};
 use eehrxf::document::Document;
+use eehrxf::document::language::DocumentLanguage;
 use eehrxf::document::metadata::DocumentMetadata;
 use eehrxf::document::section::Section;
 use eehrxf::document::test_report::{
@@ -252,6 +253,7 @@ fn document_of(
         category,
         Some(Category::Laboratory),
     )?);
+    document.with_language(DocumentLanguage::of_composition(&source)?)?;
     let bundle = document.into_bundle()?;
     Ok(serde_json::to_value(bundle)?)
 }
@@ -337,7 +339,7 @@ fn the_report_carries_the_annex_iii_document_metadata() -> Result<(), Box<dyn Er
     )?;
     let composition = only(&bundle, "Composition")?;
     assert_eq!(composition["status"], "final");
-    assert_eq!(composition["language"], "en");
+    assert_eq!(composition["language"], "en-NL");
     assert!(composition["identifier"]["value"].is_string());
     assert!(composition["date"].is_string());
     assert!(

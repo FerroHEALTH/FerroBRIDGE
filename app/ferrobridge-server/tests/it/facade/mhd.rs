@@ -439,6 +439,41 @@ async fn the_capability_statement_instantiates_the_document_responder() -> Resul
 }
 
 #[tokio::test]
+async fn binary_read_is_neither_claimed_nor_served() -> Result<(), Box<dyn Error>> {
+    // R4 CapabilityStatement.instantiates: a server may implement a subset of
+    // what it instantiates and states its full capability details. ITI-68
+    // retrieves the `attachment.url`, the `$document` URL (ITI TF-2: 3.68.4.1.2).
+    let harness = responder().await?;
+    let (status, statement) = get(&harness, "/fhir/metadata").await?;
+    assert_eq!(StatusCode::OK, status, "{statement}");
+    let resources = statement["rest"][0]["resource"]
+        .as_array()
+        .ok_or("resources")?;
+    assert!(
+        resources
+            .iter()
+            .all(|resource| resource["type"] != "Binary"),
+        "{statement}"
+    );
+    let composition = resources
+        .iter()
+        .find(|resource| resource["type"] == "Composition")
+        .ok_or_else(|| format!("no Composition in {statement}"))?;
+    assert!(
+        composition["operation"]
+            .as_array()
+            .is_some_and(|operations| operations
+                .iter()
+                .any(|operation| operation["name"] == "document")),
+        "{statement}"
+    );
+    let (status, outcome) = get(&harness, "/fhir/Binary/any").await?;
+    assert!(status.is_client_error(), "{status}: {outcome}");
+    assert_eq!(Some("OperationOutcome"), outcome["resourceType"].as_str());
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_composition_with_no_category_is_refused_naming_it() -> Result<(), Box<dyn Error>> {
     // Draft EEHRxF Annex III Table 1: documentCategory is required.
     let harness = responder_over(

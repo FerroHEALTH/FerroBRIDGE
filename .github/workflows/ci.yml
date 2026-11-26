@@ -435,9 +435,12 @@ jobs:
   # The profile validator's package set (#435), fetched at build time and
   # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/
   # PROVENANCE.md). The cache is keyed on the pins, and the script verifies
-  # the count and digest of a restored tree as it does of a download. The
-  # closure check first proves on synthetic sets that it refuses a gap, then
-  # runs over every fetched package.json.
+  # the count and digest of a restored tree as it does of a download. This is
+  # the one job that fetches on a cache miss: every other job that reads the
+  # packages needs it and restores its entry with fail-on-cache-miss, so a
+  # cold cache costs the registry one fetch per run (#2239). The closure
+  # check first proves on synthetic sets that it refuses a gap, then runs
+  # over every fetched package.json.
   profile-packages:
     name: profile-packages
     runs-on: ubuntu-latest
@@ -761,7 +764,7 @@ jobs:
   # The reached packages in shards, as the clippy lane runs them.
   test:
     name: test (${{ matrix.packages }})
-    needs: detect
+    needs: [detect, profile-packages]
     if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -854,6 +857,7 @@ jobs:
         with:
           path: docs/specs/fhir-packages/*/package
           key: profile-packages-${{ steps.profile-packages.outputs.key }}
+          fail-on-cache-miss: true
       - name: Fetch and verify the profile packages
         run: bash scripts/vendor/profile-packages.sh
       # One package at a time, as the clippy and msrv lanes do: a workspace-wide
@@ -1016,6 +1020,7 @@ jobs:
         with:
           path: docs/specs/fhir-packages/*/package
           key: profile-packages-${{ steps.profile-packages.outputs.key }}
+          fail-on-cache-miss: true
       - name: Fetch and verify the profile packages
         run: bash scripts/vendor/profile-packages.sh
       # The validator jar and the packages it loads beyond the profile set, pinned
@@ -1088,7 +1093,7 @@ jobs:
   # cache keys of the test and profile-packages lanes.
   conformance:
     name: conformance
-    needs: detect
+    needs: [detect, profile-packages]
     if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.conformance == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -1137,6 +1142,9 @@ jobs:
         with:
           path: docs/specs/fhir-packages/*/package
           key: profile-packages-${{ steps.profile-packages.outputs.key }}
+          fail-on-cache-miss: true
+      - name: Verify the profile packages
+        run: bash scripts/vendor/profile-packages.sh
       - run: scripts/checks/conformance.sh --check
 
   # The container-backed lane. Every test behind the harness returns early
@@ -1151,7 +1159,7 @@ jobs:
   # and ferrobridge-testkit that the change reaches (affected.sh names them).
   e2e:
     name: e2e (containers)
-    needs: detect
+    needs: [detect, profile-packages]
     if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1197,6 +1205,7 @@ jobs:
         with:
           path: docs/specs/fhir-packages/*/package
           key: profile-packages-${{ steps.profile-packages.outputs.key }}
+          fail-on-cache-miss: true
       - name: Fetch and verify the profile packages
         run: bash scripts/vendor/profile-packages.sh
       # A test starts against a local image, so a slow registry fails this
