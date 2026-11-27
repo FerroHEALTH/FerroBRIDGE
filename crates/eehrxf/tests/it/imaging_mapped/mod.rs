@@ -21,7 +21,9 @@ use std::error::Error;
 
 use eehrxf::category::Category;
 use eehrxf::document::Document;
+use eehrxf::document::exposure::{ExposureInformation, RADIATION_DOSE_EXTENSION, StructuredDose};
 use eehrxf::document::imaging::{IMAGING_BUNDLE, IMAGING_REPORT_FORM, IMAGING_SLOTS};
+use eehrxf::document::manifest::DCM;
 use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::IMAGING;
@@ -31,11 +33,14 @@ use ferrobridge_testkit::fixtures::{
     FERROBRIDGE_IMAGING_TEMPLATE_ID,
 };
 use fhir_types::codec::{Json, Path};
+use fhir_types::r4::codeable_concept::CodeableConcept;
+use fhir_types::r4::coding::Coding;
 use fhir_types::r4::device::{Device, DeviceDeviceName};
 use fhir_types::r4::human_name::HumanName;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
 use fhir_types::r4::practitioner::Practitioner;
+use fhir_types::r4::quantity::Quantity;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
@@ -221,16 +226,56 @@ fn imaging_document(identifier: &str) -> Result<(Document, String, String), Box<
 /// section listing `study`, and each other one empty for
 /// nothing known, which `eu-imaging-composition-1` asks of an empty section.
 fn with_sections(document: &mut Document, study: &str) -> Result<(), Box<dyn Error>> {
+    with_sections_exposed(document, study, None)
+}
+
+/// Adds the sections of [`with_sections`], the procedure section holding
+/// `exposure` when one is given.
+fn with_sections_exposed(
+    document: &mut Document,
+    study: &str,
+    exposure: Option<&ExposureInformation>,
+) -> Result<(), Box<dyn Error>> {
     for slot in IMAGING_SLOTS.iter().take(4) {
-        let mut section = Section::new(slot, vec![format!("{}.", slot.title)]);
-        section = if slot.slice == "imagingstudy" {
-            section.with_entry(study.to_owned())
-        } else {
-            section.empty_because(EmptyReason::NilKnown)
-        };
-        document.with_section(section)?;
+        let section = Section::new(slot, vec![format!("{}.", slot.title)]);
+        match (slot.slice, exposure) {
+            ("imagingstudy", _) => document.with_section(section.with_entry(study.to_owned()))?,
+            ("procedure", Some(exposure)) => document.with_exposure(section, exposure, study)?,
+            _ => document.with_section(section.empty_because(EmptyReason::NilKnown))?,
+        }
     }
     Ok(())
+}
+
+/// The synthetic exposure the modality reports beside the study: a summary
+/// and one CT dose in milligray over three series of the chest.
+fn exposure() -> ExposureInformation {
+    ExposureInformation {
+        summary: Some(String::from("A synthetic CT dose of 4.2 mGy.")),
+        doses: vec![StructuredDose {
+            quantity: Some(Quantity {
+                value: Some("4.2".into()),
+                unit: Some("mGy".into()),
+                system: Some("http://unitsofmeasure.org".into()),
+                code: Some("mGy".into()),
+                ..Quantity::default()
+            }),
+            modality: Some(CodeableConcept {
+                coding: vec![Coding {
+                    system: Some(DCM.into()),
+                    code: Some("CT".into()),
+                    display: Some("Computed Tomography".into()),
+                    ..Coding::default()
+                }],
+                ..CodeableConcept::default()
+            }),
+            body_site: Some(CodeableConcept {
+                text: Some("Chest".into()),
+                ..CodeableConcept::default()
+            }),
+            number_of_series: Some(3),
+        }],
+    }
 }
 
 /// The synthetic imaging report document a member sends.
@@ -359,7 +404,7 @@ fn round_trip() -> Result<(String, String), Box<dyn Error>> {
         "the document names the run's one study with the fullUrl its entry holds"
     );
     let study = studies.first().ok_or("the mapped study")?.to_string();
-    with_sections(&mut out, &study)?;
+    with_sections_exposed(&mut out, &study, Some(&exposure()))?;
     out.with_metadata(annex_iii("18748-4"));
     Ok((received, serde_json::to_string(&out.into_bundle()?)?))
 }
@@ -626,6 +671,58 @@ fn the_study_section_lists_the_study_entry_the_document_holds() -> Result<(), Bo
         section["entry"][0]["reference"].as_str(),
         "Document::studies names the study with the fullUrl of the entry that holds it"
     );
+    Ok(())
+}
+
+// NOTE: HL7 Europe Imaging Report 1.0.0-ballot CompositionEuImaging.section:procedure carries the
+// RadiationDose summary extension and the entry:radiation-dose slice of ObservationRadiationDoseEuImaging.
+#[test]
+fn the_exposure_is_the_procedure_section_s_radiation_dose() -> Result<(), Box<dyn Error>> {
+    let (_, written) = round_trip()?;
+    let output: Value = serde_json::from_str(&written)?;
+    let composition = only(&output, "Composition")?;
+    let procedure = composition["section"]
+        .as_array()
+        .ok_or("sections")?
+        .iter()
+        .find(|section| section["code"]["coding"][0]["code"] == "55111-9")
+        .ok_or("the procedure section")?;
+    assert_eq!(
+        procedure["extension"],
+        serde_json::json!([{"url": RADIATION_DOSE_EXTENSION, "valueString": "A synthetic CT dose of 4.2 mGy."}]),
+        "{procedure}"
+    );
+    let dose = only(&output, "Observation")?;
+    let listed = procedure["entry"][0]["reference"]
+        .as_str()
+        .ok_or("the procedure section lists the dose")?;
+    assert_eq!(Some(listed), full_url(&output, "Observation").ok());
+    assert_eq!(
+        dose["meta"]["profile"],
+        serde_json::json!([
+            "http://hl7.eu/fhir/imaging/StructureDefinition/ObservationRadiationDoseEuImaging"
+        ])
+    );
+    assert_eq!(dose["code"]["coding"][0]["code"], "73569-6", "{dose}");
+    assert_eq!(
+        dose["valueString"], "A synthetic CT dose of 4.2 mGy.",
+        "{dose}"
+    );
+    assert_eq!(
+        dose["partOf"][0]["reference"],
+        full_url(&output, "ImagingStudy")?,
+        "{dose}"
+    );
+    assert_eq!(dose["bodySite"]["text"], "Chest", "{dose}");
+    assert_eq!(
+        dose["component"][0]["valueQuantity"]["code"], "mGy",
+        "{dose}"
+    );
+    assert_eq!(
+        dose["component"][1]["valueCodeableConcept"]["coding"][0]["code"], "CT",
+        "{dose}"
+    );
+    assert_eq!(dose["component"][2]["valueInteger"], 3, "{dose}");
     Ok(())
 }
 

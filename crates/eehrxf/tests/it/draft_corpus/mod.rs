@@ -582,6 +582,9 @@ fn profile_of(annex: Annex, resource: &str) -> Option<&'static str> {
         (Annex::Vii, "Composition") => {
             "http://hl7.eu/fhir/imaging/StructureDefinition/CompositionEuImaging"
         }
+        (Annex::Vii, "Observation") => {
+            "http://hl7.eu/fhir/imaging/StructureDefinition/ObservationRadiationDoseEuImaging"
+        }
         (Annex::Vii, "ImagingStudy") => {
             "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging"
         }
