@@ -67,6 +67,18 @@
 # validator reports no error, no fatal issue and no unchecked profile for it;
 # the mode fails only when it cannot measure.
 #
+# A case asks whether a document, in the form eehrxf wrote it, is also a
+# MyHealth@EU document (#2325). A document in the MyHealth@EU form is measured
+# as written. A document in the HL7 Europe form claims the MyHealth@EU Bundle
+# profile of its guide instead, and each entry of a type exactly one entry
+# slice of that Bundle matches by type and profile claims the slice's profile,
+# the way the Core corpus holds each entry to the Core profile of its type.
+# FHIR R4 profiling.html 5.1.0.11 matches a `profile` discriminator by the
+# entry's conformance to the profile, never by its meta.profile, so the claim
+# changes no verdict: without it the validator reports only that the slice
+# found no entry, and with it the validator names what the entry lacks. No
+# specification governs the corpora: our own design.
+#
 # Usage:
 #   scripts/checks/fhir-validator.sh DOCUMENTS OUT
 #   scripts/checks/fhir-validator.sh --myhealth-eu DOCUMENTS OUT
@@ -159,6 +171,10 @@ readonly HDR_BUNDLE="http://hl7.eu/fhir/hdr/StructureDefinition/bundle-eu-hdr"
 # the MyHealth@EU Hospital Discharge Report CI build docs/VERSIONS.md pins.
 readonly MYHEALTHEU_HDR_BUNDLE="http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu"
 readonly HDR_IG="hl7.fhir.eu.hdr#1.0.0"
+
+# The laboratory report in the MyHealth@EU form, the profile an HL7 Europe
+# laboratory report claims in the MyHealth@EU Laboratory corpus.
+readonly MYHEALTHEU_LAB_BUNDLE="http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu"
 
 # The MyHealth@EU vaccination history a run validates over the MyHealth@EU
 # Vaccination guide, a preview (#2168).
@@ -565,6 +581,9 @@ myhealth_eu() {
   profiles="$(jq -s -c '[.[] | select(.resourceType == "StructureDefinition" and .kind == "resource" and .derivation == "constraint")]
     | group_by(.type) | map(select(length == 1) | {key: .[0].type, value: .[0].url}) | from_entries' \
     "docs/specs/fhir-packages/$core/package/"StructureDefinition-*.json)"
+  local lab_slices hdr_slices
+  lab_slices="$(profile_slices "docs/specs/fhir-packages/$lab/package" "$MYHEALTHEU_LAB_BUNDLE")"
+  hdr_slices="$(profile_slices "docs/specs/fhir-packages/$hdr/package" "$MYHEALTHEU_HDR_BUNDLE")"
   local dir seen=""
   while IFS= read -r dir; do
     for doc in "$dir"/eehrxf-*.json; do
@@ -575,7 +594,7 @@ myhealth_eu() {
         return 1
       fi
       seen+="$stem"$'\n'
-      measure_document "$doc" "$stem" "$out" "$profiles"
+      measure_document "$doc" "$stem" "$out" "$profiles" "$lab_slices" "$hdr_slices"
     done
   done < <(lanes "$documents")
   measure_guide myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
@@ -585,15 +604,54 @@ myhealth_eu() {
   mvc_codes "$out/core" "docs/specs/fhir-packages/$core/package" "docs/specs/fhir-packages/$mvc/package" "$out"
 }
 
-# measure_document DOC STEM OUT PROFILES: writes the cases the document DOC
-# gives each MyHealth@EU corpus under OUT, its Core entries held to the
-# profile PROFILES names for their type.
+# profile_slices PACKAGE BUNDLE: the entry profile by resource type of the
+# Bundle profile BUNDLE in PACKAGE, for each type exactly one entry slice
+# matches when that slice is required and the slicing discriminates by
+# profile; {} when it does not, since a slice matched by type alone is
+# validated against its profile anyway.
+profile_slices() {
+  local file
+  file="$(grep -l "\"url\" *: *\"$2\"" "$1"/StructureDefinition-*.json | head -n 1)"
+  [[ -n "$file" ]] || {
+    echo "::error::$1 holds no StructureDefinition $2" >&2
+    return 1
+  }
+  jq -c '[.snapshot.element[]] as $elements
+    | if any($elements[] | select(.id == "Bundle.entry") | .slicing.discriminator[]?;
+        .type == "profile" and .path == "resource")
+      then ([$elements[] | select(.id | test("^Bundle\\.entry:[^.]+$")) | {key: .id, value: .min}] | from_entries) as $min
+        | [$elements[] | select(.id | test("^Bundle\\.entry:[^.]+\\.resource$"))
+          | {slice: (.id | rtrimstr(".resource")), types: .type}]
+        | group_by(.types[0].code)
+        | map(select(length == 1 and (.[0].types | length) == 1 and (.[0].types[0].profile // [] | length) == 1
+            and ($min[.[0].slice] // 0) >= 1)
+          | {key: .[0].types[0].code, value: .[0].types[0].profile[0]})
+        | from_entries
+      else {} end' "$file"
+}
+
+# retag DOC BUNDLE SLICES: the document DOC claiming the Bundle profile
+# BUNDLE, and the one entry of each type SLICES names claiming that profile.
+# Only the sole entry of its type must meet a required slice, so the claim
+# changes no verdict; a type the document holds twice keeps its claims.
+retag() {
+  jq --arg p "$2" --argjson slices "$3" '.meta.profile = [$p]
+    | ([.entry[]?.resource.resourceType] | group_by(.) | map({key: .[0], value: length}) | from_entries) as $count
+    | .entry |= map(.resource.resourceType as $t
+        | if $t != null and $slices[$t] != null and $count[$t] == 1
+          then .resource.meta.profile = [$slices[$t]] else . end)' "$1"
+}
+
+# measure_document DOC STEM OUT PROFILES LAB HDR: writes the cases the
+# document DOC gives each MyHealth@EU corpus under OUT, its Core entries held
+# to the profile PROFILES names for their type, an HL7 Europe laboratory or
+# discharge report retagged by the slices LAB or HDR.
 measure_document() {
-  local doc="$1" stem="$2" out="$3" profiles="$4" line
+  local doc="$1" stem="$2" out="$3" profiles="$4" lab_slices="$5" hdr_slices="$6" line
   if jq -e --arg b "$LAB_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-    jq --arg p "http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/laboratory/$stem.json"
+    retag "$doc" "$MYHEALTHEU_LAB_BUNDLE" "$lab_slices" > "$out/laboratory/$stem.json"
   elif jq -e --arg b "$HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-    jq --arg p "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/hdr/$stem.json"
+    retag "$doc" "$MYHEALTHEU_HDR_BUNDLE" "$hdr_slices" > "$out/hdr/$stem.json"
   elif jq -e --arg b "$MYHEALTHEU_HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
     cp "$doc" "$out/hdr/$stem.json"
   elif jq -e --arg b "$EUVAC_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
@@ -750,6 +808,25 @@ self_test() {
   lane "each subdirectory holding a document is a lane, sorted" "./e2e ./test-1"
   echo '{}' > "$scratch/lanes/b.json"
   lane "a document at the top level makes the directory one lane" "."
+  mkdir -p "$scratch/pkg"
+  jq -n '{resourceType: "StructureDefinition", url: "urn:b", snapshot: {element: [
+      {id: "Bundle.entry", slicing: {discriminator: [{type: "type", path: "resource"}, {type: "profile", path: "resource"}]}},
+      {id: "Bundle.entry:c", min: 1}, {id: "Bundle.entry:c.resource", type: [{code: "Composition", profile: ["urn:c"]}]},
+      {id: "Bundle.entry:d", min: 0}, {id: "Bundle.entry:d.resource", type: [{code: "Device", profile: ["urn:d"]}]},
+      {id: "Bundle.entry:p", min: 1}, {id: "Bundle.entry:p.resource", type: [{code: "Patient", profile: ["urn:p"]}]}]}}' \
+    > "$scratch/pkg/StructureDefinition-b.json"
+  jq -n '{resourceType: "Bundle", meta: {profile: ["urn:eu"]}, entry: [
+      {resource: {resourceType: "Composition"}}, {resource: {resourceType: "Device"}},
+      {resource: {resourceType: "Patient", meta: {profile: ["urn:x"]}}}, {resource: {resourceType: "Patient"}}]}' \
+    > "$scratch/doc.json"
+  local claims
+  claims="$(retag "$scratch/doc.json" urn:mhe "$(profile_slices "$scratch/pkg" urn:b)" |
+    jq -c '[.meta.profile[0], (.entry[] | .resource.meta.profile[0])]')"
+  cases=$((cases + 1))
+  if [[ "$claims" != '["urn:mhe","urn:c",null,"urn:x",null]' ]]; then
+    echo "::error::self-test: only the sole entry of a required profile slice is retagged: got $claims" >&2
+    wrong=1
+  fi
   if [[ "$wrong" -ne 0 ]]; then
     return 1
   fi
