@@ -18,6 +18,9 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+#[cfg(any(feature = "imaging", feature = "discharge", feature = "vaccination"))]
+mod left_out;
+
 /// One shipped FHIRconnect project: its directory, its files, the context
 /// mappings to compile from them, the search declarations beside them and the
 /// received elements it accounts for.
@@ -30,6 +33,7 @@ pub struct Project {
     accounted: &'static [&'static str],
     followed: &'static [&'static str],
     left_out: &'static [LeftOut],
+    slices: &'static [(&'static str, &'static str)],
 }
 
 /// One element of an entry a project maps that the project carries into no
@@ -151,6 +155,34 @@ impl Project {
         self.left_out
     }
 
+    /// Returns the section slice of the document form whose section lists
+    /// the entry that holds the element at `path`, an openEHR path a run
+    /// declared (`crate::mapping::left_out`), or `None` when the path lies in
+    /// no entry the project places in a section.
+    ///
+    /// The entry is the innermost archetype the path names that the project
+    /// maps to an entry; each one fills one section of its form. No
+    /// specification governs the placement: our own design.
+    #[must_use]
+    pub fn slice_of(&self, path: &str) -> Option<&'static str> {
+        let mut found: Option<(usize, &'static str)> = None;
+        for &(archetype, slice) in self.slices {
+            let opening = format!("[{archetype}");
+            let at = path.match_indices(&opening).filter_map(|(at, _)| {
+                let after = at.checked_add(opening.len())?;
+                path.get(after..)
+                    .filter(|rest| rest.starts_with([']', ',', ' ']))
+                    .map(|_| at)
+            });
+            if let Some(at) = at.max()
+                && found.is_none_or(|(held, _)| at > held)
+            {
+                found = Some((at, slice));
+            }
+        }
+        found.map(|(_, slice)| slice)
+    }
+
     /// Writes every file of the project and every search declaration into
     /// `directory`, which must exist, and answers the paths of the files
     /// written, in loading order, the `files` a [`crate::mapping::Mapping`]
@@ -217,6 +249,7 @@ pub const MPD: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
 
 /// The HL7 Europe Imaging Report 1.0.0-ballot project.
@@ -229,7 +262,10 @@ pub const MPD: Project = Project {
 /// received report declares each section none of whose entries it carries,
 /// and each element of the report and of its studies it carries into no
 /// structured element, such as a performer that is no `Organization`
-/// ([`Project::accounted`]).
+/// ([`Project::accounted`]). Out of openEHR, [`Project::left_out`] lists
+/// every element of the imaging examination result in the template that no
+/// profile element carries, each of which a run declares when the
+/// composition holds it.
 #[cfg(feature = "imaging")]
 pub const IMAGING: Project = Project {
     directory: "imaging",
@@ -287,7 +323,8 @@ pub const IMAGING: Project = Project {
     // NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer:organization; the
     // project maps the Organization a performer names, so a performer that resolves to one it read is carried.
     followed: &["DiagnosticReport.performer"],
-    left_out: &[],
+    left_out: left_out::IMAGING_LEFT_OUT,
+    slices: &[],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
@@ -333,6 +370,7 @@ pub const LABORATORY: Project = Project {
     ],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.
@@ -401,6 +439,7 @@ pub const EPS: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
 
 /// The HL7 Europe Hospital Discharge Report 1.0.0 project.
@@ -416,7 +455,11 @@ pub const EPS: Project = Project {
 /// `medicationRequest-eu-core`, each an entry of the section of that name.
 /// A received report declares each section none of whose entries it
 /// carries, the hospital course among them, and each element of an entry it
-/// carries into no structured element ([`Project::accounted`]).
+/// carries into no structured element ([`Project::accounted`]). Out of
+/// openEHR, [`Project::left_out`] lists every element of the three entries
+/// in the template that no profile element carries, each of which a run
+/// declares when the composition holds it, and [`Project::slice_of`] names
+/// the section whose narrative names it.
 #[cfg(feature = "discharge")]
 pub const HDR: Project = Project {
     directory: "hdr",
@@ -507,7 +550,12 @@ pub const HDR: Project = Project {
         "MedicationRequest.eventHistory",
     ],
     followed: &[],
-    left_out: &[],
+    left_out: left_out::HDR_LEFT_OUT,
+    slices: &[
+        (left_out::HDR_DIAGNOSIS, "sectionDiagnosticSummary"),
+        (left_out::HDR_PROCEDURE, "sectionSignificantProcedures"),
+        (left_out::HDR_ORDER, "sectionDischargeMedications"),
+    ],
 };
 
 /// FerroBRIDGE's medical test report project, the non-laboratory reports of
@@ -535,6 +583,7 @@ pub const TEST_REPORT: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
 
 /// The draft `EEHRxF` Annex X project: the common data groups served as
@@ -713,12 +762,8 @@ pub const ANNEX_X: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
-
-/// The archetype of the entry the `euvac` project maps, the CKM medication
-/// action the template's immunisations section holds.
-#[cfg(feature = "vaccination")]
-const VACCINATION_ENTRY: &str = "openEHR-EHR-ACTION.medication.v1";
 
 /// The MyHealth@EU Vaccination 10.0.0-preview project.
 ///
@@ -760,56 +805,8 @@ pub const EUVAC: Project = Project {
     ],
     accounted: &[],
     followed: &[],
-    left_out: &[
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0156]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0132]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0133]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0043]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0154]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0155]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0021]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0140]/items[at0141]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0140]/items[at0143]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0033]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "description[at0017]/items[at0149]",
-        },
-        LeftOut {
-            archetype: VACCINATION_ENTRY,
-            path: "protocol[at0030]/items[at0103]",
-        },
-    ],
+    left_out: left_out::EUVAC_LEFT_OUT,
+    slices: &[(left_out::VACCINATION_ENTRY, "immunisations")],
 };
 
 /// Every project the enabled features ship.
