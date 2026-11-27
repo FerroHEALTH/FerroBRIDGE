@@ -20,6 +20,7 @@
 //! them. [`FhirResourceId`], [`ExternalResourceId`] and [`PersonId`] are the
 //! three this side owns.
 
+pub mod cache;
 pub mod claims;
 pub mod created;
 pub mod derive;

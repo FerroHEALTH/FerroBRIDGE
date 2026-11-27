@@ -44,6 +44,9 @@ pub struct State {
     pub max_lifetime: Duration,
     /// The longest a pooled connection stays idle.
     pub idle_timeout: Duration,
+    /// The most entries the replica's copy of each record-once identity
+    /// table holds; `0` keeps none.
+    pub identity_copy_entries: usize,
     /// The keys stored bodies are sealed under, when any area seals.
     pub seal: Option<StateSeal>,
 }
@@ -66,6 +69,7 @@ impl Default for State {
             statement_cache_capacity: 100,
             max_lifetime: Duration::from_secs(30 * 60),
             idle_timeout: Duration::from_secs(10 * 60),
+            identity_copy_entries: 10_000,
             seal: None,
         }
     }

@@ -34,7 +34,6 @@ use ferrobridge_testkit::fixtures::{
 };
 use fhir_types::codec::{Json, Object};
 use fhir_types::r4::bundle::Bundle;
-use fhir_types::r4::device::{Device, DeviceDeviceName};
 use fhir_types::r4::human_name::HumanName;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
@@ -388,8 +387,9 @@ fn only(bundle: &Bundle, kind: &str) -> Result<Value, Box<dyn Error>> {
 }
 
 /// A discharge report document, named `identifier`, of the synthetic
-/// patient, by the synthetic gateway and operator, answering the document
-/// and the references of its subject and its gateway device.
+/// patient, authored by the synthetic operator that holds the record,
+/// answering the document and the references of its subject and its author.
+// NOTE: composition-hdr-myhealtheu Composition.author admits no Device; the record holder authors it.
 fn discharge_document(identifier: &str) -> Result<(Document, String, String), Box<dyn Error>> {
     let mut document = Document::of(
         &DISCHARGE_REPORT_FORM,
@@ -407,22 +407,13 @@ fn discharge_document(identifier: &str) -> Result<(Document, String, String), Bo
         birth_date: Some("1970-01-01".into()),
         ..Patient::default()
     })?;
-    let device = document.with_author(&Resource::Device(Box::new(Device {
-        id: Some(String::from("gateway")),
-        device_name: vec![DeviceDeviceName {
-            name: "Synthetic gateway".into(),
-            r#type: "user-friendly-name".into(),
-            ..DeviceDeviceName::default()
-        }],
-        ..Device::default()
-    })))?;
-    document.with_author(&Resource::Organization(Box::new(Organization {
+    let author = document.with_author(&Resource::Organization(Box::new(Organization {
         id: Some(String::from("operator")),
         name: Some("Synthetic operator".into()),
         ..Organization::default()
     })))?;
     document.with_language(DocumentLanguage::new("en", "GB")?)?;
-    Ok((document, subject, device))
+    Ok((document, subject, author))
 }
 
 // NOTE: draft EEHRxF Art 3(1)(b): narrative by data group, one HDR section per Annex IX data group a
@@ -481,13 +472,13 @@ fn a_narrative_only_discharge_report_is_written_for_the_corpus() -> Result<(), B
 /// The document of the run of `mapping` over `composition`, named
 /// `identifier`, in the text it is sent as.
 fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String, Box<dyn Error>> {
-    let (mut document, subject, device) = discharge_document(identifier)?;
+    let (mut document, subject, author) = discharge_document(identifier)?;
     let (run, warnings) = mapping.to_fhir_with_warnings(
         composition,
-        &Settings::new(device.clone(), NOW),
+        &Settings::new(author.clone(), NOW),
         CallContext::new()
             .with_patient(reference(&subject))
-            .with_who(reference(&device)),
+            .with_who(reference(&author)),
     )?;
     // NOTE: composition-eu-hdr cmp-hdr-2 requires the discharge summary or the hospital course; the
     // crosswalk has the document assembly write the course's narrative, which the system supplies.

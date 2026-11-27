@@ -22,10 +22,12 @@ use eehrxf::document::language::DocumentLanguage;
 use eehrxf::document::section::Section;
 use eehrxf::document::{Document, DocumentError, LOINC};
 use fhir_types::r4::coding::Coding;
+use fhir_types::r4::device::Device;
 use fhir_types::r4::encounter::Encounter;
 use fhir_types::r4::human_name::HumanName;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
+use fhir_types::r4::resource::Resource;
 use flate2::read::GzDecoder;
 use serde_json::Value;
 
@@ -106,11 +108,34 @@ fn every_slot_is_a_section_slice_with_the_code_the_profile_fixes() -> Result<(),
     Ok(())
 }
 
-/// A discharge report document over a synthetic patient, given its
-/// encounter when `encounter` and its language when `language`, with its
-/// hospital course.
+/// A discharge report document over a synthetic patient, authored by the
+/// synthetic organization that holds the record, given its encounter when
+/// `encounter` and its language when `language`, with its hospital course.
 pub(crate) fn document(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
-    let mut document = bare(encounter, language)?;
+    coursed(bare(encounter, language)?)
+}
+
+// NOTE: composition-hdr-myhealtheu Composition.author admits no Device; the HL7 Europe form takes the record's authors.
+#[test]
+fn a_discharge_report_authored_by_no_record_holder_is_refused() -> Result<(), Box<dyn Error>> {
+    assert!(matches!(
+        coursed(unauthored_bare(true, true)?)?.into_bundle(),
+        Err(DocumentError::Unauthored)
+    ));
+    let mut gateway = coursed(unauthored_bare(true, true)?)?;
+    gateway.with_author(&Resource::Device(Box::new(Device {
+        id: Some(String::from("gateway")),
+        ..Device::default()
+    })))?;
+    assert!(matches!(
+        gateway.into_bundle(),
+        Err(DocumentError::Author { full_url }) if full_url.ends_with("/Device/gateway")
+    ));
+    Ok(())
+}
+
+/// `document` with its hospital course.
+fn coursed(mut document: Document) -> Result<Document, Box<dyn Error>> {
     let course = HDR_SLOTS
         .iter()
         .find(|slot| slot.slice == "sectionHospitalCourse")
@@ -124,6 +149,17 @@ pub(crate) fn document(encounter: bool, language: bool) -> Result<Document, Box<
 
 /// The document of [`document`] before any section is given.
 fn bare(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
+    let mut document = unauthored_bare(encounter, language)?;
+    document.with_author(&Resource::Organization(Box::new(Organization {
+        id: Some(String::from("record-holder")),
+        name: Some("Synthetic hospital".into()),
+        ..Organization::default()
+    })))?;
+    Ok(document)
+}
+
+/// The document of [`bare`] before its author is given.
+fn unauthored_bare(encounter: bool, language: bool) -> Result<Document, Box<dyn Error>> {
     let mut document = Document::of(
         &DISCHARGE_REPORT_FORM,
         BASE,

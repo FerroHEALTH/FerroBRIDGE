@@ -816,7 +816,8 @@ async fn build_facade(
     )?;
     let store = crate::identity::state::StateStore::open(state)
         .await
-        .context("opening the identity map in the state store")?;
+        .context("opening the identity map in the state store")?
+        .with_copy(state.identity_copy_entries());
     let owned = |on: bool| on.then(|| Arc::new(facade::owned::OwnedStore::open(state)));
     let app_state = owned(lane.app_state);
     let launch_tasks = owned(lane.launch_task);

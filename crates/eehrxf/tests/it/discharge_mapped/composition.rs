@@ -113,14 +113,14 @@ fn the_report_maps_to_its_composition_encounter_and_condition() -> Result<(), Bo
 #[test]
 fn two_diagnoses_are_two_entries_of_the_diagnostic_summary() -> Result<(), Box<dyn Error>> {
     let mapping = mapping()?;
-    let (mut document, subject, device) =
+    let (mut document, subject, author) =
         discharge_document("urn:uuid:5b0c3f7e-0000-4000-8000-00000000d107")?;
     let run = mapping.to_fhir_with(
         &composition(&[diagnosis(), diagnosis()]),
-        &Settings::new(device.clone(), NOW),
+        &Settings::new(author.clone(), NOW),
         CallContext::new()
             .with_patient(reference(&subject))
-            .with_who(reference(&device)),
+            .with_who(reference(&author)),
     )?;
     let sections = document.with_mapped_composition(run.bundle())?;
     let [section] = sections.as_slice() else {
