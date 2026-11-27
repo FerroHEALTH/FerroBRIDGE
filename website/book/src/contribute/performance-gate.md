@@ -26,8 +26,15 @@ change with the pull request's base (with the merge group's, or with the
 commit before a push), and on a release the previous release. A previous
 release that carries no gate contract (neither `perf/arm.env` nor
 `scripts/perf/gate.sh`) gives way to the oldest commit after it that carries
-one, the nearest point both arms can be booted from. The build prints which
-commit it chose and why, and the release notes' performance line names it.
+one, the nearest point both arms can be booted from. When the head asks an
+identity source and that base asks none, the base moves on to the oldest
+commit after it whose `perf/ferrobridge.toml` names `[identity_source]`, so
+both arms make the ITI-83 round trip and the gate compares like with like;
+the commits it skips are left out of that measurement, and the reason says
+so. A head that is itself the first commit with an identity source keeps
+its base, and the gate judges its figures with the round trip in them. An
+explicit base is measured as given. The build prints which commit it chose
+and why, and the release notes' performance line names it.
 A manual dispatch of the `Perf` workflow on `main` with an empty `base`
 resolves and measures the base the next release will take, so the base is
 proven before the tag.

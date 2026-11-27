@@ -12,14 +12,16 @@
 # source asks one FerroPIX, at its pin, for the ITI-83 pseudonym of every
 # subject it resolves, its token signed by a stub OpenID Provider at its pin;
 # a base from before the facade needed one asks nothing, so the head's
-# latency then carries an ITI-83 round trip the base's does not.
+# latency then carries an ITI-83 round trip the base's does not. With no
+# BASE, such a base gives way to the oldest later commit that asks one.
 #
 #   scripts/perf/gate.sh build [BASE]
 #       Builds target/release/ferrobridge of the checkout, the head, and of
 #       its base: the merge base of HEAD with BASE, a commit or ref, or with
 #       no BASE the newest v* tag before HEAD (the oldest commit after it
-#       with the gate contract when the tag carries none), else HEAD's first
-#       parent, and writes why into target/perf-base/why. Both
+#       with the gate contract when the tag carries none, and then with an
+#       identity source when HEAD names one and that commit does not), else
+#       HEAD's first parent, and writes why into target/perf-base/why. Both
 #       arms build in one tree, target/perf-build, with its own toolchain pin:
 #       first the base from `git archive` of that commit, then the same tree
 #       brought to the checkout by rewriting only the files that differ, so
@@ -195,9 +197,12 @@ broker_up() {
 # it, resolved from AT (HEAD by default), with the reason on stderr. A
 # previous release that carries no gate contract (neither perf/arm.env nor
 # scripts/perf/gate.sh) gives way to the oldest commit after it that does,
-# the nearest point both arms can be booted and measured from.
+# the nearest point both arms can be booted and measured from. Then, when AT
+# asks an identity source and that base does not, the base gives way to the
+# oldest commit after it that does (like_for_like). An explicit BASE is
+# measured as given.
 base_rev() {
-  local base="${1:-}" at="${2:-HEAD}" tag tagged rev
+  local base="${1:-}" at="${2:-HEAD}" tag tagged rev found=""
   # The commit before the push that created a branch is all zeros.
   [[ "$base" =~ ^0+$ ]] && base=""
   if [[ -n "$base" ]]; then
@@ -206,23 +211,59 @@ base_rev() {
   elif tag="$(git -C "$root" describe --tags --abbrev=0 --match 'v*' "$at^" 2> /dev/null)"; then
     tagged="$(git -C "$root" rev-parse "$tag^{commit}")"
     if has_contract "$tagged"; then
-      echo "$tagged"
-      echo "the previous release $tag" >&2
+      like_for_like "$tagged" "$at" "the previous release $tag"
       return 0
     fi
     while IFS= read -r rev; do
       if has_contract "$rev"; then
-        echo "$rev"
-        echo "the oldest commit after $tag that carries the gate contract, since $tag carries neither $ARM_ENV nor a $GATE whose serve() sets the arm's overrides" >&2
-        return 0
+        found="$rev"
+        break
       fi
     done < <(git -C "$root" rev-list --reverse --first-parent --ancestry-path "$tagged..$at")
-    echo "no commit after $tag up to $at carries the gate contract" >&2
-    return 1
+    if [[ -z "$found" ]]; then
+      echo "no commit after $tag up to $at carries the gate contract" >&2
+      return 1
+    fi
+    like_for_like "$found" "$at" \
+      "the oldest commit after $tag that carries the gate contract, since $tag carries neither $ARM_ENV nor a $GATE whose serve() sets the arm's overrides"
   else
     git -C "$root" rev-parse "$at^1"
     echo "the first parent of $at" >&2
   fi
+}
+
+# like_for_like REV AT WHY: prints the base for a head at AT, REV chosen for
+# WHY, with the reason on stderr. A head whose perf/ferrobridge.toml names an
+# identity source pays an ITI-83 round trip on every subject it resolves, so
+# a base that names none gives way to the oldest commit after it, up to and
+# not including AT, that names one and carries the gate contract: both arms
+# then pay it, and the reason says which commits the measurement leaves out.
+# With no such commit the base stays REV and the reason says the head's
+# figures carry the round trip, which the gate judges in full.
+like_for_like() {
+  local rev="$1" at="$2" why="$3" head next
+  if ! identity_at "$at" || identity_at "$rev"; then
+    echo "$rev"
+    echo "$why" >&2
+    return 0
+  fi
+  head="$(git -C "$root" rev-parse "$at^{commit}")"
+  while IFS= read -r next; do
+    [[ "$next" != "$head" ]] || break
+    if identity_at "$next" && has_contract "$next"; then
+      echo "$next"
+      echo "the oldest commit after $rev whose $CONFIG names [identity_source], since $why asks no identity source and the head asks one over ITI-83 for every subject it resolves; both arms now make that round trip, and the commits from $rev up to this one are left out of the measurement" >&2
+      return 0
+    fi
+  done < <(git -C "$root" rev-list --reverse --first-parent --ancestry-path "$rev..$at")
+  echo "$rev"
+  echo "$why, which asks no identity source while the head asks one over ITI-83 for every subject it resolves, so the head's facade figures carry that round trip and the gate judges them with it" >&2
+}
+
+# identity_at REV: whether REV's perf/ferrobridge.toml names an identity
+# source, as pseudonymous reads a tree.
+identity_at() {
+  git -C "$root" show "$1:$CONFIG" 2> /dev/null | grep -q '^\[identity_source\]'
 }
 
 # has_contract REV: REV carries the gate contract, a perf/arm.env or a gate
@@ -947,6 +988,40 @@ GATE
     "$(base_rev "" 2>&1 > /dev/null)"
   check "a previous release with the contract is the base, and says so" "the previous release v0.0.1" \
     "$(root="$repo" base_rev "" 2>&1 > /dev/null)"
+  # A head that asks an identity source, over a previous release that asks
+  # none (#2312).
+  local ids="$work/identity"
+  git init --quiet "$ids"
+  icommit() { git -C "$ids" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit --quiet --allow-empty -m "$1"; }
+  mkdir -p "$ids/perf"
+  printf 'FERROBRIDGE__A=1\n' > "$ids/$ARM_ENV"
+  printf '[facade]\nenabled = true\n' > "$ids/$CONFIG"
+  git -C "$ids" add perf
+  icommit plain-release
+  git -C "$ids" -c tag.gpgsign=false tag v0.2.0
+  icommit plain-after
+  root="$ids"
+  icommit head-introduces
+  printf '[facade]\nenabled = true\n\n[identity_source]\npseudonym_domain = "urn:oid:2.999.9"\n' > "$ids/$CONFIG"
+  git -C "$ids" add perf
+  icommit head-introduces-identity
+  check "a head that introduces the identity source keeps the previous release as its base" \
+    "$(git -C "$ids" rev-parse v0.2.0)" "$(base_rev "" 2> /dev/null)"
+  check "and says its figures carry the round trip, judged in full" \
+    "the previous release v0.2.0, which asks no identity source while the head asks one over ITI-83 for every subject it resolves, so the head's facade figures carry that round trip and the gate judges them with it" \
+    "$(base_rev "" 2>&1 > /dev/null)"
+  icommit after-identity
+  icommit release-commit
+  check "a previous release with no identity source gives way to the oldest commit after it with one" \
+    "$(git -C "$ids" rev-parse HEAD~2)" "$(base_rev "" 2> /dev/null)"
+  check "and the reason names what the measurement leaves out" \
+    "the oldest commit after $(git -C "$ids" rev-parse v0.2.0) whose $CONFIG names [identity_source], since the previous release v0.2.0 asks no identity source and the head asks one over ITI-83 for every subject it resolves; both arms now make that round trip, and the commits from $(git -C "$ids" rev-parse v0.2.0) up to this one are left out of the measurement" \
+    "$(base_rev "" 2>&1 > /dev/null)"
+  check "an explicit BASE is measured as given" \
+    "$(git -C "$ids" rev-parse v0.2.0)" "$(base_rev v0.2.0 2> /dev/null)"
+  git -C "$ids" -c tag.gpgsign=false tag v0.3.0 HEAD~1
+  check "a previous release that asks one is the base" \
+    "$(git -C "$ids" rev-parse v0.3.0)" "$(base_rev "" 2> /dev/null)"
   root="$repo"
   printf 'a\n' > "$repo/kept"
   printf 'b\n' > "$repo/changed"
