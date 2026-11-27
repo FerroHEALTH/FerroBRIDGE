@@ -22,8 +22,13 @@ GitHub's hosted runners that report the same CPU model and memory differ by
 machine fails unchanged code on another. The gate builds the change, the
 head, and its base, and measures both on one runner in one job, so the
 difference between machines cancels. The base is the merge base of the
-change with the pull request's base (with the merge group's, or with the
-commit before a push), and on a release the previous release. A previous
+change with the pull request's base (with the merge group's), on a push to
+`main` the newest commit of `main` whose own push run passed the gate, and
+on a release the previous release. GitHub keeps one pending run per
+concurrency group and cancels the one it replaces, so many commits on `main`
+get no run; measuring from the last commit that passed puts every change
+since into the push run, and a breach fails every later push until it is
+fixed. A previous
 release that carries no gate contract (neither `perf/arm.env` nor
 `scripts/perf/gate.sh`) gives way to the oldest commit after it that carries
 one, the nearest point both arms can be booted from. When the head asks an
