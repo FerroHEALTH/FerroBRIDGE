@@ -458,6 +458,21 @@ pub fn left_out(warnings: &[Warning]) -> Vec<String> {
     paths
 }
 
+/// Returns the openEHR path of each element [`left_out`] reads from
+/// `warnings` that `project` places in the section of the form's slice
+/// `slice` ([`Project::slice_of`]), in the same order.
+///
+/// A document assembled from one run names these in the narrative of that
+/// section (`Section::with_left_out` of the `document` module), so each
+/// left-out element is named beside the entries it was recorded with.
+#[must_use]
+pub fn left_out_in(warnings: &[Warning], project: &Project, slice: &str) -> Vec<String> {
+    left_out(warnings)
+        .into_iter()
+        .filter(|path| project.slice_of(path) == Some(slice))
+        .collect()
+}
+
 /// Names every entry of `bundle`, the `collection` a mapping run answers, by
 /// the `fullUrl` `{base}/{type}/{id}`, so the collection a system exchanges
 /// identifies each resource it holds.
