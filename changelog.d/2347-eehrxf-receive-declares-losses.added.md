@@ -5,4 +5,4 @@
   it, so a later reader of the record is told what the composition lacks.
   `ReceivedComposition::not_carried` returns the same paths, and
   `ReceiveMappingError::DeclarationTaken` refuses a mapping that already
-  wrote those details. `eehrxf` moves to 0.48.0.
+  wrote those details. `eehrxf` moves to 0.48.1.
