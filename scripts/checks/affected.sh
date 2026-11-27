@@ -171,6 +171,12 @@ classify() {
     # The performance gate measures the server: its plans, its script and
     # the workflow and action that run it.
     perf/* | scripts/perf/* | .github/workflows/perf.yml | .github/actions/perf-attempt/*) echo "packages ferrobridge-server" ;;
+    # Book pages a test holds to the code: the tutorial the server's tests
+    # run, the generated CLI reference, the problem types `problem.rs`
+    # includes, and the readiness matrix fhirconnect renders. The screenshot
+    # guard reads them too.
+    website/book/src/tutorials/first-mapping.md | website/book/src/reference/cli.md | website/book/src/operate/problems.md) echo "only ferrobridge-server ferrobridge-testkit" ;;
+    website/book/src/evaluate/ehds-readiness.md) echo "only fhirconnect ferrobridge-testkit" ;;
     # Read by the testkit's screenshot guard: every console screenshot and
     # every book page that shows one.
     website/book/src/*) echo "only ferrobridge-testkit" ;;
@@ -607,6 +613,14 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "website/book/src/operate/img/console/dashboard.png" false \
     "+ferrobridge-testkit -ferrobridge-server -ferrobridge-console"
   check "the book theme is inert" "website/book/theme/favicon.svg" false ""
+  check "the tutorial reaches the server's tests that run it" \
+    "website/book/src/tutorials/first-mapping.md" false \
+    "+ferrobridge-server +ferrobridge-testkit -fhirconnect -ferrobridge-console"
+  check "the CLI reference reaches the server's drift test" "website/book/src/reference/cli.md" false \
+    "+ferrobridge-server +ferrobridge-testkit -fhirconnect"
+  check "the readiness matrix reaches the fhirconnect test that renders it" \
+    "website/book/src/evaluate/ehds-readiness.md" false \
+    "+fhirconnect +ferrobridge-testkit -ferrobridge-server"
   check "the journeys' browser install reaches the console" "scripts/release/journey-tools.sh" false \
     "+ferrobridge-console +ferrobridge-testkit -ferrobridge-server"
   check "the performance plan reaches the server it measures" "perf/plan.toml" false \
