@@ -390,6 +390,10 @@ jobs:
       # counted from it (#2177).
       - run: bash scripts/checks/post-quantum.sh --self-test
       - run: bash scripts/checks/post-quantum.sh
+      # The conformance badge rendering and the upstream rows a badge names
+      # as `, k upstream` (#2334), against scratch trees and a stub gh.
+      - run: bash scripts/checks/conformance.sh --self-test
+      - run: bash scripts/checks/upstream-rows.sh --self-test
       # Every released changelog section against its text at its tag, which
       # it fetches from origin when the shallow checkout lacks it.
       - run: bash scripts/checks/changelog-released.sh
@@ -520,7 +524,8 @@ jobs:
           bash scripts/terminology/pack-hl7v2-values.sh --self-test
 
   # Every TODO(#N) and every issue a pending subcommand names must still be
-  # open on the tracker (#614). The job token reads the issues and nothing
+  # open on the tracker (#614), and every issue an upstream row names open and
+  # labelled upstream-report (#2334). The job token reads the issues and nothing
   # else.
   todo-issues:
     name: todo-issues
@@ -538,6 +543,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: bash scripts/checks/todo-issues.sh
+      # Every upstream row of a conformance badge names an open
+      # upstream-report issue (#2334).
+      - name: Every upstream row names an open upstream-report issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash scripts/checks/upstream-rows.sh
 
   # The tracker helpers, the release milestone script, the deployment probe and
   # the destructive-command hook, each with a self-test. The probe self-test drives a stub curl. The helpers' real branches run only

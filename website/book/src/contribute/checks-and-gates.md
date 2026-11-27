@@ -60,7 +60,8 @@ containers and stops them when it ends.
 Neither FHIRconnect nor OMOCL has an external conformance suite, so the corpus
 tests are the instrument. Fifteen corpora are measured, and each keeps a
 committed pass list under `conformance/<corpus>/pass-list.txt`: one passing
-case id per line, then a `total` line with the corpus size. The HL7 v2
+case id per line, then a `total` line with the corpus size, and, beside it,
+`upstream.tsv` when an open `upstream-report` issue holds a failing case. The HL7 v2
 messages count twice: the vendored sets are the `hl7v2` corpus and the sets
 fetched at build time the `hl7v2-smoke` corpus. HL7's examples package of each
 FHIR version is fetched at build time too, and six corpora read it: one per
@@ -102,9 +103,29 @@ never remove a case from one to make CI green.
 
 The script writes one shields.io endpoint badge per file under
 `conformance/badges/`. A badge's message is the passing and the total count
-(`68 / 120`), and its colour follows the passing share: red under a quarter,
-orange under a half, yellow under three quarters, green from three quarters,
-and brightgreen when every case passes.
+(`68 / 120`), and its colour follows the count: brightgreen when every case
+passes, yellow when some do, red when none do.
+
+A failing case that an open `upstream-report` issue holds (the corpus, guide
+or tool contradicts its own specification) stays in the total and is named
+after the fraction, as `5295 / 5309, 14 upstream`. Such cases do not count
+against the colour, so that badge is brightgreen when every other case
+passes. Each one is a row of `conformance/<corpus>/upstream.tsv`, a
+`case<TAB>issue` header and then the case id and the issue number,
+tab-separated:
+
+```text
+case	issue
+Questionnaire-qs1	632
+```
+
+`conformance.sh` refuses a malformed row, a case named twice and a case the
+corpus does not hold. A held case that passes fails `--check`, and `--update`
+drops its row. `scripts/checks/upstream-rows.sh` asks the tracker for every
+issue a row names and fails when one is closed or carries no `upstream-report`
+label; it runs in the CI `todo-issues` job. When an upstream issue closes,
+remove its rows: the cases then count against the colour again. An
+unmapped count (`, 8 unmapped`) is named the same way.
 
 - `<corpus>.json`: one per corpus, counted from its pass list.
 - `hl7v2-family-<family>.json`: one per HL7 v2 message family with at least

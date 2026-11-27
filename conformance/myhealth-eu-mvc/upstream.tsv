@@ -1,0 +1,7 @@
+case	issue
+eehrxf-imaging-mapped.0.Composition Composition.type http://loinc.org|24802-1	2112
+eehrxf-imaging-mapped.1.DiagnosticReport DiagnosticReport.code http://loinc.org|24802-1	2112
+eehrxf-test-report-ecg.0.Composition Composition.type http://loinc.org|11524-6	2112
+eehrxf-test-report-ecg.1.DiagnosticReport DiagnosticReport.code http://loinc.org|11524-6	2112
+eehrxf-test-report-spirometry.0.Composition Composition.type http://loinc.org|18759-1	2112
+eehrxf-test-report-spirometry.1.DiagnosticReport DiagnosticReport.code http://loinc.org|18759-1	2112
