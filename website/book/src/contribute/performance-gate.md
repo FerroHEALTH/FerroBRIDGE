@@ -24,7 +24,10 @@ head, and its base, and measures both on one runner in one job, so the
 difference between machines cancels. The base is the merge base of the
 change with the pull request's base (with the merge group's), on a push to
 `main` the newest commit of `main` whose own push run passed the gate, and
-on a release the previous release. GitHub keeps one pending run per
+on a release the previous release that was published. A tag whose release
+run stopped before it published a GitHub release, as `v0.0.30` did at this
+gate, is skipped: users never ran it, so the next release is judged against
+the last one they did, and the reason names each tag skipped. GitHub keeps one pending run per
 concurrency group and cancels the one it replaces, so many commits on `main`
 get no run; measuring from the last commit that passed puts every change
 since into the push run, and a breach fails every later push until it is

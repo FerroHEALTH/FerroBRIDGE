@@ -18,7 +18,8 @@
 #   scripts/perf/gate.sh build [BASE]
 #       Builds target/release/ferrobridge of the checkout, the head, and of
 #       its base: the merge base of HEAD with BASE, a commit or ref, or with
-#       no BASE the newest v* tag before HEAD (the oldest commit after it
+#       no BASE the newest v* tag before HEAD that has a published GitHub
+#       release, a tag that was never published skipped (the oldest commit after it
 #       with the gate contract when the tag carries none, and then with an
 #       identity source when HEAD names one and that commit does not), else
 #       HEAD's first parent, and writes why into target/perf-base/why. Both
@@ -205,13 +206,27 @@ base_rev() {
   local base="${1:-}" at="${2:-HEAD}" tag tagged rev found=""
   # The commit before the push that created a branch is all zeros.
   [[ "$base" =~ ^0+$ ]] && base=""
+  local status=0 released=""
+  if [[ -z "$base" ]]; then
+    released="$(previous_release "$at")" || status=$?
+    # NOTE: no specification governs this: our own design; only "no published tag" (1) falls
+    # back to the first parent, so an unreachable API ends the run.
+    [[ "$status" -le 1 ]] || exit "$status"
+  fi
   if [[ -n "$base" ]]; then
     git -C "$root" merge-base "$at" "$base"
     echo "the merge base of $at with $base" >&2
-  elif tag="$(git -C "$root" describe --tags --abbrev=0 --match 'v*' "$at^" 2> /dev/null)"; then
+  elif [[ -n "$released" ]]; then
+    local release skipped=""
+    tag="${released%%$'\n'*}"
+    [[ "$released" != *$'\n'* ]] || skipped="${released#*$'\n'}"
+    release="the previous release $tag"
+    if [[ -n "$skipped" ]]; then
+      release="the previous published release $tag, since $skipped never published a GitHub release"
+    fi
     tagged="$(git -C "$root" rev-parse "$tag^{commit}")"
     if has_contract "$tagged"; then
-      like_for_like "$tagged" "$at" "the previous release $tag"
+      like_for_like "$tagged" "$at" "$release"
       return 0
     fi
     while IFS= read -r rev; do
@@ -225,11 +240,48 @@ base_rev() {
       return 1
     fi
     like_for_like "$found" "$at" \
-      "the oldest commit after $tag that carries the gate contract, since $tag carries neither $ARM_ENV nor a $GATE whose serve() sets the arm's overrides"
+      "the oldest commit after $tag that carries the gate contract, since $tag carries neither $ARM_ENV nor a $GATE whose serve() sets the arm's overrides${skipped:+ ($tag is the previous published release, since $skipped never published a GitHub release)}"
   else
     git -C "$root" rev-parse "$at^1"
     echo "the first parent of $at" >&2
   fi
+}
+
+# previous_release AT: the newest v* tag before AT that has a published
+# GitHub release, on its first line, and on its second the tags before it
+# that were tagged and never published, which it skipped, comma-separated.
+# Fails when no tag before AT is published.
+previous_release() {
+  local at="$1" tag excluded=() skipped=""
+  while tag="$(git -C "$root" describe --tags --abbrev=0 --match 'v*' "${excluded[@]}" "$at^" 2> /dev/null)"; do
+    if published "$tag"; then
+      printf '%s\n%s\n' "$tag" "$skipped"
+      return 0
+    fi
+    skipped="${skipped:+$skipped, }$tag"
+    excluded+=(--exclude "$tag")
+  done
+  return 1
+}
+
+# published TAG: whether TAG has a GitHub release that is no draft. The
+# newline-separated tags in PERF_PUBLISHED answer when it is set (the
+# self-test); otherwise the GitHub API is asked, a 404 answering no and any
+# other failure ending the run, so an unreachable API never passes as an
+# unpublished tag.
+published() {
+  local tag="$1" repo answer
+  if [[ -n "${PERF_PUBLISHED+set}" ]]; then
+    grep -qxF "$tag" <<< "$PERF_PUBLISHED"
+    return
+  fi
+  repo="${GITHUB_REPOSITORY:-FerroHEALTH/FerroBRIDGE}"
+  if answer="$(gh api "repos/$repo/releases/tags/$tag" --jq '.draft' 2>&1)"; then
+    [[ "$answer" = "false" ]]
+    return
+  fi
+  grep -qF 'HTTP 404' <<< "$answer" && return 1
+  die "cannot tell whether $tag has a published GitHub release: $answer"
 }
 
 # like_for_like REV AT WHY: prints the base for a head at AT, REV chosen for
@@ -941,6 +993,8 @@ GATE
   check "the committed perf/arm.env switches the usage report off" 1 \
     "$(grep -cx 'FERROBRIDGE__USAGE_REPORT__ENABLED=false' <<< "$committed" || true)"
   local repo="$work/repo" saved_root="$root"
+  # Every tag of the cases below is published unless a case says otherwise.
+  local PERF_PUBLISHED=$'v0.0.1\nv0.1.0\nv0.2.0\nv0.3.0'
   git init --quiet "$repo"
   commit() { git -C "$repo" -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false commit --quiet --allow-empty -m "$1"; }
   mkdir -p "$repo/perf"
@@ -964,6 +1018,15 @@ GATE
     "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev 0000000000000000000000000000000000000000 2> /dev/null)"
   check "with no tag before it the base is the first parent" \
     "$(git -C "$repo" rev-parse v0.0.1~1)" "$(base_rev "" v0.0.1 2> /dev/null)"
+  git -C "$repo" -c tag.gpgsign=false tag v0.0.2 HEAD~1
+  check "a tag with no published release gives way to the previous published one (#2346)" \
+    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev "" 2> /dev/null)"
+  check "and the reason names the tag it skipped" \
+    "the previous published release v0.0.1, since v0.0.2 never published a GitHub release" \
+    "$(base_rev "" 2>&1 > /dev/null)"
+  check "with no published tag before it the base is the first parent" \
+    "$(git -C "$repo" rev-parse HEAD~1)" "$(PERF_PUBLISHED="" base_rev "" 2> /dev/null)"
+  git -C "$repo" tag -d v0.0.2 > /dev/null
   local release="$work/release"
   git init --quiet "$release"
   rcommit() { git -C "$release" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit --quiet --allow-empty -m "$1"; }
