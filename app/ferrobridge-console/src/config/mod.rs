@@ -40,9 +40,8 @@
 //! `[oidc]` and `[session]` are the sections of `ferrohealth-session`
 //! (`ferrohealth_session::config`): with `issuer` alone the provider's
 //! endpoints are discovered when the console starts, each endpoint written
-//! takes the place of the discovered one, and `[session] store = "sealed"`
-//! with a `key` or `key_file` keeps the session in an encrypted cookie in
-//! place of the console's memory. `config check` contacts no provider.
+//! takes the place of the discovered one, and every session stays in the
+//! console's memory. `config check` contacts no provider.
 
 pub mod error;
 pub mod load;

@@ -272,10 +272,7 @@ pub(crate) fn held_token(
 
 /// How many pending sign-ins and sessions the console's memory store holds.
 pub(crate) fn occupancy(state: &ConsoleState) -> Result<Occupancy, Box<dyn Error>> {
-    state
-        .sessions()
-        .occupancy()?
-        .ok_or_else(|| "a memory store".into())
+    Ok(state.sessions().occupancy()?)
 }
 
 /// Every line the console logs while it is captured.
