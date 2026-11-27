@@ -925,7 +925,7 @@ source identity of every resource the facade consumed. It lives in the state sto
 `[state.seal]`, and every replica shares it. No clinical content and no
 identifier value in clear is written into it. Back the database up with the
 CDR, because a lost map means the next create writes a second composition for a
-resource the CDR already holds ([the identity store](container.md#the-identity-store)).
+resource the CDR already holds ([the identity store](container.md#the-state-store)).
 
 ### `[facade.references]`
 

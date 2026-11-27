@@ -3,16 +3,14 @@
 
 # Checks and gates
 
-CI runs in two tiers. The first tier gates today, on a repository with no Rust
-code: it covers the workflow files, the shell scripts, any Dockerfile, and the
-committed guards. The second tier is the Rust set, written and gated behind a
-job that looks for a root `Cargo.toml`, so it activates by itself when the
-workspace lands. One `conclusion` job reads every result and is the single
-required status check on `main`.
+CI runs in two tiers. The first covers the workflow files, the shell scripts,
+the Dockerfiles and the committed guards. The second is the Rust set. One
+`conclusion` job reads every result and is the single required status check
+on `main`.
 
 <!-- toc -->
 
-## Tier 1, running now
+## Tier 1: workflows, shell and guards
 
 | Check | Command | What it protects |
 |---|---|---|
@@ -29,7 +27,7 @@ required status check on `main`.
 Run the same commands locally before you push. A finding costs a local run
 rather than a CI round trip.
 
-## Tier 2, gated on the workspace
+## Tier 2: the Rust set
 
 `cargo fmt --all --check`, `cargo clippy --workspace --all-targets
 --all-features -- -D warnings`, `cargo nextest run --workspace --locked` with
@@ -213,8 +211,7 @@ CodeQL scans the workflow files, because a workflow that holds a token is code.
 SonarQube Cloud runs a multi-language sweep over shell, YAML, and JSON. OpenSSF
 Scorecard scores the repository's security posture. All three are advisory:
 they gate no merge, and a finding never outranks a specification citation or a
-project rule. A wrong finding is recorded on the tracker rather than
-suppressed quietly.
+project rule. A wrong finding is recorded on the tracker, never suppressed.
 
 ## Building this book
 

@@ -203,9 +203,8 @@ the upstream answers.
 
 `503`. The run history in the bridge schema (`[cdm] bridge_schema`) could
 not be read, because the CDM database did not answer or holds no run table.
-The server log names the cause. A bridge schema an earlier release created
-gets its run table from `ferrobridge cdm init`, which leaves every other
-table as it is.
+The server log names the cause. `ferrobridge cdm init` creates a missing
+run table and leaves every other table as it is.
 
 ## registers-unavailable
 
