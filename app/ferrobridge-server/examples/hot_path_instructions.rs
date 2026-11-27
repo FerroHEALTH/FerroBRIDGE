@@ -50,6 +50,25 @@ fn measured<R>(path: impl FnOnce() -> R) -> R {
     std::hint::black_box(path())
 }
 
+/// Runs `path` through [`measured`] on a thread of its own, which allocates
+/// from a fresh glibc arena, so the count does not depend on the heap that
+/// loading the mappings left behind (#2305).
+///
+/// The thread allocates once before the measured call, so the arena and the
+/// thread's cache are set up outside the count. A panic on the thread carries
+/// on in the caller.
+fn on_fresh_heap<R: Send>(path: impl FnOnce() -> R + Send) -> R {
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                drop(std::hint::black_box(Box::new(0_u8)));
+                measured(path)
+            })
+            .join()
+            .unwrap_or_else(|payload| std::panic::resume_unwind(payload))
+    })
+}
+
 /// Returns the facade settings the facade suite runs with, over an identity
 /// source no path reaches.
 fn settings() -> Result<Settings, Box<dyn Error>> {
@@ -107,7 +126,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             control_id: "ACK00001",
             timestamp: "20260925090001+0200",
         };
-        let reply = measured(|| {
+        let reply = on_fresh_heap(|| {
             match inbound::receive(message.as_bytes(), Charset::Ascii, structure_for, stamp) {
                 Received::Parsed(parsed) => parsed.answer(Code::Accept, &[], stamp).ok(),
                 _ => None,
@@ -140,11 +159,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     match path.as_str() {
         "fhir_to_openehr" => {
-            measured(write)?;
+            on_fresh_heap(write)?;
         }
         "openehr_to_fhir" => {
             let composition = write()?.into_value();
-            measured(|| {
+            on_fresh_heap(|| {
                 engine::outbound(
                     loaded.program(),
                     loaded.index(),

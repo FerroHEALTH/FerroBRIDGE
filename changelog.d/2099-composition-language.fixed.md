@@ -1,1 +1,0 @@
-- The European interoperability component writes a document's language on `Composition.language` as well as `Bundle.language`, so a discharge report matches the `composition` slice of MyHealth@EU HDR 9.2.0's `bundle-hdr-myhealtheu`.
