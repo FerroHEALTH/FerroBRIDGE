@@ -1,7 +1,15 @@
+III:Data_group_metadata:attestation
+III:Data_group_metadata:attestation.attester[x]
+III:Data_group_metadata:attestation.dateTime
 III:Data_group_metadata:author[x]
+III:Data_group_metadata:clinicalEventTime[x]
+III:Data_group_metadata:date
 III:Data_group_metadata:identifier
+III:Data_group_metadata:language
+III:Data_group_metadata:lastUpdate
 III:Data_group_metadata:status
 III:Data_group_metadata:subject
+III:Data_group_metadata:version
 III:Document_metadata:attestation
 III:Document_metadata:attestation.attester[x]
 III:Document_metadata:attestation.dateTime
@@ -348,6 +356,7 @@ VIII:EHDSMedicalTestReport:header.version
 VIII:EHDSMedicalTestReport:intendedRecipient[x]
 VIII:EHDSMedicalTestReport:presentedForm
 X:EHDSAddress:city
+X:EHDSAddress:country
 X:EHDSAddress:houseNumber
 X:EHDSAddress:postBox
 X:EHDSAddress:postalCode
@@ -365,10 +374,12 @@ X:EHDSAdministeredDosage:dosageDetails.routeOfAdministration
 X:EHDSAdministeredDosage:renderedDosageInstruction
 X:EHDSAdvanceDirective:attachment
 X:EHDSAdvanceDirective:category
+X:EHDSAdvanceDirective:directiveType
 X:EHDSAdvanceDirective:header
 X:EHDSAdvanceDirective:header.author[x]
 X:EHDSAdvanceDirective:header.date
 X:EHDSAdvanceDirective:header.identifier
+X:EHDSAdvanceDirective:header.language
 X:EHDSAdvanceDirective:header.status
 X:EHDSAdvanceDirective:header.subject
 X:EHDSAdvanceDirective:note
@@ -378,6 +389,7 @@ X:EHDSAlert:header
 X:EHDSAlert:header.author[x]
 X:EHDSAlert:header.date
 X:EHDSAlert:header.identifier
+X:EHDSAlert:header.language
 X:EHDSAlert:header.status
 X:EHDSAlert:header.subject
 X:EHDSAlert:period
@@ -391,6 +403,7 @@ X:EHDSAllergyIntolerance:header
 X:EHDSAllergyIntolerance:header.author[x]
 X:EHDSAllergyIntolerance:header.date
 X:EHDSAllergyIntolerance:header.identifier
+X:EHDSAllergyIntolerance:header.language
 X:EHDSAllergyIntolerance:header.status
 X:EHDSAllergyIntolerance:header.subject
 X:EHDSAllergyIntolerance:note
@@ -399,8 +412,11 @@ X:EHDSAllergyIntolerance:reaction
 X:EHDSAllergyIntolerance:reaction.manifestation
 X:EHDSAllergyIntolerance:reaction.onset
 X:EHDSAllergyIntolerance:reaction.severity
+X:EHDSAllergyIntolerance:reaction.substance
+X:EHDSAllergyIntolerance:type
 X:EHDSAttachment:contentType
 X:EHDSAttachment:data
+X:EHDSAttachment:language
 X:EHDSAttachment:size
 X:EHDSAttachment:title
 X:EHDSAttachment:url
@@ -410,17 +426,21 @@ X:EHDSBodyStructure:location
 X:EHDSBodyStructure:locationQualifier
 X:EHDSBodyStructure:morphology
 X:EHDSCarePlan:activity[x]
+X:EHDSCarePlan:conditionAddressed[x]
 X:EHDSCarePlan:description
+X:EHDSCarePlan:goal[x]
 X:EHDSCarePlan:header
 X:EHDSCarePlan:header.author[x]
 X:EHDSCarePlan:header.date
 X:EHDSCarePlan:header.identifier
+X:EHDSCarePlan:header.language
 X:EHDSCarePlan:header.status
 X:EHDSCarePlan:header.subject
 X:EHDSCarePlan:period
 X:EHDSCarePlan:title
 X:EHDSCondition:bodySite
 X:EHDSCondition:category
+X:EHDSCondition:code
 X:EHDSCondition:diagnosisAssertionStatus
 X:EHDSCondition:endDate
 X:EHDSCondition:externalResource
@@ -428,8 +448,10 @@ X:EHDSCondition:header
 X:EHDSCondition:header.author[x]
 X:EHDSCondition:header.date
 X:EHDSCondition:header.identifier
+X:EHDSCondition:header.language
 X:EHDSCondition:header.status
 X:EHDSCondition:header.subject
+X:EHDSCondition:note
 X:EHDSCondition:onsetDate
 X:EHDSCondition:resolutionCircumstances
 X:EHDSCondition:severity
@@ -442,6 +464,7 @@ X:EHDSCurrentPregnancyStatus:header
 X:EHDSCurrentPregnancyStatus:header.author[x]
 X:EHDSCurrentPregnancyStatus:header.date
 X:EHDSCurrentPregnancyStatus:header.identifier
+X:EHDSCurrentPregnancyStatus:header.language
 X:EHDSCurrentPregnancyStatus:header.status
 X:EHDSCurrentPregnancyStatus:header.subject
 X:EHDSCurrentPregnancyStatus:note
@@ -457,6 +480,7 @@ X:EHDSDevice:name.value
 X:EHDSDevice:note
 X:EHDSDevice:serialNumber
 X:EHDSDevice:type
+X:EHDSDevice:udiCarrier
 X:EHDSDevice:version
 X:EHDSDeviceUse:bodySite
 X:EHDSDeviceUse:device[x]
@@ -464,6 +488,7 @@ X:EHDSDeviceUse:header
 X:EHDSDeviceUse:header.author[x]
 X:EHDSDeviceUse:header.date
 X:EHDSDeviceUse:header.identifier
+X:EHDSDeviceUse:header.language
 X:EHDSDeviceUse:header.status
 X:EHDSDeviceUse:header.subject
 X:EHDSDeviceUse:note
@@ -482,6 +507,8 @@ X:EHDSDosage:dosageDetails.repeat.dayOfWeek
 X:EHDSDosage:dosageDetails.repeat.duration
 X:EHDSDosage:dosageDetails.repeat.eventTime
 X:EHDSDosage:dosageDetails.repeat.frequency
+X:EHDSDosage:dosageDetails.repeat.frequency.numberOfTimes
+X:EHDSDosage:dosageDetails.repeat.frequency.period
 X:EHDSDosage:dosageDetails.repeat.timeOfDay
 X:EHDSDosage:dosageDetails.routeOfAdministration
 X:EHDSDosage:dosageDetails.sequence
@@ -490,6 +517,7 @@ X:EHDSEncounter:admission
 X:EHDSEncounter:admission.admitSource
 X:EHDSEncounter:admission.admitter
 X:EHDSEncounter:basedOn[x]
+X:EHDSEncounter:class
 X:EHDSEncounter:dischargeDestination
 X:EHDSEncounter:dischargeDestination.location[x]
 X:EHDSEncounter:dischargeDestination.type
@@ -498,6 +526,7 @@ X:EHDSEncounter:header
 X:EHDSEncounter:header.author[x]
 X:EHDSEncounter:header.date
 X:EHDSEncounter:header.identifier
+X:EHDSEncounter:header.language
 X:EHDSEncounter:header.status
 X:EHDSEncounter:header.subject
 X:EHDSEncounter:note
@@ -506,6 +535,7 @@ X:EHDSEncounter:priority
 X:EHDSEncounter:reason[x]
 X:EHDSEncounter:referringProfessional
 X:EHDSEncounter:serviceLocation
+X:EHDSEncounter:serviceLocation.organisation
 X:EHDSEncounter:serviceLocation.period
 X:EHDSEncounter:serviceProvider
 X:EHDSEncounter:subEncounter
@@ -543,6 +573,7 @@ X:EHDSImmunisation:header
 X:EHDSImmunisation:header.author[x]
 X:EHDSImmunisation:header.date
 X:EHDSImmunisation:header.identifier
+X:EHDSImmunisation:header.language
 X:EHDSImmunisation:header.status
 X:EHDSImmunisation:header.subject
 X:EHDSImmunisation:note
@@ -575,6 +606,7 @@ X:EHDSLaboratoryObservation:header.author[x]
 X:EHDSLaboratoryObservation:header.date
 X:EHDSLaboratoryObservation:header.directSubject[x]
 X:EHDSLaboratoryObservation:header.identifier
+X:EHDSLaboratoryObservation:header.language
 X:EHDSLaboratoryObservation:header.status
 X:EHDSLaboratoryObservation:header.subject
 X:EHDSLaboratoryObservation:interpretation
@@ -618,6 +650,7 @@ X:EHDSMedication:characteristic.value[x]
 X:EHDSMedication:classification
 X:EHDSMedication:description
 X:EHDSMedication:device
+X:EHDSMedication:device.device
 X:EHDSMedication:device.deviceQuantity
 X:EHDSMedication:doseForm
 X:EHDSMedication:identifyingCode[x]
@@ -625,9 +658,11 @@ X:EHDSMedication:item
 X:EHDSMedication:item.amount
 X:EHDSMedication:item.containedQuantity
 X:EHDSMedication:item.doseForm
+X:EHDSMedication:item.ingredient
 X:EHDSMedication:item.ingredient.isActive
 X:EHDSMedication:item.ingredient.strengthInfo
 X:EHDSMedication:item.ingredient.strengthInfo.basisOfStrengthSubstance
+X:EHDSMedication:item.ingredient.strengthInfo.strength[x]
 X:EHDSMedication:item.ingredient.substance
 X:EHDSMedication:item.packageType
 X:EHDSMedication:item.unitOfPresentation
@@ -640,6 +675,7 @@ X:EHDSMedicationAdministration:header
 X:EHDSMedicationAdministration:header.author[x]
 X:EHDSMedicationAdministration:header.date
 X:EHDSMedicationAdministration:header.identifier
+X:EHDSMedicationAdministration:header.language
 X:EHDSMedicationAdministration:header.status
 X:EHDSMedicationAdministration:header.subject
 X:EHDSMedicationAdministration:medication
@@ -652,6 +688,7 @@ X:EHDSMedicationUse:header
 X:EHDSMedicationUse:header.author[x]
 X:EHDSMedicationUse:header.date
 X:EHDSMedicationUse:header.identifier
+X:EHDSMedicationUse:header.language
 X:EHDSMedicationUse:header.status
 X:EHDSMedicationUse:header.subject
 X:EHDSMedicationUse:medication
@@ -684,6 +721,7 @@ X:EHDSObservation:header.author[x]
 X:EHDSObservation:header.date
 X:EHDSObservation:header.directSubject[x]
 X:EHDSObservation:header.identifier
+X:EHDSObservation:header.language
 X:EHDSObservation:header.status
 X:EHDSObservation:header.subject
 X:EHDSObservation:interpretation
@@ -716,15 +754,23 @@ X:EHDSOrganisation:partOf
 X:EHDSOrganisation:telecom
 X:EHDSOrganisation:type
 X:EHDSPatient:address
+X:EHDSPatient:administrativeGender
 X:EHDSPatient:dateOfBirth
 X:EHDSPatient:deceased[x]
+X:EHDSPatient:genderIdentity
 X:EHDSPatient:identifier
+X:EHDSPatient:identifier.system
+X:EHDSPatient:identifier.type
+X:EHDSPatient:identifier.value
+X:EHDSPatient:name
+X:EHDSPatient:sexForClinicalUse
 X:EHDSPatient:telecom
 X:EHDSPregnancyHistory:endDate
 X:EHDSPregnancyHistory:header
 X:EHDSPregnancyHistory:header.author[x]
 X:EHDSPregnancyHistory:header.date
 X:EHDSPregnancyHistory:header.identifier
+X:EHDSPregnancyHistory:header.language
 X:EHDSPregnancyHistory:header.status
 X:EHDSPregnancyHistory:header.subject
 X:EHDSPregnancyHistory:note
@@ -738,6 +784,7 @@ X:EHDSProcedure:header
 X:EHDSProcedure:header.author[x]
 X:EHDSProcedure:header.date
 X:EHDSProcedure:header.identifier
+X:EHDSProcedure:header.language
 X:EHDSProcedure:header.status
 X:EHDSProcedure:header.subject
 X:EHDSProcedure:note
@@ -746,6 +793,11 @@ X:EHDSProcedure:performer
 X:EHDSProcedure:procedureDate[x]
 X:EHDSProcedure:reason[x]
 X:EHDSRelatedPerson:address
+X:EHDSRelatedPerson:identifier
+X:EHDSRelatedPerson:identifier.system
+X:EHDSRelatedPerson:identifier.type
+X:EHDSRelatedPerson:identifier.value
+X:EHDSRelatedPerson:name
 X:EHDSRelatedPerson:relationship
 X:EHDSRelatedPerson:subject
 X:EHDSRelatedPerson:telecom
@@ -757,6 +809,7 @@ X:EHDSServiceRequest:header
 X:EHDSServiceRequest:header.author[x]
 X:EHDSServiceRequest:header.date
 X:EHDSServiceRequest:header.identifier
+X:EHDSServiceRequest:header.language
 X:EHDSServiceRequest:header.status
 X:EHDSServiceRequest:header.subject
 X:EHDSServiceRequest:occurrence[x]
@@ -785,6 +838,7 @@ X:EHDSSpecimen:request
 X:EHDSSpecimen:specimenSource[x]
 X:EHDSSpecimen:status
 X:EHDSSpecimen:type
+X:EHDSTelecom:system
 X:EHDSTelecom:use
 X:EHDSTelecom:value
 X:EHDSTravelHistory:country
@@ -792,6 +846,7 @@ X:EHDSTravelHistory:header
 X:EHDSTravelHistory:header.author[x]
 X:EHDSTravelHistory:header.date
 X:EHDSTravelHistory:header.identifier
+X:EHDSTravelHistory:header.language
 X:EHDSTravelHistory:header.status
 X:EHDSTravelHistory:header.subject
 X:EHDSTravelHistory:period

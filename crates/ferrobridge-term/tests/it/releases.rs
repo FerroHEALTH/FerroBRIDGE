@@ -233,6 +233,44 @@ fn the_ecosystem_error_output_and_match_note_are_read() -> Result<(), Error> {
 }
 
 #[test]
+fn the_ecosystem_normalized_concept_is_read() -> Result<(), Error> {
+    let body = r#"{"resourceType":"Parameters","parameter":[
+        {"name":"result","valueBoolean":true},
+        {"name":"match","part":[
+          {"name":"concept","valueCoding":{"system":"http://id.who.int/icd/release/11/mms","code":"1A00"}},
+          {"name":"normalized-concept","valueCoding":{"system":"http://id.who.int/icd/release/11/mms","code":"http://id.who.int/icd/entity/257068234"}}]}]}"#;
+    for version in [
+        WireVersion::R4,
+        WireVersion::R4B,
+        WireVersion::R5,
+        WireVersion::R6,
+    ] {
+        let outcome = answer(version, &translation(), &url(), StatusCode::OK, body)?;
+        let BatchOutcome::Translate(TranslateOutcome::Translated { matches, .. }) = outcome else {
+            panic!("{version:?}: a translation, got {outcome:?}");
+        };
+        let found = matches.first().expect("the match");
+        assert_eq!(
+            Some("1A00"),
+            found
+                .concept
+                .as_ref()
+                .and_then(|concept| concept.code.as_deref()),
+            "{version:?}: the concept stays as the map states it"
+        );
+        assert_eq!(
+            Some("http://id.who.int/icd/entity/257068234"),
+            found
+                .normalized_concept
+                .as_ref()
+                .and_then(|concept| concept.code.as_deref()),
+            "{version:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn an_r5_lookup_reads_its_definition() -> Result<(), Error> {
     let lookup = Request::Lookup {
         system: "http://example.org/cs".to_owned(),
