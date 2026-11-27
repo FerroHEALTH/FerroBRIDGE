@@ -119,6 +119,24 @@ pub enum StoreError {
     Poisoned,
 }
 
+/// The identity of one committed entry, recorded together by
+/// [`Store::record_entry`].
+#[derive(Debug, Clone, Copy)]
+pub struct EntryWrite<'a> {
+    /// The resource type the entry is served as.
+    pub resource_type: &'a str,
+    /// The key the entry's internal id is recorded under.
+    pub key: &'a ExternalResourceId,
+    /// The internal id derived for the entry.
+    pub derived: &'a FhirResourceId,
+    /// Where the entry lives.
+    pub binding: &'a CompositionBinding,
+    /// Every `Resource.identifier` the written resource carries.
+    pub identifiers: &'a [Identifier],
+    /// The source version the write consumed, when it names one.
+    pub source: Option<&'a SourceVersion>,
+}
+
 /// The identity map the facade resolves every request through.
 ///
 #[async_trait::async_trait]
@@ -297,6 +315,44 @@ pub trait Store: fmt::Debug + Send + Sync {
         identifier: &Identifier,
         internal: &FhirResourceId,
     ) -> Result<(), StoreError>;
+
+    /// Returns the listener state of the copy the map reads through, which
+    /// the replica's `LISTEN` session carries; `None` for a map that keeps
+    /// none.
+    fn listened(&self) -> Option<std::sync::Arc<crate::store::listen::Listened>> {
+        None
+    }
+
+    /// Records the internal id, the binding, the identifiers and the consumed
+    /// source of one committed entry, and returns the id and the binding
+    /// that stand.
+    ///
+    /// The state store records them in one transaction; this default records
+    /// them one after another.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] when the store cannot be read or written.
+    async fn record_entry(
+        &self,
+        write: &EntryWrite<'_>,
+    ) -> Result<(FhirResourceId, CompositionBinding), StoreError> {
+        let id = self
+            .record_internal(write.resource_type, write.key, write.derived)
+            .await?;
+        let stood = self
+            .record_binding(write.resource_type, &id, write.binding)
+            .await?;
+        for identifier in write.identifiers {
+            self.record_identifier(write.resource_type, identifier, &id)
+                .await?;
+        }
+        if let Some(source) = write.source {
+            self.record_consumed(source, &ConsumedSource::of(&stood, &id))
+                .await?;
+        }
+        Ok((id, stood))
+    }
 }
 
 /// Returns the logical id one identifier row holds.

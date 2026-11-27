@@ -39,10 +39,19 @@ rule, machine-enforced by the `crate-version-guard` CI job.
 
 ## The bump rule
 
-- **A PR that changes any packaged content of a `crates/*` member bumps THAT
-  member's version in the same PR.** Packaged content is what the crate's
-  `include` ships: `src/**`, `README.md`, `LICENSE`, and `Cargo.toml`. Tests,
-  benches and `CLAUDE.md` are not packaged and need no bump. A root
+- **A member's version steps once per publish, not once per merge** (owner
+  decision 2026-11-27, #2367). A PR that changes any packaged content of a
+  `crates/*` member leaves that member at a version above its newest release
+  on crates.io and not below the target branch's. When the target branch
+  already holds an unpublished version, the PR keeps it and bumps nothing;
+  when the branch is at the published version, the PR takes the step. This is
+  how Cargo and crates.io version a crate: a version names what one publish
+  uploads, and crates.io refuses a second upload under it, so the version that
+  must never carry two contents is the published one. Two PRs that change one
+  crate between publishes therefore share its next version and never race in
+  the merge queue. Packaged content is what the crate's `include` ships:
+  `src/**`, `README.md`, `LICENSE`, and `Cargo.toml`. Tests, benches and
+  `CLAUDE.md` are not packaged and need no bump. A root
   `[workspace.dependencies]` entry a member consumes is packaged content too,
   because `cargo package` renders the concrete requirement.
 - The member's own `Cargo.toml`, any internal requirement in the root
@@ -64,9 +73,10 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   either. That is the rule Cargo reads a caret requirement by
   (<https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#caret-requirements>).
   `cargo-semver-checks` is the judge (`scripts/checks/semver.sh`, pinned in
-  `docs/VERSIONS.md`). CI judges every crate that moved from a published
-  line against the target branch, and the release plan judges every crate
-  it publishes against crates.io. Each crate is judged on the judge's
+  `docs/VERSIONS.md`). CI judges every changed crate against the target
+  branch, or against its newest release on crates.io while the branch holds
+  an unpublished version, and the release plan judges every crate it
+  publishes against crates.io. Each crate is judged on the judge's
   default feature set and, when it has features, on
   `--only-explicit-features`, and `fhir-types` on each FHIR version module
   with its terminology set and with its own `<version>-resources` set. The `cargo-semver-checks` README says the judge
@@ -74,7 +84,10 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   crate features are activated". `crate-version-guard` refuses two steps
   only: a minor step whose patch is not 0, which SemVer 2.0.0 §7 forbids
   (<https://semver.org/#spec-item-7>), and a step out of 0.x, which is an
-  owner decision. A new variant goes at the end of an enum, since the judge
+  owner decision. It measures the step from the newest release, read from the
+  crates.io sparse index
+  (<https://doc.rust-lang.org/cargo/reference/registry-index.html>), and
+  fails when the index cannot be read. A new variant goes at the end of an enum, since the judge
   counts a moved discriminant as a break.
 - **A public dependency moved to an incompatible version is a breaking
   change** (coordinator ruling, 2026-11-09, #1777; grounds corrected by
@@ -86,7 +99,9 @@ rule, machine-enforced by the `crate-version-guard` CI job.
   function parameter" among what the judge does not catch. For a 0.x
   dependency, the incompatible step is the left-most non-zero component
   (`openehr-rm` 0.0.135 to 0.0.136, `fhirconnect` 0.1 to 0.2). The crate
-  bumps its minor. A public dependency is any normal dependency of the
+  bumps its minor, measured from its newest release: a branch that already
+  holds the next minor takes no further step. A public dependency is any
+  normal dependency of the
   `openehr-*`, `fhir-types`, `hl7v2-types` and `ferrohealth-*` families or a
   sibling of this workspace (`scripts/checks/lib/public-deps.sh`), optional
   ones included. `crate-version-guard` refuses a patch step for a member

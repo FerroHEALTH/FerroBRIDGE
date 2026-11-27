@@ -312,10 +312,10 @@ fn a_second_service_specialty_is_refused_where_r4_holds_one() -> Result<(), Box<
 }
 
 #[test]
-#[cfg(feature = "discharge")]
+#[cfg(feature = "laboratory")]
 fn a_document_without_an_author_is_refused() -> Result<(), Box<dyn Error>> {
-    let mut document = super::discharge_document::document(true, true)?;
-    document.with_metadata(metadata("34105-7")?);
+    let mut document = super::lab_document::document()?;
+    document.with_metadata(metadata("11502-2")?);
     assert!(matches!(
         document.into_bundle(),
         Err(DocumentError::MissingMetadata { element: "author" })

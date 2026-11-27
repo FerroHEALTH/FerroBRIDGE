@@ -46,7 +46,7 @@
 [![HL7 v2 message corpora](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2.json)](conformance/README.md)
 [![HL7 v2 smoke (NIST, AIRA)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fhl7v2-smoke.json)](conformance/README.md)
 <br>
-[![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
+[![CRA](https://img.shields.io/badge/CRA-user%20information-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)
 [![Post-quantum](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2Fpost-quantum.json)](docs/post-quantum.md)
 
 **EHDS and EEHRxF draft 2026-11-23**<br>
