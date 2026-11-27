@@ -119,10 +119,7 @@ impl Config {
         let base = base_url("bridge.base_url", &self.bridge.base_url)?;
         let timeout = positive("bridge.timeout", self.bridge.timeout)?;
         let oidc = self.oidc.as_ref().map(resolve_oidc).transpose()?;
-        let session = match &oidc {
-            Some(oidc) => self.session.check(&oidc.checked)?,
-            None => self.session.check_with(false)?,
-        };
+        let session = self.session.check()?;
         // NOTE: RFC 6265bis §4.1.2.5: a cookie without `Secure` travels over plain
         // HTTP, so it is admitted only where the console itself is HTTP on loopback.
         if !session.secure_cookie()

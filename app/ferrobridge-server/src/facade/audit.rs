@@ -298,6 +298,7 @@ impl Recording {
             emergency: None,
             inserted: None,
             transformations: Vec::new(),
+            regulatory: self.log.regulatory().clone(),
         }
     }
 

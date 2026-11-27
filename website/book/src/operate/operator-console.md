@@ -83,8 +83,7 @@ timeouts:
 
 | Key | Default | Meaning |
 |---|---|---|
-| `store` | `"memory"` | `memory` keeps sessions in the console's process; `sealed` keeps each in one encrypted cookie |
-| `key`, `key_file` | none | The sealing key of a `sealed` store: base64 of at least 64 bytes, the same on every replica; refused beside `memory` |
+| `store` | `"memory"` | `memory`, the one store, keeps sessions in the console's process |
 | `secure_cookie` | `true` | Cookies carry `Secure` and the `__Host-` prefix; `false` only for a console on `http` loopback |
 | `sign_in_timeout` | `"5min"` | How long a started sign-in waits for the provider |
 | `max_sign_ins` | `1000` | Pending sign-ins a `memory` store holds; a new one drops the oldest |
@@ -93,9 +92,7 @@ timeouts:
 | `max_sessions` | `10000` | Sessions a `memory` store holds; a sign-in past it is refused |
 
 A `memory` store loses its sessions on a restart, so every operator signs in
-again, and replicas behind a load balancer need sticky sessions. A `sealed`
-store needs neither, and refuses `offline_access`, which would put a refresh
-token in a browser cookie.
+again, and replicas behind a load balancer need sticky sessions.
 
 A signed-in page carries FerroUI's session watch. It asks `GET /session`,
 which reads what the session has left and never counts as activity, and

@@ -40,10 +40,10 @@ hash. A row whose post-quantum form has no standard yet counts as not safe,
 whatever its `safe` column says.
 
 The README badge counts the safe rows out of the rows whose post-quantum
-form a standard defines, and names the rows with no standard yet after the
-fraction (`16/21, 4 without a post-quantum standard`). Those rows stay
-visible and out of the colour, since no change in FerroBRIDGE can move them
-until a standard exists.
+form a standard defines (for example `19/21`). The rows with no standard yet are the
+table's `no standard yet` rows below; they stay out of the fraction and the
+colour, since no change in FerroBRIDGE can move them until a standard
+exists.
 
 Each `no standard yet` was re-checked on 2026-11-27:
 
