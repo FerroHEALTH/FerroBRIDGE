@@ -23,6 +23,7 @@ use fhir_types::r4::bundle::{Bundle, BundleEntry};
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::model::load::MappingSet;
@@ -429,6 +430,32 @@ fn claim(bundle: &mut Bundle, resource_type: &str, profile: &str) -> Result<(), 
             "the run wrote no resource of the mapped type",
         )))
     }
+}
+
+/// Returns the openEHR path of each element `warnings`, the losses one run
+/// declared ([`Mapping::to_fhir_with_warnings`]), names as left unread, in
+/// the order the run declared them and each once.
+///
+/// These are the elements the composition holds that the mapped resources
+/// do not carry, the ones a project lists in
+/// [`crate::mappings::Project::left_out`] among them, named by path and
+/// never by value. A document names them in the narrative of the section
+/// the entries fill (`Section::with_left_out` of the `document` module). An
+/// unread element the run located by no openEHR path is named by its node
+/// identifier, so none is dropped.
+#[must_use]
+pub fn left_out(warnings: &[Warning]) -> Vec<String> {
+    let mut paths: Vec<String> = Vec::new();
+    for warning in warnings {
+        let Loss::Unread { ref node } = *warning.loss() else {
+            continue;
+        };
+        let path = warning.location().openehr().unwrap_or(node);
+        if !paths.iter().any(|held| held == path) {
+            paths.push(path.to_owned());
+        }
+    }
+    paths
 }
 
 /// Names every entry of `bundle`, the `collection` a mapping run answers, by

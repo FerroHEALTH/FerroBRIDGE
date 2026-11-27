@@ -218,6 +218,7 @@ classify() {
     scripts/checks/vex-coverage.sh | scripts/checks/advisory-exceptions.sh) echo inert ;;
     scripts/security/* | security/* | trivy.yaml | .trivyignore.yaml) echo inert ;;
     scripts/checks/todo-issues.sh | scripts/checks/usage-report-off.sh) echo inert ;;
+    scripts/checks/upstream-rows.sh) echo inert ;;
     scripts/deploy-probe.sh) echo inert ;;
     # The post-quantum inventory, its table and its badge are read by the CI
     # `versions` job alone, which runs on every change.

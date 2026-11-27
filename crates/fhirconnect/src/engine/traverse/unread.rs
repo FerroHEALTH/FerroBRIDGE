@@ -151,6 +151,13 @@ fn held_instance(key: &str, root: Option<&str>, pinned: &[u32]) -> Option<Instan
         .then_some((flat_id, positions))
 }
 
+/// Returns the archetype node identifier of `node`, `None` for a node with
+/// none.
+fn archetyped(node: &ResolvedNode) -> Option<&str> {
+    node.node_id()
+        .filter(|id| id.starts_with("at") || id.starts_with("id"))
+}
+
 /// Returns the template node `held` names, its node identifier and, for one
 /// of the [`CONTENT_ATTRIBUTES`], the attribute below the node, `None` for no
 /// archetype element or one the run read.
@@ -160,13 +167,21 @@ fn element_of<'index>(
     read: &BTreeSet<Instance>,
 ) -> Option<(&'index ResolvedNode, &'index str, Option<&'static str>)> {
     if let Ok(node) = index.node_by_flat_id(&held.0) {
-        let node_id = node
-            .node_id()
-            .filter(|id| id.starts_with("at") || id.starts_with("id"))?;
-        if model::is_a(base_name(node.rm_type()), derive::STRUCTURAL) {
+        if let Some(node_id) = archetyped(node) {
+            if model::is_a(base_name(node.rm_type()), derive::STRUCTURAL) {
+                return None;
+            }
+            return Some((node, node_id, None));
+        }
+        // NOTE: the openehr-sdt Web Template gives an ELEMENT of more than one data value type one
+        // child per type (`text_value`) with no node id, so a value held there is the ELEMENT's.
+        let (parent, _) = held.0.as_str().rsplit_once('/')?;
+        let below = (FlatId::new(parent), held.1.clone());
+        let element = index.node_by_flat_id(&below.0).ok()?;
+        if read.contains(&below) || base_name(element.rm_type()) != "ELEMENT" {
             return None;
         }
-        return Some((node, node_id, None));
+        return Some((element, archetyped(element)?, None));
     }
     // NOTE: the Web Template carries no node for an entry attribute such as
     // `ACTIVITY.timing`; one of the content attributes is named below its parent node.

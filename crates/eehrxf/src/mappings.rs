@@ -29,6 +29,24 @@ pub struct Project {
     searches: &'static [File],
     accounted: &'static [&'static str],
     followed: &'static [&'static str],
+    left_out: &'static [LeftOut],
+}
+
+/// One element of an entry a project maps that the project carries into no
+/// FHIR element.
+///
+/// A run out of openEHR declares each one a composition holds as
+/// `fhirconnect`'s `Loss::Unread`, naming its openEHR path, and
+/// [`crate::mapping::left_out`] reads those paths back for a document's
+/// narrative (`Section::with_left_out` of the `document` module). No
+/// specification governs the declaration: our own design.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LeftOut {
+    /// The archetype id of the entry, `openEHR-EHR-ACTION.medication.v1`.
+    pub archetype: &'static str,
+    /// The element's path below the entry's archetype root,
+    /// `description[at0017]/items[at0021]`.
+    pub path: &'static str,
 }
 
 /// A context mapping a project does not compile, named to
@@ -124,6 +142,15 @@ impl Project {
         self.followed
     }
 
+    /// Returns each element of an entry the project maps that it carries into
+    /// no FHIR element, the elements a run declares when a composition holds
+    /// them. A project that lists none still declares each element its run
+    /// leaves unread; the list states a project's own account of them.
+    #[must_use]
+    pub const fn left_out(&self) -> &'static [LeftOut] {
+        self.left_out
+    }
+
     /// Writes every file of the project and every search declaration into
     /// `directory`, which must exist, and answers the paths of the files
     /// written, in loading order, the `files` a [`crate::mapping::Mapping`]
@@ -189,6 +216,7 @@ pub const MPD: Project = Project {
     ],
     accounted: &[],
     followed: &[],
+    left_out: &[],
 };
 
 /// The HL7 Europe Imaging Report 1.0.0-ballot project.
@@ -259,6 +287,7 @@ pub const IMAGING: Project = Project {
     // NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer:organization; the
     // project maps the Organization a performer names, so a performer that resolves to one it read is carried.
     followed: &["DiagnosticReport.performer"],
+    left_out: &[],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
@@ -303,6 +332,7 @@ pub const LABORATORY: Project = Project {
         "Observation.referenceRange",
     ],
     followed: &[],
+    left_out: &[],
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.
@@ -370,6 +400,7 @@ pub const EPS: Project = Project {
     ],
     accounted: &[],
     followed: &[],
+    left_out: &[],
 };
 
 /// The HL7 Europe Hospital Discharge Report 1.0.0 project.
@@ -476,6 +507,7 @@ pub const HDR: Project = Project {
         "MedicationRequest.eventHistory",
     ],
     followed: &[],
+    left_out: &[],
 };
 
 /// FerroBRIDGE's medical test report project, the non-laboratory reports of
@@ -502,6 +534,7 @@ pub const TEST_REPORT: Project = Project {
     ],
     accounted: &[],
     followed: &[],
+    left_out: &[],
 };
 
 /// The draft `EEHRxF` Annex X project: the common data groups served as
@@ -679,7 +712,13 @@ pub const ANNEX_X: Project = Project {
     ],
     accounted: &[],
     followed: &[],
+    left_out: &[],
 };
+
+/// The archetype of the entry the `euvac` project maps, the CKM medication
+/// action the template's immunisations section holds.
+#[cfg(feature = "vaccination")]
+const VACCINATION_ENTRY: &str = "openEHR-EHR-ACTION.medication.v1";
 
 /// The MyHealth@EU Vaccination 10.0.0-preview project.
 ///
@@ -691,6 +730,12 @@ pub const ANNEX_X: Project = Project {
 /// sequence number as its dose number and a `location-myhealtheu-core` in
 /// the composition's territory as its vaccination country. A document takes
 /// the run with [`crate::document::Document::with_mapped_composition`].
+///
+/// It carries the vaccine, the time, the route, the sequence number and the
+/// comment of a medication action, the elements `vaccination-myhealtheu-euvac`
+/// has a place for, and [`Project::left_out`] lists every other element of
+/// the action in the template, each of which a run declares when the
+/// composition holds it.
 #[cfg(feature = "vaccination")]
 pub const EUVAC: Project = Project {
     directory: "euvac",
@@ -715,6 +760,56 @@ pub const EUVAC: Project = Project {
     ],
     accounted: &[],
     followed: &[],
+    left_out: &[
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0156]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0132]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0133]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0043]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0154]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0155]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0021]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0140]/items[at0141]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0140]/items[at0143]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0033]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "description[at0017]/items[at0149]",
+        },
+        LeftOut {
+            archetype: VACCINATION_ENTRY,
+            path: "protocol[at0030]/items[at0103]",
+        },
+    ],
 };
 
 /// Every project the enabled features ship.
