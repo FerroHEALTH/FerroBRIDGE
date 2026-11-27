@@ -62,7 +62,9 @@
 # laboratory Bundle profile, each discharge report against its discharge
 # Bundle profile, each vaccination history against the Vaccination guide's
 # Bundle profile it claims, every document entry of a type the Core guide profiles
-# against that Core profile, and every coded element a Core profile binds
+# against that Core profile, in a run that also loads the HL7 Europe guide of
+# the document's category so an extension that guide defines resolves (#2372),
+# and every coded element a Core profile binds
 # to a Master Value Sets Catalogue value set against it. A case passes when the
 # validator reports no error, no fatal issue and no unchecked profile for it;
 # the mode fails only when it cannot measure.
@@ -158,6 +160,7 @@ outcome_files() {
 readonly KNOWN_DEFECT_ID="Reference_REF_CantResolveProfile"
 readonly KNOWN_DEFECT_PROFILE="http://hl7.eu/fhir/base/StructureDefinition/patient-animal-eu-core"
 readonly LAB_BUNDLE="http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab"
+readonly LAB_IG="hl7.fhir.eu.laboratory#2.0.0"
 
 # The imaging report document a run validates over the Imaging Report guide.
 readonly IMAGING_BUNDLE="http://hl7.eu/fhir/imaging/StructureDefinition/BundleReportEuImaging"
@@ -190,6 +193,7 @@ readonly EUVAC_IG="myhealth.eu.fhir.euvac#10.0.0-preview"
 # view; CapabilityStatement capabilityStatement-yb-provider).
 readonly IPS_BUNDLE="http://hl7.org/fhir/uv/ips/StructureDefinition/Bundle-uv-ips"
 readonly EPS_BUNDLE="http://hl7.eu/fhir/eps/StructureDefinition/bundle-eu-eps"
+readonly EPS_IG="hl7.fhir.eu.eps#1.0.0-ballot"
 readonly XSHARE_IG="hl7.eu.fhir.xshare-yb#0.3.0"
 readonly XSHARE_PROFILE="$IPS_BUNDLE|2.0.1"
 
@@ -452,8 +456,8 @@ run_lane() {
   local parts=()
   if [[ "${#general[@]}" -gt 0 ]]; then
     validate "$out" general "${general[@]}" -- \
-      'hl7.fhir.uv.ips#2.0.1' 'hl7.fhir.eu.eps#1.0.0-ballot' 'hl7.fhir.eu.base#2.0.1' \
-      'hl7.fhir.eu.laboratory#2.0.0' 'hl7.fhir.eu.mpd#1.0.0' "$REMAINING" "$name" \
+      'hl7.fhir.uv.ips#2.0.1' "$EPS_IG" 'hl7.fhir.eu.base#2.0.1' \
+      "$LAB_IG" 'hl7.fhir.eu.mpd#1.0.0' "$REMAINING" "$name" \
       > "$out/general.bundle.json" || return 1
     parts+=("$out/general.bundle.json")
   fi
@@ -485,7 +489,7 @@ run_lane() {
     parts+=("$out/euvac.bundle.json")
   fi
   if [[ "${#summaries[@]}" -gt 0 ]]; then
-    validate "$out" xshare-yb "${summaries[@]}" -- "$XSHARE_IG" 'hl7.fhir.eu.eps#1.0.0-ballot' "$name" \
+    validate "$out" xshare-yb "${summaries[@]}" -- "$XSHARE_IG" "$EPS_IG" "$name" \
       "profile=$XSHARE_PROFILE" > "$out/xshare-yb.bundle.json" || return 1
     for doc in "${summaries[@]}"; do
       if ! outcome_files "$out/xshare-yb.bundle.json" | grep -qxF "${doc##*/}"; then
@@ -581,6 +585,7 @@ myhealth_eu() {
     esac
   done
   mkdir -p "$out/core" "$out/laboratory" "$out/hdr" "$out/euvac"
+  : > "$out/core.guides.tsv"
   local profiles
   profiles="$(jq -s -c '[.[] | select(.resourceType == "StructureDefinition" and .kind == "resource" and .derivation == "constraint")]
     | group_by(.type) | map(select(length == 1) | {key: .[0].type, value: .[0].url}) | from_entries' \
@@ -601,7 +606,7 @@ myhealth_eu() {
       measure_document "$doc" "$stem" "$out" "$profiles" "$lab_slices" "$hdr_slices"
     done
   done < <(lanes "$documents")
-  measure_guide myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
+  measure_core myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
   measure_guide myhealth-eu-laboratory "$out" "$out/laboratory" "$lab" || return 1
   measure_guide myhealth-eu-hdr "$out" "$out/hdr" "$hdr" || return 1
   measure_guide myhealth-eu-euvac "$out" "$out/euvac" "$EUVAC_IG" || return 1
@@ -661,13 +666,71 @@ measure_document() {
   elif jq -e --arg b "$EUVAC_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
     cp "$doc" "$out/euvac/$stem.json"
   fi
+  local guide file
+  guide="$(category_guide "$doc")"
   jq -c --argjson profiles "$profiles" '
     select(.resourceType == "Bundle") | .entry // [] | to_entries[]
     | select(.value.resource.resourceType as $t | $profiles[$t] != null)
     | [.key, .value.resource.resourceType, (.value.resource | .meta.profile = [$profiles[.resourceType]])]' "$doc" |
     while IFS= read -r line; do
-      jq '.[2]' <<< "$line" > "$out/core/$stem.$(jq -r '"\(.[0]).\(.[1])"' <<< "$line").json"
+      file="$stem.$(jq -r '"\(.[0]).\(.[1])"' <<< "$line").json"
+      jq '.[2]' <<< "$line" > "$out/core/$file"
+      printf '%s\t%s\n' "$file" "$guide" >> "$out/core.guides.tsv"
     done
+}
+
+# category_guide DOC: the HL7 Europe guide of the category whose Bundle
+# profile the document DOC claims, which defines the extensions its entries
+# carry, or nothing for a document of no such category.
+category_guide() {
+  local doc="$1" bundle guide
+  for bundle in "$IMAGING_BUNDLE" "$MANIFEST_BUNDLE" "$HDR_BUNDLE" "$LAB_BUNDLE" "$EPS_BUNDLE"; do
+    if jq -e --arg b "$bundle" 'any((.meta.profile // [])[]; split("|")[0] == $b)' "$doc" > /dev/null 2>&1; then
+      case "$bundle" in
+        "$IMAGING_BUNDLE") guide="$IMAGING_IG" ;;
+        "$MANIFEST_BUNDLE") guide="$MANIFEST_IG" ;;
+        "$HDR_BUNDLE") guide="$HDR_IG" ;;
+        "$LAB_BUNDLE") guide="$LAB_IG" ;;
+        *) guide="$EPS_IG" ;;
+      esac
+      printf '%s\n' "$guide"
+      return 0
+    fi
+  done
+}
+
+# measure_core NAME OUT DIR IG...: measures the Core entries under DIR as
+# measure_guide does, each in a run that also loads the category guide
+# OUT/core.guides.tsv names for its file, so an extension that guide defines
+# resolves; the entries of one guide share a run.
+measure_core() {
+  local corpus="$1" out="$2" dir="$3"
+  shift 3
+  local guides="$out/core.guides.tsv" guide group n=0 file parts=()
+  [[ -s "$guides" ]] || {
+    echo "::error::$corpus: no document to measure" >&2
+    return 1
+  }
+  while IFS= read -r guide; do
+    local files=()
+    while IFS=$'\t' read -r file group; do
+      [[ "$group" = "$guide" ]] && files+=("$dir/$file")
+    done < "$guides"
+    n=$((n + 1))
+    if [[ -n "$guide" ]]; then
+      validate "$out" "$corpus.$n" "${files[@]}" -- "$@" "$guide" > "$out/$corpus.$n.bundle.json" || return 1
+    else
+      validate "$out" "$corpus.$n" "${files[@]}" -- "$@" > "$out/$corpus.$n.bundle.json" || return 1
+    fi
+    parts+=("$out/$corpus.$n.bundle.json")
+  done < <(cut -f2 "$guides" | LC_ALL=C sort -u)
+  jq -s '{resourceType: "Bundle", type: "collection", entry: [.[].entry[]]}' "${parts[@]}" \
+    > "$out/$corpus.bundle.json"
+  {
+    printf 'file\tseverity\tmessage-id\twhere\ttext\n'
+    issues "$out/$corpus.bundle.json"
+  } > "$out/$corpus.tsv"
+  corpus_result "$corpus" "$dir" "$out/$corpus.tsv"
 }
 
 # mvc_codes CASES CORE MVC OUT [REVIEWED]: one case per coded element of
@@ -869,6 +932,22 @@ self_test() {
   cases=$((cases + 1))
   if [[ "$verdicts" != '[1,["a",true,"extensible"],["b",true,"extensible"],["c",false,"extensible"],["x",false,"required"]]' ]]; then
     echo "::error::self-test: a reviewed extensible miss passes, an unreviewed one and a required miss fail: got $verdicts" >&2
+    wrong=1
+  fi
+  mkdir -p "$scratch/core/core"
+  : > "$scratch/core/core.guides.tsv"
+  jq -n --arg b "$IMAGING_BUNDLE" '{resourceType: "Bundle", meta: {profile: [$b]}, entry: [
+      {resource: {resourceType: "Composition", section: [{extension: [{url: "urn:category-extension"}]}]}},
+      {resource: {resourceType: "Endpoint"}}]}' > "$scratch/imaging.json"
+  jq -n '{resourceType: "Bundle", meta: {profile: ["urn:no-category"]}, entry: [{resource: {resourceType: "Patient"}}]}' \
+    > "$scratch/other.json"
+  measure_document "$scratch/imaging.json" imaging "$scratch/core" '{"Composition":"urn:core-c","Patient":"urn:core-p"}' '{}' '{}'
+  measure_document "$scratch/other.json" other "$scratch/core" '{"Composition":"urn:core-c","Patient":"urn:core-p"}' '{}' '{}'
+  local guided
+  guided="$(tr '\t' '=' < "$scratch/core/core.guides.tsv" | tr '\n' ' ')"
+  cases=$((cases + 1))
+  if [[ "$guided" != "imaging.0.Composition.json=$IMAGING_IG other.0.Patient.json= " ]]; then
+    echo "::error::self-test: a Core entry is measured with its document's category guide: got $guided" >&2
     wrong=1
   fi
   if [[ "$wrong" -ne 0 ]]; then
