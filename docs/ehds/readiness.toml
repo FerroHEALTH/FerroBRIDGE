@@ -12,8 +12,9 @@
 #
 # Paths are relative to the workspace root. A test is `<file>::<function>`.
 # `target` is what the matrix shows; `profile` is the canonical the context's
-# project directory must name, unless `claimed = false` says the resource is
-# produced without claiming it.
+# project directory must name, or the file `claimed_in` names when the code
+# assembling the document claims it, unless `claimed = false` says the
+# resource is produced without claiming it.
 
 [[category]]
 article = "14(1)(a)"
@@ -55,6 +56,27 @@ template = "FerroBRIDGE patient summary template over CKM archetypes"
 template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_patient_summary.adlt"
 context = "crates/eehrxf/mappings/eps/ferrobridge_eu_eps.context.yml"
 test = "crates/eehrxf/tests/it/eps_mapped.rs::the_summary_holds_the_medicine_and_the_vaccine_in_their_sections"
+
+[[category.row]]
+target = "Composition-uv-ips"
+profile = "http://hl7.org/fhir/uv/ips/StructureDefinition/Composition-uv-ips"
+package = "hl7.fhir.uv.ips 2.0.1"
+template = "FerroBRIDGE patient summary template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_patient_summary.adlt"
+context = "crates/eehrxf/mappings/eps/ferrobridge_eu_eps.context.yml"
+claimed_in = "crates/eehrxf/src/document/mod.rs"
+remark = "the IPS form `eehrxf::document` writes from the same sections, the default of `Patient/$summary`"
+test = "crates/eehrxf/tests/it/eps_mapped.rs::the_summary_in_the_ips_form_validates_against_bundle_uv_ips"
+
+[[category.row]]
+target = "composition-myhealtheu-core"
+package = "myhealth.eu.fhir.core 1.0.1"
+template = "FerroBRIDGE patient summary template over CKM archetypes"
+template_file = "tools/ferrobridge-testkit/fixtures/adl2/ferrobridge_patient_summary.adlt"
+context = "crates/eehrxf/mappings/eps/ferrobridge_eu_eps.context.yml"
+claimed = false
+remark = "`Patient/$summary` answers the HL7 Europe form this profile constrains, with the ICD-10 and ATC codings its required bindings take"
+test = "app/ferrobridge-server/tests/it/facade/summary.rs::the_myhealth_eu_profile_adds_the_codings_its_core_bindings_take"
 
 [[category]]
 article = "14(1)(b)"

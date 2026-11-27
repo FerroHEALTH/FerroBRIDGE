@@ -17,7 +17,7 @@ OMOP table.
 |---|---|---|---|
 | An integrator | Connect a FHIR client, a source system or an analytics pipeline to openEHR data | [Your first mapping](tutorials/first-mapping.md) | [The FHIR facade](integrate/fhir-facade.md), [The inbound intake](integrate/inbound.md), [The change feed](integrate/change-feed.md), [The OMOP ETL](integrate/omop-etl.md) |
 | A mapping author | Write and check FHIRconnect and OMOCL files | [Your first mapping](tutorials/first-mapping.md) | [Writing and loading mappings](integrate/mappings.md), [The two mapping specifications](evaluate/mapping-specifications.md), [How FerroBRIDGE maps](explanation/how-ferrobridge-maps.md) |
-| An operator | Deploy, configure, upgrade and watch the bridge | [What FerroBRIDGE runs beside](operate/deployment-shape.md) | [The container image](operate/container.md), [Configuration](operate/configuration.md), [The state store and high availability](operate/high-availability.md), [Upgrading to the state store](operate/upgrade-state-store.md) |
+| An operator | Deploy, configure, upgrade and watch the bridge | [What FerroBRIDGE runs beside](operate/deployment-shape.md) | [The container image](operate/container.md), [Configuration](operate/configuration.md), [The state store and high availability](operate/high-availability.md), [Upgrading](operate/upgrades.md) |
 | A compliance or procurement reader | Judge the bridge against the EHDS Regulation, the CRA and the licence | [How FerroBRIDGE maps](explanation/how-ferrobridge-maps.md) | [EHDS readiness](evaluate/ehds-readiness.md), [CRA information for users](evaluate/cra-user-information.md), [Licensing](evaluate/licensing.md) |
 
 ## How this book is organised

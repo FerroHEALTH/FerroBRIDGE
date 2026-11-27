@@ -3,6 +3,8 @@
 
 # What FerroBRIDGE runs beside
 
+**Audience:** operators planning a deployment.
+
 This page describes the shape of a deployment: which systems the bridge talks
 to, what it stores, and what you have to supply. Read it to plan, then install
 the image or a release binary as [The container](container.md) describes.
@@ -31,17 +33,22 @@ implementation the same way.
 ## What FerroBRIDGE stores
 
 Clinical data lives in the CDR and, on the OMOP side, in the CDM database.
-FerroBRIDGE stores two things of its own: the id-map, in the `[state]` store,
-holding the patient identifier to `ehr_id` relation, the external to internal
-resource id relation and the resource id to composition relation; and, on the
-OMOP side, a side table in its own schema beside the CDM that maps each source
-record to its rows, which is what makes a re-run replace rather than
-duplicate. The bridge's own working state lives in one PostgreSQL database
-that every replica shares, the `[state]` store, which the bridge migrates at
-start and which stays apart from the CDM database
-([The state store and high availability](high-availability.md)). Everything
-else it holds is configuration: the loaded
-mapping files, the terminology server address, and the CDR address.
+FerroBRIDGE keeps two stores of its own:
+
+- **The state store**, `[state]`: one PostgreSQL database every replica
+  shares, which the bridge migrates at start. It holds the identity map, the
+  facade's own resources (SMART Health Links, App State, launch `Task`s), the
+  change-feed watermarks and parked events, the outbound delivery record, the
+  audit outbox, the mapping revisions, the settings registers, the inbound
+  sources and the inbound work. Identifier values are stored as an HMAC and
+  stored bodies are sealed ([The state store and high
+  availability](high-availability.md)).
+- **The bridge schema**, `[cdm] bridge_schema`, beside the CDM in the CDM
+  database: the natural-key side table that makes a re-run replace rows
+  instead of adding them, the watermarks and the ETL run history
+  ([The OMOP ETL](../integrate/omop-etl.md)).
+
+Everything else it holds is configuration.
 
 ## What it asks of PostgreSQL
 
@@ -115,9 +122,9 @@ to `TRUNCATE` a table another table's foreign key references.
 
 The format the loader reads is the one the Athena application writes, read
 from its source at a pinned commit: tab-separated, unquoted, UTF-8, with a
-header row and `yyyyMMdd` dates. OHDSI publishes no format document, so a
-download that the loader refuses for its shape is worth reporting on issue
-#88.
+header row and `yyyyMMdd` dates. OHDSI publishes no format document, so
+report a download the loader refuses for its shape on the
+[tracker](https://github.com/FerroHEALTH/FerroBRIDGE/issues).
 
 ### Vocabulary licences
 

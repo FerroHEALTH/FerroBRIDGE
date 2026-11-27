@@ -43,6 +43,8 @@ The interoperability component (`eehrxf`) maps HL7 Europe Patient Summary 1.0.0-
 | `condition-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Diagnose | `the_profile_elements_of_condition_eu_core_survive_the_round_trip` |
 | `medicalTestResult-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_test_result_survive_the_round_trip` |
 | `composition-eu-eps` | hl7.fhir.eu.eps 1.0.0-ballot | FerroBRIDGE patient summary template over CKM archetypes | `the_summary_holds_the_medicine_and_the_vaccine_in_their_sections` |
+| `Composition-uv-ips`; the IPS form `eehrxf::document` writes from the same sections, the default of `Patient/$summary` | hl7.fhir.uv.ips 2.0.1 | FerroBRIDGE patient summary template over CKM archetypes | `the_summary_in_the_ips_form_validates_against_bundle_uv_ips` |
+| `composition-myhealtheu-core` (produced, not claimed); `Patient/$summary` answers the HL7 Europe form this profile constrains, with the ICD-10 and ATC codings its required bindings take | myhealth.eu.fhir.core 1.0.1 | FerroBRIDGE patient summary template over CKM archetypes | `the_myhealth_eu_profile_adds_the_codings_its_core_bindings_take` |
 
 ### Article 14(1)(b): Electronic prescriptions
 

@@ -75,6 +75,9 @@ struct Row {
     test: Option<String>,
     /// Whether the produced resource claims the profile.
     claimed: Option<bool>,
+    /// The file that names the claimed canonical when the code assembling
+    /// the document claims it, in place of the context's project directory.
+    claimed_in: Option<String>,
     /// Why no template exists.
     gap: Option<String>,
     /// What the matrix says beside the row's target.
@@ -117,7 +120,12 @@ fn defects(row: &Row) -> Vec<String> {
     if !context_path.is_file() {
         found.push(format!("{}: the context {context} is gone", row.target));
     }
-    if row.claimed != Some(false) {
+    if let (Some(file), Some(profile)) = (row.claimed_in.as_ref(), row.profile.as_ref()) {
+        let source = std::fs::read_to_string(rooted(file)).unwrap_or_default();
+        if !source.contains(profile.as_str()) {
+            found.push(format!("{}: {file} names no {profile}", row.target));
+        }
+    } else if row.claimed != Some(false) {
         match (row.profile.as_ref(), context_path.parent()) {
             (Some(profile), Some(directory)) => {
                 let named = std::fs::read_dir(directory)
