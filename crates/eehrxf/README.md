@@ -147,10 +147,10 @@ uses it:
 
 ```toml
 [dependencies]
-eehrxf = "0.49"
+eehrxf = "0.50"
 ```
 
-Name a patch (`"0.49.N"`) when you need the first release that carries what
+Name a patch (`"0.50.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## Licence
