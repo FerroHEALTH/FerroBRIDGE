@@ -58,8 +58,11 @@ containers and stops them when it ends.
 ## The conformance pass lists
 
 Neither FHIRconnect nor OMOCL has an external conformance suite, so the corpus
-tests are the instrument. Fifteen corpora are measured, and each keeps a
-committed pass list under `conformance/<corpus>/pass-list.txt`: one passing
+tests are the instrument. `scripts/checks/conformance.sh` runs the corpus
+tests its table names and reads the results the `fhir-validator` job (the
+MyHealth@EU corpora) and the test job (the EEHRxF draft corpora and the
+Xt-EHR crosswalk) write; its usage line lists them all.
+Each keeps a committed pass list under `conformance/<corpus>/pass-list.txt`: one passing
 case id per line, then a `total` line with the corpus size, and, beside it,
 `upstream.tsv` when an open `upstream-report` issue holds a failing case. The HL7 v2
 messages count twice: the vendored sets are the `hl7v2` corpus and the sets

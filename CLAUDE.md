@@ -355,26 +355,28 @@ the testkit tool crate. Beside it:
   `file-length.sh`, the 1000-line cap with its allow-list, both ratchets
   that fail a rise, pass a fall and only tighten (#1359); `forwarders.sh`,
   the ratchet of the same kind over the functions that only forward to
-  another, which `tools/forwarders` lists (#1414); and `conformance.sh`, the pass-list gate over the six
-  corpora under `conformance/` (seventeen: the two mapping libraries, the
-  round-trip laws, the REST API draft, the two HL7 v2 message sets, the five
-  FHIR examples packages per version, STU3 to R6, the R4 facade, the draft
-  EEHRxF Annex X groups the facade serves, the HL7
-  FHIRPath test suite for R4 as N1 and with the 3.0.0 STU functions, the
-  R4 profile validator's agreement with the HL7 FHIR Validator, and the
-  draft EEHRxF annexes against the Xt-EHR models 1.0.0), and the four
-  MyHealth@EU corpora HL7's FHIR Validator measures in the `fhir-validator`
-  job (`scripts/checks/fhir-validator.sh --myhealth-eu`: Core, Laboratory and
-  HDR on their CI builds, and the codes against the MVC catalogue), (a regression fails, a new pass asks for the
+  another, which `tools/forwarders` lists (#1414); and `conformance.sh`, the pass-list gate over
+  the corpora under `conformance/`. It measures the ones in its corpus table
+  itself (the two mapping libraries, the round-trip laws, the REST API draft,
+  the two HL7 v2 message sets, the FHIR examples package of each version,
+  STU3 to R6, the R4 facade, the draft EEHRxF Annex X groups the facade
+  serves, the HL7 FHIRPath test suite for R4 as N1 and with the 3.0.0 STU
+  functions, and the R4 profile validator's agreement with the HL7 FHIR
+  Validator), and reads the results of the rest from the jobs that measure
+  them: the MyHealth@EU corpora HL7's FHIR Validator measures in the
+  `fhir-validator` job (`scripts/checks/fhir-validator.sh --myhealth-eu`:
+  Core, Laboratory, HDR and EuVAC, and the codes against the MVC catalogue),
+  and the EEHRxF draft corpora and the Xt-EHR crosswalk the `eehrxf` suites
+  measure in the test job (a regression fails, a new pass asks for the
   list, `--update` rewrites the lists and the shields.io badge JSON).
   `affected.sh` computes the packages a change reaches, which decides the
   CI lanes a pull request runs, and `fast.sh` is the default local gate over
   the same set (`docs/ci-cd.md`).
 - `.github/`: issue and pull-request templates, CODEOWNERS, Dependabot, and
-  sixteen workflows (CI, PR guards, Docs, Scorecard, CodeQL, SonarQube Cloud,
-  Release, Release build, Release image, Release console, Scan and tag images,
-  Published image scan, Publish crates, Pin freshness, Fuzz, Ratchet
-  tighten). `ci.yml` runs
+  the workflows under `.github/workflows/` (CI, PR guards, Docs, Scorecard,
+  CodeQL, SonarQube Cloud, Release, Release build, Release image, Release
+  console, Scan and tag images, Published image scan, Publish crates, Pin
+  freshness, Fuzz, Ratchet tighten, Perf). `ci.yml` runs
   its workflow, shell, container and guard tier beside the Rust tier; its
   `conclusion` job is the single required check on `main` (`docs/ci-cd.md`).
   `pr-guards.yml` re-runs the guard a changed label affects
