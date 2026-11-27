@@ -837,6 +837,42 @@ pseudonym_domain = "https://example.org/fhir/sid/pseudonym"
 source_domains = ["http://fhir.nl/fhir/NamingSystem/bsn", "https://example.org/fhir/sid/mrn"]
 ```
 
+### `[identity_source.cache]`
+
+Each replica can keep the pseudonyms the identity source answered, so a
+repeated subject costs no ITI-83 round trip. An answer changes when the
+identity source merges, unmerges, links or deletes a patient, so the cache
+serves only while the identity source's PMIR feed reaches the bridge:
+
+- One replica holds the deployment's ITI-94 subscription, which asks for
+  every Patient change to be sent to `feed_url`. It reads the subscription's
+  status every `status_every`.
+- The bridge receives each ITI-93 message at `POST /pmir/feed`. It forgets
+  the identifiers of every merged, updated or deleted patient on every
+  replica before it acknowledges the message.
+- While the subscription is not `active`, its status is older than two
+  periods, or a replica's `LISTEN` session is down, every lookup asks the
+  identity source. An entry also lives at most `max_age`.
+
+The receiver admits only an access token whose `client_id` is in
+`feed_clients`, so the table needs `[auth]`. It also needs `[state]` with
+`[state.seal]`: the subscription is held there, and a source identifier is
+kept as its HMAC under the lookup key.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `entries` | `10000` | The most pseudonyms one replica keeps, at least 1 |
+| `max_age` | `5m` | The longest one pseudonym is kept, whatever the feed says |
+| `feed_url` | none, required | This bridge's `/pmir/feed` route as the identity source reaches it: the subscription's channel endpoint |
+| `feed_clients` | none, required | The client ids of the identity source's access tokens the receiver admits |
+| `status_every` | `30s` | How often the subscription's holder reads its status |
+
+```toml
+[identity_source.cache]
+feed_url = "https://bridge.example.org/pmir/feed"
+feed_clients = ["ferropix"]
+```
+
 ### `[facade]`
 
 The FHIR R4 facade. It is off until `enabled` is true, and a disabled facade

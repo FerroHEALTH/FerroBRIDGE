@@ -2923,7 +2923,14 @@ draft upstream change.
   own design). A patient-scoped token's launch patient and every search
   subject resolve the same way, the identity map first and on a miss the
   party read and ITI-83, so a `Patient` with no party the CDR holds reaches
-  no data (our own design). Under `[audit]` the bridge records each ITI-83
+  no data (our own design). Under `[identity_source.cache]` each replica
+  keeps the answers, keyed by the HMAC of the source identifier, while the
+  deployment's PMIR subscription (ITI-94, held by one replica under a lane
+  lease) is `active`. Each ITI-93 message received at `/pmir/feed`, admitted
+  only for a listed client's token, forgets the identifiers of the patients
+  it merged, updated or deleted on every replica before it is acknowledged,
+  because a merge or an unmerge changes what ITI-83 answers (PIXm 3.1.0
+  §2:3.83.4.2.2.5, PMIR 1.6.0 §2:3.93.4.1.3; our own design). Under `[audit]` the bridge records each ITI-83
   exchange in the audit outbox as the PIXm Query Consumer `AuditEvent`
   (PIXm 3.1.0 §2:3.83.5.1.1). `person_id` maps one
   `ehr_id` to one person on the OMOP side; reconciling one person across

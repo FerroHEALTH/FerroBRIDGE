@@ -57,6 +57,11 @@ pub const INBOUND: Channel = Channel("ferrobridge_inbound");
 /// and loss of the session.
 pub const IDENTITY: Channel = Channel("ferrobridge_identity");
 
+/// The cached pseudonyms of the identity source: the payload is
+/// `forget:<digest>`, the base64url digest of one source identifier whose
+/// answer changed, or `status:<code>`, the PMIR subscription's status.
+pub const PSEUDONYMS: Channel = Channel("ferrobridge_pseudonyms");
+
 impl Channel {
     /// Returns the name a session listens on.
     #[must_use]

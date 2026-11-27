@@ -267,6 +267,7 @@ mod tests {
     /// an identity source no case reaches.
     fn link() -> SubjectLink {
         let section = crate::config::section::identity_source::IdentitySource {
+            cache: None,
             endpoint: ferrohealth_smart::config::endpoint::EndpointSection {
                 url: ferrohealth_secret::secret_url::SecretUrl::new("http://127.0.0.1:9/fhir"),
                 ..ferrohealth_smart::config::endpoint::EndpointSection::default()

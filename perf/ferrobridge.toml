@@ -38,7 +38,14 @@ url = "http://127.0.0.1:18110/fhir"
 issuer = "http://127.0.0.1:18180/perf"
 client_id = "ferrobridge-perf"
 client_secret = "perf"
-scope = "system/Patient.rs"
+scope = "system/Patient.rs system/Subscription.cruds"
+
+# The identity source's answers cached while its PMIR feed reaches this arm:
+# FerroPIX sends each ITI-93 message to the arm's /pmir/feed with the stub
+# issuer's token for its client (scripts/perf/gate.sh, identity).
+[identity_source.cache]
+feed_url = "http://127.0.0.1:18080/pmir/feed"
+feed_clients = ["ferropix-perf"]
 
 [facade]
 enabled = true
@@ -62,10 +69,11 @@ lookup_key = "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI="
 id = "perf"
 key = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE="
 
-# The gate runs on a runner no other caller reaches, as the [auth] section
-# of the Operate pages allows; the request set then carries no token.
-[auth]
-enabled = false
+# The pseudonym cache's feed receiver admits only the identity source's
+# token, so the arm checks every token against the gate's stub issuer, and
+# the request set carries one (perf/plan.toml).
+[auth.issuer.perf]
+issuer = "http://127.0.0.1:18180/perf"
 
 [hl7v2]
 enabled = true
