@@ -25,7 +25,7 @@ use eehrxf::document::discharge::{
 use eehrxf::document::language::DocumentLanguage;
 use eehrxf::document::language::EHDSI_LANGUAGE;
 use eehrxf::document::section::Section;
-use eehrxf::mapping::Mapping;
+use eehrxf::mapping::{Mapping, left_out_in};
 use eehrxf::mappings::HDR;
 use eehrxf::terminology::Terminology;
 use ferrobridge_testkit::fixtures::{
@@ -482,7 +482,7 @@ fn a_narrative_only_discharge_report_is_written_for_the_corpus() -> Result<(), B
 /// `identifier`, in the text it is sent as.
 fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String, Box<dyn Error>> {
     let (mut document, subject, device) = discharge_document(identifier)?;
-    let run = mapping.to_fhir_with(
+    let (run, warnings) = mapping.to_fhir_with_warnings(
         composition,
         &Settings::new(device.clone(), NOW),
         CallContext::new()
@@ -501,7 +501,12 @@ fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String
     ))?;
     for section in document.with_mapped_composition(run.bundle())? {
         let paragraph = format!("{}.", section.slot.title);
-        document.with_section(section.into_section(vec![paragraph]))?;
+        let left_out = left_out_in(&warnings, &HDR, section.slot.slice);
+        document.with_section(
+            section
+                .into_section(vec![paragraph])
+                .with_left_out(left_out),
+        )?;
     }
     document.with_metadata(annex_iii("18842-5"));
     Ok(serde_json::to_string(&document.into_bundle()?)?)
@@ -542,7 +547,7 @@ async fn sent_myhealtheu(
             .held(&terminology, EHDSI_LANGUAGE)
             .await?,
     )?;
-    let run = mapping.to_fhir_with(
+    let (run, warnings) = mapping.to_fhir_with_warnings(
         composition,
         &Settings::new(author.clone(), NOW),
         CallContext::new()
@@ -559,7 +564,12 @@ async fn sent_myhealtheu(
     ))?;
     for section in document.with_mapped_composition(run.bundle())? {
         let paragraph = format!("{}.", section.slot.title);
-        document.with_section(section.into_section(vec![paragraph]))?;
+        let left_out = left_out_in(&warnings, &HDR, section.slot.slice);
+        document.with_section(
+            section
+                .into_section(vec![paragraph])
+                .with_left_out(left_out),
+        )?;
     }
     document.with_metadata(annex_iii("18842-5"));
     Ok(serde_json::to_string(&document.into_bundle()?)?)

@@ -50,6 +50,7 @@ use serde_json::Value;
 use super::support::{annex_iii, emit, imaging};
 
 mod accounted;
+mod declared;
 
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
