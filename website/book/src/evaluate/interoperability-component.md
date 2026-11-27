@@ -88,7 +88,7 @@ four ways:
   which writes only the documents no other job writes: the plain
   `Patient/$summary` documents come from the `test` job alone, so each
   document is validated once. The CI `fhir-validator` job runs HL7's FHIR Validator over every one of them, offline, against `hl7.fhir.eu.eps` 1.0.0-ballot,
-  `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.eu.laboratory` 2.0.0,
+  `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.eu.laboratory` 2.1.0,
   `hl7.fhir.eu.mpd` 1.0.0, the remaining-dispensations extension and the
   MyHealth@EU Master Value Sets Catalogue, with the jar and every package
   pinned by sha256 in `docs/VERSIONS.md`. It fails on an error, a fatal issue
@@ -245,7 +245,7 @@ the crate's tests:
 | HL7 Europe Patient Summary (`hl7.fhir.eu.eps`) | 1.0.0-ballot | the patient summary document and its crosswalk |
 | HL7 Europe Base and Core (`hl7.fhir.eu.base`) | 2.0.1 | the core profiles a patient summary section claims |
 | HL7 Europe Medication Prescription and Dispense (`hl7.fhir.eu.mpd`) | 1.0.0 | the prescription and dispensation records |
-| HL7 Europe Laboratory Report (`hl7.fhir.eu.laboratory`) | 2.0.0 | the laboratory report crosswalk and document |
+| HL7 Europe Laboratory Report (`hl7.fhir.eu.laboratory`) | 2.1.0 | the laboratory report crosswalk and document |
 | HL7 Europe Imaging Report (`hl7.fhir.eu.imaging`) | 1.0.0-ballot | the imaging report and imaging study crosswalks |
 | HL7 Europe Imaging Manifest (`hl7.fhir.eu.imaging-manifest`) | 1.0.0-ballot | the imaging study manifest |
 | HL7 Europe Hospital Discharge Report (`hl7.fhir.eu.hdr`) | 1.0.0 | the discharge report crosswalk and document |
