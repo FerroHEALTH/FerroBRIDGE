@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored context over FerroBRIDGE's medication template whose
+# start model reads the medication item, the order ID (an element of two data
+# value types) and, through a manual entry's condition, the comment: the
+# fixture for the elements a run out to FHIR leaves unread.
+grammar: FHIRConnect/v1.0.0
+type: context
+metadata:
+  name: ferrobridge_unread_action.context
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+context:
+  profile:
+    url: "http://example.org/fhir/StructureDefinition/ferrobridge-unread-action"
+  template:
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_medication.v1.0.0"
+  archetypes:
+    - "ferrobridge_unread_action"
+  start: "ferrobridge_unread_action"

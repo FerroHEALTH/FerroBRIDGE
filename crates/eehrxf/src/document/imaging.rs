@@ -6,7 +6,8 @@
 //!
 //! A `BundleReportEuImaging` whose `CompositionEuImaging` and
 //! `DiagnosticReportEuImaging` each name the other. The composition's type is
-//! the report's code, as the guide's examples write it, and its
+//! the report's code, as the guide's examples write it, with LOINC
+//! `18748-4` beside it for the MyHealth@EU imaging guide, and its
 //! `Organization` authors are the report's performing organizations, which
 //! `dr-comp-author-org` requires; the operator is its custodian.
 
@@ -24,6 +25,16 @@ pub const IMAGING_BUNDLE: &str =
 /// none: LOINC `18726-0`, the concept the `ImagingReportTypesEuVSEuImaging`
 /// value set includes with every descendant (`is-a`).
 pub const IMAGING_REPORT: &str = "18726-0";
+
+/// The `Composition.type` coding the MyHealth@EU imaging guide requires.
+///
+/// LOINC `18748-4` is the one concept of the catalogue's
+/// `eHDSIMedicalImagingReportType`, which the Core `eHDSIDocumentTypes`
+/// includes.
+pub const MYHEALTHEU_IMAGING_TYPE: Code = Code {
+    system: LOINC,
+    code: "18748-4",
+};
 
 /// The two categories `CompositionEuImaging` and `DiagnosticReportEuImaging`
 /// require: the imaging report (LOINC `85430-7`) and the `Medical-Imaging`
@@ -64,6 +75,9 @@ pub const IMAGING_REPORT_FORM: Form = Form {
             system: LOINC,
             code: IMAGING_REPORT,
         },
+        // NOTE: MyHealth@EU imaging 9.1.1 composition-img-myhealtheu binds Composition.type required to
+        // eHDSIDocumentTypes; HL7 Europe Imaging binds it preferred, so the second coding meets both.
+        beside: &[MYHEALTHEU_IMAGING_TYPE],
     },
     categories: &IMAGING_CATEGORIES,
     authorship: Authorship::ReportPerformers,

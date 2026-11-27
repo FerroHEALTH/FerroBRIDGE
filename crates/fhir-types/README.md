@@ -23,10 +23,10 @@ uses it:
 
 ```toml
 [dependencies]
-fhir-types = "0.3"
+fhir-types = "0.4"
 ```
 
-Name a patch (`"0.3.N"`) when you need the first release that carries what
+Name a patch (`"0.4.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## Features

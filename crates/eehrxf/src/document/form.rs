@@ -112,10 +112,14 @@ pub enum Kind {
     /// one.
     Fixed(Code),
     /// The codings of the report's `code`, or `fallback` when the report
-    /// carries none, which the report then carries too.
+    /// carries none, which the report then carries too, followed by each
+    /// code of `beside` the type does not hold yet.
     Report {
         /// The code written when the report carries none.
         fallback: Code,
+        /// The codes the type carries beside the report's, for a guide that
+        /// binds the type to a value set the report's code is not in.
+        beside: &'static [Code],
     },
 }
 

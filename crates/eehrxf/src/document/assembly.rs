@@ -37,8 +37,27 @@ impl Document {
             (Kind::Report { .. }, Some(report)) if !report.code.coding.is_empty() => {
                 report.code.coding.clone()
             }
-            (Kind::Report { fallback }, _) => vec![coding(fallback)],
+            (Kind::Report { fallback, .. }, _) => vec![coding(fallback)],
         };
+        if let Kind::Report { beside, .. } = self.form.kind {
+            for code in beside {
+                let held = composition.r#type.coding.iter().any(|written| {
+                    written
+                        .system
+                        .as_ref()
+                        .and_then(|system| system.value.as_deref())
+                        == Some(code.system)
+                        && written
+                            .code
+                            .as_ref()
+                            .and_then(|value| value.value.as_deref())
+                            == Some(code.code)
+                });
+                if !held {
+                    composition.r#type.coding.push(coding(*code));
+                }
+            }
+        }
         composition.category = match report {
             Some(report) => report.category.clone(),
             None => self
@@ -262,7 +281,7 @@ impl Document {
                     report.code.coding.push(kind);
                 }
             }
-            Kind::Report { fallback } => {
+            Kind::Report { fallback, .. } => {
                 if report.code.coding.is_empty() {
                     report.code.coding.push(coding(fallback));
                 }
