@@ -5,6 +5,6 @@
 # path, as `<path> <ceiling>`, each the CI count plus 2%. A ceiling is
 # lowered in a normal change and raised only with its cause stated in the
 # pull request; `report` measures a path without judging it.
-fhir_to_openehr 2855000
-openehr_to_fhir 606000
-hl7v2_ack 356000
+fhir_to_openehr 2878000
+openehr_to_fhir 627000
+hl7v2_ack 366000

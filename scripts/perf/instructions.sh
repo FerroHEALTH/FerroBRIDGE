@@ -7,10 +7,15 @@
 # each counted by callgrind in a release build of the example
 # `hot_path_instructions` and held to its ceiling in perf/instructions.ceilings.
 #
-# A count is deterministic for one binary on one platform, so the lane runs
-# on Linux, where valgrind runs. `--toggle-collect` counts inside the
-# example's `measured` function and nowhere else. No specification governs
-# the cost of a path: our own design.
+# The lane runs on Linux, where valgrind runs. `--toggle-collect` counts
+# inside the example's `measured` function and nowhere else. Two things make
+# one binary's count the same in every run (#2305): the example runs the
+# measured call on a thread of its own, so it allocates from a fresh heap and
+# never from the one loading the mappings left behind, and the script
+# preloads perf/getrandom.c, so every standard library hash seed is the same.
+# Each path is measured twice, and the lane fails when the two counts
+# differ, so a count that stops being repeatable is reported as such. No
+# specification governs the cost of a path: our own design.
 #
 # Usage:
 #   scripts/perf/instructions.sh            build, measure, fail on a ceiling
@@ -23,27 +28,41 @@ cd "$root"
 ceilings="perf/instructions.ceilings"
 example="target/release/examples/hot_path_instructions"
 
-command -v valgrind >/dev/null || {
-  echo "instructions: valgrind is not installed" >&2
-  exit 2
-}
+for tool in valgrind cc; do
+  command -v "$tool" >/dev/null || {
+    echo "instructions: $tool is not installed" >&2
+    exit 2
+  }
+done
 if [[ "${1:-}" != "--no-build" ]]; then
   cargo build --locked --release -p ferrobridge-server --example hot_path_instructions
 fi
 
 out="$(mktemp -d)"
-trap 'rm -f "$out"/*.out; rmdir "$out"' EXIT
+trap 'rm -f "$out"/*.out "$out"/getrandom.so; rmdir "$out"' EXIT
+cc -shared -fPIC -O2 -o "$out/getrandom.so" perf/getrandom.c
+
+# Prints the instructions one run of `$1` executes inside `measured`.
+measure() {
+  local trace="$out/$1.$2.out"
+  LD_PRELOAD="$out/getrandom.so" valgrind --tool=callgrind \
+    --toggle-collect='*measured*' --callgrind-out-file="$trace" \
+    "$example" "$1" 2>/dev/null
+  awk '/^summary:/ { print $2 }' "$trace"
+}
 
 over=0
 printf '%-16s %15s %15s\n' path instructions ceiling
 while read -r path ceiling; do
   [[ -z "$path" || "$path" == \#* ]] && continue
-  trace="$out/$path.out"
-  valgrind --tool=callgrind --toggle-collect='*measured*' \
-    --callgrind-out-file="$trace" "$example" "$path" 2>/dev/null
-  count="$(awk '/^summary:/ { print $2 }' "$trace")"
-  [[ -n "$count" ]] || {
+  count="$(measure "$path" 1)"
+  again="$(measure "$path" 2)"
+  [[ -n "$count" && -n "$again" ]] || {
     echo "instructions: no count for $path" >&2
+    exit 2
+  }
+  [[ "$count" == "$again" ]] || {
+    echo "instructions: $path counted $count, then $again: the count is not repeatable" >&2
     exit 2
   }
   verdict=""
