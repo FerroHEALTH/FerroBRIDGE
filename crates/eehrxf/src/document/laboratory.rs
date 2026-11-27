@@ -6,7 +6,7 @@
 //! and `DiagnosticReport-eu-lab` each name the other.
 
 use crate::crosswalk::laboratory::{LAB_COMPOSITION, LAB_DIAGNOSTIC_REPORT};
-use crate::document::form::{Authorship, Code, Companion, Form, Kind, Slot};
+use crate::document::form::{Authorship, Code, Companion, EHDSI_RESULTS, Form, Kind, Slot};
 use crate::document::language::Language;
 use crate::document::{EU_CORE_PATIENT, LOINC};
 
@@ -26,13 +26,13 @@ pub const LABORATORY_REPORT: &str = "11502-2";
 /// which codes: our own design, the value set the profile binds the report's
 /// study type to).
 pub const LAB_SLOTS: [Slot; 9] = [
-    Slot::new("bloodBank", "18717-9", "Blood bank studies"),
-    Slot::new("chemistry", "18719-5", "Chemistry studies"),
-    Slot::new("fertility", "18722-9", "Fertility studies"),
-    Slot::new("hematology", "18723-7", "Hematology studies"),
-    Slot::new("microbiology", "18725-2", "Microbiology studies"),
-    Slot::new("toxicology", "18728-6", "Toxicology studies"),
-    Slot::new("laboratory", "26436-6", "Laboratory studies"),
+    Slot::new("bloodBank", "18717-9", "Blood bank studies").with_ehdsi(EHDSI_RESULTS),
+    Slot::new("chemistry", "18719-5", "Chemistry studies").with_ehdsi(EHDSI_RESULTS),
+    Slot::new("fertility", "18722-9", "Fertility studies").with_ehdsi(EHDSI_RESULTS),
+    Slot::new("hematology", "18723-7", "Hematology studies").with_ehdsi(EHDSI_RESULTS),
+    Slot::new("microbiology", "18725-2", "Microbiology studies").with_ehdsi(EHDSI_RESULTS),
+    Slot::new("toxicology", "18728-6", "Toxicology studies").with_ehdsi(EHDSI_RESULTS),
+    Slot::new("laboratory", "26436-6", "Laboratory studies").with_ehdsi(EHDSI_RESULTS),
     Slot::new("annotations", "48767-8", "Annotation comment"),
     Slot::new("attachment", "77599-9", "Additional documents"),
 ];

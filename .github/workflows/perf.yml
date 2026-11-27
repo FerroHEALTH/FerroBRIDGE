@@ -113,6 +113,9 @@ jobs:
         id: arms
         env:
           BASE: ${{ inputs.base }}
+          # With no BASE the gate asks the GitHub API which tags have a
+          # published release (#2346), with this job's read-only token.
+          GH_TOKEN: ${{ github.token }}
         # The memory, swap and disk are logged each minute, so a runner that
         # shuts down mid-build leaves the last reading in its log. Nothing is
         # measured on this runner.

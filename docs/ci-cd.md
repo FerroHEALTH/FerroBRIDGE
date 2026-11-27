@@ -302,15 +302,19 @@ from the vendored HL7 packages. `publish-dry-run` runs `cargo publish
 --workspace --dry-run --locked` with no cache, so a packaging failure surfaces
 on the pull request instead of in a release. `crate-version-guard` runs on pull
 requests and again on the merge group against the queue base, and fails a
-change that alters a crate's packaged content without moving that crate's
-version above the base's, which a published version's immutability makes a
-hard rule (`.claude/rules/crates-publishing.md`); the `no-crate-bump` label is
-its escape. It also refuses a minor step that keeps its patch, a step out of
-0.x and a README whose stated caret range is not the manifest's line. It then
-installs the toolchain and the pinned `cargo-semver-checks` to judge every
-crate that moved from a published line against the same base
+change that alters a crate's packaged content while that crate's version is
+not above its newest release on crates.io, or is below the base's. A version
+steps once per publish, so a change to a crate whose base already holds an
+unpublished version bumps nothing, and two such changes never race in the
+merge queue (#2367, `.claude/rules/crates-publishing.md`); the guard reads the
+releases from the crates.io sparse index and fails when it cannot, and the
+`no-crate-bump` label is its escape. It also refuses a minor step that keeps
+its patch, a step out of 0.x and a README whose stated caret range is not the
+manifest's line. It then installs the toolchain and the pinned
+`cargo-semver-checks` to judge every changed crate against the same base, or
+against its newest release while the base holds an unpublished version
 (`scripts/checks/semver.sh`), on the judge's default feature set and with no
-default features: a breaking change on a patch bump fails it (#1745, #1830).
+default features: a breaking change on a patch step fails it (#1745, #1830).
 
 `hashFiles()` cannot do this work. It is evaluated before checkout, when the
 workspace is empty, so a `if: hashFiles('Cargo.toml') != ''` gate never sees

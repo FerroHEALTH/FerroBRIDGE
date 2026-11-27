@@ -157,7 +157,10 @@ fn written() -> BTreeSet<&'static str> {
         .chain(&HDR_SLOTS)
         .chain(&IMAGING_SLOTS)
         .collect();
-    let mut codes: BTreeSet<&'static str> = slots.iter().map(|slot| slot.code).collect();
+    let mut codes: BTreeSet<&'static str> = slots
+        .iter()
+        .flat_map(|slot| std::iter::once(slot.code).chain(slot.ehdsi))
+        .collect();
     codes.extend([
         PATIENT_SUMMARY,
         LABORATORY_REPORT,
@@ -253,6 +256,50 @@ fn every_priority_category_carries_its_health_data_api_display() -> Result<(), B
             display(PRIORITY_SYSTEM, code),
             concept["display"].as_str(),
             "{code}"
+        );
+    }
+    Ok(())
+}
+
+// NOTE: FHIR R4 terminologies.html 4.1.5.3: a concept of an extensible value set is required when one applies.
+#[test]
+fn a_slot_s_ehdsi_concept_is_in_ehdsi_section_and_its_own_code_is_not() -> Result<(), Box<dyn Error>>
+{
+    let set = member(
+        "ehdsi-mvc/myhealth.eu.fhir.mvc-package-9.1.0.tgz",
+        "ValueSet-eHDSISection.json",
+    )?;
+    let members: BTreeSet<&str> = set["compose"]["include"]
+        .as_array()
+        .ok_or("the includes")?
+        .iter()
+        .filter(|include| include["system"] == LOINC)
+        .flat_map(|include| include["concept"].as_array().into_iter().flatten())
+        .filter_map(|concept| concept["code"].as_str())
+        .collect();
+    let slots: Vec<&Slot> = SLOTS
+        .iter()
+        .chain(&LAB_SLOTS)
+        .chain(&HDR_SLOTS)
+        .chain(&IMAGING_SLOTS)
+        .collect();
+    let carried: Vec<&&Slot> = slots.iter().filter(|slot| slot.ehdsi.is_some()).collect();
+    assert!(
+        !carried.is_empty(),
+        "some slot carries an eHDSISection concept"
+    );
+    for slot in carried {
+        let ehdsi = slot.ehdsi.ok_or("the concept")?;
+        assert!(
+            members.contains(ehdsi),
+            "{}: {ehdsi} is no eHDSISection concept",
+            slot.slice
+        );
+        assert!(
+            !members.contains(slot.code),
+            "{}: {} is in eHDSISection already",
+            slot.slice,
+            slot.code
         );
     }
     Ok(())

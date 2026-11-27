@@ -48,6 +48,7 @@ const LOINC_DISPLAYS: &[(&str, &str)] = &[
     ),
     ("26436-6", "Laboratory studies (set)"),
     ("29545-1", "Physical findings Narrative"),
+    ("29554-3", "Procedure Narrative"),
     ("29762-2", "Social history Narrative"),
     (
         "30954-2",

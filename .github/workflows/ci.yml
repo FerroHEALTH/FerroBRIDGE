@@ -1753,12 +1753,13 @@ jobs:
   # request that changes a crate's packaged content moves that crate's version
   # in the same change, because a published version is immutable. The
   # `no-crate-bump` label is the escape for a diff that provably alters no
-  # packaged bytes. The merge group runs it again against the queue base, so a
-  # change whose version main reached while it waited fails before it merges
-  # (#1096). Each crate that moved from a published line is then judged by
-  # cargo-semver-checks against the same base (scripts/checks/semver.sh,
-  # #1745): a breaking change bumps the minor while 0.x, a compatible one the
-  # patch. The toolchain is installed only when a crate is to be judged.
+  # packaged bytes. The merge group runs it again against the queue base
+  # (#1096): a version is above its newest release on crates.io and not below
+  # the base's, so one step serves every change until the next publish
+  # (#2367). Each changed crate is then judged by cargo-semver-checks against
+  # the same base, or its newest release while the base is unpublished
+  # (scripts/checks/semver.sh, #1745): a breaking change bumps the minor while
+  # 0.x, a compatible one the patch. The toolchain is installed only when a crate is to be judged.
   crate-version-guard:
     name: crate-version-guard
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
@@ -1797,7 +1798,7 @@ jobs:
       # the pull request (`gh-readonly-queue/main/pr-<n>-<sha>`), whose label
       # is the same escape; a ref that names none runs the guard.
       - id: guard-queue
-        name: The queued change moves each version above the queue base
+        name: Each changed crate is above its release and not below the queue base
         if: github.event_name == 'merge_group'
         env:
           GH_TOKEN: ${{ github.token }}
