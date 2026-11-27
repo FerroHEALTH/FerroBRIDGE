@@ -10,3 +10,5 @@
   When a discharge report holding that comment is sent, the run leaves the
   comment unread and `Project::slice_of` places it in the hospital course
   section, whose narrative the document assembly writes.
+  `eehrxf` moves to 0.50.0, since a shipped project no longer compiles
+  against a template without the comment.
