@@ -5,8 +5,9 @@
 //! through a scripted terminology server: an `equivalent` or `equal` match
 //! added after the original coding, a concept in a preferred system left
 //! alone, no server leaving the code as recorded (eHN PS Art 10(7)), a
-//! refusal failing the translation, and a concept at an element a target
-//! profile binds asked for the binding's system.
+//! refusal failing the translation, a concept at an element a target
+//! profile binds asked for the binding's system, and each added coding
+//! given its designation in a requested language.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -307,4 +308,107 @@ async fn a_refused_translation_of_a_bound_concept_fails() {
         ),
         "{refused:?}"
     );
+}
+
+/// The terminology whose `$translate` matches `L-1` to `P-1` with `display`,
+/// and whose `$lookup` answers `designation`.
+fn designating(
+    display: Option<&'static str>,
+    designation: Result<Option<&'static str>, StatusCode>,
+) -> Terminology {
+    scripted(Script::Designate {
+        matches: vec![("equivalent", PREFERRED, "P-1")],
+        display,
+        designation,
+    })
+}
+
+#[tokio::test]
+async fn an_added_coding_with_no_display_takes_the_designation_in_the_requested_language()
+-> TestResult {
+    let terminology = designating(None, Ok(Some("Pinda")));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_designations("nl");
+    let translated = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await?;
+    let json = serde_json::to_value(&translated)?;
+    let codings = &json["code"]["coding"];
+    assert_eq!(codings[1]["code"], "P-1");
+    assert_eq!(codings[1]["display"], "Pinda");
+    assert!(
+        codings[0].get("display").is_none(),
+        "the original coding is left as recorded"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_added_coding_with_a_display_carries_the_designation_as_its_translation() -> TestResult {
+    let terminology = designating(Some("Peanut"), Ok(Some("Pinda")));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_designations("nl");
+    let translated = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await?;
+    let json = serde_json::to_value(&translated)?;
+    let coding = &json["code"]["coding"][1];
+    assert_eq!(coding["display"], "Peanut");
+    let translation = &coding["_display"]["extension"][0];
+    assert_eq!(
+        translation["url"],
+        "http://hl7.org/fhir/StructureDefinition/translation"
+    );
+    assert_eq!(translation["extension"][0]["valueCode"], "nl");
+    assert_eq!(translation["extension"][1]["valueString"], "Pinda");
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_added_coding_the_server_holds_no_designation_for_is_left_as_it_is() -> TestResult {
+    let terminology = designating(None, Ok(None));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_designations("nl");
+    let translated = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await?;
+    assert_eq!(
+        codes(&translated),
+        [pair(LOCAL, "L-1"), pair(PREFERRED, "P-1")]
+    );
+    let json = serde_json::to_value(&translated)?;
+    let coding = &json["code"]["coding"][1];
+    assert!(coding.get("display").is_none());
+    assert!(coding.get("_display").is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refused_designation_lookup_fails_the_translation() {
+    let terminology = designating(None, Err(StatusCode::SERVICE_UNAVAILABLE));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_designations("nl");
+    let refused = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await;
+    assert!(
+        matches!(
+            refused,
+            Err(TranslationError::Terminology(TerminologyError::Status {
+                operation: Operation::Lookup,
+                status: StatusCode::SERVICE_UNAVAILABLE,
+            }))
+        ),
+        "{refused:?}"
+    );
+}
+
+#[tokio::test]
+async fn no_designation_is_asked_without_a_requested_language() -> TestResult {
+    let terminology = designating(None, Err(StatusCode::SERVICE_UNAVAILABLE));
+    let mut translator = Translator::new(&terminology, &TARGETS);
+    let translated = translator
+        .translate(&allergy(vec![coding(LOCAL, "L-1")]), preferred)
+        .await?;
+    assert_eq!(
+        codes(&translated),
+        [pair(LOCAL, "L-1"), pair(PREFERRED, "P-1")]
+    );
+    Ok(())
 }

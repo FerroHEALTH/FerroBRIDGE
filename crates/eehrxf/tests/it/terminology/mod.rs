@@ -67,6 +67,18 @@ pub(crate) enum Script {
     Unmapped(&'static str),
     /// Every operation is refused with this status.
     Refuse(StatusCode),
+    /// `$translate` answers these matches, as [`Script::Translate`], each
+    /// carrying `display` where it is given, and `$lookup` answers
+    /// `designation`: a Dutch (`nl`) designation or none, or a refusal with
+    /// a status.
+    Designate {
+        /// The matches, each an equivalence, a system and a code.
+        matches: Vec<(&'static str, &'static str, &'static str)>,
+        /// The display each matched coding carries.
+        display: Option<&'static str>,
+        /// The Dutch designation, or the refusal's status.
+        designation: Result<Option<&'static str>, StatusCode>,
+    },
 }
 
 /// One entry of [`Script::Map`]: the source system, the source code, the
@@ -111,14 +123,21 @@ impl TerminologyServer for Scripted {
                 })
                 .collect());
         }
-        let Script::Translate(matches) = &self.0 else {
-            return Err(self.refusal(Operation::Translate));
+        let (matches, display) = match &self.0 {
+            Script::Translate(matches) => (matches, None),
+            Script::Designate {
+                matches, display, ..
+            } => (matches, *display),
+            _ => return Err(self.refusal(Operation::Translate)),
         };
         Ok(matches
             .iter()
             .map(|(equivalence, system, code)| Match {
                 equivalence: Some((*equivalence).to_owned()),
-                concept: Some(coding(system, code)),
+                concept: Some(Coding {
+                    display: display.map(Into::into),
+                    ..coding(system, code)
+                }),
                 source: Some(MAP.to_owned()),
             })
             .collect())
@@ -137,10 +156,21 @@ impl TerminologyServer for Scripted {
         _code: &str,
         language: &str,
     ) -> Result<Option<String>, TerminologyError> {
-        let Script::Unmapped(english) = self.0 else {
-            return Err(self.refusal(Operation::Lookup));
-        };
-        Ok((language == "en").then(|| english.to_owned()))
+        match &self.0 {
+            Script::Unmapped(english) => Ok((language == "en").then(|| (*english).to_owned())),
+            Script::Designate {
+                designation: Ok(dutch),
+                ..
+            } => Ok(dutch.filter(|_| language == "nl").map(str::to_owned)),
+            Script::Designate {
+                designation: Err(status),
+                ..
+            } => Err(TerminologyError::Status {
+                operation: Operation::Lookup,
+                status: *status,
+            }),
+            _ => Err(self.refusal(Operation::Lookup)),
+        }
     }
 
     async fn validate_code(

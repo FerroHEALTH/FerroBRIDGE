@@ -26,9 +26,12 @@
 #   --dry-run      print the plan and run nothing
 #
 # Each step is one cargo invocation over the whole reached set, so a shared
-# dependency builds once under one feature set. Features therefore unify
-# across the set; the CI lanes run each package on its own through cargo
-# hack and catch a feature one package forgets. Cargo picks the job count.
+# dependency builds once under one feature set. The steps run rustfmt, then
+# every clippy (the all-features ones included), then every nextest, then
+# the doctests, so a lint failure is reported before the long test runs.
+# Features unify across the set; the CI lanes run each package on its own
+# through cargo hack and catch a feature one package forgets. Cargo picks
+# the job count.
 # Exit 0 when every step passed, 1 when one failed, 2 on a usage error.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -150,16 +153,18 @@ fi
 
 args=()
 for package in $packages; do args+=(-p "$package"); done
-run cargo fmt --check "${args[@]}"
-run cargo clippy --locked "${args[@]}" --all-targets -- -D warnings
-run cargo nextest run --locked "${args[@]}" --no-tests=pass
 # A package with a feature its default set leaves off is linted and tested
 # with every feature on as well, as the CI lanes do, so a file only those
 # features compile is never skipped.
 # shellcheck disable=SC2086 # the package list splits on whitespace by design
 featured="$(scripts/checks/featured.sh $packages)"
+run cargo fmt --check "${args[@]}"
+run cargo clippy --locked "${args[@]}" --all-targets -- -D warnings
 for package in $featured; do
   run cargo clippy --locked -p "$package" --all-features --all-targets -- -D warnings
+done
+run cargo nextest run --locked "${args[@]}" --no-tests=pass
+for package in $featured; do
   run cargo nextest run --locked -p "$package" --all-features --no-tests=pass
 done
 # `cargo test --doc` refuses a package without a library target; a `cdylib`
