@@ -168,9 +168,11 @@ struct Stack {
     /// The test OpenID Provider.
     provider: Provider,
     /// `FerroPIX` and its database.
-    _pix: ferropix::FerroPix,
+    pix: ferropix::FerroPix,
     /// The bridge's state store.
     _state: containers::Postgres,
+    /// The bridge's state store, where the holder records the status.
+    store: Store,
     /// The bridge's origin, `http://127.0.0.1:<port>`.
     origin: String,
     /// The identity source the facade would ask.
@@ -273,8 +275,9 @@ impl Stack {
         ))?;
         Ok(Self {
             provider,
-            _pix: pix,
+            pix,
             _state: state,
+            store,
             origin,
             identity: identity.with_cache(running.cache.clone()),
             subscription: cache_settings.subscription,
@@ -285,6 +288,38 @@ impl Stack {
             holder,
             served,
         })
+    }
+
+    /// What the bridge and `FerroPIX` say about the subscription, for a
+    /// case that waited for it in vain.
+    async fn diagnosis(&self) -> String {
+        let recorded: Result<Vec<(String, Option<String>)>, sqlx::Error> =
+            sqlx::query_as("SELECT status, location FROM pmir_subscription")
+                .fetch_all(self.store.pool())
+                .await;
+        let subscription = &self.subscription;
+        let found = subscription
+            .subscriber
+            .find(&subscription.request, TIMEOUT)
+            .await;
+        let created = subscription
+            .subscriber
+            .subscribe(&subscription.request, TIMEOUT)
+            .await;
+        let created = match created {
+            Ok(subscribed) => format!(
+                "{:?}",
+                subscription.subscriber.status(&subscribed, TIMEOUT).await
+            ),
+            Err(error) => format!("{error:?}"),
+        };
+        let log = self.pix.log().await;
+        let tail: Vec<&str> = log.lines().rev().take(40).collect();
+        format!(
+            "listening: {}\nrecorded: {recorded:?}\nfound: {found:?}\ncreated: {created}\nFerroPIX log, newest first:\n{}",
+            self.running.cache.listened().is_listening(),
+            tail.join("\n")
+        )
     }
 
     /// How many ITI-83 queries reached `FerroPIX`.
@@ -407,10 +442,13 @@ async fn the_pseudonym_cache_follows_ferropix_through_its_pmir_feed() -> Result<
     source
         .feed(&c, &patient("synthetic-cache-c", "Charlie", "1993-06-07")?)
         .await?;
-    until("the subscription's first active announcement", || {
+    if let Err(error) = until("the subscription's first active announcement", || {
         stack.running.cache.serving()
     })
-    .await?;
+    .await
+    {
+        return Err(format!("{error}\n{}", stack.diagnosis().await).into());
+    }
 
     // A merge: once its ITI-93 message arrives, the subsumed patient resolves to the survivor.
     let pseudonym_a = stack.cached(&a).await?;
