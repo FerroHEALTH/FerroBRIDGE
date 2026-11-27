@@ -100,6 +100,7 @@ pub(crate) async fn access_log(
         feed: ferrobridge_server::audit::feed::repository(client, true)?,
         source_id: String::from("ferrobridge.test"),
         site: None,
+        regulatory: ehds_logging::regulatory::Regulatory::default(),
     };
     let log =
         Arc::new(AccessLog::open(&settings, (&BASE_URL.parse()?, cdr), store, registers).await?);

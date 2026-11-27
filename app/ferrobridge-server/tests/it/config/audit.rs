@@ -57,6 +57,34 @@ fn an_enabled_lane_resolves_every_key() -> Result<(), Box<dyn std::error::Error>
 }
 
 #[test]
+fn the_regulatory_declaration_reaches_the_lane() -> Result<(), Box<dyn std::error::Error>> {
+    use ehds_logging::regulatory::{Condition, Lawfulness, LegalBasis, Regulatory};
+    let text = lane(&format!(
+        "{COMPLETE}[audit.regulatory]\nlegal_basis.lawfulness = \"public-task\"\nlegal_basis.condition = \"health-or-social-care\"\ncontrollers = [\"urn:oid:2.999.1.1\"]\nprocessors = [\"urn:oid:2.999.1.2\"]\n"
+    ));
+    let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
+    let audit = settings.audit.ok_or("the lane is on")?;
+    assert_eq!(
+        Regulatory {
+            legal_basis: Some(LegalBasis {
+                lawfulness: Lawfulness::PublicTask,
+                condition: Some(Condition::HealthOrSocialCare),
+            }),
+            controllers: vec![String::from("urn:oid:2.999.1.1")],
+            processors: vec![String::from("urn:oid:2.999.1.2")],
+        },
+        audit.regulatory
+    );
+    let default =
+        Config::from_sources(Some(&lane(COMPLETE)), &BTreeMap::new())?.resolve(Process::Server)?;
+    assert_eq!(
+        Regulatory::default(),
+        default.audit.ok_or("the lane is on")?.regulatory
+    );
+    Ok(())
+}
+
+#[test]
 fn the_bridge_names_itself_by_the_facade_system_id_by_default()
 -> Result<(), Box<dyn std::error::Error>> {
     let settings =
