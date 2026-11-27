@@ -269,14 +269,27 @@ impl IdentitySource {
     }
 
     /// Returns this identity source recording every ITI-83 exchange through
-    /// `recorder` as the `PIXm` Query Consumer audit profile fixes it, and
-    /// every ITI-104 exchange as the Feed Source profile does (`PIXm` 3.1.0
-    /// §2:3.83.5.1.1, §2:3.104.5.1.1).
+    /// `recorder` as the `PIXm` Query Consumer audit profile fixes it, every
+    /// ITI-104 exchange as the Feed Source profile does (`PIXm` 3.1.0
+    /// §2:3.83.5.1.1, §2:3.104.5.1.1), and every ITI-94 exchange of the
+    /// cache's subscription as the Subscriber's profiles do (PMIR 1.6.0
+    /// §2:3.94.5.1).
     #[must_use]
     pub fn audited(self, recorder: std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>) -> Self {
+        let cache_settings = self.cache_settings.map(|settings| CacheSettings {
+            subscription: subscription::Subscription {
+                subscriber: settings
+                    .subscription
+                    .subscriber
+                    .audited(std::sync::Arc::clone(&recorder)),
+                ..settings.subscription
+            },
+            ..settings
+        });
         Self {
             pixm: self.pixm.audited(std::sync::Arc::clone(&recorder)),
             feed: self.feed.audited(recorder),
+            cache_settings,
             ..self
         }
     }

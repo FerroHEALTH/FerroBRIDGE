@@ -852,7 +852,8 @@ serves only while the identity source's PMIR feed reaches the bridge:
   replica before it acknowledges the message.
 - While the subscription is not `active`, its status is older than two
   periods, or a replica's `LISTEN` session is down, every lookup asks the
-  identity source. An entry also lives at most `max_age`.
+  identity source, and the replica drops what it held, since a message may
+  have been missed meanwhile. An entry also lives at most `max_age`.
 
 The receiver admits only an access token whose `client_id` is in
 `feed_clients`, so the table needs `[auth]`. It also needs `[state]` with

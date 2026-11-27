@@ -12,7 +12,8 @@
 //! status and announces it on [`PSEUDONYMS`], and every ITI-93 message the
 //! receiver ([`super::feed`]) takes forgets the identifiers it names on every
 //! replica. While the subscription is not `active`, its status is stale, or
-//! the replica's `LISTEN` session is down, every lookup asks the source. An
+//! the replica's `LISTEN` session is down, every lookup asks the source, and
+//! nothing cached before such a gap is served after it. An
 //! entry is keyed by the HMAC of the source identifier under the state
 //! store's lookup key, so no identifier value is held, and lives at most
 //! `max_age` whatever the feed says. No specification governs the cache: our
@@ -85,12 +86,22 @@ impl Shared {
     }
 
     /// Holds the gate open for one announcement when `status` is `active`,
-    /// and closes it otherwise.
+    /// and closes it otherwise; every entry is dropped unless the gate was
+    /// open and stays open, since a feed message may have been missed while
+    /// it was closed.
     fn announced(&self, status: &str) {
         let until = (status == ACTIVE)
             .then(|| Instant::now().checked_add(self.announcement))
             .flatten();
-        *self.gate() = until;
+        let held = {
+            let mut gate = self.gate();
+            let held = until.is_some() && gate.is_some_and(|open| Instant::now() < open);
+            *gate = until;
+            held
+        };
+        if !held {
+            self.clear();
+        }
     }
 
     /// Whether an `active` announcement still holds.
@@ -372,6 +383,30 @@ mod tests {
         assert!(shared(&cache).entries.get(&two).is_some());
         shared(&cache).notified("forget:not base64!").await;
         assert!(shared(&cache).entries.is_empty());
+    }
+
+    #[tokio::test]
+    async fn only_an_unbroken_run_of_active_announcements_keeps_the_entries() {
+        let cache = cache();
+        let person = crate::identity::PersonId::new("urn:oid:2.999.9", "p-1").expect("a person");
+        let one = cache.digest("urn:oid:2.999.1", "a");
+        let put = || {
+            shared(&cache)
+                .entries
+                .put(one.clone(), (std::time::Instant::now(), person.clone()));
+        };
+        shared(&cache).announced(ACTIVE);
+        put();
+        shared(&cache).announced(ACTIVE);
+        assert!(shared(&cache).entries.get(&one).is_some());
+        shared(&cache).announced("unreachable");
+        assert!(shared(&cache).entries.is_empty());
+        put();
+        shared(&cache).announced(ACTIVE);
+        assert!(
+            shared(&cache).entries.is_empty(),
+            "an entry from before the gap is not served after it"
+        );
     }
 
     #[tokio::test]

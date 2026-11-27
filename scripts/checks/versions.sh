@@ -604,7 +604,8 @@ if [[ -f "$harness" ]] && [[ -f docs/VERSIONS.md ]]; then
     "FerroEHR main CDR image|CDR_MAIN" \
     "FerroEHR main CDR database image|CDR_MAIN_POSTGRES" \
     "FerroTERM terminology server image|TERMINOLOGY" \
-    "FerroSMART authorization server image|FERROSMART"; do
+    "FerroSMART authorization server image|FERROSMART" \
+    "FerroPIX identity source image|FERROPIX"; do
     item="${image%%|*}"
     constant="${image##*|}"
     expected=$((expected + 1))

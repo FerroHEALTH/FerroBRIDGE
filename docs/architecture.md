@@ -2926,7 +2926,7 @@ draft upstream change.
   no data (our own design). Under `[identity_source.cache]` each replica
   keeps the answers, keyed by the HMAC of the source identifier, while the
   deployment's PMIR subscription (ITI-94, held by one replica under a lane
-  lease) is `active`. Each ITI-93 message received at `/pmir/feed`, admitted
+  lease) is `active`, and drops them whenever it is not. Each ITI-93 message received at `/pmir/feed`, admitted
   only for a listed client's token, forgets the identifiers of the patients
   it merged, updated or deleted on every replica before it is acknowledged,
   because a merge or an unmerge changes what ITI-83 answers (PIXm 3.1.0
