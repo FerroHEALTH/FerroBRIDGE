@@ -76,7 +76,12 @@
 # DOCUMENTS is the directory the tests wrote (EEHRXF_EMIT_DIR), OUT the
 # directory the results go to: validation.json (the validator's
 # OperationOutcome output), validation.html, validator.log, summary.tsv and
-# summary.md, beside a copy of every document. --judge reads an existing
+# summary.md, beside a copy of every document. A DOCUMENTS with no document
+# at its top level holds one lane per subdirectory, the documents one CI job
+# wrote, as the fhir-validator job downloads each artifact into a directory
+# of its own (#2315): two lanes may write one name with different bytes. Each
+# lane is then validated on its own into OUT/LANE, and OUT/summary.tsv and
+# OUT/summary.md name the lane of every document. --judge reads an existing
 # validator output alone. Needs Java 17 or later (as $JAVA or java on PATH),
 # curl, jq, tar and shasum. Exit 1 naming each failure; 0 otherwise.
 set -euo pipefail
@@ -310,13 +315,79 @@ validate() {
     end' "$out/$group.json"
 }
 
-# run DOCUMENTS OUT: prepares the jar and the package cache, runs the
+# lanes DOCUMENTS: the lane directories of DOCUMENTS, one per line, sorted:
+# DOCUMENTS itself when it holds a document at its top level, otherwise each
+# subdirectory that holds one.
+lanes() {
+  local documents="$1" dir docs
+  docs=("$documents"/*.json)
+  if [[ -f "${docs[0]}" ]]; then
+    printf '%s\n' "$documents"
+    return
+  fi
+  for dir in "$documents"/*/; do
+    docs=("$dir"*.json)
+    [[ -f "${docs[0]}" ]] && printf '%s\n' "${dir%/}"
+  done | LC_ALL=C sort
+}
+
+# run DOCUMENTS OUT: validates DOCUMENTS as one lane, or each of its lanes on
+# its own into OUT/LANE, and writes OUT/summary.tsv and OUT/summary.md with
+# the lane of every document (no specification governs this: our own design).
+run() {
+  local documents="$1" out="$2" status=0 dir lane
+  local found=()
+  while IFS= read -r dir; do
+    [[ -n "$dir" ]] && found+=("$dir")
+  done < <(lanes "$documents")
+  if [[ "${#found[@]}" -eq 0 ]]; then
+    echo "::error::$documents holds no document: did the tests run with EEHRXF_EMIT_DIR set?" >&2
+    return 1
+  fi
+  if [[ "${found[0]}" == "$documents" ]]; then
+    run_lane "$documents" "$out"
+    return
+  fi
+  mkdir -p "$out"
+  for dir in "${found[@]}"; do
+    lane="${dir##*/}"
+    echo "lane $lane"
+    run_lane "$dir" "$out/$lane" || status=1
+  done
+  {
+    printf 'lane\tfile\tseverity\tmessage-id\twhere\ttext\n'
+    for dir in "${found[@]}"; do
+      lane="${dir##*/}"
+      [[ -f "$out/$lane/summary.tsv" ]] || continue
+      awk -F '\t' -v lane="$lane" 'NR > 1 { print lane "\t" $0 }' "$out/$lane/summary.tsv"
+    done
+  } > "$out/summary.tsv"
+  {
+    echo "## HL7 FHIR Validator over the exchange-format documents"
+    echo
+    echo "${#found[@]} lane(s), each validated on its own: a lane is the documents one CI job wrote."
+    for dir in "${found[@]}"; do
+      lane="${dir##*/}"
+      echo
+      if [[ -f "$out/$lane/summary.md" ]]; then
+        sed -e "1s/^## .*/## Lane \`$lane\`/" -e '2,$s/^### /#### /' "$out/$lane/summary.md"
+      else
+        echo "## Lane \`$lane\`"
+        echo
+        echo "The validator wrote no result for this lane; see its log."
+      fi
+    done
+  } > "$out/summary.md"
+  return "$status"
+}
+
+# run_lane DOCUMENTS OUT: prepares the jar and the package cache, runs the
 # validator offline over every document in DOCUMENTS and judges its output.
 # An imaging report, an imaging study manifest, a discharge report and a
 # vaccination history are each validated in a run of their own, over their guide's closure: one validator context holding
 # several closures read the laboratory report against the imaging guide's
 # dependencies too (no specification governs this: our own design).
-run() {
+run_lane() {
   local documents="$1" out="$2" java="${JAVA:-java}"
   command -v "$java" > /dev/null 2>&1 || {
     echo "::error::java is not on PATH; the validator needs Java 17 or later" >&2
@@ -494,31 +565,47 @@ myhealth_eu() {
   profiles="$(jq -s -c '[.[] | select(.resourceType == "StructureDefinition" and .kind == "resource" and .derivation == "constraint")]
     | group_by(.type) | map(select(length == 1) | {key: .[0].type, value: .[0].url}) | from_entries' \
     "docs/specs/fhir-packages/$core/package/"StructureDefinition-*.json)"
-  for doc in "$documents"/eehrxf-*.json; do
-    [[ -f "$doc" ]] || continue
-    stem="$(basename "$doc" .json)"
-    if jq -e --arg b "$LAB_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-      jq --arg p "http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/laboratory/$stem.json"
-    elif jq -e --arg b "$HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-      jq --arg p "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/hdr/$stem.json"
-    elif jq -e --arg b "$MYHEALTHEU_HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-      cp "$doc" "$out/hdr/$stem.json"
-    elif jq -e --arg b "$EUVAC_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-      cp "$doc" "$out/euvac/$stem.json"
-    fi
-    jq -c --argjson profiles "$profiles" '
-      select(.resourceType == "Bundle") | .entry // [] | to_entries[]
-      | select(.value.resource.resourceType as $t | $profiles[$t] != null)
-      | [.key, .value.resource.resourceType, (.value.resource | .meta.profile = [$profiles[.resourceType]])]' "$doc" |
-      while IFS= read -r line; do
-        jq '.[2]' <<< "$line" > "$out/core/$stem.$(jq -r '"\(.[0]).\(.[1])"' <<< "$line").json"
-      done
-  done
+  local dir seen=""
+  while IFS= read -r dir; do
+    for doc in "$dir"/eehrxf-*.json; do
+      [[ -f "$doc" ]] || continue
+      stem="$(basename "$doc" .json)"
+      if grep -qxF "$stem" <<< "$seen"; then
+        echo "::error::two lanes of $documents write $stem.json; a corpus case is named by its document" >&2
+        return 1
+      fi
+      seen+="$stem"$'\n'
+      measure_document "$doc" "$stem" "$out" "$profiles"
+    done
+  done < <(lanes "$documents")
   measure_guide myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
   measure_guide myhealth-eu-laboratory "$out" "$out/laboratory" "$lab" || return 1
   measure_guide myhealth-eu-hdr "$out" "$out/hdr" "$hdr" || return 1
   measure_guide myhealth-eu-euvac "$out" "$out/euvac" "$EUVAC_IG" || return 1
   mvc_codes "$out/core" "docs/specs/fhir-packages/$core/package" "docs/specs/fhir-packages/$mvc/package" "$out"
+}
+
+# measure_document DOC STEM OUT PROFILES: writes the cases the document DOC
+# gives each MyHealth@EU corpus under OUT, its Core entries held to the
+# profile PROFILES names for their type.
+measure_document() {
+  local doc="$1" stem="$2" out="$3" profiles="$4" line
+  if jq -e --arg b "$LAB_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+    jq --arg p "http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/laboratory/$stem.json"
+  elif jq -e --arg b "$HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+    jq --arg p "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/hdr/$stem.json"
+  elif jq -e --arg b "$MYHEALTHEU_HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+    cp "$doc" "$out/hdr/$stem.json"
+  elif jq -e --arg b "$EUVAC_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
+    cp "$doc" "$out/euvac/$stem.json"
+  fi
+  jq -c --argjson profiles "$profiles" '
+    select(.resourceType == "Bundle") | .entry // [] | to_entries[]
+    | select(.value.resource.resourceType as $t | $profiles[$t] != null)
+    | [.key, .value.resource.resourceType, (.value.resource | .meta.profile = [$profiles[.resourceType]])]' "$doc" |
+    while IFS= read -r line; do
+      jq '.[2]' <<< "$line" > "$out/core/$stem.$(jq -r '"\(.[0]).\(.[1])"' <<< "$line").json"
+    done
 }
 
 # mvc_codes CASES CORE MVC OUT: one case per coded element of each Core
@@ -648,6 +735,21 @@ self_test() {
     "$(bundle "$(outcome a.json error "$KNOWN_DEFECT_ID" "$known")" "$(outcome b.json information All_OK)")"
   rm -f "$scratch/docs/"*.json
   check "no document fails" 1 '{"resourceType":"OperationOutcome","issue":[]}'
+  lane() {
+    local label="$1" want="$2" got
+    got="$(lanes "$scratch/lanes" | sed "s|^$scratch/lanes|.|" | paste -sd ' ' -)"
+    cases=$((cases + 1))
+    if [[ "$got" != "$want" ]]; then
+      echo "::error::self-test: $label: lanes '$got', expected '$want'" >&2
+      wrong=1
+    fi
+  }
+  mkdir -p "$scratch/lanes/test-1" "$scratch/lanes/e2e" "$scratch/lanes/empty"
+  echo '{}' > "$scratch/lanes/test-1/a.json"
+  echo '{}' > "$scratch/lanes/e2e/a.json"
+  lane "each subdirectory holding a document is a lane, sorted" "./e2e ./test-1"
+  echo '{}' > "$scratch/lanes/b.json"
+  lane "a document at the top level makes the directory one lane" "."
   if [[ "$wrong" -ne 0 ]]; then
     return 1
   fi

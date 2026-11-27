@@ -974,7 +974,7 @@ jobs:
         if: github.event_name != 'merge_group' && (contains(matrix.packages, 'eehrxf') || contains(matrix.packages, 'ferrobridge-server'))
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: eehrxf-documents-${{ strategy.job-index }}
+          name: eehrxf-documents-test-${{ strategy.job-index }}
           path: ${{ runner.temp }}/eehrxf-documents/
           if-no-files-found: error
           retention-days: 7
@@ -1007,11 +1007,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # Each artifact into a directory of its own, one lane each: a test shard
+      # and the e2e job write documents of one name with different bytes, and
+      # one merged directory extracted both into one file (#2315).
       - name: Download the emitted exchange-format documents
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: eehrxf-documents-*
-          merge-multiple: true
           path: ${{ runner.temp }}/eehrxf-documents
       - name: Read the pinned profile packages
         id: profile-packages
