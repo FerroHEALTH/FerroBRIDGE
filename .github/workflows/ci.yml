@@ -431,6 +431,8 @@ jobs:
       - run: bash scripts/perf/gate.sh --self-test
       # The gate's verdict over every shape of its three attempts (#1737).
       - run: bash scripts/perf/verdict.sh --self-test
+      # The base of the gate on a push to main, over stubbed API answers (#2313).
+      - run: bash scripts/perf/last-measured.sh --self-test
 
   # The profile validator's package set (#435), fetched at build time and
   # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/
@@ -1323,19 +1325,52 @@ jobs:
           cargo nextest run --locked -p ferrobridge-testkit
           -E 'test(/^journeys::/)'
 
+  # The base of the gate on a push to main (#2313): the newest commit of main
+  # whose own push run passed the gate. GitHub keeps one pending run per
+  # concurrency group and cancels the one it replaces, so the commit before
+  # a push is often one nobody measured; measuring from the last commit that
+  # passed brings every change since into this run. Empty takes the previous
+  # release.
+  perf-base:
+    name: perf base
+    needs: detect
+    if: github.event_name == 'push' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read # read the earlier CI runs on main and their jobs
+      contents: read
+    outputs:
+      base: ${{ steps.base.outputs.base }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/perf
+      - name: The last commit of main that passed the gate
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          base="$(bash scripts/perf/last-measured.sh)"
+          echo "base=${base}" >> "$GITHUB_OUTPUT"
+
   # The performance gate (#1656): ferrohealth-perf's A/B mode, the head
   # judged against its base on the same runner, in perf.yml, which the release
   # lane calls on the release commit too. The base is the merge base with the
-  # pull request's base, or the commit before a push.
+  # pull request's base, on a push the last commit of main that passed the
+  # gate (perf-base), and on a dispatch the previous release. A perf-base
+  # that fails skips the gate, and conclusion fails on it.
   perf:
     name: perf
-    needs: detect
-    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    needs: [detect, perf-base]
+    if: ${{ !cancelled() && needs.perf-base.result != 'failure' && github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true' }}
     permissions:
       contents: read
     uses: ./.github/workflows/perf.yml
     with:
-      base: ${{ github.event.pull_request.base.sha || github.event.before }}
+      base: ${{ github.event.pull_request.base.sha || needs.perf-base.outputs.base }}
 
   # The CPU instructions of each hot path's in-process work (#2249), counted
   # by callgrind in a release build and held to perf/instructions.ceilings.
@@ -1902,6 +1937,7 @@ jobs:
       - publish-dry-run
       - dependency-review
       - journeys
+      - perf-base
       - perf
       - instructions
       - conflict-markers
