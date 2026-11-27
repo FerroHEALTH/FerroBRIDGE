@@ -301,18 +301,15 @@ impl Ingest<'_> {
         composition: &CanonicalComposition,
     ) -> Result<Written, Refused> {
         let entry = only_entry(program, composition)?;
-        let source = resource_source(inbound);
-        let (id, _stood) = self
-            .write_entry(
-                program,
-                inbound,
-                (ehr_id, version),
-                composition,
-                &entry,
-                source.as_ref(),
-            )
-            .await?;
-        Ok(written(id, ehr_id, version, composition.clone()))
+        self.written_entry(
+            program,
+            inbound,
+            (ehr_id, version),
+            composition,
+            &entry,
+            composition.clone(),
+        )
+        .await
     }
 
     /// Records the identity of a committed update of the entry `path` names,
@@ -339,18 +336,16 @@ impl Ingest<'_> {
                 ),
             )
         })?;
-        let source = resource_source(inbound);
-        let (id, _stood) = self
-            .write_entry(
-                program,
-                inbound,
-                (ehr_id, version),
-                composition,
-                &entry,
-                source.as_ref(),
-            )
-            .await?;
-        Ok(written(id, ehr_id, version, entry.isolate(composition)))
+        let narrowed = entry.isolate(composition);
+        self.written_entry(
+            program,
+            inbound,
+            (ehr_id, version),
+            composition,
+            &entry,
+            narrowed,
+        )
+        .await
     }
 
     /// Binds, indexes and consumes each mapped entry at the version `stored`
@@ -433,6 +428,38 @@ impl Ingest<'_> {
             .map_err(|error| store_refusal(&error))
     }
 
+    /// Records the entry of a written resource with the source it names,
+    /// and returns the committed write of `narrowed`.
+    async fn written_entry(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        (ehr_id, version): (&EhrId, &ObjectVersionId),
+        composition: &CanonicalComposition,
+        entry: &engine::entry::Entry,
+        narrowed: CanonicalComposition,
+    ) -> Result<Written, Refused> {
+        let source = resource_source(inbound);
+        let (id, _stood) = self
+            .write_entry(
+                program,
+                inbound,
+                (ehr_id, version),
+                composition,
+                entry,
+                source.as_ref(),
+            )
+            .await?;
+        Ok(Written {
+            id,
+            ehr_id: ehr_id.clone(),
+            version: version.clone(),
+            composition: narrowed,
+            delivery: Delivery::Committed,
+            losses: Vec::new(),
+        })
+    }
+
     /// Records the binding of one entry of a written resource with every
     /// `Resource.identifier` it carries, so a conditional create's
     /// `identifier` search finds it (<https://hl7.org/fhir/R4/http.html#ccreate>),
@@ -469,23 +496,6 @@ fn only_entry(
             ),
         )
     })
-}
-
-/// The committed write of the resource `id`.
-fn written(
-    id: FhirResourceId,
-    ehr_id: &EhrId,
-    version: &ObjectVersionId,
-    composition: CanonicalComposition,
-) -> Written {
-    Written {
-        id,
-        ehr_id: ehr_id.clone(),
-        version: version.clone(),
-        composition,
-        delivery: Delivery::Committed,
-        losses: Vec::new(),
-    }
 }
 
 /// The key, the derived id and the binding one committed entry is recorded
