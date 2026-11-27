@@ -38,6 +38,8 @@ eehrxf-eps-summary-problem-allergy-procedure.5.Procedure Procedure.code http://s
 eehrxf-euvac-vaccination-history.0.Composition Composition.section.code http://loinc.org|11369-6
 eehrxf-euvac-vaccination-history.0.Composition Composition.type http://loinc.org|11369-6
 eehrxf-euvac-vaccination-history.5.Immunization Immunization.vaccineCode http://snomed.info/sct|836398006
+eehrxf-imaging-mapped.0.Composition Composition.section.code http://loinc.org|11329-0
+eehrxf-imaging-mapped.0.Composition Composition.section.code http://loinc.org|55115-0
 eehrxf-imaging-mapped.0.Composition Composition.type http://loinc.org|24802-1,http://loinc.org|18748-4
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition Composition.section.code http://loinc.org|10160-0
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition Composition.section.code http://loinc.org|11369-6
@@ -62,7 +64,9 @@ eehrxf-manifest-study.0.Composition Composition.type http://loinc.org|18748-4
 eehrxf-mpd-dispense.1.Medication Medication.form http://standardterms.edqm.eu|10219000
 eehrxf-mpd-prescription.1.Medication Medication.form http://standardterms.edqm.eu|10219000
 eehrxf-narrative-discharge.0.Composition Composition.section.code http://loinc.org|104605-1
+eehrxf-narrative-discharge.0.Composition Composition.section.code http://loinc.org|11329-0
 eehrxf-narrative-discharge.0.Composition Composition.section.code http://loinc.org|18776-5
+eehrxf-narrative-discharge.0.Composition Composition.section.code http://loinc.org|67851-6
 eehrxf-narrative-discharge.0.Composition Composition.section.code http://loinc.org|75311-1
 eehrxf-narrative-discharge.0.Composition Composition.section.code http://loinc.org|8648-8
 eehrxf-narrative-discharge.0.Composition Composition.section.code http://loinc.org|8650-4
@@ -93,3 +97,4 @@ eehrxf-summary-two-runs.6.AllergyIntolerance AllergyIntolerance.code http://snom
 eehrxf-test-report-ecg.0.Composition Composition.section.code http://loinc.org|30954-2
 eehrxf-test-report-spirometry.0.Composition Composition.section.code http://loinc.org|30954-2
 total 106
+reviewed 4

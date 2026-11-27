@@ -1,0 +1,4 @@
+value set	coding	reason
+http://terminology.ehdsi.eu/ValueSet/eHDSISection	http://loinc.org|55115-0	the imaging order section (Order) of CompositionEuImaging: eHDSISection holds no order or request section
+http://terminology.ehdsi.eu/ValueSet/eHDSISection	http://loinc.org|11329-0	general history (History): eHDSISection holds only histories of one kind (past illness, present illness, pregnancies, procedures, immunization, medication use, social), none of which is the general history
+http://terminology.ehdsi.eu/ValueSet/eHDSISection	http://loinc.org|67851-6	admission evaluation note: eHDSISection holds no admission evaluation section; physical findings (29545-1) covers part of it, not the evaluation
