@@ -36,8 +36,9 @@
 //!   Art 6(3) (initiative 17512, 2026-11-23): the original coding kept, an
 //!   `equivalent` or `equal` translation added with its concept map and
 //!   equivalence recorded, and a code no map covers given its English
-//!   designation when the content is not in English; left as recorded when
-//!   no server is configured.
+//!   designation when the content is not in English, and each added coding
+//!   given its designation in a requested language where the server holds
+//!   one; left as recorded when no server is configured.
 //!
 //! The crate reaches no server itself: [`TerminologyServer`] is the seam the
 //! system that reaches one implements.
@@ -329,20 +330,25 @@ impl Terminology {
     }
 
     /// Looks up the designation of the code `code` of the system `system`
-    /// in English, the textual designation draft `EEHRxF` Art 6(3) sends
-    /// beside a national code no mapping covers.
+    /// in the language `language`, a BCP 47 tag, among the `designation`
+    /// parts of a `$lookup` answer
+    /// (<https://hl7.org/fhir/R4/codesystem-operation-lookup.html>), and none
+    /// when the server holds no designation in that language. `en` asks for
+    /// the textual designation draft `EEHRxF` Art 6(3) sends beside a
+    /// national code no mapping covers.
     ///
     /// # Errors
     ///
     /// [`TerminologyError::Unconfigured`] with no server, and the server's
     /// [`TerminologyError`] for a call that gives no answer.
-    pub async fn english(
+    pub async fn designation(
         &self,
         system: &str,
         code: &str,
+        language: &str,
     ) -> Result<Option<String>, TerminologyError> {
         let server = self.ask(Operation::Lookup)?;
-        server.designation(system, code, "en").await
+        server.designation(system, code, language).await
     }
 
     /// Looks up the preferred display of the code `code` of the system
