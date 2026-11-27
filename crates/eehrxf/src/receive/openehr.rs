@@ -586,11 +586,6 @@ pub enum InstructionError {
         #[source]
         source: serde_json::Error,
     },
-    /// The mapping already wrote the other details of the composition's
-    /// feeder system audit, where the elements it does not carry are
-    /// declared.
-    #[error("the mapping already wrote the feeder system audit's other details")]
-    DeclarationTaken,
 }
 
 /// Why a received document gives no composition.
