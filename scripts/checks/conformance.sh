@@ -180,6 +180,11 @@ readonly OUT=target/conformance
 # The tree of the pass lists and upstream rows; the self-test points it elsewhere.
 root=conformance
 readonly UPSTREAM_HEADER=$'case\tissue'
+# The counts a pass list records after its total line, each named after the
+# badge fraction: unmapped annex elements (the EEHRxF draft corpora) and
+# reviewed extensible-binding misses (myhealth-eu-mvc).
+readonly COUNT_KINDS=(unmapped reviewed)
+readonly COUNT_LINE='^(total|unmapped|reviewed) '
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
 readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2F'
@@ -207,7 +212,7 @@ readonly QUALITY_BADGES=(
 )
 
 # The line under the caption that says what a suffix after a fraction counts.
-readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour'
+readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour; k extensible misses reviewed: codes outside an extensible value set that a review found no concept for (FHIR R4 terminologies 4.1.5.3), counted as passing'
 
 # The badge label of a corpus.
 label_of() {
@@ -263,7 +268,7 @@ logo_of() {
 unit_of() {
   case "$1" in
     myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr | myhealth-eu-euvac) echo " valid" ;;
-    myhealth-eu-mvc) echo " codes in bound value sets" ;;
+    myhealth-eu-mvc) echo " codes that meet their binding" ;;
     xtehr-crosswalk) echo " elements aligned" ;;
     eehrxf-draft-*) echo " annex elements held" ;;
     *) echo "" ;;
@@ -333,7 +338,7 @@ upstream_rows() {
 
 # The passing case ids of the pass list of corpus $1, sorted.
 listed_cases() {
-  grep -vE '^(total|unmapped) ' "$root/$1/pass-list.txt" | LC_ALL=C sort || true
+  grep -vE "$COUNT_LINE" "$root/$1/pass-list.txt" | LC_ALL=C sort || true
 }
 
 # The count of upstream rows of corpus $1 whose case its pass list does not
@@ -345,18 +350,28 @@ held_of() {
     wc -l | tr -d ' '
 }
 
-# The badge JSON a pass list implies; a list that records unmapped elements
-# names their count after the fraction, and so do the upstream rows, so the
-# badge never hides them.
+# What count $2 of kind $1 reads as after a badge fraction.
+count_suffix() {
+  case "$1" in
+    unmapped) echo ", $2 unmapped" ;;
+    reviewed) echo ", $2 extensible misses reviewed" ;;
+  esac
+}
+
+# The badge JSON a pass list implies; each count the list records is named
+# after the fraction, and so are the upstream rows, so the badge never hides
+# them.
 badge_of() {
-  local corpus="$1" list="$root/$1/pass-list.txt" passed total unmapped unit held
-  passed="$(grep -vEc '^(total|unmapped) ' "$list" || true)"
+  local corpus="$1" list="$root/$1/pass-list.txt" passed total kind count unit held
+  passed="$(grep -vEc "$COUNT_LINE" "$list" || true)"
   total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   [[ -n "$total" ]] || { echo "conformance: $list has no total line" >&2; return 2; }
-  unmapped="$(sed -n 's/^unmapped \([0-9][0-9]*\)$/\1/p' "$list")"
   held="$(held_of "$corpus")" || return 2
   unit="$(unit_of "$corpus")"
-  [[ -z "$unmapped" ]] || unit="$unit, $unmapped unmapped"
+  for kind in "${COUNT_KINDS[@]}"; do
+    count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
+    [[ -z "$count" ]] || unit="$unit$(count_suffix "$kind" "$count")"
+  done
   [[ "$held" -eq 0 ]] || unit="$unit, $held upstream"
   fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(logo_of "$corpus")" "$unit" "$held"
 }
@@ -486,6 +501,9 @@ run_self_test() {
   printf '%s\n' a b 'total 4' 'unmapped 3' >"$work/$corpus/pass-list.txt"
   st_upstream $'c\t632' $'d\t2112'
   st_expect '2 / 4, 3 unmapped, 2 upstream' brightgreen "unmapped and upstream named together" || return 1
+  printf '%s\n' a b 'total 4' 'reviewed 1' >"$work/$corpus/pass-list.txt"
+  st_expect '2 / 4, 1 extensible misses reviewed, 2 upstream' brightgreen "reviewed misses named before the upstream rows" || return 1
+  printf '%s\n' a b 'total 4' 'unmapped 3' >"$work/$corpus/pass-list.txt"
 
   st_upstream $'c\t632' $'c\t2112'
   if badge_of "$corpus" >/dev/null 2>&1; then st_fail "a repeated case renders"; return 1; fi
@@ -619,12 +637,14 @@ for corpus in "${selected[@]}"; do
     {
       jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort
       echo "total $(jq -r '.total' "$result")"
-      jq -r 'select(.unmapped != null) | "unmapped \(.unmapped)"' "$result"
+      for kind in "${COUNT_KINDS[@]}"; do
+        jq -r --arg kind "$kind" 'select(.[$kind] != null) | "\($kind) \(.[$kind])"' "$result"
+      done
     } >"$list"
   fi
   passing="$(jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort)"
   measured_total="$(jq -r '.total' "$result")"
-  listed="$(grep -vE '^(total|unmapped) ' "$list" | LC_ALL=C sort || true)"
+  listed="$(grep -vE "$COUNT_LINE" "$list" | LC_ALL=C sort || true)"
   listed_total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   regressed="$(LC_ALL=C comm -23 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
   new="$(LC_ALL=C comm -13 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
@@ -642,12 +662,14 @@ for corpus in "${selected[@]}"; do
     printf '  %s\n' "$new"
     if [[ "$mode" = check ]]; then failed=1; fi
   fi
-  measured_unmapped="$(jq -r '.unmapped // empty' "$result")"
-  listed_unmapped="$(sed -n 's/^unmapped \([0-9][0-9]*\)$/\1/p' "$list")"
-  if [[ "$measured_unmapped" != "$listed_unmapped" ]]; then
-    echo "conformance: $corpus leaves $measured_unmapped elements unmapped and its list records ${listed_unmapped:-none}; run $0 --update"
-    if [[ "$mode" = check ]]; then failed=1; fi
-  fi
+  for kind in "${COUNT_KINDS[@]}"; do
+    measured_count="$(jq -r --arg kind "$kind" '.[$kind] // empty' "$result")"
+    listed_count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
+    if [[ "$measured_count" != "$listed_count" ]]; then
+      echo "conformance: $corpus measures ${measured_count:-no} $kind and its list records ${listed_count:-none}; run $0 --update"
+      if [[ "$mode" = check ]]; then failed=1; fi
+    fi
+  done
   if [[ "$measured_total" != "$listed_total" ]]; then
     echo "conformance: $corpus holds $measured_total cases and its list records $listed_total; run $0 --update"
     if [[ "$mode" = check ]]; then failed=1; fi
