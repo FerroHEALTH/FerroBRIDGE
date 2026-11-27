@@ -406,7 +406,7 @@ async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<
 }
 
 // NOTE: RFC 9964 §5, an issuer that signs with ML-DSA-65 and publishes its key as an `AKP` JWK
-// (§4) reaches the operator API as an ECDSA one does.
+// (§3) reaches the operator API as an ECDSA one does.
 #[tokio::test]
 async fn an_ml_dsa_token_reaches_the_operator_api() -> Result<(), Box<dyn Error>> {
     let case = Case::build(Signer::MlDsa65, None, None, (None, None), (None, None)).await?;

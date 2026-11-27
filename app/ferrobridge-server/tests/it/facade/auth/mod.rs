@@ -113,7 +113,7 @@ pub(crate) fn ec_key(kid: &str, alg: Algorithm) -> SigningKey {
 }
 
 /// Returns a fresh ML-DSA key of `alg`'s parameter set (RFC 9964 §5),
-/// published as `kid` in an `AKP` JWK (§4).
+/// published as `kid` in an `AKP` JWK (§3).
 pub(crate) fn ml_dsa_key(kid: &str, alg: Verified) -> SigningKey {
     let mut seed = [0_u8; 32];
     aws_lc_rs::rand::fill(&mut seed).expect("a random seed");

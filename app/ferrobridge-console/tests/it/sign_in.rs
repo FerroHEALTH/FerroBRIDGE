@@ -193,7 +193,7 @@ async fn a_verified_sign_in_begins_a_session_and_returns_to_the_console()
 }
 
 // NOTE: RFC 9964 §5, an ID Token signed with ML-DSA-65 by a key the provider publishes as an
-// `AKP` JWK (§4) holds as an ECDSA one does.
+// `AKP` JWK (§3) holds as an ECDSA one does.
 #[tokio::test]
 async fn an_id_token_signed_with_ml_dsa_begins_a_session() -> Result<(), Box<dyn Error>> {
     use ferrohealth_smart::jws::algorithm::Algorithm as Signed;
