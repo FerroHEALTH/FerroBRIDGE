@@ -277,11 +277,25 @@ fn the_ecosystem_defined_outputs_join_every_version_and_r6_pre_adopts_nothing() 
             ],
             "{module}"
         );
+        let metadata = lookup
+            .inputs
+            .iter()
+            .find(|f| f.fhir_name == "post-coordination-metadata")
+            .expect("post-coordination-metadata");
+        assert_eq!(metadata.source, ParameterSource::Ecosystem, "{module}");
+        assert_eq!(metadata.type_code.as_deref(), Some("boolean"), "{module}");
         for (resource, code) in [
             ("CodeSystem", "validate-code"),
             ("ValueSet", "validate-code"),
         ] {
             let contract = find(&contracts, resource, code);
+            let classification = contract
+                .outputs
+                .iter()
+                .find(|f| f.fhir_name == "classificationCode")
+                .expect("classificationCode");
+            assert_eq!(classification.source, ParameterSource::Ecosystem, "{module}");
+            assert_eq!(classification.type_code.as_deref(), Some("code"), "{module}");
             let unknown = contract
                 .outputs
                 .iter()
