@@ -15,11 +15,15 @@
 use std::error::Error;
 use std::io::Read;
 
-use eehrxf::document::exposure::{ExposureInformation, StructuredDose};
+use eehrxf::crosswalk::imaging::IMAGING_RADIATION_DOSE;
+use eehrxf::document::exposure::{
+    ExposureInformation, RADIATION_DOSE_CODE, RADIATION_DOSE_EXTENSION, StructuredDose,
+};
 use eehrxf::document::form::SectionRule;
 use eehrxf::document::imaging::{
     IMAGING_BUNDLE, IMAGING_CATEGORIES, IMAGING_REPORT, IMAGING_REPORT_FORM, IMAGING_SLOTS,
 };
+use eehrxf::document::manifest::DCM;
 use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::document::{Document, DocumentError, LOINC};
 use eehrxf::receive::ReceivedDocument;
@@ -705,13 +709,97 @@ fn an_exposure_outside_the_procedure_section_or_of_an_unheld_study_is_refused()
     Ok(())
 }
 
+/// A synthetic exposure: a summary and one CT dose in milligray over three
+/// series of the chest.
+fn ct_exposure() -> ExposureInformation {
+    let mut exposed = exposure(Some("A synthetic CT dose of 4.2 mGy."), Some("4.2"));
+    if let Some(dose) = exposed.doses.first_mut() {
+        dose.modality = Some(CodeableConcept {
+            coding: vec![Coding {
+                system: Some(DCM.into()),
+                code: Some("CT".into()),
+                display: Some("Computed Tomography".into()),
+                ..Coding::default()
+            }],
+            ..CodeableConcept::default()
+        });
+        dose.body_site = Some(CodeableConcept {
+            text: Some("Chest".into()),
+            ..CodeableConcept::default()
+        });
+        dose.number_of_series = Some(3);
+    }
+    exposed
+}
+
+// NOTE: HL7 Europe Imaging Report 1.0.0-ballot CompositionEuImaging.section:procedure carries the
+// RadiationDose summary extension and the entry:radiation-dose slice of ObservationRadiationDoseEuImaging.
+#[test]
+fn the_exposure_is_the_procedure_section_s_radiation_dose() -> Result<(), Box<dyn Error>> {
+    let exposed = ct_exposure();
+    let bundle =
+        serde_json::to_value(document_with(Some(MR_BRAIN), Some(&exposed))?.into_bundle()?)?;
+    let composition = the(&bundle, "Composition")?;
+    let procedure = composition["section"]
+        .as_array()
+        .ok_or("sections")?
+        .iter()
+        .find(|section| section["code"]["coding"][0]["code"] == "55111-9")
+        .ok_or("the procedure section")?;
+    assert_eq!(
+        procedure["extension"],
+        serde_json::json!([{"url": RADIATION_DOSE_EXTENSION, "valueString": "A synthetic CT dose of 4.2 mGy."}]),
+        "{procedure}"
+    );
+    let dose = the(&bundle, "Observation")?;
+    let study = format!("{BASE}/ImagingStudy/study-1");
+    let listed = procedure["entry"][0]["reference"]
+        .as_str()
+        .ok_or("the procedure section lists the dose")?;
+    assert!(
+        bundle["entry"]
+            .as_array()
+            .ok_or("entries")?
+            .iter()
+            .any(|entry| entry["fullUrl"] == listed
+                && entry["resource"]["resourceType"] == "Observation"),
+        "{listed}"
+    );
+    assert_eq!(
+        dose["meta"]["profile"],
+        serde_json::json!([IMAGING_RADIATION_DOSE]),
+        "{dose}"
+    );
+    assert_eq!(
+        dose["code"]["coding"][0]["code"], RADIATION_DOSE_CODE,
+        "{dose}"
+    );
+    assert_eq!(dose["subject"]["reference"], "Patient/patient-1", "{dose}");
+    assert_eq!(
+        dose["valueString"], "A synthetic CT dose of 4.2 mGy.",
+        "{dose}"
+    );
+    assert_eq!(dose["partOf"][0]["reference"], study.as_str(), "{dose}");
+    assert_eq!(dose["bodySite"]["text"], "Chest", "{dose}");
+    assert_eq!(
+        dose["component"][0]["valueQuantity"]["code"], "mGy",
+        "{dose}"
+    );
+    assert_eq!(
+        dose["component"][1]["valueCodeableConcept"]["coding"][0]["code"], "CT",
+        "{dose}"
+    );
+    assert_eq!(dose["component"][2]["valueInteger"], 3, "{dose}");
+    Ok(())
+}
+
 #[test]
 fn an_imaging_report_with_its_exposure_validates_against_bundle_report_eu_imaging()
 -> Result<(), Box<dyn Error>> {
     let Some(set) = profile_set()? else {
         return Ok(());
     };
-    let exposed = exposure(Some("A synthetic dose of 1.5 mGy."), Some("1.5"));
+    let exposed = ct_exposure();
     let text =
         serde_json::to_string(&document_with(Some(MR_BRAIN), Some(&exposed))?.into_bundle()?)?;
     let received = ReceivedDocument::read(&text)?;
