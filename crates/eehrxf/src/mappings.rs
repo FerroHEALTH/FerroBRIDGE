@@ -34,6 +34,7 @@ pub struct Project {
     followed: &'static [&'static str],
     left_out: &'static [LeftOut],
     slices: &'static [(&'static str, &'static str)],
+    note: Option<Note>,
 }
 
 /// One element of an entry a project maps that the project carries into no
@@ -51,6 +52,51 @@ pub struct LeftOut {
     /// The element's path below the entry's archetype root,
     /// `description[at0017]/items[at0021]`.
     pub path: &'static str,
+}
+
+/// The composition-level comment of a project's template where a received
+/// document's composition names, to its reader, the elements it does not
+/// carry ([`crate::receive::openehr`]).
+///
+/// It is an `ELEMENT` holding a `DV_TEXT` in the `ITEM_TREE` of the
+/// composition's `context/other_context`, the place the RM gives "other
+/// optional context which will be archetyped" (RM Release 1.1.0, EHR IM,
+/// `EVENT_CONTEXT.other_context`). The names are the template's terms for the
+/// two nodes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Note {
+    /// The node id of the `ITEM_TREE`, `at0001`.
+    pub tree: &'static str,
+    /// The name of the `ITEM_TREE`, written when the composition has none.
+    pub tree_name: &'static str,
+    /// The node id of the comment `ELEMENT`, `at0007`.
+    pub element: &'static str,
+    /// The name of the comment `ELEMENT`.
+    pub element_name: &'static str,
+    /// The section slice of the document form whose narrative names the
+    /// comment when a run out of openEHR leaves it unread
+    /// ([`Project::slice_of`]), or `None` when the project's run reads no
+    /// node of the composition's context.
+    pub slice: Option<&'static str>,
+}
+
+impl Note {
+    /// Returns the openEHR path of the comment's value,
+    /// `/context/other_context[at0001]/items[at0007]/value`.
+    #[must_use]
+    pub fn value_path(&self) -> String {
+        format!("{}/value", self.element_path())
+    }
+
+    /// Returns the openEHR path of the comment,
+    /// `/context/other_context[at0001]/items[at0007]`.
+    #[must_use]
+    pub fn element_path(&self) -> String {
+        format!(
+            "/context/other_context[{}]/items[{}]",
+            self.tree, self.element
+        )
+    }
 }
 
 /// A context mapping a project does not compile, named to
@@ -114,6 +160,14 @@ impl Project {
         })
     }
 
+    /// Returns the composition-level comment where a received document's
+    /// composition names the elements it does not carry, when the project's
+    /// template has one.
+    #[must_use]
+    pub const fn note(&self) -> Option<Note> {
+        self.note
+    }
+
     /// Returns the project's files, in loading order.
     #[must_use]
     pub const fn files(&self) -> &'static [File] {
@@ -161,10 +215,19 @@ impl Project {
     /// no entry the project places in a section.
     ///
     /// The entry is the innermost archetype the path names that the project
-    /// maps to an entry; each one fills one section of its form. No
-    /// specification governs the placement: our own design.
+    /// maps to an entry; each one fills one section of its form. The
+    /// project's composition-level comment ([`Project::note`]) is placed in
+    /// the slice its note names. No specification governs the placement: our
+    /// own design.
     #[must_use]
     pub fn slice_of(&self, path: &str) -> Option<&'static str> {
+        if let Some(note) = self.note
+            && path
+                .strip_prefix(&note.element_path())
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        {
+            return note.slice;
+        }
         let mut found: Option<(usize, &'static str)> = None;
         for &(archetype, slice) in self.slices {
             let opening = format!("[{archetype}");
@@ -250,6 +313,7 @@ pub const MPD: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
+    note: None,
 };
 
 /// The HL7 Europe Imaging Report 1.0.0-ballot project.
@@ -325,6 +389,13 @@ pub const IMAGING: Project = Project {
     followed: &["DiagnosticReport.performer"],
     left_out: left_out::IMAGING_LEFT_OUT,
     slices: &[],
+    note: Some(Note {
+        tree: "at0001",
+        tree_name: "Tree",
+        element: "at0007",
+        element_name: "Comment",
+        slice: None,
+    }),
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
@@ -371,6 +442,7 @@ pub const LABORATORY: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
+    note: None,
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.
@@ -440,6 +512,7 @@ pub const EPS: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
+    note: None,
 };
 
 /// The HL7 Europe Hospital Discharge Report 1.0.0 project.
@@ -556,6 +629,13 @@ pub const HDR: Project = Project {
         (left_out::HDR_PROCEDURE, "sectionSignificantProcedures"),
         (left_out::HDR_ORDER, "sectionDischargeMedications"),
     ],
+    note: Some(Note {
+        tree: "at0001",
+        tree_name: "Tree",
+        element: "at0.1",
+        element_name: "Comment",
+        slice: Some("sectionHospitalCourse"),
+    }),
 };
 
 /// FerroBRIDGE's medical test report project, the non-laboratory reports of
@@ -584,6 +664,13 @@ pub const TEST_REPORT: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
+    note: Some(Note {
+        tree: "at0001",
+        tree_name: "Tree",
+        element: "at0007",
+        element_name: "Comment",
+        slice: None,
+    }),
 };
 
 /// The draft `EEHRxF` Annex X project: the common data groups served as
@@ -763,6 +850,7 @@ pub const ANNEX_X: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
+    note: None,
 };
 
 /// The MyHealth@EU Vaccination 10.0.0-preview project.
@@ -807,6 +895,7 @@ pub const EUVAC: Project = Project {
     followed: &[],
     left_out: left_out::EUVAC_LEFT_OUT,
     slices: &[(left_out::VACCINATION_ENTRY, "immunisations")],
+    note: None,
 };
 
 /// Every project the enabled features ship.

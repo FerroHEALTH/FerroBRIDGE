@@ -112,8 +112,12 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   that the run carries into no structured element is a `warning` issue in
   `ReceivedComposition::outcome`, and is named by its FHIRPath in the
   composition's `FEEDER_AUDIT.feeder_system_audit.other_details`, beside the
-  original content, for a later reader of the record
-  (`ReceivedComposition::not_carried`).
+  original content (`ReceivedComposition::not_carried`). Where the shipped
+  project declares its template's composition-level comment
+  (`Project::note`: the discharge, imaging and medical test reports), the
+  same paths are written into that `Comment` in the composition's
+  `other_context`, where the record's reader sees them; compiling such a
+  project against a template without the comment is refused.
 - `terminology` (feature `fhir-r4`): the terminology rules. With `openehr`,
   `transcode` turns an openEHR text item into FHIR codings and narrative: a
   code in a preferred system as recorded, a `TERM_MAPPING` of match `=` as a
