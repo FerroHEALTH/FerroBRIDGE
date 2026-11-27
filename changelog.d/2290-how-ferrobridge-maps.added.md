@@ -1,1 +1,0 @@
-- The book explains how FerroBRIDGE maps, from FHIRconnect contexts compiled into programs to the facade over the CDR, the OMOP ETL, the inbound engine, the outbound lane and the state store, naming the specification that governs each part and where FerroBRIDGE's own design takes over.

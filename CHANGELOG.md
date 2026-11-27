@@ -26,7 +26,7 @@ crates on crates.io.
 
 ## [Unreleased]
 
-## [0.0.30] - 2026-11-26
+## [0.0.30] - 2026-11-27
 
 High availability, inbound patient events and the draft EEHRxF implementing
 act. The bridge keeps its state in a PostgreSQL state store every replica
@@ -216,6 +216,7 @@ Each breaking change below names what an operator or a crate user changes.
   documents valid; the other three are the HL7 Europe form, whose `Device`
   author MyHealth@EU does not allow (#2240).
 - `[state]` and `[cdm]` take `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `statement_cache_capacity`, `max_lifetime` and `idle_timeout`. Both PostgreSQL clients start every session with the three timeouts in the startup `options` parameter, read them back from `pg_settings` once connected, and refuse a server that does not hold them. The state store defaults to 30 s, 5 s and 60 s; the CDM sets no statement timeout, 60 s for a lock and 10 minutes idle in a transaction. Upgrade note: a connection URL that carries `options` is refused; set the timeouts in the section instead (#2246).
+- The book explains how FerroBRIDGE maps, from FHIRconnect contexts compiled into programs to the facade over the CDR, the OMOP ETL, the inbound engine, the outbound lane and the state store, naming the specification that governs each part and where FerroBRIDGE's own design takes over (#2290).
 
 ### Changed
 
@@ -329,6 +330,7 @@ Each breaking change below names what an operator or a crate user changes.
   `masterIdentifier.type` as IHE MHD `uniqueId`, which
   `IHE.MHD.UniqueIdIdentifier` 4.2.5 requires (#2229).
 - `eehrxf` 0.45.0: the discharge report's medication orders carry `MedicationRequest.authoredOn` and `requester`, written from the record's context end time and composer, which MyHealth@EU HDR 9.2.0 `medicationRequest-hdr-myhealtheu` requires (1..1 each). A document in the MyHealth@EU form whose record gives neither is refused with `DocumentError::EntryElement`, naming the element and the profile. Upgrade note: `Form` has a new `entries` field, the elements a form's entry profiles require (`EntryRule`) (#2245).
+- The book's configuration example and variable mapping, the settings registers route, the OMOP ETL page's account of the ported Data Quality Dashboard checks and the EHDS readiness row of the patient summary Composition agree with the code (#2289).
 
 ## [0.0.29] - 2026-11-24
 
