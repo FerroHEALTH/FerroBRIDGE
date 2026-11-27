@@ -586,6 +586,11 @@ pub enum InstructionError {
         #[source]
         source: serde_json::Error,
     },
+    /// The mapping already wrote the other details of the composition's
+    /// feeder system audit, where the elements it does not carry are
+    /// declared.
+    #[error("the mapping already wrote the feeder system audit's other details")]
+    DeclarationTaken,
 }
 
 /// Why a received document gives no composition.
@@ -621,11 +626,6 @@ pub enum ReceiveMappingError {
     /// The mapping already wrote the composition's original content.
     #[error("the mapping already wrote the composition's original content")]
     OriginalTaken,
-    /// The mapping already wrote the other details of the composition's
-    /// feeder system audit, where the elements it does not carry are
-    /// declared.
-    #[error("the mapping already wrote the feeder system audit's other details")]
-    DeclarationTaken,
     /// The composition cannot be written as canonical JSON.
     #[error("the composition cannot be written as canonical JSON")]
     Encode {
@@ -633,6 +633,11 @@ pub enum ReceiveMappingError {
         #[source]
         source: serde_json::Error,
     },
+    /// The mapping already wrote the other details of the composition's
+    /// feeder system audit, where the elements it does not carry are
+    /// declared.
+    #[error("the mapping already wrote the feeder system audit's other details")]
+    DeclarationTaken,
 }
 
 #[cfg(test)]
