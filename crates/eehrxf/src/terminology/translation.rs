@@ -30,6 +30,11 @@
 //! coding and the ICD-10 or ATC coding the server maps it to, the original
 //! and the mapped coding draft `EEHRxF` Art 6(2) keeps side by side. A bound
 //! concept no translation reaches is an [`Unbound`] outcome.
+//!
+//! A translator given a language ([`Translator::with_designations`]) gives
+//! each coding a translation adds the server's designation in that language,
+//! such as the designations of the MyHealth@EU Master Value Sets Catalogue a
+//! national contact point asks for.
 
 use std::collections::BTreeMap;
 
@@ -148,6 +153,7 @@ pub struct Translator<'t> {
     bindings: &'t [Binding],
     asked: BTreeMap<(String, String, String), Vec<Translated>>,
     english: bool,
+    designations: Option<&'t str>,
     mapped: Vec<Mapping>,
     unmapped: Vec<(String, String)>,
     unbound: Vec<Unbound>,
@@ -176,6 +182,7 @@ impl<'t> Translator<'t> {
             bindings: &[],
             asked: BTreeMap::new(),
             english: false,
+            designations: None,
             mapped: Vec::new(),
             unmapped: Vec::new(),
             unbound: Vec::new(),
@@ -205,6 +212,16 @@ impl<'t> Translator<'t> {
     #[must_use]
     pub const fn for_non_english(mut self) -> Self {
         self.english = true;
+        self
+    }
+
+    /// Returns the translator that gives each coding a translation adds the
+    /// server's designation in `language`, a BCP 47 tag, where the server
+    /// holds one, as [`Translator::for_non_english`] gives an uncovered
+    /// concept the English one.
+    #[must_use]
+    pub const fn with_designations(mut self, language: &'t str) -> Self {
+        self.designations = Some(language);
         self
     }
 
@@ -283,12 +300,13 @@ impl<'t> Translator<'t> {
                 if !concept.preferred {
                     self.unmapped.extend(concept.originals.iter().cloned());
                     if self.english {
-                        changed |= self.designate(codings).await?;
+                        changed |= self.designate(codings, "en").await?;
                     }
                 }
                 continue;
             }
             changed = true;
+            let first = codings.len();
             for (original, translated) in added {
                 let encoded = Json::to_json(&translated.coding)
                     .map_err(|source| TranslationError::Encode { source })?;
@@ -299,6 +317,9 @@ impl<'t> Translator<'t> {
                     translated,
                 });
             }
+            if let (Some(language), Some(added)) = (self.designations, codings.get_mut(first..)) {
+                self.designate(added, language).await?;
+            }
         }
         if !changed {
             return Ok(resource.clone());
@@ -307,12 +328,16 @@ impl<'t> Translator<'t> {
             .map_err(|source| TranslationError::Decode { source })
     }
 
-    /// Gives each of `codings` the English designation the server holds for
-    /// it: as its `display` when it has none, and otherwise in the R4
+    /// Gives each of `codings` the designation in `language` the server holds
+    /// for it: as its `display` when it has none, and otherwise in the R4
     /// `translation` extension of its `display`
     /// (<https://hl7.org/fhir/R4/extension-translation.html>), and answers
     /// whether any changed.
-    async fn designate(&self, codings: &mut [Value]) -> Result<bool, TerminologyError> {
+    async fn designate(
+        &self,
+        codings: &mut [Value],
+        language: &str,
+    ) -> Result<bool, TerminologyError> {
         let mut changed = false;
         for coding in codings.iter_mut() {
             let Value::Object(coding) = coding else {
@@ -325,12 +350,16 @@ impl<'t> Translator<'t> {
             let (Some(system), Some(code)) = (text("system"), text("code")) else {
                 continue;
             };
-            let Some(english) = self.terminology.english(&system, &code).await? else {
+            let Some(designation) = self
+                .terminology
+                .designation(&system, &code, language)
+                .await?
+            else {
                 continue;
             };
             changed = true;
             if !coding.contains_key("display") {
-                coding.insert("display".into(), Value::String(english));
+                coding.insert("display".into(), Value::String(designation));
                 continue;
             }
             let part = |url: &str, key: &str, value: String| {
@@ -344,8 +373,8 @@ impl<'t> Translator<'t> {
                 (
                     "extension".to_owned(),
                     Value::Array(vec![
-                        part("lang", "valueCode", String::from("en")),
-                        part("content", "valueString", english),
+                        part("lang", "valueCode", language.to_owned()),
+                        part("content", "valueString", designation),
                     ]),
                 ),
             ]));

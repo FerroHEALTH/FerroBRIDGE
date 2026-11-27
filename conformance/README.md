@@ -11,9 +11,9 @@ disagrees with them. The counts are self-tested; none is a
 certification.
 
 - **Held upstream:** failing cases an open upstream-report issue holds
-  (`upstream.tsv` beside the pass list). They stay in the total and out of
-  the colour: a badge is green when every case the upstream does not hold
-  passes.
+  (`upstream.tsv` beside the pass list). They stay in the total. A badge is
+  green only when every case passes, and yellowgreen when every case that
+  does not pass is held upstream.
 - **Also counted:** unmapped annex elements; codes outside an
   extensible value set that a review found no concept for (FHIR R4
   terminologies 4.1.5.3), counted as passing; and annex elements whose
@@ -43,9 +43,9 @@ certification.
 | EEHRxF Medical test report | 137 of 137 annex elements held | - | 7 unmapped | the EEHRxF draft 2026-11-23 | [pass list](eehrxf-draft-medical-test-report/pass-list.txt) |
 | EEHRxF Imaging report | 96 of 97 annex elements held | 1 ([#2120](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2120)) | 2 unmapped | the EEHRxF draft 2026-11-23 | [pass list](eehrxf-draft-imaging/pass-list.txt) |
 | EEHRxF Discharge report | 263 of 263 annex elements held | - | 9 unmapped | the EEHRxF draft 2026-11-23 | [pass list](eehrxf-draft-discharge/pass-list.txt) |
-| Xt-EHR 1.0.0 crosswalk | 797 of 852 elements resolved | - | 140 differ from Xt-EHR | Xt-EHR models 1.0.0 against the EEHRxF draft 2026-11-23 | [pass list](xtehr-crosswalk/pass-list.txt) |
+| Xt-EHR 1.0.0 crosswalk | 852 of 852 elements resolved | - | 140 differ from Xt-EHR | Xt-EHR models 1.0.0 against the EEHRxF draft 2026-11-23 | [pass list](xtehr-crosswalk/pass-list.txt) |
 | Core 1.0.1 | 78 of 80 documents valid | 2 ([#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112)) | - | MyHealth@EU, the CI build | [pass list](myhealth-eu-core/pass-list.txt) |
 | Laboratory 9.2.0 | 1 of 1 documents valid | - | - | MyHealth@EU, the CI build | [pass list](myhealth-eu-laboratory/pass-list.txt) |
-| HDR 9.2.0 | 2 of 5 documents valid | - | - | MyHealth@EU, the CI build | [pass list](myhealth-eu-hdr/pass-list.txt) |
-| MVC 10.1.0 | 98 of 106 codes that meet their binding | 5 ([#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112)) | 4 extensible misses reviewed | MyHealth@EU, the CI build | [pass list](myhealth-eu-mvc/pass-list.txt) |
+| HDR 9.2.0 | 5 of 5 documents valid | - | - | MyHealth@EU, the CI build | [pass list](myhealth-eu-hdr/pass-list.txt) |
+| MVC 10.1.0 | 101 of 106 codes that meet their binding | 5 ([#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112)) | 4 extensible misses reviewed | MyHealth@EU, the CI build | [pass list](myhealth-eu-mvc/pass-list.txt) |
 | EuVAC 10.0.0-preview | 1 of 1 documents valid | - | - | MyHealth@EU, the pinned preview package | [pass list](myhealth-eu-euvac/pass-list.txt) |

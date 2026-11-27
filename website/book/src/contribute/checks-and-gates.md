@@ -58,8 +58,11 @@ containers and stops them when it ends.
 ## The conformance pass lists
 
 Neither FHIRconnect nor OMOCL has an external conformance suite, so the corpus
-tests are the instrument. Fifteen corpora are measured, and each keeps a
-committed pass list under `conformance/<corpus>/pass-list.txt`: one passing
+tests are the instrument. `scripts/checks/conformance.sh` runs the corpus
+tests its table names and reads the results the `fhir-validator` job (the
+MyHealth@EU corpora) and the test job (the EEHRxF draft corpora and the
+Xt-EHR crosswalk) write; its usage line lists them all.
+Each keeps a committed pass list under `conformance/<corpus>/pass-list.txt`: one passing
 case id per line, then a `total` line with the corpus size, and, beside it,
 `upstream.tsv` when an open `upstream-report` issue holds a failing case. The HL7 v2
 messages count twice: the vendored sets are the `hl7v2` corpus and the sets
@@ -97,25 +100,31 @@ CI runs. When your change moves one corpus, name it after the flag
 corpus's test alone and rewrites only its list, its badge and the README
 block. Naming either HL7 v2 corpus also runs the other one, because the family
 and version badges count both. It needs `cargo-nextest` and `jq`. Never edit a list by hand, and
-never remove a case from one to make CI green.
+never remove a case from one to make CI green. After a change to how a badge
+or the page is drawn, `scripts/checks/conformance.sh --render` rewrites every
+corpus badge, `conformance/README.md` and the README block from the committed
+lists and upstream rows, running no test; it keeps the HL7 v2 family and
+version badges, which only a measured run counts.
 
 ### The badges and the README block
 
 The script writes one shields.io endpoint badge per file under
 `conformance/badges/`. A badge's message is the passing and the total count
 (`68/120`), at most with one word for what it counts (`78/80 valid`), and its
-colour follows the count: brightgreen when every case passes, yellow when
-some do, red when none do. A badge stays short: the script fails a label
-past 30 characters or a message past 20 in every mode. Everything else a
+colour follows the count: brightgreen when every case passes, yellowgreen
+when every case that does not pass is held upstream (below), yellow when
+some pass, red when none do. A badge stays short: the script fails a label
+past 30 characters or a message past 20 in every mode, the static badges of
+the README included. Everything else a
 count holds is on `conformance/README.md`, the page every corpus badge links
 to, which the script renders from the same lists and rows and `--check`
 holds to them.
 
 A failing case that an open `upstream-report` issue holds (the corpus, guide
 or tool contradicts its own specification) stays in the total, as
-`5295/5309`, and the page names the count and its issues. Such cases do not
-count against the colour, so that badge is brightgreen when every other case
-passes. Each one is a row of `conformance/<corpus>/upstream.tsv`, a
+`5295/5309`, and the page names the count and its issues. That badge is
+yellowgreen when every other case passes, and green only once the upstream
+fix lands and every case passes. Each one is a row of `conformance/<corpus>/upstream.tsv`, a
 `case<TAB>issue` header and then the case id and the issue number,
 tab-separated:
 
@@ -129,7 +138,7 @@ corpus does not hold. A held case that passes fails `--check`, and `--update`
 drops its row. `scripts/checks/upstream-rows.sh` asks the tracker for every
 issue a row names and fails when one is closed or carries no `upstream-report`
 label; it runs in the CI `todo-issues` job. When an upstream issue closes,
-remove its rows: the cases then count against the colour again. The page
+remove its rows: the cases then count as plain failures again. The page
 names an unmapped count (`8 unmapped`) the same way, and the count of codes
 outside an `extensible` MyHealth@EU binding that a review found no concept
 of the value set for (`4 extensible misses reviewed`): FHIR R4

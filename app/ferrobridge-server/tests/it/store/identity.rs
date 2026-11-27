@@ -2,18 +2,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The identity map in the state store: one winner between two replicas, no
-//! identifier value in clear, and a store of another derivation or lookup key
-//! refused at start.
+//! identifier value in clear, a store of another derivation or lookup key
+//! refused at start, one entry recorded whole, and the copy that serves only
+//! found rows while its session listens.
 
 use std::error::Error;
+use std::sync::Arc;
 
 use ferrobridge_server::cdr::ids::EhrId;
 use ferrobridge_server::identity::record::{
-    CompositionBinding, Identifier, IdentifierQuery, SystemMatch,
+    CompositionBinding, Identifier, IdentifierQuery, SourceVersion, SystemMatch,
 };
 use ferrobridge_server::identity::state::StateStore;
-use ferrobridge_server::identity::store::{Store as _, StoreError};
-use ferrobridge_server::identity::{FhirResourceId, PersonId};
+use ferrobridge_server::identity::store::{EntryWrite, Store as _, StoreError};
+use ferrobridge_server::identity::{ExternalResourceId, FhirResourceId, PersonId};
+use ferrobridge_server::store::listen::SESSION_NAME;
 use ferrobridge_testkit::containers;
 
 /// A person identifier shaped like a BSN, synthetic.
@@ -136,5 +139,117 @@ async fn a_store_of_another_derivation_or_lookup_key_refuses_start() -> Result<(
         StateStore::open(&unsealed).await,
         Err(StoreError::Unsealed)
     ));
+    Ok(())
+}
+
+/// The longest a case waits for the listener.
+const WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+
+#[tokio::test]
+async fn one_entry_is_recorded_whole_and_its_first_record_stands() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let postgres = containers::postgres().await?;
+    let map = StateStore::open(&super::open_sealed(postgres.url(), super::KEY_B).await?).await?;
+    let key = ExternalResourceId::new("entry-key-1")?;
+    let derived = FhirResourceId::new("entry-1")?;
+    let identifier = Identifier::new(Some("urn:oid:2.999.1.2"), "synthetic-condition-1");
+    let source = SourceVersion::new(
+        "Condition",
+        ExternalResourceId::new("sender-1")?,
+        Some(String::from("1")),
+    );
+    let first = binding("uid-1");
+    let (id, stood) = map
+        .record_entry(&EntryWrite {
+            resource_type: "Condition",
+            key: &key,
+            derived: &derived,
+            binding: &first,
+            identifiers: std::slice::from_ref(&identifier),
+            source: Some(&source),
+        })
+        .await?;
+    assert_eq!((derived.clone(), first.clone()), (id.clone(), stood));
+    assert_eq!(Some(id.clone()), map.internal_of("Condition", &key).await?);
+    assert_eq!(Some(first.clone()), map.binding_of("Condition", &id).await?);
+    let query = IdentifierQuery::new(
+        SystemMatch::Is(String::from("urn:oid:2.999.1.2")),
+        "synthetic-condition-1",
+    );
+    assert_eq!(vec![id.clone()], map.identified("Condition", &query).await?);
+    let consumed = map
+        .consumed(&source)
+        .await?
+        .ok_or("the source is consumed")?;
+    assert_eq!(id.as_str(), consumed.internal_id);
+    assert_eq!(first.versioned_object_uid, consumed.versioned_object_uid);
+
+    let again = map
+        .record_entry(&EntryWrite {
+            resource_type: "Condition",
+            key: &key,
+            derived: &FhirResourceId::new("entry-2")?,
+            binding: &binding("uid-2"),
+            identifiers: &[],
+            source: None,
+        })
+        .await?;
+    assert_eq!((id, first), again, "the first record stands");
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_copy_serves_found_rows_while_listening_and_drops_them_on_a_loss()
+-> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let postgres = containers::postgres().await?;
+    let store = super::open_sealed(postgres.url(), super::KEY_B).await?;
+    let map = StateStore::open(&store).await?.with_copy(8);
+    let other = StateStore::open(&store).await?;
+    let listened = map.listened().ok_or("a copy of eight entries")?;
+    store.listeners(&[Arc::clone(&listened)]).spawn();
+    assert!(listened.listening_within(WAIT).await);
+
+    let missing = FhirResourceId::new("written-later")?;
+    assert_eq!(None, map.binding_of("Condition", &missing).await?);
+    other
+        .record_binding("Condition", &missing, &binding("uid-later"))
+        .await?;
+    assert_eq!(
+        Some(binding("uid-later")),
+        map.binding_of("Condition", &missing).await?,
+        "a miss is never copied"
+    );
+
+    let id = FhirResourceId::new("copied")?;
+    map.record_binding("Condition", &id, &binding("uid-1"))
+        .await?;
+    sqlx::query("DELETE FROM composition_binding WHERE internal_id = $1")
+        .bind(id.as_str())
+        .execute(store.pool())
+        .await?;
+    assert_eq!(
+        Some(binding("uid-1")),
+        map.binding_of("Condition", &id).await?,
+        "a found row is served from the copy"
+    );
+
+    sqlx::query(
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = $1",
+    )
+    .bind(SESSION_NAME)
+    .execute(store.pool())
+    .await?;
+    assert!(listened.lost_after(0, WAIT).await);
+    assert!(listened.listening_within(WAIT).await);
+    assert_eq!(
+        None,
+        map.binding_of("Condition", &id).await?,
+        "a lost session drops the copy"
+    );
     Ok(())
 }
