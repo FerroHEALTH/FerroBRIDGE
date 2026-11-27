@@ -16,13 +16,19 @@
 //! <https://specifications.openehr.org/releases/RM/Release-1.1.0/common.html#_feeder_audit_class>).
 //! What the mapping does not carry into structured content is therefore
 //! still stored, and what the run declared lost travels beside the
-//! composition as an `OperationOutcome`.
+//! composition as an `OperationOutcome`. Each element of the received
+//! resources the project accounts for and the run did not carry is also named
+//! in the composition itself, by its FHIRPath and never by its value, in the
+//! `other_details` of its `FEEDER_AUDIT.feeder_system_audit`, the RM's place
+//! for "custom meta-data" of a system that handled the item (Common IM,
+//! `FEEDER_AUDIT_DETAILS`), beside the original content that keeps it, so a
+//! later reader of the record is told what the composition lacks.
 
 use std::fmt;
 
 use fhir_types::codec::Value;
 use fhir_types::r4::bundle::Bundle;
-use fhir_types::r4::operation_outcome::OperationOutcome;
+use fhir_types::r4::operation_outcome::{OperationOutcome, OperationOutcomeIssue};
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::seam::Seams;
 use fhirconnect::operations::contract::ToOpenehrRequest;
@@ -39,6 +45,7 @@ use openehr_rm::v1_2::common::generic::party_self::PartySelf;
 use openehr_rm::v1_2::composition::composition::Composition;
 use openehr_rm::v1_2::composition::content::content_item::ContentItem;
 use openehr_rm::v1_2::composition::content::entry::instruction_details::InstructionDetails;
+use openehr_rm::v1_2::data_structures::item_structure::item_structure::ItemStructure;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
 use openehr_rm::v1_2::data_types::encapsulated::dv_encapsulated::DvEncapsulated;
 use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
@@ -52,6 +59,20 @@ use crate::receive::accounted;
 /// `DV_PARSABLE.formalism` the original document is kept under.
 pub const FHIR_JSON: &str = "application/fhir+json";
 
+/// The name of the declaration of the elements a composition does not carry.
+pub const DECLARATION: &str = "Elements of the received document this composition does not carry";
+
+/// The value of each declared element.
+pub const NOT_CARRIED: &str = "The composition carries this element of the received document in no \
+                               structured element; FEEDER_AUDIT.original_content keeps it.";
+
+// NOTE: RM Release 1.1.0, Common IM, FEEDER_AUDIT_DETAILS.other_details is "custom meta-data" that
+// "may be archetyped"; the declaration is not, so its node ids are local to it.
+/// The node id of the declaration's tree.
+const DECLARATION_TREE: &str = "at0000";
+/// The node id of each declared element.
+const DECLARED_ELEMENT: &str = "at0001";
+
 /// The openEHR composition a received document maps to.
 #[derive(Debug, Clone)]
 pub struct ReceivedComposition {
@@ -59,6 +80,7 @@ pub struct ReceivedComposition {
     composition: String,
     template_id: String,
     outcome: Option<OperationOutcome>,
+    not_carried: Vec<String>,
 }
 
 // NOTE: no specification governs this: our own design; the canonical JSON is written from
@@ -99,6 +121,14 @@ impl ReceivedComposition {
     pub const fn outcome(&self) -> Option<&OperationOutcome> {
         self.outcome.as_ref()
     }
+
+    /// Returns the FHIRPath of each element of the received resources the
+    /// composition does not carry, in the order the run declared them, each
+    /// once; the composition's feeder audit names them to its reader.
+    #[must_use]
+    pub fn not_carried(&self) -> &[String] {
+        &self.not_carried
+    }
 }
 
 impl Mapping {
@@ -115,7 +145,10 @@ impl Mapping {
     /// element the mapping accounts for ([`Mapping::accounting`]) that the
     /// run carried into no structured element is declared in the
     /// composition's [`ReceivedComposition::outcome`] beside the engine's own
-    /// losses.
+    /// losses, and named by its FHIRPath in the other details of the
+    /// composition's feeder system audit ([`DECLARATION`]), beside the
+    /// original content that keeps it, where a reader of the record finds it
+    /// ([`ReceivedComposition::not_carried`]).
     ///
     /// # Errors
     ///
@@ -124,7 +157,9 @@ impl Mapping {
     /// read as JSON, [`ReceiveMappingError::Composition`] when its composition
     /// does not read as RM canonical JSON, [`ReceiveMappingError::Untemplated`]
     /// when it names no template, [`ReceiveMappingError::OriginalTaken`] when
-    /// the mapping already wrote an original content, and
+    /// the mapping already wrote an original content,
+    /// [`ReceiveMappingError::DeclarationTaken`] when it already wrote the
+    /// feeder system audit's other details, and
     /// [`ReceiveMappingError::Encode`] when it cannot be written out.
     pub fn to_openehr(
         &self,
@@ -183,6 +218,7 @@ impl Mapping {
             self.followed(),
             transformed.reads(),
         );
+        let lost = lost_paths(&not_carried);
         let response = transformed.into_response();
         let mut outcome = response.outcome().cloned();
         if !not_carried.is_empty() {
@@ -219,6 +255,23 @@ impl Mapping {
         if audit.original_content.is_some() {
             return Err(ReceiveMappingError::OriginalTaken);
         }
+        if !lost.is_empty() {
+            let feeder = audit.feeder_system_audit.get_or_insert_with(|| {
+                Box::new(FeederAuditDetails {
+                    system_id: settings.device().to_owned(),
+                    location: None,
+                    subject: None,
+                    provider: None,
+                    time: None,
+                    version_id: None,
+                    other_details: None,
+                })
+            });
+            if feeder.other_details.is_some() {
+                return Err(ReceiveMappingError::DeclarationTaken);
+            }
+            feeder.other_details = Some(Box::new(declaration(&lost)?));
+        }
         audit.original_content = Some(Box::new(DvEncapsulated::DvParsable(DvParsable {
             charset: None,
             language: None,
@@ -232,8 +285,49 @@ impl Mapping {
             composition: canonical,
             template_id,
             outcome,
+            not_carried: lost,
         })
     }
+}
+
+/// The FHIRPath of every element `issues` declares the composition does not
+/// carry, each once, in the order declared.
+fn lost_paths(issues: &[OperationOutcomeIssue]) -> Vec<String> {
+    let mut lost: Vec<String> = Vec::new();
+    for path in issues
+        .iter()
+        .flat_map(|issue| issue.expression.iter())
+        .filter_map(|path| path.value.as_deref())
+    {
+        if !lost.iter().any(|held| held == path) {
+            lost.push(path.to_owned());
+        }
+    }
+    lost
+}
+
+/// The declaration of the elements `lost` names, an `ITEM_TREE` of one
+/// `ELEMENT` per element, named by its FHIRPath and saying that the
+/// composition's original content keeps it.
+fn declaration(lost: &[String]) -> Result<ItemStructure, ReceiveMappingError> {
+    let items: Vec<serde_json::Value> = lost
+        .iter()
+        .map(|path| {
+            serde_json::json!({
+                "_type": "ELEMENT",
+                "name": {"_type": "DV_TEXT", "value": path},
+                "archetype_node_id": DECLARED_ELEMENT,
+                "value": {"_type": "DV_TEXT", "value": NOT_CARRIED},
+            })
+        })
+        .collect();
+    serde_json::from_value(serde_json::json!({
+        "_type": "ITEM_TREE",
+        "name": {"_type": "DV_TEXT", "value": DECLARATION},
+        "archetype_node_id": DECLARATION_TREE,
+        "items": items,
+    }))
+    .map_err(|source| ReceiveMappingError::Encode { source })
 }
 
 impl ReceivedComposition {
@@ -527,6 +621,11 @@ pub enum ReceiveMappingError {
     /// The mapping already wrote the composition's original content.
     #[error("the mapping already wrote the composition's original content")]
     OriginalTaken,
+    /// The mapping already wrote the other details of the composition's
+    /// feeder system audit, where the elements it does not carry are
+    /// declared.
+    #[error("the mapping already wrote the feeder system audit's other details")]
+    DeclarationTaken,
     /// The composition cannot be written as canonical JSON.
     #[error("the composition cannot be written as canonical JSON")]
     Encode {
@@ -573,6 +672,7 @@ mod tests {
             model,
             template_id: String::from("synthetic.v1"),
             outcome: None,
+            not_carried: Vec::new(),
         })
     }
 

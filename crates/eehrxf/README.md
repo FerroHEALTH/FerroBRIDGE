@@ -110,7 +110,10 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   composition as the RM model holds it. A received instance of an element
   the mapping accounts for (`Mapping::accounting`, `Project::accounted`)
   that the run carries into no structured element is a `warning` issue in
-  `ReceivedComposition::outcome`.
+  `ReceivedComposition::outcome`, and is named by its FHIRPath in the
+  composition's `FEEDER_AUDIT.feeder_system_audit.other_details`, beside the
+  original content, for a later reader of the record
+  (`ReceivedComposition::not_carried`).
 - `terminology` (feature `fhir-r4`): the terminology rules. With `openehr`,
   `transcode` turns an openEHR text item into FHIR codings and narrative: a
   code in a preferred system as recorded, a `TERM_MAPPING` of match `=` as a
@@ -144,10 +147,10 @@ uses it:
 
 ```toml
 [dependencies]
-eehrxf = "0.47"
+eehrxf = "0.48"
 ```
 
-Name a patch (`"0.47.N"`) when you need the first release that carries what
+Name a patch (`"0.48.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## Licence
