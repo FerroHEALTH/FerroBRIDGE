@@ -192,6 +192,53 @@ async fn a_verified_sign_in_begins_a_session_and_returns_to_the_console()
     Ok(())
 }
 
+// NOTE: RFC 9964 §5, an ID Token signed with ML-DSA-65 by a key the provider publishes as an
+// `AKP` JWK (§4) holds as an ECDSA one does.
+#[tokio::test]
+async fn an_id_token_signed_with_ml_dsa_begins_a_session() -> Result<(), Box<dyn Error>> {
+    use ferrohealth_smart::jws::algorithm::Algorithm as Signed;
+    use ferrohealth_smart::jws::{compact, key};
+    let provider = Provider::start().await?;
+    let mut seed = [0_u8; 32];
+    aws_lc_rs::rand::fill(&mut seed).map_err(|_unspecified| "a seed")?;
+    let signing = key::SigningKey::new(
+        key::PrivateKey::from_ml_dsa_seed(Signed::MlDsa65, &seed)?,
+        Signed::MlDsa65,
+    )?;
+    let mut published = signing.public_jwk().to_value();
+    published["kid"] = serde_json::json!("pq1");
+    published["use"] = serde_json::json!("sig");
+    let mut keys = vec![serde_json::to_value(provider.jwks())?["keys"][0].clone()];
+    keys.push(published);
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path(
+            ferrobridge_testkit::oidc::JWKS_PATH,
+        ))
+        .respond_with(
+            wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({"keys": keys})),
+        )
+        .with_priority(1)
+        .mount(provider.server())
+        .await;
+    let (state, service) = console(&configuration(&provider, NO_BRIDGE, "", "")).await?;
+    let begun = begin(&service).await?;
+    let claims = IdTokenClaims::new(&provider.issuer(), CLIENT_ID, begun.pair("nonce"));
+    let mut header = compact::Header::new(Signed::MlDsa65);
+    header.kid = Some(String::from("pq1"));
+    let answer = TokenAnswer {
+        expires_in: Some(300),
+        id_token: Some(compact::encode(&header, &claims, &signing)?),
+        ..TokenAnswer::bearer(OPERATOR_TOKEN)
+    };
+    provider
+        .answer_grant("grant_type=authorization_code", &answer)
+        .await?;
+    let (response, body) = complete(&service, &begun).await?;
+    assert_eq!(StatusCode::SEE_OTHER, response.status(), "{body}");
+    assert_eq!(1, occupancy(&state)?.sessions);
+    Ok(())
+}
+
 // RFC 7636 §4.5: the token request carries the verifier whose S256 the
 // authorization request carried.
 #[tokio::test]
