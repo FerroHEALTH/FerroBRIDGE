@@ -32,9 +32,18 @@
 # the base ref itself, so a crate change the base gained after the head forked
 # is not counted against the head (#969). CI passes the current tip of the
 # pull request's target branch as the base ref on a pull request, and the
-# queue base on a merge group, so a changed crate whose version the queue base
-# already reached fails before it merges (#1096). A version moves strictly
-# upward: equal to the base, or below it, fails.
+# queue base on a merge group (#1096).
+#
+# A version steps once per publish, not once per merge (#2367): a changed
+# crate's version is above its newest release on crates.io and not below the
+# base's. A base already above crates.io holds an unpublished version every
+# change until the next publish shares, so two changes to one crate never race
+# in the merge queue. The step and the public dependency verdicts are taken
+# from the newest release, the version a consumer's caret requirement reads.
+# The release is read from the crates.io sparse index
+# (https://doc.rust-lang.org/cargo/reference/registry-index.html), or from
+# CRATE_GUARD_INDEX (a URL, or file:// for a local tree in the same layout);
+# an index that cannot be read fails the guard, never passes it.
 #
 # The head ref may be the literal WORKTREE, which compares the base with the
 # tree as it stands rather than with a commit. That is what the pre-commit hook
@@ -61,6 +70,14 @@ self_test() {
   trap 'rm -rf "$tmp"' RETURN
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
   t_git() { git -C "$tmp/repo" -c user.name=self-test -c user.email=self-test@example.invalid -c commit.gpgsign=false "$@"; }
+  # The scratch index the guard reads demo's releases from, one per argument.
+  export CRATE_GUARD_INDEX="file://$tmp/index"
+  publish() {
+    mkdir -p "$tmp/index/de/mo"
+    : > "$tmp/index/de/mo/demo"
+    local v
+    for v in "$@"; do printf '{"name":"demo","vers":"%s","yanked":false}\n' "$v" >> "$tmp/index/de/mo/demo"; done
+  }
   set_version() {
     printf '[package]\nname = "demo"\nversion = "%s"\n' "$1" > "$tmp/repo/crates/demo/Cargo.toml"
     printf '[[package]]\nname = "demo"\nversion = "%s"\n' "$1" > "$tmp/repo/Cargo.lock"
@@ -83,6 +100,7 @@ self_test() {
   echo 'pub fn a() {}' > "$tmp/repo/crates/demo/src/lib.rs"
   printf 'demo = "0.1"\n' > "$tmp/repo/crates/demo/README.md"
   set_version 0.1.0
+  publish 0.1.0
   t_git add -A
   t_git commit -qm base
   t_git branch pr
@@ -112,17 +130,20 @@ self_test() {
   t_git commit -qm merge
   expect 0 "a committed merge of main" main HEAD
 
-  # The guard still bites: the branch changes the crate without a bump.
+  # The guard still bites: the branch changes a crate whose version crates.io
+  # already holds.
+  publish 0.1.0 0.1.1
   echo 'pub fn c() {}' >> "$tmp/repo/crates/demo/src/lib.rs"
   t_git commit -qam 'unbumped change'
-  expect 1 "a crate change without a bump" main HEAD
+  expect 1 "a crate change at its published version" main HEAD
   set_version 0.1.2
   t_git commit -qam bump
   expect 0 "a crate change with its bump" main HEAD
 
-  # The #1096 case: a branch bumped to the version main reaches while it waits
-  # in the merge queue. The queue builds the merge onto main and names main's
-  # tip as the base, so the change arrives at a version that is not above it.
+  # The #1096 and #2367 cases: a branch bumped to the version main reaches
+  # while it waits in the merge queue. The version is unpublished, so the two
+  # changes share it until the next publish; once it is published, the queued
+  # change needs a version above it.
   t_git checkout -q main
   echo 'pub fn d() {}' > "$tmp/repo/crates/demo/src/d.rs"
   t_git add -A
@@ -136,10 +157,14 @@ self_test() {
   t_git commit -qam 'queued change at 0.1.2'
   t_git checkout -q --detach main
   t_git merge -q --no-ff -m 'merge group' queued > /dev/null 2>&1
-  expect 1 "a queued change at the version the queue base reached" main HEAD
+  expect 0 "a queued change at the unpublished version the queue base reached" main HEAD
+  publish 0.1.0 0.1.1 0.1.2
+  expect 1 "a queued change at the version the queue base reached and published" main HEAD
+  publish 0.1.0 0.1.1
   set_version 0.1.1
   t_git commit -qam 'below the base'
   expect 1 "a queued change below the version of the queue base" main HEAD
+  CRATE_GUARD_INDEX="bad://index" expect 1 "an index that cannot be read" main HEAD
   set_version 0.1.3
   t_git commit -qam 'above the base'
   expect 0 "a queued change above the version of the queue base" main HEAD
@@ -151,6 +176,7 @@ self_test() {
   printf '\n[dependencies]\nserde.workspace = true\n' >> "$tmp/repo/crates/demo/Cargo.toml"
   t_git commit -qam 'a workspace dependency'
   t_git branch patched
+  publish 0.1.0 0.1.1 0.1.2 0.1.3 0.1.4
   printf '\n[patch.crates-io]\nserde = { path = "vendor/serde" }\n' >> "$tmp/repo/Cargo.toml"
   t_git commit -qam 'a patch entry'
   expect 0 "a patch entry naming a workspace dependency" patched HEAD
@@ -220,6 +246,7 @@ self_test() {
   with_dependency 0.1.3 0.0.135 1.0.0
   t_git commit -qam 'a public dependency'
   t_git branch public-base
+  publish 0.1.0 0.1.1 0.1.2 0.1.3
   with_dependency 0.1.4 0.0.136 1.0.0
   t_git commit -qam 'an incompatible public dependency on a patch'
   expect 1 "a public dependency on another line with a patch step" public-base HEAD
@@ -268,6 +295,21 @@ self_test() {
   with_declared 0.1.4 1.0.0 0.3.0 '"serde_json"'
   t_git commit -qam 'an undeclared jiff on another line'
   expect 0 "an undeclared jiff on another line with a patch step" undeclared-base HEAD
+
+  # The #2367 case: a change to a crate whose base already holds an
+  # unpublished version takes no new step.
+  t_git checkout -q -b per-publish main
+  publish 0.1.0 0.1.1 0.1.2
+  set_version 0.1.3
+  printf 'demo = "0.1"\n' > "$tmp/repo/crates/demo/README.md"
+  t_git commit -qam 'main at an unpublished 0.1.3'
+  t_git branch per-publish-base
+  echo 'pub fn f() {}' > "$tmp/repo/crates/demo/src/f.rs"
+  t_git add -A
+  t_git commit -qm 'a second change before the publish'
+  expect 0 "a change at the unpublished version of its base" per-publish-base HEAD
+  publish 0.1.0 0.1.1 0.1.2 0.1.3
+  expect 1 "the same change once that version is published" per-publish-base HEAD
 
   if [[ "$failures" -ne 0 ]]; then
     echo "crate-version-guard: self-test: $failures case(s) failed" >&2
@@ -374,9 +416,42 @@ if grep -qx 'Cargo.toml' <<<"$changed"; then
     sed -E 's/^[[:space:]]+//; s/[[:space:]]*=.*//' | sort -u | tr '\n' ' ')"
 fi
 
-# Whether version $1 sorts strictly above version $2. Equal is not above: a
-# queued change whose version the queue base already reached would publish
-# different content under one version.
+# The sparse index path of crate $1 (Cargo Book, "Registry Index", Index
+# files): 1/, 2/, 3/<first char>/ or <first two>/<next two>/ before the name.
+index_path() {
+  local name
+  name="$(tr '[:upper:]' '[:lower:]' <<<"$1")"
+  case "${#name}" in
+    1) echo "1/$name" ;;
+    2) echo "2/$name" ;;
+    3) echo "3/${name:0:1}/$name" ;;
+    *) echo "${name:0:2}/${name:2:2}/$name" ;;
+  esac
+}
+
+# The newest stable, unyanked release of crate $1 on the index; empty when the
+# index has none. Exits the guard when the index cannot be read.
+published_version() {
+  local index="${CRATE_GUARD_INDEX:-https://index.crates.io}" path body status
+  path="$(index_path "$1")"
+  if [[ "$index" == file://* ]]; then
+    [[ -d "${index#file://}" ]] || { echo "::error::crate-version-guard: the index ${index} is not a directory." >&2; exit 1; }
+    [[ -f "${index#file://}/$path" ]] || return 0
+    body="$(cat "${index#file://}/$path")"
+  else
+    body="$(mktemp)"
+    status="$(curl --proto '=https' --tlsv1.2 -sS -m 30 -A 'ferrobridge-crate-version-guard' \
+      -o "$body" -w '%{http_code}' "$index/$path" 2>/dev/null)" || status="000"
+    case "$status" in
+      200) body="$(cat "$body")" ;;
+      404) rm -f "$body"; return 0 ;;
+      *) rm -f "$body"; echo "::error::crate-version-guard: the index answered $status for $1 at $index/$path; the newest release cannot be read." >&2; exit 1 ;;
+    esac
+  fi
+  jq -r 'select(.yanked | not) | .vers | select(test("-") | not)' <<<"$body" | sort -V | tail -n 1
+}
+
+# Whether version $1 sorts strictly above version $2.
 version_above() {
   local candidate="$1" base_version="$2"
   [[ "$candidate" != "$base_version" ]] && [[ "$(printf '%s\n%s\n' "$candidate" "$base_version" | sort -V | tail -n 1)" = "$candidate" ]]
@@ -432,14 +507,20 @@ for manifest in crates/*/Cargo.toml; do
     reserved="$reserved $name"
     continue
   fi
-  if [[ -n "$old_ver" ]] && ! version_above "$new_ver" "$old_ver"; then
-    echo "::error::packaged content of $name changed but its version $new_ver is not above the base's $old_ver. Bump $manifest, move any internal requirement in the root Cargo.toml with it, refresh Cargo.lock, or apply the 'no-crate-bump' label when the diff provably does not alter packaged bytes." >&2
+  if [[ -n "$old_ver" ]] && version_above "$old_ver" "$new_ver"; then
+    echo "::error::$name moves down from the base's $old_ver to $new_ver; a version never goes back (.claude/rules/crates-publishing.md)." >&2
     fail=1
     continue
   fi
-  if [[ -n "$old_ver" ]] && [[ "$old_ver" != "0.0.0" ]]; then
-    if ! semver_step "$old_ver" "$new_ver"; then
-      echo "::error::$name moves from $old_ver to $new_ver, which is neither a later patch nor a later minor at patch 0 (SemVer 2.0.0 §7; .claude/rules/crates-publishing.md)." >&2
+  pub_ver="$(published_version "$name")"
+  if [[ -n "$pub_ver" ]] && ! version_above "$new_ver" "$pub_ver"; then
+    echo "::error::packaged content of $name changed but its version $new_ver is not above its newest release on crates.io, $pub_ver. Bump $manifest, move any internal requirement in the root Cargo.toml with it, refresh Cargo.lock, or apply the 'no-crate-bump' label when the diff provably does not alter packaged bytes." >&2
+    fail=1
+    continue
+  fi
+  if [[ -n "$pub_ver" ]] && [[ "$pub_ver" != "0.0.0" ]]; then
+    if ! semver_step "$pub_ver" "$new_ver"; then
+      echo "::error::$name moves from its release $pub_ver to $new_ver, which is neither a later patch nor a later minor at patch 0 (SemVer 2.0.0 §7; .claude/rules/crates-publishing.md)." >&2
       fail=1
       continue
     fi
@@ -451,8 +532,8 @@ for manifest in crates/*/Cargo.toml; do
     moved="$(moved_lines \
       "$(manifest_requirements <(git show "$base:Cargo.toml") <(git show "$base:$manifest") | public_lines "$declared")" \
       "$(manifest_requirements <(head_file Cargo.toml) <(head_file "$manifest") | public_lines "$declared")")"
-    if [[ -n "$moved" ]] &&[[ "$(version_line "$old_ver")" == "$(version_line "$new_ver")" ]]; then
-      echo "::error::$name moves from $old_ver to $new_ver while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
+    if [[ -n "$moved" ]] && [[ "$(version_line "$pub_ver")" == "$(version_line "$new_ver")" ]]; then
+      echo "::error::$name moves from its release $pub_ver to $new_ver while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
       fail=1
       continue
     fi
@@ -481,7 +562,7 @@ for manifest in crates/*/Cargo.toml; do
     echo "::error::Cargo.lock records $name ${locked:-nothing}, its manifest is at $new_ver; run cargo update -w and commit the lock." >&2
     fail=1
   fi
-  bumped="$bumped $name@${old_ver:-<new>}->$new_ver"
+  bumped="$bumped $name@${pub_ver:-<unpublished>}->$new_ver"
 done
 
 [[ "$fail" -eq 0 ]] || exit 1
@@ -493,7 +574,7 @@ fi
 if [[ -z "$bumped" ]]; then
   echo "crate-version-guard: no packaged content of crates/* changed."
 else
-  echo "crate-version-guard: packaged content changed and the version moved:$bumped"
+  echo "crate-version-guard: packaged content changed and each version is above its release:$bumped"
 fi
 [[ -z "$clean" ]] || echo "crate-version-guard: unchanged packaged content:$clean"
 [[ -z "$reserved" ]] || echo "crate-version-guard: 0.0.0 name reservations, outside the line:$reserved"

@@ -52,6 +52,11 @@ pub const MAPPINGS: Channel = Channel("ferrobridge_mappings");
 /// The inbound work: the payload is the id of the source with due work.
 pub const INBOUND: Channel = Channel("ferrobridge_inbound");
 
+/// The identity map's record-once rows: no write notifies it, since no row
+/// it covers is updated or deleted, and its copy drops whole on every connect
+/// and loss of the session.
+pub const IDENTITY: Channel = Channel("ferrobridge_identity");
+
 impl Channel {
     /// Returns the name a session listens on.
     #[must_use]

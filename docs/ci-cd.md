@@ -160,7 +160,10 @@ from the merge base with `origin/main` to the working tree, and runs
 rustfmt, clippy, nextest and the doctests on the reached packages, each as
 one cargo invocation over the whole set with cargo's default job count, the
 full-emit tests when `fhir-codegen` is reached, and the `omop-cdm-codegen`
-drift check when that is. On every run it also resolves the fuzz crate's
+drift check when that is. Every clippy run, the all-features one of each
+package with features its default set leaves off included, comes before the
+first nextest run, so a lint failure shows before the long tests start. On
+every run it also resolves the fuzz crate's
 own `fuzz/Cargo.lock` with `--locked`, as the `cargo-deny` job does, and
 names `cargo update --manifest-path fuzz/Cargo.toml --workspace` when a
 moved path dependency left it stale. One invocation builds a shared dependency once,
@@ -170,6 +173,14 @@ forgets is caught by the CI lanes, which run each package on its own
 through cargo hack. It treats the CI configuration
 and its own pair as inert, since they change no cargo result. CI stays the
 full gate.
+
+In a linked worktree, `fast.sh` first copies each build-time corpus tree
+the worktree lacks from the primary checkout of the repository, as a
+copy-on-write clone where the filesystem has one (`cp -c` on APFS), else as
+hard links, else as a copy, with the file times kept. The vendor scripts then
+check every tree against its pin and fetch only a tree that is missing or
+does not match, so a fresh worktree does not download about 2 GB before
+rustfmt starts. `--no-fetch` skips the copy with the fetch.
 
 When the change reaches `ferrobridge-validator` or `fhirconnect`, `fast.sh`
 runs `scripts/vendor/profile-packages.sh`, which hashes each profile package
@@ -294,15 +305,19 @@ from the vendored HL7 packages. `publish-dry-run` runs `cargo publish
 --workspace --dry-run --locked` with no cache, so a packaging failure surfaces
 on the pull request instead of in a release. `crate-version-guard` runs on pull
 requests and again on the merge group against the queue base, and fails a
-change that alters a crate's packaged content without moving that crate's
-version above the base's, which a published version's immutability makes a
-hard rule (`.claude/rules/crates-publishing.md`); the `no-crate-bump` label is
-its escape. It also refuses a minor step that keeps its patch, a step out of
-0.x and a README whose stated caret range is not the manifest's line. It then
-installs the toolchain and the pinned `cargo-semver-checks` to judge every
-crate that moved from a published line against the same base
+change that alters a crate's packaged content while that crate's version is
+not above its newest release on crates.io, or is below the base's. A version
+steps once per publish, so a change to a crate whose base already holds an
+unpublished version bumps nothing, and two such changes never race in the
+merge queue (#2367, `.claude/rules/crates-publishing.md`); the guard reads the
+releases from the crates.io sparse index and fails when it cannot, and the
+`no-crate-bump` label is its escape. It also refuses a minor step that keeps
+its patch, a step out of 0.x and a README whose stated caret range is not the
+manifest's line. It then installs the toolchain and the pinned
+`cargo-semver-checks` to judge every changed crate against the same base, or
+against its newest release while the base holds an unpublished version
 (`scripts/checks/semver.sh`), on the judge's default feature set and with no
-default features: a breaking change on a patch bump fails it (#1745, #1830).
+default features: a breaking change on a patch step fails it (#1745, #1830).
 
 `hashFiles()` cannot do this work. It is evaluated before checkout, when the
 workspace is empty, so a `if: hashFiles('Cargo.toml') != ''` gate never sees

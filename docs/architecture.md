@@ -2823,7 +2823,12 @@ draft upstream change.
   internal resource id to composition uid and entry path, and source resource
   `id` and `meta.versionId` to the mapping that consumed them, so a `PUT`
   resolves, a re-sent Bundle is recognised, and a re-sent resource updates
-  rather than duplicates (section 4.6). The acknowledged failure mode (a
+  rather than duplicates (section 4.6). One written entry records its rows in
+  one statement, and each replica reads the rows no write changes (person to
+  EHR, EHR to person, sender id to internal id, internal id to binding)
+  through a copy bounded by `[state] identity_copy_entries`, which keeps only
+  rows it found and serves only while its `LISTEN` session is connected (our
+  own design). The acknowledged failure mode (a
   re-sent Bundle omitting one resource reads as a different mapping) is
   documented, not hidden. The store file records its schema (#298): this
   build writes and reads schema 4, the bindings of identity derivation 3. The

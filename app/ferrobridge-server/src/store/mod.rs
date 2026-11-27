@@ -45,6 +45,8 @@ pub struct Settings {
     pub max_connections: u32,
     /// How long a request waits for a connection.
     pub acquire_timeout: Duration,
+    /// The most entries the copy of each record-once identity table holds.
+    pub identity_copy_entries: usize,
     /// The sealing keys, when `[state.seal]` is present.
     pub seal: Option<SealKeys>,
 }
@@ -106,6 +108,8 @@ pub struct Store {
     connection: omop_cdm::connection::CdmConnection,
     /// The sealing keys, when `[state.seal]` is present.
     seal: Option<SealKeys>,
+    /// The most entries the copy of each record-once identity table holds.
+    identity_copy_entries: usize,
 }
 
 impl Store {
@@ -141,6 +145,7 @@ impl Store {
             holder: Holder::new(),
             connection: settings.connection.clone(),
             seal: settings.seal.clone(),
+            identity_copy_entries: settings.identity_copy_entries,
         })
     }
 
@@ -204,6 +209,13 @@ impl Store {
         self.seal.as_ref()
     }
 
+    /// Returns the most entries the copy of each record-once identity table
+    /// holds; `0` keeps none.
+    #[must_use]
+    pub const fn identity_copy_entries(&self) -> usize {
+        self.identity_copy_entries
+    }
+
     /// Returns the connection the store was opened on.
     #[must_use]
     pub fn connection(&self) -> &omop_cdm::connection::CdmConnection {
@@ -240,6 +252,7 @@ mod tests {
             .expect("a plaintext URL"),
             max_connections: 1,
             acquire_timeout: Duration::from_secs(2),
+            identity_copy_entries: 0,
             seal: None,
         };
         assert!(matches!(
