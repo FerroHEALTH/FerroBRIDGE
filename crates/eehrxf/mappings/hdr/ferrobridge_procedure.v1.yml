@@ -9,7 +9,10 @@
 # element the composition holds. A procedure commenced is in progress, one completed is
 # completed and one aborted is stopped, the three careflow steps of the
 # archetype at which a procedure was performed (no specification governs
-# the pairing: our own design).
+# the pairing: our own design). The preprocessor admits only those steps, so
+# a procedure at any other step, a planned one among them, is no entry of
+# the report (FHIRconnect 1.0.0 basics/Conditions.adoc, §Conditions in the
+# preprocessor).
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
@@ -22,6 +25,24 @@ spec:
     archetype: openEHR-EHR-ACTION.procedure.v1
   fhirConfig:
     structureDefinition: http://hl7.org/fhir/StructureDefinition/Procedure
+
+preprocessor:
+  openehrCondition:
+    targetRoot: "$archetype"
+    targetAttribute: "ism_transition/careflow_step/defining_code/code_string"
+    operator: "one of"
+    criterias:
+      - "at0068"
+      - "at0043"
+      - "at0041"
+  fhirCondition:
+    targetRoot: "$resource"
+    targetAttribute: "status"
+    operator: "one of"
+    criterias:
+      - "in-progress"
+      - "completed"
+      - "stopped"
 
 mappings:
   - name: "metaURL"

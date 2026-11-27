@@ -23,7 +23,7 @@ use eehrxf::mapping::left_out;
 use eehrxf::mappings::HDR;
 use eehrxf::receive::ReceivedDocument;
 use fhirconnect::engine::context::CallContext;
-use fhirconnect::engine::outcome::Loss;
+use fhirconnect::engine::outcome::{Loss, SkipReason, Warning};
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_sdt::flat::example::{DetailLevel, apply_output_uid, example_composition};
 use serde_json::Value;
@@ -237,20 +237,26 @@ fn a_report_that_records_only_what_the_project_carries_declares_nothing()
     Ok(())
 }
 
+/// The archetype of a diagnostic summary entry.
+const PROBLEM_DIAGNOSIS: &str = "openEHR-EHR-EVALUATION.problem_diagnosis.v1";
+
+/// The archetype of a significant procedures entry.
+const PROCEDURE_ACTION: &str = "openEHR-EHR-ACTION.procedure.v1";
+
+/// The archetype of a discharge medications entry.
+const MEDICATION_ORDER: &str = "openEHR-EHR-INSTRUCTION.medication_order.v3";
+
 /// A discharge report of FerroBRIDGE's template that records one occurrence
 /// of every node the template holds, generated from its Web Template
-/// (`openehr-sdt`'s example at the `Medium` detail level), with the stay's
-/// end, a completed procedure and a medicine's timing, which the example
-/// leaves out or sets otherwise.
+/// (`openehr-sdt`'s example at the `Medium` detail level, whose procedure is
+/// planned), with the stay's end and a medicine's timing, which the example
+/// leaves out.
 fn every_element() -> Result<String, Box<dyn Error>> {
     let index = WebTemplateIndex::build(&super::template()?)?;
     let mut example = example_composition(index.web_template(), DetailLevel::Medium)?;
     apply_output_uid(&mut example, index.template_id());
     example["context"]["end_time"] =
         serde_json::json!({ "_type": "DV_DATE_TIME", "value": "2026-10-20T11:00:00Z" });
-    let procedure = &mut example["content"][1]["items"][0]["ism_transition"];
-    procedure["careflow_step"]["defining_code"]["code_string"] = Value::from("at0043");
-    procedure["current_state"]["defining_code"]["code_string"] = Value::from("532");
     example["content"][2]["items"][0]["activities"][0]["timing"] = serde_json::json!({
         "_type": "DV_PARSABLE",
         "value": "R/2026-10-20T08:00:00Z/P1D",
@@ -259,27 +265,76 @@ fn every_element() -> Result<String, Box<dyn Error>> {
     Ok(serde_json::to_string(&example)?)
 }
 
-#[test]
-fn the_project_declares_every_element_of_an_entry_it_leaves_out() -> Result<(), Box<dyn Error>> {
+/// Asserts that the left-out elements `named` of the entries of
+/// `archetype` are exactly the ones the HDR project declares for it.
+fn exactly_declared(named: &[String], archetype: &str) {
+    let opening = format!("[{archetype}]/");
+    let held: Vec<&String> = named
+        .iter()
+        .filter(|path| path.contains(&opening))
+        .collect();
+    let declared: Vec<_> = HDR
+        .left_out()
+        .iter()
+        .filter(|element| element.archetype == archetype)
+        .collect();
+    assert_eq!(
+        held.len(),
+        declared.len(),
+        "the run leaves out exactly the elements of {archetype} the project declares: {held:#?}"
+    );
+    for element in declared {
+        let at = format!("[{}]/{}", element.archetype, element.path);
+        assert!(
+            held.iter()
+                .any(|path| path.ends_with(&at) || path.contains(&format!("{at}/"))),
+            "{at} is declared and the run names it: {held:#?}"
+        );
+    }
+}
+
+/// The left-out elements of a run of the HDR project over `composition`,
+/// with every loss the run declared.
+fn left_out_of(composition: &str) -> Result<(Vec<String>, Vec<Warning>), Box<dyn Error>> {
     let (_, warnings) = mapping()?.to_fhir_with_warnings(
-        &every_element()?,
+        composition,
         &settings(),
         CallContext::new().with_patient(reference("Patient/synthetic-patient")),
     )?;
-    let named = left_out(&warnings);
-    let declared = HDR.left_out();
-    assert_eq!(
-        named.len(),
-        declared.len(),
-        "the run leaves out exactly the elements the project declares: {named:#?}"
-    );
-    for element in declared {
+    Ok((left_out(&warnings), warnings))
+}
+
+/// Whether `warnings` declare the procedure mapping skipped by its
+/// preprocessor gate.
+fn procedure_gated(warnings: &[Warning]) -> bool {
+    warnings.iter().any(|warning| {
+        matches!(
+            warning.loss(),
+            Loss::Skipped { reason: SkipReason::PreprocessorGate { model }, .. }
+                if model == "ACTION.procedure.v1"
+        )
+    })
+}
+
+#[test]
+fn the_project_declares_every_element_of_an_entry_it_leaves_out() -> Result<(), Box<dyn Error>> {
+    let (named, warnings) = left_out_of(&every_element()?)?;
+    exactly_declared(&named, PROBLEM_DIAGNOSIS);
+    exactly_declared(&named, MEDICATION_ORDER);
+    // NOTE: the generated procedure is planned, which the preprocessor admits as no entry, so the
+    // run declares every element it holds, each one the project declares among them.
+    assert!(procedure_gated(&warnings), "{warnings:?}");
+    for element in HDR
+        .left_out()
+        .iter()
+        .filter(|element| element.archetype == PROCEDURE_ACTION)
+    {
         let at = format!("[{}]/{}", element.archetype, element.path);
         assert!(
             named
                 .iter()
                 .any(|path| path.ends_with(&at) || path.contains(&format!("{at}/"))),
-            "{at} is declared and the run names it: {named:#?}"
+            "{at} is named: {named:#?}"
         );
     }
     for path in &named {
@@ -291,6 +346,49 @@ fn the_project_declares_every_element_of_an_entry_it_leaves_out() -> Result<(), 
             "{slice} is a slice of composition-eu-hdr"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn a_completed_procedure_leaves_out_exactly_what_the_project_declares() -> Result<(), Box<dyn Error>>
+{
+    let mut example: Value = serde_json::from_str(&every_element()?)?;
+    let transition = &mut example["content"][1]["items"][0]["ism_transition"];
+    transition["careflow_step"]["defining_code"]["code_string"] = Value::from("at0043");
+    transition["careflow_step"]["value"] = Value::from("Procedure completed");
+    transition["current_state"]["defining_code"]["code_string"] = Value::from("532");
+    transition["current_state"]["value"] = Value::from("completed");
+    let (named, warnings) = left_out_of(&serde_json::to_string(&example)?)?;
+    assert!(!procedure_gated(&warnings), "{warnings:?}");
+    exactly_declared(&named, PROCEDURE_ACTION);
+    Ok(())
+}
+
+#[test]
+fn a_planned_procedure_is_no_entry_and_leaves_the_rest_of_the_report_mapped()
+-> Result<(), Box<dyn Error>> {
+    let planned = procedure()
+        .replace(r#""value": "completed""#, r#""value": "planned""#)
+        .replace(r#""code_string": "532""#, r#""code_string": "526""#)
+        .replace(
+            r#""value": "Procedure completed""#,
+            r#""value": "Procedure planned""#,
+        )
+        .replace(r#""code_string": "at0043""#, r#""code_string": "at0004""#);
+    let (run, warnings) = mapping()?.to_fhir_with_warnings(
+        &composition_of(&[
+            ("Diagnostic summary", &[diagnosis()]),
+            ("Significant procedures", &[planned]),
+        ]),
+        &settings(),
+        CallContext::new().with_patient(reference("Patient/synthetic-patient")),
+    )?;
+    assert!(procedure_gated(&warnings), "{warnings:?}");
+    only(run.bundle(), "Condition")?;
+    assert!(
+        of_type(run.bundle(), "Procedure")?.is_empty(),
+        "no Procedure is written"
+    );
     Ok(())
 }
 
