@@ -58,6 +58,7 @@ fn settings(state: &State) -> Result<Settings, Error> {
         connection,
         max_connections: state.max_connections,
         acquire_timeout: state.acquire_timeout.get(),
+        identity_copy_entries: state.identity_copy_entries,
         seal: state.seal.as_ref().map(resolve_seal).transpose()?,
     })
 }

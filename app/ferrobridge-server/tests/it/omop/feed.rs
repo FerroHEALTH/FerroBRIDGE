@@ -173,6 +173,7 @@ async fn feed(
         connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
         max_connections: 2,
         acquire_timeout: std::time::Duration::from_secs(5),
+        identity_copy_entries: 0,
         seal: None,
     })
     .await?;
