@@ -7,8 +7,10 @@
 # docs/specs/ietf-oauth/: RFC 6749, whose client-credentials grant (§4.4)
 # the facade's system lane takes, RFC 7523, whose JWT bearer grant (§2.1)
 # carries the Entra on-behalf-of exchange, RFC 8693, the token exchange
-# (§2.1) with its `act` claim (§4.1), and RFC 8707, whose `resource`
-# parameter (§2) names the CDR alone.
+# (§2.1) with its `act` claim (§4.1), RFC 8707, whose `resource`
+# parameter (§2) names the CDR alone, and RFC 9964, whose ML-DSA JWS
+# examples (Appendix A.1) the bridge's signers and verifiers are tested
+# against.
 #
 # Each RFC is pinned by its RFC Editor URL and the sha256 of its text
 # (scripts/vendor/lib/pinned.sh); a published RFC never changes, so a moved
@@ -46,15 +48,18 @@ pin commit rfc8693.txt "RFC 8693, January 2020, Standards Track" "$editor/rfc869
   358d658014738bf4dc56c8aae2094ce716ede23b6d5a80488a7dc8e8d72da609 "$trust"
 pin commit rfc8707.txt "RFC 8707, February 2020, Standards Track" "$editor/rfc8707.txt" \
   3b89844a938b9219571931b664ed4a7b380555a4dda1df4e9445a2f72188e76b "$trust"
+pin commit rfc9964.txt "RFC 9964, May 2026, Standards Track" "$editor/rfc9964.txt" \
+  8c42035b948301b197d431de8b3f40019bdaa3bb40150dc523306923948f34cf "$trust"
 pinned_corpus ietf-oauth "IETF OAuth RFCs" \
   "the IETF OAuth RFCs" \
   "The text form of RFC 6749 (The OAuth 2.0 Authorization Framework),
 RFC 7523 (JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication
-and Authorization Grants), RFC 8693 (OAuth 2.0 Token Exchange) and RFC 8707
-(Resource Indicators for OAuth 2.0), each the whole document as the RFC
-Editor publishes it, with every legend and notice it carries, which is what
-the IETF Trust's grant covers. The files are the ones
-FerroHEALTH/FerroSMART vendors, identified by the same sha256." "" \
-  "FerroHEALTH/FerroBRIDGE#1582 (the onward exchange of the facade's caller token)"
+and Authorization Grants), RFC 8693 (OAuth 2.0 Token Exchange), RFC 8707
+(Resource Indicators for OAuth 2.0) and RFC 9964 (ML-DSA for JSON Object
+Signing and Encryption (JOSE) and CBOR Object Signing and Encryption
+(COSE)), each the whole document as the RFC Editor publishes it, with every
+legend and notice it carries, which is what the IETF Trust's grant covers.
+The first four are the files FerroHEALTH/FerroSMART vendors, identified by the same sha256." "" \
+  "FerroHEALTH/FerroBRIDGE#1582 (the onward exchange of the facade's caller token) and FerroHEALTH/FerroBRIDGE#2323 (ML-DSA JWS)"
 
 say "done"
