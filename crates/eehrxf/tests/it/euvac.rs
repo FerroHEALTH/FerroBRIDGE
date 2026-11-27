@@ -22,7 +22,7 @@ use eehrxf::document::vaccination::{
     EUVAC_BUNDLE, EUVAC_COMPOSITION, EUVAC_SLOTS, VACCINATION_HISTORY_FORM,
 };
 use eehrxf::document::{Document, DocumentError};
-use eehrxf::mapping::Mapping;
+use eehrxf::mapping::{Mapping, left_out};
 use eehrxf::mappings::EUVAC;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::conform::check_resource;
@@ -76,9 +76,37 @@ fn history() -> Result<Mapping, Box<dyn Error>> {
 /// A medication action recording a dose of the vaccine administered, its
 /// sequence number `sequence` when given.
 fn administered(sequence: Option<u32>) -> String {
+    recorded(sequence, &[], None)
+}
+
+/// An element `node` named `name` holding the data value `value`.
+fn element(node: &str, name: &str, value: &str) -> String {
+    format!(
+        r#"{{ "_type": "ELEMENT", "name": {{ "_type": "DV_TEXT", "value": "{name}" }}, "archetype_node_id": "{node}", "value": {value} }}"#
+    )
+}
+
+/// A plain text.
+fn text(value: &str) -> String {
+    format!(r#"{{ "_type": "DV_TEXT", "value": "{value}" }}"#)
+}
+
+/// A medication action recording a dose of the vaccine administered, its
+/// sequence number `sequence` when given, the items `extra` after the
+/// sequence number in its description, and the protocol items `protocol`
+/// when given.
+fn recorded(sequence: Option<u32>, extra: &[String], protocol: Option<&[String]>) -> String {
     let sequence = sequence.map_or_else(String::new, |number| {
         format!(
             r#", {{ "_type": "ELEMENT", "name": {{ "_type": "DV_TEXT", "value": "Sequence number" }}, "archetype_node_id": "at0025", "value": {{ "_type": "DV_COUNT", "magnitude": {number} }} }}"#
+        )
+    });
+    let extra: String = extra.iter().map(|item| format!(", {item}")).collect();
+    let protocol = protocol.map_or_else(String::new, |items| {
+        format!(
+            r#",
+  "protocol": {{ "_type": "ITEM_TREE", "name": {{ "_type": "DV_TEXT", "value": "Tree" }}, "archetype_node_id": "at0030", "items": [{}] }}"#,
+            items.join(",")
         )
     });
     format!(
@@ -98,9 +126,9 @@ fn administered(sequence: Option<u32>) -> String {
     "name": {{ "_type": "DV_TEXT", "value": "Tree" }},
     "archetype_node_id": "at0017",
     "items": [
-      {{ "_type": "ELEMENT", "name": {{ "_type": "DV_TEXT", "value": "Medication item" }}, "archetype_node_id": "at0020", "value": {{ "_type": "DV_CODED_TEXT", "value": "Streptococcus pneumoniae antigen-containing vaccine product", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "http://snomed.info/sct" }}, "code_string": "{VACCINE}" }} }} }}{sequence}
+      {{ "_type": "ELEMENT", "name": {{ "_type": "DV_TEXT", "value": "Medication item" }}, "archetype_node_id": "at0020", "value": {{ "_type": "DV_CODED_TEXT", "value": "Streptococcus pneumoniae antigen-containing vaccine product", "defining_code": {{ "_type": "CODE_PHRASE", "terminology_id": {{ "_type": "TERMINOLOGY_ID", "value": "http://snomed.info/sct" }}, "code_string": "{VACCINE}" }} }} }}{sequence}{extra}
     ]
-  }}
+  }}{protocol}
 }}"#,
         details = details("openEHR-EHR-ACTION.medication.v1"),
     )
@@ -110,6 +138,116 @@ fn administered(sequence: Option<u32>) -> String {
 /// immunisations section.
 fn vaccinated(sequence: Option<u32>) -> String {
     composition(&[section(IMMUNISATION_LIST, &[administered(sequence)])])
+}
+
+/// The administration details cluster holding the items `items`.
+fn administration(items: &[String]) -> String {
+    format!(
+        r#"{{ "_type": "CLUSTER", "name": {{ "_type": "DV_TEXT", "value": "Administration details" }}, "archetype_node_id": "at0140", "items": [{}] }}"#,
+        items.join(",")
+    )
+}
+
+/// The route and the comment, the elements of the action beside the vaccine,
+/// the time and the sequence number that the project carries.
+fn carried() -> Vec<String> {
+    vec![
+        administration(&[element("at0147", "Route", &text("Intramuscular"))]),
+        element("at0024", "Comment", &text("A synthetic comment")),
+    ]
+}
+
+/// A composition whose one administered dose records every element of the
+/// medication action in the template: each the project carries and each it
+/// leaves out.
+fn fully_recorded() -> String {
+    let instant = |value: &str| format!(r#"{{ "_type": "DV_DATE_TIME", "value": "{value}" }}"#);
+    let description = [
+        element(
+            "at0156",
+            "Clinical indication",
+            &text("A synthetic indication"),
+        ),
+        element(
+            "at0132",
+            "Substitution",
+            r#"{ "_type": "DV_CODED_TEXT", "value": "Substitution not performed", "defining_code": { "_type": "CODE_PHRASE", "terminology_id": { "_type": "TERMINOLOGY_ID", "value": "local" }, "code_string": "at0139" } }"#,
+        ),
+        element("at0133", "Substitution reason", &text("A synthetic reason")),
+        element(
+            "at0043",
+            "Original scheduled date/time",
+            &instant("2026-09-14T09:30:00Z"),
+        ),
+        element(
+            "at0154",
+            "Restart date/time",
+            &instant("2026-09-16T09:30:00Z"),
+        ),
+        element(
+            "at0155",
+            "Restart criterion",
+            &text("A synthetic criterion"),
+        ),
+        element("at0021", "Reason", &text("A synthetic reason to vaccinate")),
+        administration(&[
+            element("at0147", "Route", &text("Intramuscular")),
+            element("at0141", "Body site", &text("A synthetic body site")),
+            element(
+                "at0143",
+                "Administration method",
+                &text("A synthetic method"),
+            ),
+        ]),
+        element("at0033", "Patient guidance", &text("A synthetic guidance")),
+        element(
+            "at0149",
+            "Double-checked?",
+            r#"{ "_type": "DV_BOOLEAN", "value": true }"#,
+        ),
+        element("at0024", "Comment", &text("A synthetic comment")),
+    ];
+    let protocol = [element(
+        "at0103",
+        "Order ID",
+        r#"{ "_type": "DV_IDENTIFIER", "id": "synthetic-order-1" }"#,
+    )];
+    composition(&[section(
+        IMMUNISATION_LIST,
+        &[recorded(Some(1), &description, Some(&protocol))],
+    )])
+}
+
+/// A composition whose one administered dose records the reason and the
+/// body site, two elements the project leaves out.
+fn with_left_out() -> String {
+    let extra = [
+        element("at0021", "Reason", &text("A synthetic reason to vaccinate")),
+        administration(&[element(
+            "at0141",
+            "Body site",
+            &text("A synthetic body site"),
+        )]),
+    ];
+    composition(&[section(
+        IMMUNISATION_LIST,
+        &[recorded(Some(1), &extra, None)],
+    )])
+}
+
+/// The narrative `div` of the one section of the written `bundle`.
+fn immunisations_narrative(bundle: &Bundle) -> Result<String, Box<dyn Error>> {
+    let root = serde_json::to_value(bundle)?;
+    let sections = root["entry"][0]["resource"]["section"]
+        .as_array()
+        .ok_or("the sections")?;
+    let [immunisations] = sections.as_slice() else {
+        return Err(format!("{} sections", sections.len()).into());
+    };
+    Ok(immunisations["text"]["div"]
+        .as_str()
+        .ok_or("the narrative")?
+        .to_owned())
 }
 
 /// The FHIR JSON of the resources of `resources` of the type `name`.
@@ -151,9 +289,14 @@ fn written(composition: &str) -> Result<Bundle, Box<dyn Error>> {
         }],
         ..Practitioner::default()
     })))?;
-    let answer = history()?.to_fhir_with(composition, &settings(), call(&subject, &device))?;
+    let (answer, warnings) =
+        history()?.to_fhir_with_warnings(composition, &settings(), call(&subject, &device))?;
     for mapped in document.with_mapped_composition(answer.bundle())? {
-        document.with_section(mapped.into_section(vec![String::from("One synthetic vaccine.")]))?;
+        document.with_section(
+            mapped
+                .into_section(vec![String::from("One synthetic vaccine.")])
+                .with_left_out(left_out(&warnings)),
+        )?;
     }
     document.with_metadata(
         annex_iii(IMMUNISATIONS).with_legal_authentication(Attestation::new(
@@ -255,7 +398,7 @@ fn a_dose_with_no_sequence_number_states_its_number_absent() -> Result<(), Box<d
 
 #[test]
 fn the_vaccination_history_validates_against_the_euvac_profiles() -> Result<(), Box<dyn Error>> {
-    let bundle = written(&vaccinated(Some(1)))?;
+    let bundle = written(&with_left_out())?;
     let text = serde_json::to_string(&bundle)?;
     let received = ReceivedDocument::read(&text)?;
     received.check(&euvac(EUVAC_BUNDLE)?, &euvac(EUVAC_COMPOSITION)?)?;
@@ -269,7 +412,99 @@ fn the_vaccination_history_validates_against_the_euvac_profiles() -> Result<(), 
     };
     assert_eq!(immunisations["code"]["coding"][0]["code"], IMMUNISATIONS);
     assert_eq!(immunisations["entry"].as_array().map(Vec::len), Some(1));
+    assert!(
+        immunisations["text"]["div"]
+            .as_str()
+            .is_some_and(|div| div.matches("which this document does not carry").count() == 2),
+        "the history validates with the two left-out elements named: {immunisations}"
+    );
     emit("eehrxf-euvac-vaccination-history", &text)?;
+    Ok(())
+}
+
+#[test]
+fn the_project_declares_every_element_of_the_action_it_leaves_out() -> Result<(), Box<dyn Error>> {
+    let (_, warnings) = history()?.to_fhir_with_warnings(
+        &fully_recorded(),
+        &settings(),
+        call("Patient/synthetic-subject", "Device/gateway"),
+    )?;
+    let named = left_out(&warnings);
+    let declared = EUVAC.left_out();
+    assert_eq!(
+        named.len(),
+        declared.len(),
+        "the run leaves out exactly the elements the project declares: {named:#?}"
+    );
+    for element in declared {
+        let at = format!("[{}]/{}", element.archetype, element.path);
+        assert!(
+            named
+                .iter()
+                .any(|path| path.ends_with(&at) || path.contains(&format!("{at}/"))),
+            "{at} is declared and the run names it: {named:#?}"
+        );
+    }
+    let carried = history()?.to_fhir_with_warnings(
+        &composition(&[section(
+            IMMUNISATION_LIST,
+            &[recorded(Some(1), &carried(), None)],
+        )]),
+        &settings(),
+        call("Patient/synthetic-subject", "Device/gateway"),
+    )?;
+    assert!(left_out(&carried.1).is_empty(), "{:?}", carried.1);
+    Ok(())
+}
+
+#[test]
+fn a_left_out_element_is_named_by_its_path_in_the_immunisation_narrative()
+-> Result<(), Box<dyn Error>> {
+    let (_, warnings) = history()?.to_fhir_with_warnings(
+        &with_left_out(),
+        &settings(),
+        call("Patient/synthetic-subject", "Device/gateway"),
+    )?;
+    let named = left_out(&warnings);
+    assert_eq!(
+        named,
+        [
+            "/content[openEHR-EHR-SECTION.immunisation_list.v0]/items[openEHR-EHR-ACTION.medication.v1]/description[at0017]/items[at0021]/value",
+            "/content[openEHR-EHR-SECTION.immunisation_list.v0]/items[openEHR-EHR-ACTION.medication.v1]/description[at0017]/items[at0140]/items[at0141]/value",
+        ],
+        "the reason and the body site: {warnings:?}"
+    );
+    let narrative = immunisations_narrative(&written(&with_left_out())?)?;
+    for path in &named {
+        assert!(
+            narrative.contains(&format!(
+                "<p>The source record holds the element {path}, which this document does not carry.</p>"
+            )),
+            "the narrative names {path}: {narrative}"
+        );
+    }
+    assert!(
+        !narrative.contains("A synthetic reason to vaccinate")
+            && !narrative.contains("A synthetic body site"),
+        "the narrative names no value: {narrative}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_fully_mapped_history_names_nothing() -> Result<(), Box<dyn Error>> {
+    let composition = composition(&[section(
+        IMMUNISATION_LIST,
+        &[recorded(Some(1), &carried(), None)],
+    )]);
+    let bundle = written(&composition)?;
+    let narrative = immunisations_narrative(&bundle)?;
+    assert_eq!(
+        narrative,
+        r#"<div xmlns="http://www.w3.org/1999/xhtml"><h3>Immunisations</h3><p>One synthetic vaccine.</p></div>"#
+    );
+    let text = serde_json::to_string(&bundle)?;
+    ReceivedDocument::read(&text)?.check(&euvac(EUVAC_BUNDLE)?, &euvac(EUVAC_COMPOSITION)?)?;
     Ok(())
 }
 
