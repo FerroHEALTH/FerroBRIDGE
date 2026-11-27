@@ -79,8 +79,8 @@ version through the `fhir-types` model (`fhir-stu3`, `fhir-r4`, `fhir-r4b`,
 | FHIRPath R4 test suite, N1 and 3.0.0 STU functions | for a test expecting the expression refused (`invalid`), the expression fails to parse, fails the static check against the input's resource type, or fails to evaluate; for any other test, the evaluation answers the expected outputs, in order unless the test says `ordered="false"` (HL7 `tests-fhir-r4.xml`; FHIRPath N1, and the functions FHIRPath 3.0.0 adds as STU for `fhirpath-r4-stu3`) |
 | R4 profile validator, agreement with the HL7 FHIR Validator | the error and fatal findings of `ferrobridge-validator` on the synthetic case equal those the HL7 FHIR Validator 7.0.4 recorded for it, each compared as its location and its rule (an invariant key, a slice a slice cardinality names); a disagreement the owning test adjudicates against the specification is listed as failing with the adjudication as its reason. `scripts/vendor/hl7-validator-agreement.sh` regenerates the recorded outcomes |
 | FHIR R4 facade | for each context that maps the example's type (the suite's and the KDS diagnosis project), the create answers `201` and the read `200`; the read decodes as an R4 instance; no element the example carries comes back with another value (`PutGet`); and a second create and read of the answer gives it back unchanged. The identity, `meta` and the subject are the facade's and leave the comparison. An example of a type no context maps is counted by type under `set_aside` in the result file, never a case |
-| Xt-EHR models 1.0.0 crosswalk, EEHRxF draft 2026-11-23 | the annex element of the draft EEHRxF implementing act is resolved: it sits in the Xt-EHR models 1.0.0 under the same name and cardinality (the `same` verdict of `crates/eehrxf/src/draft/annexes.tsv`), or it differs and the component records where it goes, following the draft (the category crosswalk, the draft corpus's path table, or for Annex III Table 1 the `DocumentReference` table). A divergence with no recorded decision fails with its verdict as the reason. The `differ` line counts every divergence, named on the badge. The CI test job measures it with every `eehrxf` feature on |
-| EEHRxF draft 2026-11-23, one corpus per priority category | a document the eehrxf suites emitted holds an annex element its HL7 Europe profile carries: the element is followed through the draft crosswalk to the Xt-EHR models and through the category crosswalk to its profile element, and fails as missing when the annex requires it under required parents and the document holds none, or as wrong in cardinality when the annex allows one under single parents and the document holds more. An element the crosswalks follow to no profile element is unmapped, counted apart and named on the badge. The CI test job measures these after the eehrxf suites have written their documents (`EEHRXF_DRAFT_CORPUS_DIR`) |
+| Xt-EHR models 1.0.0 crosswalk, EEHRxF draft 2026-11-23 | the annex element of the draft EEHRxF implementing act is resolved: it sits in the Xt-EHR models 1.0.0 under the same name and cardinality (the `same` verdict of `crates/eehrxf/src/draft/annexes.tsv`), or it differs and the component records where it goes, following the draft (the category crosswalk, the draft corpus's path table, or for Annex III Table 1 the `DocumentReference` table). A divergence with no recorded decision fails with its verdict as the reason. The `differ` line counts every divergence, named on `conformance/README.md`. The CI test job measures it with every `eehrxf` feature on |
+| EEHRxF draft 2026-11-23, one corpus per priority category | a document the eehrxf suites emitted holds an annex element its HL7 Europe profile carries: the element is followed through the draft crosswalk to the Xt-EHR models and through the category crosswalk to its profile element, and fails as missing when the annex requires it under required parents and the document holds none, or as wrong in cardinality when the annex allows one under single parents and the document holds more. An element the crosswalks follow to no profile element is unmapped, counted apart and named on `conformance/README.md`. The CI test job measures these after the eehrxf suites have written their documents (`EEHRXF_DRAFT_CORPUS_DIR`) |
 
 A case the list records that no longer passes fails the corpus test itself, so
 a regression fails CI. When your change makes a case pass, or the corpus
@@ -103,13 +103,18 @@ never remove a case from one to make CI green.
 
 The script writes one shields.io endpoint badge per file under
 `conformance/badges/`. A badge's message is the passing and the total count
-(`68 / 120`), and its colour follows the count: brightgreen when every case
-passes, yellow when some do, red when none do.
+(`68/120`), at most with one word for what it counts (`78/80 valid`), and its
+colour follows the count: brightgreen when every case passes, yellow when
+some do, red when none do. A badge stays short: the script fails a label
+past 30 characters or a message past 20 in every mode. Everything else a
+count holds is on `conformance/README.md`, the page every corpus badge links
+to, which the script renders from the same lists and rows and `--check`
+holds to them.
 
 A failing case that an open `upstream-report` issue holds (the corpus, guide
-or tool contradicts its own specification) stays in the total and is named
-after the fraction, as `5295 / 5309, 14 upstream`. Such cases do not count
-against the colour, so that badge is brightgreen when every other case
+or tool contradicts its own specification) stays in the total, as
+`5295/5309`, and the page names the count and its issues. Such cases do not
+count against the colour, so that badge is brightgreen when every other case
 passes. Each one is a row of `conformance/<corpus>/upstream.tsv`, a
 `case<TAB>issue` header and then the case id and the issue number,
 tab-separated:
@@ -124,10 +129,10 @@ corpus does not hold. A held case that passes fails `--check`, and `--update`
 drops its row. `scripts/checks/upstream-rows.sh` asks the tracker for every
 issue a row names and fails when one is closed or carries no `upstream-report`
 label; it runs in the CI `todo-issues` job. When an upstream issue closes,
-remove its rows: the cases then count against the colour again. An
-unmapped count (`, 8 unmapped`) is named the same way, and so is the count
-of codes outside an `extensible` MyHealth@EU binding that a review found no
-concept of the value set for (`, 4 extensible misses reviewed`): FHIR R4
+remove its rows: the cases then count against the colour again. The page
+names an unmapped count (`8 unmapped`) the same way, and the count of codes
+outside an `extensible` MyHealth@EU binding that a review found no concept
+of the value set for (`4 extensible misses reviewed`): FHIR R4
 terminologies §4.1.5.3 admits such a code, so the case passes, and each one
 is a row of `conformance/myhealth-eu-mvc/extensible-reviewed.tsv` with its
 reason.
