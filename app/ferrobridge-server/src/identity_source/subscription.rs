@@ -4,9 +4,10 @@
 //! The deployment's one PMIR subscription to the identity source's feed.
 //!
 //! One replica holds the `pmir-subscription` lane lease. Every period it
-//! adopts the subscription it created before, or creates one (PMIR 1.6.0
-//! ITI-94, §2:3.94.4.1), reads its status (§2:3.94.4.3), records the status
-//! in the `pmir_subscription` row under its lease, and announces it on
+//! adopts the subscription whose location the `pmir_subscription` row
+//! records, or creates one (PMIR 1.6.0 ITI-94, §2:3.94.4.1), reads its
+//! status (§2:3.94.4.3), records the location and the status in that row
+//! under its lease, and announces the status on
 //! [`crate::store::listen::PSEUDONYMS`], so every replica's pseudonym cache
 //! serves only while the feed is `active`. A status it could not read is
 //! announced as `unreachable`, which closes every cache. No specification
@@ -18,7 +19,7 @@ use std::time::Duration;
 use http::StatusCode;
 use ihe_iti::pmir::PmirSubscriber;
 use ihe_iti::pmir::error::SubscribeError;
-use ihe_iti::pmir::subscription::{Search, Subscribed, SubscriptionRequest};
+use ihe_iti::pmir::subscription::{Subscribed, SubscriptionRequest};
 use sqlx::postgres::PgPool;
 
 use super::cache::PseudonymCache;
@@ -47,6 +48,17 @@ pub(super) async fn recorded_active(pool: &PgPool, within: Duration) -> Result<b
     .bind(within)
     .fetch_one(pool)
     .await
+}
+
+/// Why a period could not read the subscription's status.
+#[derive(Debug, thiserror::Error)]
+enum Unread {
+    /// The identity source did not answer the exchange.
+    #[error("the identity source did not answer the subscription exchange")]
+    Subscribe(#[from] SubscribeError),
+    /// The recorded location could not be read.
+    #[error("the subscription's recorded location could not be read")]
+    Store(#[from] sqlx::Error),
 }
 
 /// The holder of the subscription, run by whichever replica holds its lease.
@@ -165,7 +177,7 @@ impl Holder {
 
     /// Returns the status of the subscription `known` locates, adopting or
     /// creating one first when none is known.
-    async fn status(&self, known: &mut Option<Subscribed>) -> Result<&'static str, SubscribeError> {
+    async fn status(&self, known: &mut Option<Subscribed>) -> Result<&'static str, Unread> {
         let subscribed = match known.take() {
             Some(subscribed) => subscribed,
             None => self.adopt_or_create().await?,
@@ -184,20 +196,29 @@ impl Holder {
             }
             Err(error) => {
                 *known = Some(subscribed);
-                Err(error)
+                Err(error.into())
             }
         }
     }
 
-    /// Returns the subscription this deployment created before, found by
-    /// its channel endpoint, or a new one.
-    async fn adopt_or_create(&self) -> Result<Subscribed, SubscribeError> {
-        if let Search::Found(listed) = self.subscriber.find(&self.request, self.timeout).await?
-            && let Some(first) = listed.into_iter().next()
+    /// Returns the subscription whose location the row records, or a new
+    /// one.
+    async fn adopt_or_create(&self) -> Result<Subscribed, Unread> {
+        // NOTE: PMIR 1.6.0 §2:3.94 defines no search, so the subscriber keeps the location
+        // of what it created; a location not under the identity source's base is created anew.
+        let recorded: Option<String> =
+            sqlx::query_scalar("SELECT location FROM pmir_subscription WHERE location IS NOT NULL")
+                .fetch_optional(&self.pool)
+                .await?;
+        if let Some(subscribed) =
+            recorded.and_then(|location| Subscribed::at(self.subscriber.endpoint(), &location).ok())
         {
-            return Ok(first.subscribed);
+            return Ok(subscribed);
         }
-        self.subscriber.subscribe(&self.request, self.timeout).await
+        Ok(self
+            .subscriber
+            .subscribe(&self.request, self.timeout)
+            .await?)
     }
 
     /// Records `status` of the subscription at `location` under `term`.

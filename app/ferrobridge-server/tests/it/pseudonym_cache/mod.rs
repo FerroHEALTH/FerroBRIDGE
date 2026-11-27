@@ -55,7 +55,7 @@ pub(super) fn identity_of(text: &str) -> Result<IdentitySource, Box<dyn Error>> 
 #[tokio::test]
 async fn an_audited_identity_source_records_each_iti_94_exchange_of_its_subscription()
 -> Result<(), Box<dyn Error>> {
-    // PMIR 1.6.0 §2:3.94.5.1: the Subscriber records every subscription exchange.
+    // PMIR 1.6.0 §2:3.94.5.1: the Subscriber records each create and read of its subscription.
     let registry = wiremock::MockServer::start().await;
     let identity = identity_of(&format!(
         "[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\n\n\
@@ -71,16 +71,16 @@ async fn an_audited_identity_source_records_each_iti_94_exchange_of_its_subscrip
         .ok_or("the cache is configured")?
         .subscription;
     let timeout = Duration::from_secs(5);
-    subscription
-        .subscriber
-        .find(&subscription.request, timeout)
-        .await?;
-    let refused = subscription
-        .subscriber
-        .subscribe(&subscription.request, timeout)
-        .await;
-    assert!(refused.is_err(), "the stub registry creates nothing");
-    assert_eq!(1, kept.count(&ihe_iti::pmir::audit::subscription_search()));
+    let subscriber = &subscription.subscriber;
+    let created = subscriber.subscribe(&subscription.request, timeout).await;
+    assert!(created.is_err(), "the stub registry creates nothing");
+    let located = ihe_iti::pmir::subscription::Subscribed::at(
+        subscriber.endpoint(),
+        &format!("{}/synthetic-subscription", subscriber.endpoint()),
+    )?;
+    let read = subscriber.status(&located, timeout).await;
+    assert!(read.is_err(), "the stub registry holds nothing");
     assert_eq!(1, kept.count(&ihe_iti::pmir::audit::subscription_create()));
+    assert_eq!(1, kept.count(&ihe_iti::pmir::audit::subscription_read()));
     Ok(())
 }

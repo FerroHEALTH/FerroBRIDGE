@@ -20,7 +20,7 @@ use ferrobridge_testkit::{containers, ferropix, oidc::Provider};
 use ferrohealth_smart::kind::IssuerKind;
 use ihe_atna::user::OnBehalfOf;
 use ihe_iti::pixm::identifier::SourceIdentifier;
-use ihe_iti::pmir::subscription::Search;
+use ihe_iti::pmir::subscription::Subscribed;
 use reqwest::StatusCode;
 
 use super::{Kept, identity_of};
@@ -298,10 +298,6 @@ impl Stack {
                 .fetch_all(self.store.pool())
                 .await;
         let subscription = &self.subscription;
-        let found = subscription
-            .subscriber
-            .find(&subscription.request, TIMEOUT)
-            .await;
         let created = subscription
             .subscriber
             .subscribe(&subscription.request, TIMEOUT)
@@ -316,7 +312,7 @@ impl Stack {
         let log = self.pix.log().await;
         let tail: Vec<&str> = log.lines().rev().take(40).collect();
         format!(
-            "listening: {}\nrecorded: {recorded:?}\nfound: {found:?}\ncreated: {created}\nFerroPIX log, newest first:\n{}",
+            "listening: {}\nrecorded: {recorded:?}\ncreated: {created}\nFerroPIX log, newest first:\n{}",
             self.running.cache.listened().is_listening(),
             tail.join("\n")
         )
@@ -403,23 +399,16 @@ async fn posted(stack: &Stack, bearer: Option<&str>) -> Result<StatusCode, Box<d
     Ok(request.send().await?.status())
 }
 
-/// Deletes the subscription the holder keeps.
+/// Deletes the subscription the holder keeps, whose location its row
+/// records.
 async fn unsubscribe(stack: &Stack) -> Result<(), Box<dyn Error>> {
-    let subscription = &stack.subscription;
-    let Search::Found(listed) = subscription
-        .subscriber
-        .find(&subscription.request, TIMEOUT)
-        .await?
-    else {
-        return Err("FerroPIX searches its subscriptions by channel endpoint".into());
-    };
-    assert!(!listed.is_empty(), "the holder subscribed");
-    for found in &listed {
-        subscription
-            .subscriber
-            .unsubscribe(&found.subscribed, TIMEOUT)
+    let location: String =
+        sqlx::query_scalar("SELECT location FROM pmir_subscription WHERE location IS NOT NULL")
+            .fetch_one(stack.store.pool())
             .await?;
-    }
+    let registry = &stack.subscription.subscriber;
+    let held = Subscribed::at(registry.endpoint(), &location)?;
+    registry.unsubscribe(&held, TIMEOUT).await?;
     Ok(())
 }
 
