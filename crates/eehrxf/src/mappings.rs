@@ -30,6 +30,7 @@ pub struct Project {
     accounted: &'static [&'static str],
     followed: &'static [&'static str],
     left_out: &'static [LeftOut],
+    slices: &'static [(&'static str, &'static str)],
 }
 
 /// One element of an entry a project maps that the project carries into no
@@ -151,6 +152,34 @@ impl Project {
         self.left_out
     }
 
+    /// Returns the section slice of the document form whose section lists
+    /// the entry that holds the element at `path`, an openEHR path a run
+    /// declared (`crate::mapping::left_out`), or `None` when the path lies in
+    /// no entry the project places in a section.
+    ///
+    /// The entry is the innermost archetype the path names that the project
+    /// maps to an entry; each one fills one section of its form. No
+    /// specification governs the placement: our own design.
+    #[must_use]
+    pub fn slice_of(&self, path: &str) -> Option<&'static str> {
+        let mut found: Option<(usize, &'static str)> = None;
+        for &(archetype, slice) in self.slices {
+            let opening = format!("[{archetype}");
+            let at = path.match_indices(&opening).filter_map(|(at, _)| {
+                let after = at.checked_add(opening.len())?;
+                path.get(after..)
+                    .filter(|rest| rest.starts_with([']', ',', ' ']))
+                    .map(|_| at)
+            });
+            if let Some(at) = at.max()
+                && found.is_none_or(|(held, _)| at > held)
+            {
+                found = Some((at, slice));
+            }
+        }
+        found.map(|(_, slice)| slice)
+    }
+
     /// Writes every file of the project and every search declaration into
     /// `directory`, which must exist, and answers the paths of the files
     /// written, in loading order, the `files` a [`crate::mapping::Mapping`]
@@ -217,7 +246,13 @@ pub const MPD: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
+
+/// The entry archetype of the imaging project, the imaging examination
+/// result its report is mapped from.
+#[cfg(feature = "imaging")]
+const IMAGING_RESULT: &str = "openEHR-EHR-OBSERVATION.imaging_exam_result.v1";
 
 /// The HL7 Europe Imaging Report 1.0.0-ballot project.
 ///
@@ -229,7 +264,10 @@ pub const MPD: Project = Project {
 /// received report declares each section none of whose entries it carries,
 /// and each element of the report and of its studies it carries into no
 /// structured element, such as a performer that is no `Organization`
-/// ([`Project::accounted`]).
+/// ([`Project::accounted`]). Out of openEHR, [`Project::left_out`] lists
+/// every element of the imaging examination result in the template that no
+/// profile element carries, each of which a run declares when the
+/// composition holds it.
 #[cfg(feature = "imaging")]
 pub const IMAGING: Project = Project {
     directory: "imaging",
@@ -287,7 +325,121 @@ pub const IMAGING: Project = Project {
     // NOTE: HL7 Europe Imaging Report 1.0.0-ballot DiagnosticReportEuImaging.performer:organization; the
     // project maps the Organization a performer names, so a performer that resolves to one it read is carried.
     followed: &["DiagnosticReport.performer"],
-    left_out: &[],
+    left_out: &[
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0055]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0071]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0061]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0014]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0008]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0056]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0063]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0057]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0058]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0059]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/data[at0003]/items[at0023]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/state[at0047]/items[at0048]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "data[at0001]/events[at0002]/state[at0047]/items[at0108]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0098]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0106]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0004]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0019]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0087]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0049]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0088]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0062]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0093]/items[at0094]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0093]/items[at0095]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0093]/items[at0096]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0093]/items[at0097]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0027]/items[at0031]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0027]/items[at0028]",
+        },
+        LeftOut {
+            archetype: IMAGING_RESULT,
+            path: "protocol[at0025]/items[at0027]/items[at0029]",
+        },
+    ],
+    slices: &[],
 };
 
 /// The HL7 Europe Laboratory Report 2.0.0 project.
@@ -333,6 +485,7 @@ pub const LABORATORY: Project = Project {
     ],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.
@@ -401,7 +554,20 @@ pub const EPS: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
+
+/// The entry archetype of the HDR project's diagnostic summary.
+#[cfg(feature = "discharge")]
+const HDR_DIAGNOSIS: &str = "openEHR-EHR-EVALUATION.problem_diagnosis.v1";
+
+/// The entry archetype of the HDR project's significant procedures.
+#[cfg(feature = "discharge")]
+const HDR_PROCEDURE: &str = "openEHR-EHR-ACTION.procedure.v1";
+
+/// The entry archetype of the HDR project's discharge medications.
+#[cfg(feature = "discharge")]
+const HDR_ORDER: &str = "openEHR-EHR-INSTRUCTION.medication_order.v3";
 
 /// The HL7 Europe Hospital Discharge Report 1.0.0 project.
 ///
@@ -416,7 +582,11 @@ pub const EPS: Project = Project {
 /// `medicationRequest-eu-core`, each an entry of the section of that name.
 /// A received report declares each section none of whose entries it
 /// carries, the hospital course among them, and each element of an entry it
-/// carries into no structured element ([`Project::accounted`]).
+/// carries into no structured element ([`Project::accounted`]). Out of
+/// openEHR, [`Project::left_out`] lists every element of the three entries
+/// in the template that no profile element carries, each of which a run
+/// declares when the composition holds it, and [`Project::slice_of`] names
+/// the section whose narrative names it.
 #[cfg(feature = "discharge")]
 pub const HDR: Project = Project {
     directory: "hdr",
@@ -507,7 +677,221 @@ pub const HDR: Project = Project {
         "MedicationRequest.eventHistory",
     ],
     followed: &[],
-    left_out: &[],
+    left_out: &[
+        LeftOut {
+            archetype: HDR_DIAGNOSIS,
+            path: "data[at0001]/items[at0079]",
+        },
+        LeftOut {
+            archetype: HDR_DIAGNOSIS,
+            path: "data[at0001]/items[at0009]",
+        },
+        LeftOut {
+            archetype: HDR_DIAGNOSIS,
+            path: "data[at0001]/items[at0078]",
+        },
+        LeftOut {
+            archetype: HDR_DIAGNOSIS,
+            path: "data[at0001]/items[at0080]",
+        },
+        LeftOut {
+            archetype: HDR_DIAGNOSIS,
+            path: "data[at0001]/items[at0072]",
+        },
+        LeftOut {
+            archetype: HDR_DIAGNOSIS,
+            path: "protocol[at0032]/items[at0070]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0049]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0070]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0072]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0065]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0058]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0071]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0069]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0066]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0073]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0060]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0061]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0074]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "description[at0001]/items[at0067]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "protocol[at0053]/items[at0054]",
+        },
+        LeftOut {
+            archetype: HDR_PROCEDURE,
+            path: "protocol[at0053]/items[at0056]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0092]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0094]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0047]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0173]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0174]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0062]/items[at0064]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0062]/items[at0178]/items[at0171]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0062]/items[at0178]/items[at0162]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0062]/items[at0051]/items[at0130]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0062]/items[at0051]/items[at0053]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0062]/items[at0150]/items[at0165]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0062]/items[at0150]/items[at0151]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0044]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0105]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0107]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0018]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0148]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0179]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0113]/items[at0013]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0113]/items[at0011]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0113]/items[at0016]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0113]/items[at0060]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0113]/items[at0050]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0129]/items[at0106]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0129]/items[at0132]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0129]/items[at0154]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0129]/items[at0139]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0129]/items[at0155]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/description[at0002]/items[at0129]/items[at0161]",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "activities[at0001]/timing",
+        },
+        LeftOut {
+            archetype: HDR_ORDER,
+            path: "protocol[at0005]/items[at0004]",
+        },
+    ],
+    slices: &[
+        (HDR_DIAGNOSIS, "sectionDiagnosticSummary"),
+        (HDR_PROCEDURE, "sectionSignificantProcedures"),
+        (HDR_ORDER, "sectionDischargeMedications"),
+    ],
 };
 
 /// FerroBRIDGE's medical test report project, the non-laboratory reports of
@@ -535,6 +919,7 @@ pub const TEST_REPORT: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
 
 /// The draft `EEHRxF` Annex X project: the common data groups served as
@@ -713,6 +1098,7 @@ pub const ANNEX_X: Project = Project {
     accounted: &[],
     followed: &[],
     left_out: &[],
+    slices: &[],
 };
 
 /// The archetype of the entry the `euvac` project maps, the CKM medication
@@ -810,6 +1196,7 @@ pub const EUVAC: Project = Project {
             path: "protocol[at0030]/items[at0103]",
         },
     ],
+    slices: &[(VACCINATION_ENTRY, "immunisations")],
 };
 
 /// Every project the enabled features ship.
