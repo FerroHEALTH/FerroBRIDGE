@@ -101,7 +101,11 @@ fn recorded(sequence: Option<u32>, extra: &[String], protocol: Option<&[String]>
             r#", {{ "_type": "ELEMENT", "name": {{ "_type": "DV_TEXT", "value": "Sequence number" }}, "archetype_node_id": "at0025", "value": {{ "_type": "DV_COUNT", "magnitude": {number} }} }}"#
         )
     });
-    let extra: String = extra.iter().map(|item| format!(", {item}")).collect();
+    let extra = extra.iter().fold(String::new(), |mut held, item| {
+        held.push_str(", ");
+        held.push_str(item);
+        held
+    });
     let protocol = protocol.map_or_else(String::new, |items| {
         format!(
             r#",
