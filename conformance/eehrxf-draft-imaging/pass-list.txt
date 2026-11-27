@@ -12,6 +12,12 @@ eehrxf-imaging-mapped:body.examinationReport.medicationAdministration
 eehrxf-imaging-mapped:body.examinationReport.modality
 eehrxf-imaging-mapped:body.examinationReport.result[x]
 eehrxf-imaging-mapped:body.exposureInformation
+eehrxf-imaging-mapped:body.exposureInformation.structuredDose
+eehrxf-imaging-mapped:body.exposureInformation.structuredDose.bodySite
+eehrxf-imaging-mapped:body.exposureInformation.structuredDose.doseModality
+eehrxf-imaging-mapped:body.exposureInformation.structuredDose.doseQuantity
+eehrxf-imaging-mapped:body.exposureInformation.structuredDose.numberOfSeries
+eehrxf-imaging-mapped:body.exposureInformation.summary
 eehrxf-imaging-mapped:body.orderInformation
 eehrxf-imaging-mapped:body.orderInformation.clinicalQuestion
 eehrxf-imaging-mapped:body.orderInformation.orderDateAndTime
@@ -88,5 +94,5 @@ eehrxf-manifest-study:series.seriesUid
 eehrxf-manifest-study:series.specimen
 eehrxf-manifest-study:series.started
 eehrxf-manifest-study:started
-total 91
-unmapped 8
+total 97
+unmapped 2

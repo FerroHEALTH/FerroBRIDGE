@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the seventeen corpus tests, compares what they
+# The conformance gate (#24): runs the sixteen corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
@@ -87,17 +87,18 @@ readonly CORPUS_TESTS=(
   'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
   'fhirpath-r4-stu3 ferrobridge-fhirpath conformance_fhirpath_r4_stu3'
   'validator-agreement ferrobridge-validator conformance_the_validator_agrees_with_the_hl7_validator_on_its_corpus'
-  'xtehr-crosswalk eehrxf conformance_the_xtehr_crosswalk_holds_its_pass_list'
   'eehrxf-annex-x ferrobridge-server conformance_the_annex_x_groups_hold_their_pass_list'
 )
 # The corpora measured outside this script, whose results it reads and never
 # produces: the MyHealth@EU corpora HL7's FHIR Validator measures
-# (scripts/checks/fhir-validator.sh --myhealth-eu) and the EEHRxF draft
+# (scripts/checks/fhir-validator.sh --myhealth-eu), the EEHRxF draft
 # corpora the eehrxf draft corpus suite measures over the documents the other
-# eehrxf suites emitted (EEHRXF_DRAFT_CORPUS_DIR), each after those suites run.
+# eehrxf suites emitted (EEHRXF_DRAFT_CORPUS_DIR), each after those suites run,
+# and the Xt-EHR crosswalk, which that suite measures with every eehrxf
+# feature on, since a row resolves only through the category crosswalks.
 readonly DRAFT_CORPORA=(eehrxf-draft-patient-summary eehrxf-draft-eprescription eehrxf-draft-edispensation
   eehrxf-draft-medical-test-report eehrxf-draft-imaging eehrxf-draft-discharge)
-readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac "${DRAFT_CORPORA[@]}")
+readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac "${DRAFT_CORPORA[@]}" xtehr-crosswalk)
 
 # Whether $1 equals one of the remaining arguments.
 contains() {
@@ -180,6 +181,12 @@ readonly OUT=target/conformance
 # The tree of the pass lists and upstream rows; the self-test points it elsewhere.
 root=conformance
 readonly UPSTREAM_HEADER=$'case\tissue'
+# The counts a pass list records after its total line, each named after the
+# badge fraction: unmapped annex elements (the EEHRxF draft corpora) and
+# reviewed extensible-binding misses (myhealth-eu-mvc), and annex elements
+# whose Xt-EHR element differs (xtehr-crosswalk).
+readonly COUNT_KINDS=(unmapped reviewed differ)
+readonly COUNT_LINE='^(total|unmapped|reviewed|differ) '
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
 readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2F'
@@ -207,7 +214,7 @@ readonly QUALITY_BADGES=(
 )
 
 # The line under the caption that says what a suffix after a fraction counts.
-readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour'
+readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour; k extensible misses reviewed: codes outside an extensible value set that a review found no concept for (FHIR R4 terminologies 4.1.5.3), counted as passing; k differ from Xt-EHR: annex elements whose Xt-EHR element differs, passing when a decision records where each goes'
 
 # The badge label of a corpus.
 label_of() {
@@ -263,8 +270,8 @@ logo_of() {
 unit_of() {
   case "$1" in
     myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr | myhealth-eu-euvac) echo " valid" ;;
-    myhealth-eu-mvc) echo " codes in bound value sets" ;;
-    xtehr-crosswalk) echo " elements aligned" ;;
+    myhealth-eu-mvc) echo " codes that meet their binding" ;;
+    xtehr-crosswalk) echo " elements resolved" ;;
     eehrxf-draft-*) echo " annex elements held" ;;
     *) echo "" ;;
   esac
@@ -333,7 +340,7 @@ upstream_rows() {
 
 # The passing case ids of the pass list of corpus $1, sorted.
 listed_cases() {
-  grep -vE '^(total|unmapped) ' "$root/$1/pass-list.txt" | LC_ALL=C sort || true
+  grep -vE "$COUNT_LINE" "$root/$1/pass-list.txt" | LC_ALL=C sort || true
 }
 
 # The count of upstream rows of corpus $1 whose case its pass list does not
@@ -345,18 +352,29 @@ held_of() {
     wc -l | tr -d ' '
 }
 
-# The badge JSON a pass list implies; a list that records unmapped elements
-# names their count after the fraction, and so do the upstream rows, so the
-# badge never hides them.
+# What count $2 of kind $1 reads as after a badge fraction.
+count_suffix() {
+  case "$1" in
+    unmapped) echo ", $2 unmapped" ;;
+    reviewed) echo ", $2 extensible misses reviewed" ;;
+    differ) echo ", $2 differ from Xt-EHR" ;;
+  esac
+}
+
+# The badge JSON a pass list implies; each count the list records is named
+# after the fraction, and so are the upstream rows, so the badge never hides
+# them.
 badge_of() {
-  local corpus="$1" list="$root/$1/pass-list.txt" passed total unmapped unit held
-  passed="$(grep -vEc '^(total|unmapped) ' "$list" || true)"
+  local corpus="$1" list="$root/$1/pass-list.txt" passed total kind count unit held
+  passed="$(grep -vEc "$COUNT_LINE" "$list" || true)"
   total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   [[ -n "$total" ]] || { echo "conformance: $list has no total line" >&2; return 2; }
-  unmapped="$(sed -n 's/^unmapped \([0-9][0-9]*\)$/\1/p' "$list")"
   held="$(held_of "$corpus")" || return 2
   unit="$(unit_of "$corpus")"
-  [[ -z "$unmapped" ]] || unit="$unit, $unmapped unmapped"
+  for kind in "${COUNT_KINDS[@]}"; do
+    count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
+    [[ -z "$count" ]] || unit="$unit$(count_suffix "$kind" "$count")"
+  done
   [[ "$held" -eq 0 ]] || unit="$unit, $held upstream"
   fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(logo_of "$corpus")" "$unit" "$held"
 }
@@ -486,6 +504,9 @@ run_self_test() {
   printf '%s\n' a b 'total 4' 'unmapped 3' >"$work/$corpus/pass-list.txt"
   st_upstream $'c\t632' $'d\t2112'
   st_expect '2 / 4, 3 unmapped, 2 upstream' brightgreen "unmapped and upstream named together" || return 1
+  printf '%s\n' a b 'total 4' 'reviewed 1' >"$work/$corpus/pass-list.txt"
+  st_expect '2 / 4, 1 extensible misses reviewed, 2 upstream' brightgreen "reviewed misses named before the upstream rows" || return 1
+  printf '%s\n' a b 'total 4' 'unmapped 3' >"$work/$corpus/pass-list.txt"
 
   st_upstream $'c\t632' $'c\t2112'
   if badge_of "$corpus" >/dev/null 2>&1; then st_fail "a repeated case renders"; return 1; fi
@@ -619,12 +640,14 @@ for corpus in "${selected[@]}"; do
     {
       jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort
       echo "total $(jq -r '.total' "$result")"
-      jq -r 'select(.unmapped != null) | "unmapped \(.unmapped)"' "$result"
+      for kind in "${COUNT_KINDS[@]}"; do
+        jq -r --arg kind "$kind" 'select(.[$kind] != null) | "\($kind) \(.[$kind])"' "$result"
+      done
     } >"$list"
   fi
   passing="$(jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort)"
   measured_total="$(jq -r '.total' "$result")"
-  listed="$(grep -vE '^(total|unmapped) ' "$list" | LC_ALL=C sort || true)"
+  listed="$(grep -vE "$COUNT_LINE" "$list" | LC_ALL=C sort || true)"
   listed_total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   regressed="$(LC_ALL=C comm -23 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
   new="$(LC_ALL=C comm -13 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
@@ -642,12 +665,14 @@ for corpus in "${selected[@]}"; do
     printf '  %s\n' "$new"
     if [[ "$mode" = check ]]; then failed=1; fi
   fi
-  measured_unmapped="$(jq -r '.unmapped // empty' "$result")"
-  listed_unmapped="$(sed -n 's/^unmapped \([0-9][0-9]*\)$/\1/p' "$list")"
-  if [[ "$measured_unmapped" != "$listed_unmapped" ]]; then
-    echo "conformance: $corpus leaves $measured_unmapped elements unmapped and its list records ${listed_unmapped:-none}; run $0 --update"
-    if [[ "$mode" = check ]]; then failed=1; fi
-  fi
+  for kind in "${COUNT_KINDS[@]}"; do
+    measured_count="$(jq -r --arg kind "$kind" '.[$kind] // empty' "$result")"
+    listed_count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
+    if [[ "$measured_count" != "$listed_count" ]]; then
+      echo "conformance: $corpus measures ${measured_count:-no} $kind and its list records ${listed_count:-none}; run $0 --update"
+      if [[ "$mode" = check ]]; then failed=1; fi
+    fi
+  done
   if [[ "$measured_total" != "$listed_total" ]]; then
     echo "conformance: $corpus holds $measured_total cases and its list records $listed_total; run $0 --update"
     if [[ "$mode" = check ]]; then failed=1; fi

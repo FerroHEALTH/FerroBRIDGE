@@ -5,6 +5,7 @@
 //! reason it has none.
 
 use fhir_types::r4::codeable_concept::CodeableConcept;
+use fhir_types::r4::extension::Extension;
 
 use super::form::Slot;
 
@@ -46,6 +47,7 @@ pub struct Section {
     pub(super) entries: Vec<String>,
     pub(super) authors: Vec<String>,
     pub(super) empty: Option<Emptied>,
+    pub(super) extensions: Vec<Extension>,
 }
 
 impl Section {
@@ -59,6 +61,7 @@ impl Section {
             entries: Vec::new(),
             authors: Vec::new(),
             empty: None,
+            extensions: Vec::new(),
         }
     }
 
@@ -81,6 +84,15 @@ impl Section {
     #[must_use]
     pub fn with_author(mut self, full_url: String) -> Self {
         self.authors.push(full_url);
+        self
+    }
+
+    /// Returns this section with the extension `extension`, one of the
+    /// extensions the form's `Composition` profile slices the section's
+    /// `extension` by.
+    #[must_use]
+    pub fn with_extension(mut self, extension: Extension) -> Self {
+        self.extensions.push(extension);
         self
     }
 

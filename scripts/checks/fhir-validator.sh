@@ -67,6 +67,18 @@
 # validator reports no error, no fatal issue and no unchecked profile for it;
 # the mode fails only when it cannot measure.
 #
+# A case asks whether a document, in the form eehrxf wrote it, is also a
+# MyHealth@EU document (#2325). A document in the MyHealth@EU form is measured
+# as written. A document in the HL7 Europe form claims the MyHealth@EU Bundle
+# profile of its guide instead, and each entry of a type exactly one entry
+# slice of that Bundle matches by type and profile claims the slice's profile,
+# the way the Core corpus holds each entry to the Core profile of its type.
+# FHIR R4 profiling.html 5.1.0.11 matches a `profile` discriminator by the
+# entry's conformance to the profile, never by its meta.profile, so the claim
+# changes no verdict: without it the validator reports only that the slice
+# found no entry, and with it the validator names what the entry lacks. No
+# specification governs the corpora: our own design.
+#
 # Usage:
 #   scripts/checks/fhir-validator.sh DOCUMENTS OUT
 #   scripts/checks/fhir-validator.sh --myhealth-eu DOCUMENTS OUT
@@ -94,6 +106,10 @@ readonly CACHE="$WORK/home/.fhir/packages"
 
 # The vendored MyHealth@EU Master Value Sets Catalogue.
 readonly MVC="docs/specs/ehdsi-mvc/myhealth.eu.fhir.mvc-package-9.1.0.tgz"
+
+# The codings outside an extensible MyHealth@EU binding that a human review
+# found no concept of the value set for (FHIR R4 terminologies §4.1.5.3).
+readonly MVC_REVIEWED="conformance/myhealth-eu-mvc/extensible-reviewed.tsv"
 
 # The remaining-dispensations extension a mapped prescription carries.
 readonly REMAINING="crates/eehrxf/src/medication/StructureDefinition-remaining-dispensations.json"
@@ -159,6 +175,10 @@ readonly HDR_BUNDLE="http://hl7.eu/fhir/hdr/StructureDefinition/bundle-eu-hdr"
 # the MyHealth@EU Hospital Discharge Report CI build docs/VERSIONS.md pins.
 readonly MYHEALTHEU_HDR_BUNDLE="http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu"
 readonly HDR_IG="hl7.fhir.eu.hdr#1.0.0"
+
+# The laboratory report in the MyHealth@EU form, the profile an HL7 Europe
+# laboratory report claims in the MyHealth@EU Laboratory corpus.
+readonly MYHEALTHEU_LAB_BUNDLE="http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu"
 
 # The MyHealth@EU vaccination history a run validates over the MyHealth@EU
 # Vaccination guide, a preview (#2168).
@@ -565,6 +585,9 @@ myhealth_eu() {
   profiles="$(jq -s -c '[.[] | select(.resourceType == "StructureDefinition" and .kind == "resource" and .derivation == "constraint")]
     | group_by(.type) | map(select(length == 1) | {key: .[0].type, value: .[0].url}) | from_entries' \
     "docs/specs/fhir-packages/$core/package/"StructureDefinition-*.json)"
+  local lab_slices hdr_slices
+  lab_slices="$(profile_slices "docs/specs/fhir-packages/$lab/package" "$MYHEALTHEU_LAB_BUNDLE")"
+  hdr_slices="$(profile_slices "docs/specs/fhir-packages/$hdr/package" "$MYHEALTHEU_HDR_BUNDLE")"
   local dir seen=""
   while IFS= read -r dir; do
     for doc in "$dir"/eehrxf-*.json; do
@@ -575,7 +598,7 @@ myhealth_eu() {
         return 1
       fi
       seen+="$stem"$'\n'
-      measure_document "$doc" "$stem" "$out" "$profiles"
+      measure_document "$doc" "$stem" "$out" "$profiles" "$lab_slices" "$hdr_slices"
     done
   done < <(lanes "$documents")
   measure_guide myhealth-eu-core "$out" "$out/core" "$core" "$REMAINING" || return 1
@@ -585,15 +608,54 @@ myhealth_eu() {
   mvc_codes "$out/core" "docs/specs/fhir-packages/$core/package" "docs/specs/fhir-packages/$mvc/package" "$out"
 }
 
-# measure_document DOC STEM OUT PROFILES: writes the cases the document DOC
-# gives each MyHealth@EU corpus under OUT, its Core entries held to the
-# profile PROFILES names for their type.
+# profile_slices PACKAGE BUNDLE: the entry profile by resource type of the
+# Bundle profile BUNDLE in PACKAGE, for each type exactly one entry slice
+# matches when that slice is required and the slicing discriminates by
+# profile; {} when it does not, since a slice matched by type alone is
+# validated against its profile anyway.
+profile_slices() {
+  local file
+  file="$(grep -l "\"url\" *: *\"$2\"" "$1"/StructureDefinition-*.json | head -n 1)"
+  [[ -n "$file" ]] || {
+    echo "::error::$1 holds no StructureDefinition $2" >&2
+    return 1
+  }
+  jq -c '[.snapshot.element[]] as $elements
+    | if any($elements[] | select(.id == "Bundle.entry") | .slicing.discriminator[]?;
+        .type == "profile" and .path == "resource")
+      then ([$elements[] | select(.id | test("^Bundle\\.entry:[^.]+$")) | {key: .id, value: .min}] | from_entries) as $min
+        | [$elements[] | select(.id | test("^Bundle\\.entry:[^.]+\\.resource$"))
+          | {slice: (.id | rtrimstr(".resource")), types: .type}]
+        | group_by(.types[0].code)
+        | map(select(length == 1 and (.[0].types | length) == 1 and (.[0].types[0].profile // [] | length) == 1
+            and ($min[.[0].slice] // 0) >= 1)
+          | {key: .[0].types[0].code, value: .[0].types[0].profile[0]})
+        | from_entries
+      else {} end' "$file"
+}
+
+# retag DOC BUNDLE SLICES: the document DOC claiming the Bundle profile
+# BUNDLE, and the one entry of each type SLICES names claiming that profile.
+# Only the sole entry of its type must meet a required slice, so the claim
+# changes no verdict; a type the document holds twice keeps its claims.
+retag() {
+  jq --arg p "$2" --argjson slices "$3" '.meta.profile = [$p]
+    | ([.entry[]?.resource.resourceType] | group_by(.) | map({key: .[0], value: length}) | from_entries) as $count
+    | .entry |= map(.resource.resourceType as $t
+        | if $t != null and $slices[$t] != null and $count[$t] == 1
+          then .resource.meta.profile = [$slices[$t]] else . end)' "$1"
+}
+
+# measure_document DOC STEM OUT PROFILES LAB HDR: writes the cases the
+# document DOC gives each MyHealth@EU corpus under OUT, its Core entries held
+# to the profile PROFILES names for their type, an HL7 Europe laboratory or
+# discharge report retagged by the slices LAB or HDR.
 measure_document() {
-  local doc="$1" stem="$2" out="$3" profiles="$4" line
+  local doc="$1" stem="$2" out="$3" profiles="$4" lab_slices="$5" hdr_slices="$6" line
   if jq -e --arg b "$LAB_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-    jq --arg p "http://fhir.ehdsi.eu/laboratory/StructureDefinition/Bundle-lab-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/laboratory/$stem.json"
+    retag "$doc" "$MYHEALTHEU_LAB_BUNDLE" "$lab_slices" > "$out/laboratory/$stem.json"
   elif jq -e --arg b "$HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
-    jq --arg p "http://fhir.ehdsi.eu/hdr/StructureDefinition/bundle-hdr-myhealtheu" '.meta.profile = [$p]' "$doc" > "$out/hdr/$stem.json"
+    retag "$doc" "$MYHEALTHEU_HDR_BUNDLE" "$hdr_slices" > "$out/hdr/$stem.json"
   elif jq -e --arg b "$MYHEALTHEU_HDR_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
     cp "$doc" "$out/hdr/$stem.json"
   elif jq -e --arg b "$EUVAC_BUNDLE" '(.meta.profile // []) | index($b) != null' "$doc" > /dev/null 2>&1; then
@@ -608,16 +670,21 @@ measure_document() {
     done
 }
 
-# mvc_codes CASES CORE MVC OUT: one case per coded element of each Core
-# entry under CASES at which its Core profile (from package CORE) binds a
-# value set required or extensible, when that value set and every value set
-# it includes come from the catalogue MVC or the Core guide. The case passes
-# when a coding of the element is in the value set's members. Text alone
-# fails at a required binding and is no case at an extensible one, which
-# admits it (FHIR R4 terminologies §4.1.1.3). An element no catalogue value
-# set binds is no case.
+# mvc_codes CASES CORE MVC OUT [REVIEWED]: one case per coded element of
+# each Core entry under CASES at which its Core profile (from package CORE)
+# binds a value set required or extensible, when that value set and every
+# value set it includes come from the catalogue MVC or the Core guide. The
+# case passes when a coding of the element is in the value set's members.
+# Text alone fails at a required binding and is no case at an extensible one,
+# which admits it (FHIR R4 terminologies §4.1.1.3). An element no catalogue
+# value set binds is no case. A coding outside an extensible value set passes
+# only when the table REVIEWED (MVC_REVIEWED by default) names it for that
+# value set with the reason no concept of the set applies, the human review
+# FHIR R4 terminologies §4.1.5.3 asks for; the result counts those cases as
+# `reviewed`, which the badge names. Every case carries its binding strength.
 mvc_codes() {
-  local cases="$1" core="$2" mvc="$3" out="$4" results="${FERROBRIDGE_CONFORMANCE_OUT:-target/conformance}"
+  local cases="$1" core="$2" mvc="$3" out="$4" reviewed_table="${5:-$MVC_REVIEWED}"
+  local results="${FERROBRIDGE_CONFORMANCE_OUT:-target/conformance}" reviewed
   mkdir -p "$results"
   jq -s -c '
     map(select(.resourceType == "ValueSet"))
@@ -645,6 +712,10 @@ mvc_codes() {
           | select($members != null)
           | {path: .path, valueSet: $vs, strength: .binding.strength, members: ($members | map({key: ., value: true}) | from_entries)}]})
       | from_entries' "$core"/StructureDefinition-*.json > "$out/mvc-bindings.json"
+  reviewed="$(awk -F'\t' '/^(#|$)/ || !seen++ { next }
+    NF != 3 || $3 == "" { printf "::error::%s line %d is not a value set, a coding and a reason\n", FILENAME, NR > "/dev/stderr"; bad = 1; exit }
+    { print $1 "\t" $2 }
+    END { exit bad }' "$reviewed_table" | jq -R -s -c 'split("\n") | map(select(length > 0) | {key: ., value: true}) | from_entries')" || return 1
   local file
   for file in "$cases"/*.json; do
     [[ -f "$file" ]] || continue
@@ -670,10 +741,16 @@ mvc_codes() {
       | select(($codings | length) > 0 or (has("text") and $binding.strength == "required"))
       | {id: "\($stem) \($binding.path) \(if ($codings | length) > 0 then ($codings | join(",")) else "(text only)" end)",
          passed: any($codings[]; . as $c | $binding.members[$c] or $binding.members[($c | split("|")[0]) + "|*"]),
-         valueSet: $binding.valueSet}' "$file"
-  done | jq -s -c 'unique_by(.id)
-    | {corpus: "myhealth-eu-mvc", total: length,
-       cases: map(if .passed then {id, passed} else {id, passed, failure: "no coding is in \(.valueSet)"} end)}' \
+         codings: $codings, valueSet: $binding.valueSet, strength: $binding.strength}' "$file"
+  done | jq -s -c --argjson reviewed "$reviewed" 'unique_by(.id)
+    | map(.valueSet as $vs | . + {reviewed: ((.passed | not) and .strength == "extensible"
+        and any(.codings[]; $reviewed["\($vs)\t\(.)"] // false))})
+    | {corpus: "myhealth-eu-mvc", total: length, reviewed: ([.[] | select(.reviewed)] | length),
+       cases: map(if .passed then {id, passed, strength}
+         elif .reviewed then {id, passed: true, strength, reviewed: true}
+         elif .strength == "extensible" then {id, passed, strength,
+           failure: "no coding is in \(.valueSet), and no review in the extensible table names one"}
+         else {id, passed, strength, failure: "no coding is in \(.valueSet)"} end)}' \
     > "$results/myhealth-eu-mvc.json"
   echo "myhealth-eu: myhealth-eu-mvc $(jq '[.cases[] | select(.passed)] | length' "$results/myhealth-eu-mvc.json") / $(jq .total "$results/myhealth-eu-mvc.json")"
 }
@@ -750,6 +827,50 @@ self_test() {
   lane "each subdirectory holding a document is a lane, sorted" "./e2e ./test-1"
   echo '{}' > "$scratch/lanes/b.json"
   lane "a document at the top level makes the directory one lane" "."
+  mkdir -p "$scratch/pkg"
+  jq -n '{resourceType: "StructureDefinition", url: "urn:b", snapshot: {element: [
+      {id: "Bundle.entry", slicing: {discriminator: [{type: "type", path: "resource"}, {type: "profile", path: "resource"}]}},
+      {id: "Bundle.entry:c", min: 1}, {id: "Bundle.entry:c.resource", type: [{code: "Composition", profile: ["urn:c"]}]},
+      {id: "Bundle.entry:d", min: 0}, {id: "Bundle.entry:d.resource", type: [{code: "Device", profile: ["urn:d"]}]},
+      {id: "Bundle.entry:p", min: 1}, {id: "Bundle.entry:p.resource", type: [{code: "Patient", profile: ["urn:p"]}]}]}}' \
+    > "$scratch/pkg/StructureDefinition-b.json"
+  jq -n '{resourceType: "Bundle", meta: {profile: ["urn:eu"]}, entry: [
+      {resource: {resourceType: "Composition"}}, {resource: {resourceType: "Device"}},
+      {resource: {resourceType: "Patient", meta: {profile: ["urn:x"]}}}, {resource: {resourceType: "Patient"}}]}' \
+    > "$scratch/doc.json"
+  local claims
+  claims="$(retag "$scratch/doc.json" urn:mhe "$(profile_slices "$scratch/pkg" urn:b)" |
+    jq -c '[.meta.profile[0], (.entry[] | .resource.meta.profile[0])]')"
+  cases=$((cases + 1))
+  if [[ "$claims" != '["urn:mhe","urn:c",null,"urn:x",null]' ]]; then
+    echo "::error::self-test: only the sole entry of a required profile slice is retagged: got $claims" >&2
+    wrong=1
+  fi
+  mkdir -p "$scratch/mvc/core" "$scratch/mvc/catalogue" "$scratch/mvc/cases" "$scratch/mvc/out"
+  jq -n '{resourceType: "StructureDefinition", url: "urn:p", snapshot: {element: [
+      {id: "Composition.type", path: "Composition.type", binding: {strength: "required", valueSet: "urn:types"}},
+      {id: "Composition.section.code", path: "Composition.section.code", binding: {strength: "extensible", valueSet: "urn:sections"}}]}}' \
+    > "$scratch/mvc/core/StructureDefinition-p.json"
+  jq -n '{resourceType: "ValueSet", url: "urn:types", compose: {include: [{system: "urn:s", concept: [{code: "t"}]}]}}' \
+    > "$scratch/mvc/catalogue/ValueSet-types.json"
+  jq -n '{resourceType: "ValueSet", url: "urn:sections", compose: {include: [{system: "urn:s", concept: [{code: "a"}]}]}}' \
+    > "$scratch/mvc/catalogue/ValueSet-sections.json"
+  jq -n '{resourceType: "ValueSet", url: "urn:core", compose: {include: [{system: "urn:s", concept: [{code: "z"}]}]}}' \
+    > "$scratch/mvc/core/ValueSet-core.json"
+  jq -n '{resourceType: "Composition", meta: {profile: ["urn:p"]}, type: {coding: [{system: "urn:s", code: "x"}]},
+      section: [{code: {coding: [{system: "urn:s", code: "a"}]}}, {code: {coding: [{system: "urn:s", code: "b"}]}},
+        {code: {coding: [{system: "urn:s", code: "c"}]}}]}' > "$scratch/mvc/cases/d.0.Composition.json"
+  printf 'value set\tcoding\treason\nurn:sections\turn:s|b\tno concept applies\nurn:types\turn:s|x\tnot admitted at a required binding\n' \
+    > "$scratch/mvc/reviewed.tsv"
+  FERROBRIDGE_CONFORMANCE_OUT="$scratch/mvc/out" mvc_codes "$scratch/mvc/cases" "$scratch/mvc/core" \
+    "$scratch/mvc/catalogue" "$scratch/mvc/out" "$scratch/mvc/reviewed.tsv" > /dev/null
+  local verdicts
+  verdicts="$(jq -c '[.reviewed, (.cases[] | [(.id | split("|")[1]), .passed, .strength])]' "$scratch/mvc/out/myhealth-eu-mvc.json")"
+  cases=$((cases + 1))
+  if [[ "$verdicts" != '[1,["a",true,"extensible"],["b",true,"extensible"],["c",false,"extensible"],["x",false,"required"]]' ]]; then
+    echo "::error::self-test: a reviewed extensible miss passes, an unreviewed one and a required miss fail: got $verdicts" >&2
+    wrong=1
+  fi
   if [[ "$wrong" -ne 0 ]]; then
     return 1
   fi

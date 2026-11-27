@@ -6,8 +6,9 @@
 use crate::crosswalk::Row;
 
 use super::{
-    ADVERSE_EVENT, ASSEMBLED, CARE_PLAN, CONDITION, DEVICE, FINDING, MEDICATION_ADMINISTRATION,
-    NONE, OBSERVATION, ORDERED, PROCEDURE, RADIATION_DOSE, SHALL, SHOULD, SPECIMEN, STUDY, row,
+    ADVERSE_EVENT, ASSEMBLED, CARE_PLAN, CONDITION, DEVICE, FINDING, IMAGING_RADIATION_DOSE,
+    MEDICATION_ADMINISTRATION, NONE, OBSERVATION, ORDERED, PROCEDURE, SHALL, SHOULD, SPECIMEN,
+    STUDY, row,
 };
 
 /// The imaging report rows: the header elements, then the body in model
@@ -279,7 +280,7 @@ pub(super) const ROWS: &[Row] = &[
         NONE,
         SHOULD,
         "Composition.section:procedure.entry:radiation-dose",
-        &[RADIATION_DOSE],
+        &[IMAGING_RADIATION_DOSE],
     ),
     // The examination, in the procedure, findings and impression sections.
     row(
