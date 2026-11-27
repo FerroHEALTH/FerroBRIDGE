@@ -622,6 +622,7 @@ lock, so replicas that start together migrate once; readiness carries a
 | `statement_cache_capacity` | `100` | no | How many prepared statements each pooled connection keeps; `0` keeps none |
 | `max_lifetime` | `30m` | no | The longest a pooled connection lives before the pool replaces it; more than `0s` |
 | `idle_timeout` | `10m` | no | The longest a pooled connection stays idle before the pool closes it; more than `0s` |
+| `identity_copy_entries` | `10000` | no | The most entries the replica keeps in memory from each identity table whose rows are never changed (a person's EHR, an EHR's person, a resource's internal id and its binding); `0` keeps none and reads every lookup from the store |
 
 The URL and the CA follow the rules of `[cdm]` above: the same four
 `sslmode` values, the same refusals of `prefer`, `allow`, a missing mode,

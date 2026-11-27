@@ -55,6 +55,7 @@ pub(crate) async fn state() -> Result<Option<(containers::Postgres, Store)>, Box
         connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
         max_connections: 4,
         acquire_timeout: Duration::from_secs(30),
+        identity_copy_entries: 0,
         seal: None,
     })
     .await?;

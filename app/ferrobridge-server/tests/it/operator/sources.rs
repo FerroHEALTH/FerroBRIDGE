@@ -48,6 +48,7 @@ async fn sourced() -> Result<Option<Sourced>, Box<dyn Error>> {
         connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
         max_connections: 4,
         acquire_timeout: Duration::from_secs(30),
+        identity_copy_entries: 0,
         seal: None,
     })
     .await?;
@@ -322,6 +323,7 @@ async fn the_nedap_ons_template_creates_a_source_once_its_map_runs() -> Result<(
         connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
         max_connections: 4,
         acquire_timeout: Duration::from_secs(30),
+        identity_copy_entries: 0,
         seal: None,
     })
     .await?;
