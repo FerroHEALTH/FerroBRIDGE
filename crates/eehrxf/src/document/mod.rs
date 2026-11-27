@@ -811,7 +811,10 @@ fn composition_section(section: &Section) -> CompositionSection {
     CompositionSection {
         title: Some(section.slot.title.into()),
         code: Some(CodeableConcept {
-            coding: vec![loinc(section.slot.code)],
+            coding: std::iter::once(section.slot.code)
+                .chain(section.slot.ehdsi)
+                .map(loinc)
+                .collect(),
             ..CodeableConcept::default()
         }),
         extension: section.extensions.clone(),
