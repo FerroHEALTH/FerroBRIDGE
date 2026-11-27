@@ -390,6 +390,10 @@ jobs:
       # counted from it (#2177).
       - run: bash scripts/checks/post-quantum.sh --self-test
       - run: bash scripts/checks/post-quantum.sh
+      # The conformance badge rendering and the upstream rows a badge names
+      # as `, k upstream` (#2334), against scratch trees and a stub gh.
+      - run: bash scripts/checks/conformance.sh --self-test
+      - run: bash scripts/checks/upstream-rows.sh --self-test
       # Every released changelog section against its text at its tag, which
       # it fetches from origin when the shallow checkout lacks it.
       - run: bash scripts/checks/changelog-released.sh
@@ -431,6 +435,8 @@ jobs:
       - run: bash scripts/perf/gate.sh --self-test
       # The gate's verdict over every shape of its three attempts (#1737).
       - run: bash scripts/perf/verdict.sh --self-test
+      # The base of the gate on a push to main, over stubbed API answers (#2313).
+      - run: bash scripts/perf/last-measured.sh --self-test
 
   # The profile validator's package set (#435), fetched at build time and
   # never committed (docs/specs/fhir-packages/hl7.fhir.eu.eps#1.0.0-ballot/
@@ -518,7 +524,8 @@ jobs:
           bash scripts/terminology/pack-hl7v2-values.sh --self-test
 
   # Every TODO(#N) and every issue a pending subcommand names must still be
-  # open on the tracker (#614). The job token reads the issues and nothing
+  # open on the tracker (#614), and every issue an upstream row names open and
+  # labelled upstream-report (#2334). The job token reads the issues and nothing
   # else.
   todo-issues:
     name: todo-issues
@@ -536,6 +543,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: bash scripts/checks/todo-issues.sh
+      # Every upstream row of a conformance badge names an open
+      # upstream-report issue (#2334).
+      - name: Every upstream row names an open upstream-report issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash scripts/checks/upstream-rows.sh
 
   # The tracker helpers, the release milestone script, the deployment probe and
   # the destructive-command hook, each with a self-test. The probe self-test drives a stub curl. The helpers' real branches run only
@@ -1215,19 +1229,30 @@ jobs:
       # step and never a test (#2043).
       - name: Pull the pinned container images
         run: bash scripts/e2e-images.sh
-      # The SMART Health Link suites, which open the patient summary through a
-      # link only behind FERROBRIDGE_E2E, write it under EEHRXF_EMIT_DIR for
-      # the fhir-validator job (#2243).
+      # The SMART Health Link suites and the Yellow Button journey, which open
+      # the patient summary only behind FERROBRIDGE_E2E, write what they serve
+      # under EEHRXF_EMIT_DIR for the fhir-validator job (#2243). The plain
+      # Patient/$summary suites run here too, with no EEHRXF_EMIT_DIR: the
+      # test lane already writes their documents, and the validator judges
+      # each document once (#2318).
       - env:
           PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
-          EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
+          EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
           set -euo pipefail
           read -ra packages <<<"$PACKAGES"
           args=()
           for package in "${packages[@]}"; do args+=(-p "$package"); done
-          cargo nextest run --locked "${args[@]}" --no-tests=pass
-      - name: Upload the documents the link suites opened
+          plain='package(ferrobridge-server) & test(/^facade::summary::/)'
+          EEHRXF_EMIT_DIR="$EMIT_DIR" cargo nextest run --locked "${args[@]}" --no-tests=pass -E "not ($plain)"
+          if [[ " ${packages[*]} " == *" ferrobridge-server "* ]]; then
+            cargo nextest run --locked -p ferrobridge-server --no-tests=pass -E "$plain"
+          fi
+          if compgen -G "$EMIT_DIR/server-summary-*" > /dev/null; then
+            echo "::error::the e2e lane wrote a plain Patient/\$summary document, which the test lane writes"
+            exit 1
+          fi
+      - name: Upload the documents the link suites and the journey opened
         if: contains(needs.detect.outputs.e2e-packages, 'ferrobridge-server')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1323,19 +1348,52 @@ jobs:
           cargo nextest run --locked -p ferrobridge-testkit
           -E 'test(/^journeys::/)'
 
+  # The base of the gate on a push to main (#2313): the newest commit of main
+  # whose own push run passed the gate. GitHub keeps one pending run per
+  # concurrency group and cancels the one it replaces, so the commit before
+  # a push is often one nobody measured; measuring from the last commit that
+  # passed brings every change since into this run. Empty takes the previous
+  # release.
+  perf-base:
+    name: perf base
+    needs: detect
+    if: github.event_name == 'push' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read # read the earlier CI runs on main and their jobs
+      contents: read
+    outputs:
+      base: ${{ steps.base.outputs.base }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/perf
+      - name: The last commit of main that passed the gate
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          base="$(bash scripts/perf/last-measured.sh)"
+          echo "base=${base}" >> "$GITHUB_OUTPUT"
+
   # The performance gate (#1656): ferrohealth-perf's A/B mode, the head
   # judged against its base on the same runner, in perf.yml, which the release
   # lane calls on the release commit too. The base is the merge base with the
-  # pull request's base, or the commit before a push.
+  # pull request's base, on a push the last commit of main that passed the
+  # gate (perf-base), and on a dispatch the previous release. A perf-base
+  # that fails skips the gate, and conclusion fails on it.
   perf:
     name: perf
-    needs: detect
-    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    needs: [detect, perf-base]
+    if: ${{ !cancelled() && needs.perf-base.result != 'failure' && github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true' }}
     permissions:
       contents: read
     uses: ./.github/workflows/perf.yml
     with:
-      base: ${{ github.event.pull_request.base.sha || github.event.before }}
+      base: ${{ github.event.pull_request.base.sha || needs.perf-base.outputs.base }}
 
   # The CPU instructions of each hot path's in-process work (#2249), counted
   # by callgrind in a release build and held to perf/instructions.ceilings.
@@ -1902,6 +1960,7 @@ jobs:
       - publish-dry-run
       - dependency-review
       - journeys
+      - perf-base
       - perf
       - instructions
       - conflict-markers

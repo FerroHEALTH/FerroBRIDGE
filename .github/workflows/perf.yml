@@ -50,8 +50,8 @@ on:
       base:
         description: >-
           The commit or ref the base is the merge base with: the pull
-          request's base, or the commit before a push.
-          Empty takes the previous release.
+          request's base, or on a push to main the last commit of main
+          that passed the gate. Empty takes the previous release.
         required: false
         default: ""
         type: string
