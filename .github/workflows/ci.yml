@@ -1229,19 +1229,30 @@ jobs:
       # step and never a test (#2043).
       - name: Pull the pinned container images
         run: bash scripts/e2e-images.sh
-      # The SMART Health Link suites, which open the patient summary through a
-      # link only behind FERROBRIDGE_E2E, write it under EEHRXF_EMIT_DIR for
-      # the fhir-validator job (#2243).
+      # The SMART Health Link suites and the Yellow Button journey, which open
+      # the patient summary only behind FERROBRIDGE_E2E, write what they serve
+      # under EEHRXF_EMIT_DIR for the fhir-validator job (#2243). The plain
+      # Patient/$summary suites run here too, with no EEHRXF_EMIT_DIR: the
+      # test lane already writes their documents, and the validator judges
+      # each document once (#2318).
       - env:
           PACKAGES: ${{ needs.detect.outputs.e2e-packages }}
-          EEHRXF_EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
+          EMIT_DIR: ${{ runner.temp }}/eehrxf-documents
         run: |
           set -euo pipefail
           read -ra packages <<<"$PACKAGES"
           args=()
           for package in "${packages[@]}"; do args+=(-p "$package"); done
-          cargo nextest run --locked "${args[@]}" --no-tests=pass
-      - name: Upload the documents the link suites opened
+          plain='package(ferrobridge-server) & test(/^facade::summary::/)'
+          EEHRXF_EMIT_DIR="$EMIT_DIR" cargo nextest run --locked "${args[@]}" --no-tests=pass -E "not ($plain)"
+          if [[ " ${packages[*]} " == *" ferrobridge-server "* ]]; then
+            cargo nextest run --locked -p ferrobridge-server --no-tests=pass -E "$plain"
+          fi
+          if compgen -G "$EMIT_DIR/server-summary-*" > /dev/null; then
+            echo "::error::the e2e lane wrote a plain Patient/\$summary document, which the test lane writes"
+            exit 1
+          fi
+      - name: Upload the documents the link suites and the journey opened
         if: contains(needs.detect.outputs.e2e-packages, 'ferrobridge-server')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
