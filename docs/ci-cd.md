@@ -160,7 +160,10 @@ from the merge base with `origin/main` to the working tree, and runs
 rustfmt, clippy, nextest and the doctests on the reached packages, each as
 one cargo invocation over the whole set with cargo's default job count, the
 full-emit tests when `fhir-codegen` is reached, and the `omop-cdm-codegen`
-drift check when that is. On every run it also resolves the fuzz crate's
+drift check when that is. Every clippy run, the all-features one of each
+package with features its default set leaves off included, comes before the
+first nextest run, so a lint failure shows before the long tests start. On
+every run it also resolves the fuzz crate's
 own `fuzz/Cargo.lock` with `--locked`, as the `cargo-deny` job does, and
 names `cargo update --manifest-path fuzz/Cargo.toml --workspace` when a
 moved path dependency left it stale. One invocation builds a shared dependency once,
