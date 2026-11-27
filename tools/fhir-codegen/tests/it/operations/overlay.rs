@@ -168,6 +168,23 @@ fn the_overlay_pre_adopts_the_r6_translate_inputs() {
 }
 
 #[test]
+fn the_r4_family_takes_the_lowercase_targetcode_and_r5_on_does_not() {
+    use fhir_codegen::ecosystem::ParameterSource;
+    for (package, module) in [(&*R4, "r4"), (&*R4B, "r4b"), (&*R5, "r5"), (&*R6, "r6")] {
+        let contracts = overlaid(package, module);
+        let translate = find(&contracts, "ConceptMap", "translate");
+        let targetcode = translate
+            .inputs
+            .iter()
+            .find(|f| f.fhir_name == "targetcode")
+            .map(|f| (f.type_code.as_deref(), f.source));
+        let expected =
+            matches!(module, "r4" | "r4b").then_some((Some("code"), ParameterSource::Ecosystem));
+        assert_eq!(targetcode, expected, "{module}");
+    }
+}
+
+#[test]
 fn the_translate_match_carries_the_ecosystem_parts_and_pre_adopts_origin_map() {
     use fhir_codegen::ecosystem::ParameterSource;
     for (package, module) in [(&*R4, "r4"), (&*R4B, "r4b"), (&*R5, "r5"), (&*R6, "r6")] {
@@ -255,7 +272,8 @@ fn the_ecosystem_defined_outputs_join_every_version_and_r6_pre_adopts_nothing() 
             [
                 ("code", Some("code")),
                 ("system", Some("uri")),
-                ("abstract", Some("boolean"))
+                ("abstract", Some("boolean")),
+                ("used-supplement", Some("canonical"))
             ],
             "{module}"
         );

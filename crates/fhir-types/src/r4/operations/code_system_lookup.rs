@@ -81,6 +81,13 @@ pub struct CodeSystemLookupResponse {
     /// by no FHIR version. Whether the concept is abstract (\`notSelectable\`),
     /// a grouper that is not itself selected as a value.
     pub r#abstract: Option<super::super::primitives::Boolean>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. A code system supplement the lookup drew on, one
+    /// parameter per supplement; a global language pack that contributes a
+    /// display or a designation is reported here (requirements, CodeSystem
+    /// supplements).
+    pub used_supplement: Vec<super::super::primitives::Canonical>,
 }
 
 /// The parts of the `designation` parameter.
@@ -619,6 +626,7 @@ impl CodeSystemLookupResponse {
         let mut field_code: Option<super::super::primitives::Code> = None;
         let mut field_system: Option<super::super::primitives::Uri> = None;
         let mut field_abstract: Option<super::super::primitives::Boolean> = None;
+        let mut field_used_supplement: Vec<super::super::primitives::Canonical> = Vec::new();
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -914,6 +922,37 @@ impl CodeSystemLookupResponse {
                         }
                     });
                 }
+                "used-supplement" => {
+                    field_used_supplement.push(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::Canonical(
+                            value,
+                        )) => value.clone(),
+                        Some(super::super::parameters::ParametersParameterValue::Uri(value)) => {
+                            super::super::primitives::Canonical {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "used-supplement",
+                                    expected: "Canonical",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "used-supplement",
+                                },
+                            );
+                        }
+                    });
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -941,12 +980,13 @@ impl CodeSystemLookupResponse {
             code: field_code,
             system: field_system,
             r#abstract: field_abstract,
+            used_supplement: field_used_supplement,
         })
     }
     /// Writes the fields as a parameter list, by move.
     #[must_use]
     pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
-        let mut out = Vec::with_capacity(8);
+        let mut out = Vec::with_capacity(9);
         {
             let value = self.name;
             out.push(super::super::parameters::ParametersParameter {
@@ -1014,6 +1054,13 @@ impl CodeSystemLookupResponse {
                 value: Some(super::super::parameters::ParametersParameterValue::Boolean(
                     value,
                 )),
+                ..Default::default()
+            });
+        }
+        for value in self.used_supplement {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "used-supplement".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::Canonical(value)),
                 ..Default::default()
             });
         }
@@ -1916,6 +1963,15 @@ pub const CODE_SYSTEM_LOOKUP: super::super::super::operation::Operation =
                     max: Some(1),
                 },
                 type_code: Some("boolean"),
+                scope: &[],
+                source: super::super::super::operation::ParameterSource::Ecosystem,
+                parts: &[],
+            },
+            super::super::super::operation::Parameter {
+                name: "used-supplement",
+                usage: super::super::super::operation::ParameterUse::Out,
+                cardinality: super::super::super::operation::Cardinality { min: 0, max: None },
+                type_code: Some("canonical"),
                 scope: &[],
                 source: super::super::super::operation::ParameterSource::Ecosystem,
                 parts: &[],

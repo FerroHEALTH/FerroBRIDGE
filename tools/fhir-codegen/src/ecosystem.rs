@@ -310,8 +310,9 @@ fn validation_outputs() -> Vec<OperationParameter> {
     ]
 }
 
-/// The parameters the ecosystem alone defines, by operation URL.
-fn ecosystem_parameters(url: &str) -> Vec<OperationParameter> {
+/// The parameters the ecosystem alone defines, by operation URL; `own` is the
+/// version's definition before the overlay.
+fn ecosystem_parameters(url: &str, own: &OperationDefinition) -> Vec<OperationParameter> {
     match url {
         CODE_SYSTEM_VALIDATE_CODE => vec![
             ecosystem_parameter(
@@ -359,7 +360,10 @@ fn ecosystem_parameters(url: &str) -> Vec<OperationParameter> {
                 "string",
                 "That a returned target code is not valid in its code system, one parameter per such target; the match is still returned as the map states it (IG 1.11.0, `$translate`, The result).",
             ),
-        ],
+        ]
+        .into_iter()
+        .chain(reverse_target_code(own))
+        .collect(),
         CODE_SYSTEM_LOOKUP => vec![
             ecosystem_parameter(
                 "code",
@@ -382,9 +386,34 @@ fn ecosystem_parameters(url: &str) -> Vec<OperationParameter> {
                 "boolean",
                 "Whether the concept is abstract (`notSelectable`), a grouper that is not itself selected as a value.",
             ),
+            // NOTE: tx-ecosystem IG requirements.md at 9c2bbce, "CodeSystem supplements":
+            // a server SHALL report a global language pack as a `used-supplement` in `$lookup`.
+            ecosystem_parameter(
+                "used-supplement",
+                ParameterUse::Out,
+                "*",
+                "canonical",
+                "A code system supplement the lookup drew on, one parameter per supplement; a global language pack that contributes a display or a designation is reported here (requirements, CodeSystem supplements).",
+            ),
         ],
         _ => Vec::new(),
     }
+}
+
+/// The R4 family's lowercase `targetcode`, for a version whose own
+/// `$translate` declares no `targetCode`.
+fn reverse_target_code(own: &OperationDefinition) -> Option<OperationParameter> {
+    // NOTE: tx-ecosystem IG requirements.md at 9c2bbce, "Reverse translation": an R4
+    // server SHALL support `reverse` as well as the `targetcode` form.
+    (!declares(own, ParameterUse::In, "targetCode")).then(|| {
+        ecosystem_parameter(
+            "targetcode",
+            ParameterUse::In,
+            "1",
+            "code",
+            "The target code to translate back from, the R4 spelling of the reverse direction beside `reverse`; R5 and R6 name it `targetCode` (requirements, Reverse translation).",
+        )
+    })
 }
 
 /// The parts the ecosystem alone defines on a declared multi-part parameter.
@@ -539,7 +568,7 @@ pub fn overlay(
         overlay_type(&definition.url, &name, parameter, source, &mut added);
         overlay_parts(&definition.url, parameter, source, &mut added);
     }
-    for parameter in ecosystem_parameters(&definition.url) {
+    for parameter in ecosystem_parameters(&definition.url, definition) {
         if declares(definition, parameter.usage, &parameter.name) {
             continue;
         }

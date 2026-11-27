@@ -131,6 +131,12 @@ pub struct ConceptMapTranslateRequest {
     /// results, and it is at the discretion of the server to decide when to
     /// support this operation
     pub target_system: Option<super::super::primitives::Uri>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. The target code to translate back from, the R4
+    /// spelling of the reverse direction beside \`reverse\`; R5 and R6 name it
+    /// \`targetCode\` (requirements, Reverse translation).
+    pub targetcode: Option<super::super::primitives::Code>,
 }
 
 /// The parts of the `dependency` parameter.
@@ -300,6 +306,7 @@ impl ConceptMapTranslateRequest {
         > = None;
         let mut field_target_scope: Option<super::super::primitives::Uri> = None;
         let mut field_target_system: Option<super::super::primitives::Uri> = None;
+        let mut field_targetcode: Option<super::super::primitives::Code> = None;
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -1344,6 +1351,43 @@ impl ConceptMapTranslateRequest {
                         }
                     });
                 }
+                "targetcode" => {
+                    if field_targetcode.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "targetcode",
+                        });
+                    }
+                    field_targetcode = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::Code(value)) => {
+                            value.clone()
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::String(value)) => {
+                            super::super::primitives::Code {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "targetcode",
+                                    expected: "Code",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "targetcode",
+                                },
+                            );
+                        }
+                    });
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -1379,12 +1423,13 @@ impl ConceptMapTranslateRequest {
             target_codeable_concept: field_target_codeable_concept,
             target_scope: field_target_scope,
             target_system: field_target_system,
+            targetcode: field_targetcode,
         })
     }
     /// Writes the fields as a parameter list, by move.
     #[must_use]
     pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
-        let mut out = Vec::with_capacity(24);
+        let mut out = Vec::with_capacity(25);
         if let Some(value) = self.url {
             out.push(super::super::parameters::ParametersParameter {
                 name: "url".into(),
@@ -1600,6 +1645,15 @@ impl ConceptMapTranslateRequest {
             out.push(super::super::parameters::ParametersParameter {
                 name: "targetSystem".into(),
                 value: Some(super::super::parameters::ParametersParameterValue::Uri(
+                    value,
+                )),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.targetcode {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "targetcode".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::Code(
                     value,
                 )),
                 ..Default::default()
@@ -3166,6 +3220,18 @@ pub const CONCEPT_MAP_TRANSLATE: super::super::super::operation::Operation =
                 type_code: Some("uri"),
                 scope: &[],
                 source: super::super::super::operation::ParameterSource::PreAdopted,
+                parts: &[],
+            },
+            super::super::super::operation::Parameter {
+                name: "targetcode",
+                usage: super::super::super::operation::ParameterUse::In,
+                cardinality: super::super::super::operation::Cardinality {
+                    min: 0,
+                    max: Some(1),
+                },
+                type_code: Some("code"),
+                scope: &[],
+                source: super::super::super::operation::ParameterSource::Ecosystem,
                 parts: &[],
             },
             super::super::super::operation::Parameter {
