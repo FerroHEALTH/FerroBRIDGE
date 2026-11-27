@@ -125,7 +125,12 @@ drops its row. `scripts/checks/upstream-rows.sh` asks the tracker for every
 issue a row names and fails when one is closed or carries no `upstream-report`
 label; it runs in the CI `todo-issues` job. When an upstream issue closes,
 remove its rows: the cases then count against the colour again. An
-unmapped count (`, 8 unmapped`) is named the same way.
+unmapped count (`, 8 unmapped`) is named the same way, and so is the count
+of codes outside an `extensible` MyHealth@EU binding that a review found no
+concept of the value set for (`, 4 extensible misses reviewed`): FHIR R4
+terminologies §4.1.5.3 admits such a code, so the case passes, and each one
+is a row of `conformance/myhealth-eu-mvc/extensible-reviewed.tsv` with its
+reason.
 
 - `<corpus>.json`: one per corpus, counted from its pass list.
 - `hl7v2-family-<family>.json`: one per HL7 v2 message family with at least
