@@ -482,8 +482,8 @@ an MSRV is only ever raised.
 ## Product and citation version
 
 The product version is the workspace `version` in the root `Cargo.toml`, which
-every member inherits. The milestone line is 0.0.x, so the first product
-version is 0.0.30.
+every member inherits. The milestone line is 0.0.x, and the table below
+holds the current version, which each release moves.
 
 | Item | Pin | Repeated in |
 |---|---|---|

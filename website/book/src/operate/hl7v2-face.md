@@ -300,9 +300,11 @@ scripts/terminology/pack-hl7v2-values.sh /tmp/hl7v2-values
 ```
 
 Copy `package/` (or unpack the tarball) to the server. For FerroTERM, name
-all three in `terminology.code_systems`:
+all three in `terminology.code_systems` of FerroTERM's own configuration
+file; this block is FerroTERM's, and the bridge refuses the key:
 
 ```toml
+# FerroTERM's configuration, not the bridge's.
 [terminology]
 code_systems = [
   "/srv/hl7.terminology/package",
