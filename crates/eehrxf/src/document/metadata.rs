@@ -708,8 +708,8 @@ impl Document {
 
     /// Writes the Annex III document category on `report`, which the
     /// composition then carries with the report's own categories.
-    // NOTE: Bundle-eu-lab dr-comp-category asks the two to share a category, and
-    // DiagnosticReport-eu-lab 2.0.0 slices category open.
+    // NOTE: DiagnosticReport-eu-lab 2.1.0 slices category open, so the report carries the
+    // document's category beside its own (no specification governs this: our own design).
     pub(super) fn categorise_report(&self, report: &mut DiagnosticReport) {
         if let Some(metadata) = &self.metadata
             && self.form.categories.is_empty()
@@ -737,7 +737,7 @@ impl Document {
         if !metadata.status.is_empty() {
             composition.status = metadata.status.as_str().into();
         }
-        // NOTE: Composition-eu-lab 2.0.0 slices category open; the imaging form fixes it (#2120).
+        // NOTE: Composition-eu-lab 2.1.0 slices category open; the imaging form fixes it (#2120).
         if self.form.categories.is_empty() && !composition.category.contains(&metadata.category) {
             composition.category.push(metadata.category.clone());
         }

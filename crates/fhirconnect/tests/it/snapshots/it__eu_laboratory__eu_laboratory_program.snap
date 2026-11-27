@@ -3,7 +3,7 @@ source: crates/fhirconnect/tests/it/eu_laboratory.rs
 expression: program.to_string()
 ---
 program ferrobridge_eu_laboratory.context
-  profile http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab version 2.0.0
+  profile http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab version 2.1.0
   template KDS_Laborbericht sem_ver unpinned generation adl1.4
   resource DiagnosticReport
   start OBSERVATION.laboratory_test_result.v1

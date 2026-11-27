@@ -327,7 +327,7 @@ pub const IMAGING: Project = Project {
     slices: &[],
 };
 
-/// The HL7 Europe Laboratory Report 2.0.0 project.
+/// The HL7 Europe Laboratory Report 2.1.0 project.
 ///
 /// It maps over the published `KDS_Laborbericht` template. Its two contexts
 /// map that one template, so a run compiles one of them with
@@ -593,7 +593,7 @@ pub const TEST_REPORT: Project = Project {
 /// its EHDS record or EHDS medication administration template, the published
 /// `KDS_Laborbericht` or `KDS_Laborauftrag`, or a demographic party, to the
 /// HL7 Europe profile the `eehrxf` crosswalk names for the group (Base and
-/// Core 2.0.1, Laboratory Report 2.0.0, Patient Summary 1.0.0-ballot,
+/// Core 2.0.1, Laboratory Report 2.1.0, Patient Summary 1.0.0-ballot,
 /// Hospital Discharge Report 1.0.0), the HL7 International Patient Summary
 /// 2.0.1 pregnancy profiles, or the FHIR R4 `bodyweight` profile, with the
 /// search declaration a FHIR facade reads beside it: the IHE `QEDm` 3.0.0

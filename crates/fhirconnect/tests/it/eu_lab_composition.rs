@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The HL7 Europe Laboratory Report 2.0.0 `Composition-eu-lab` round trip: a
+//! The HL7 Europe Laboratory Report 2.1.0 `Composition-eu-lab` round trip: a
 //! FerroBRIDGE document context over the published `KDS_Laborbericht`
 //! template. The report composition is the Composition, whose one section
 //! carries the test's code and references the `DiagnosticReport-eu-lab`, which

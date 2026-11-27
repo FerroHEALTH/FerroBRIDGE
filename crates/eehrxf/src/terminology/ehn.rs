@@ -59,7 +59,7 @@ pub const UCUM: &str = "http://unitsofmeasure.org";
 pub const LOINC: &str = "http://loinc.org";
 
 /// NPU, listed in §4 beside LOINC for the result observation details (HL7
-/// Europe Laboratory Report 2.0.0, `ValueSet` `lab-obsCode-npu-eu-lab`,
+/// Europe Laboratory Report 2.1.0, `ValueSet` `lab-obsCode-npu-eu-lab`,
 /// `compose.include.system`).
 pub const NPU: &str = "http://npu-terminology.org";
 

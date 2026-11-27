@@ -213,7 +213,7 @@ person behind. When the deletion fails as well, the answer is a `500`
 naming the person's version and both refusals. An update sources the
 relationship before its one write.
 
-The laboratory profiles are HL7 Europe Laboratory Report 2.0.0, the device,
+The laboratory profiles are HL7 Europe Laboratory Report 2.1.0, the device,
 consent and travel profiles HL7 Europe Patient Summary 1.0.0-ballot, the
 care plan, administration and encounter profiles HL7 Europe Hospital
 Discharge Report 1.0.0, the pregnancy profiles the HL7 International Patient

@@ -38,7 +38,7 @@ const PACKAGES: [&str; 8] = [
     "eu-hl7-hdr/hl7.fhir.eu.hdr-1.0.0.tgz",
     HEALTH_DATA_API,
     "eu-hl7-imaging/hl7.fhir.eu.imaging-1.0.0-ballot.tgz",
-    "eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.0.0.tgz",
+    "eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.1.0.tgz",
     "eu-hl7-mpd/hl7.fhir.eu.mpd-1.0.0.tgz",
 ];
 
