@@ -43,6 +43,7 @@ fn a_lookup_response_round_trips_through_parameters() {
         code: None,
         system: None,
         r#abstract: None,
+        used_supplement: Vec::new(),
     };
     let parameters = response.clone().into_parameters();
     let names: Vec<&str> = parameters

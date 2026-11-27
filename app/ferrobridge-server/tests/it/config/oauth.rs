@@ -11,6 +11,9 @@ use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
 use ferrohealth_smart::client::{ClientAuth, ClientCredentials, Endpoint};
 use ferrohealth_smart::config::ConfigError;
+use ferrohealth_smart::jws::algorithm::Algorithm;
+use ferrohealth_smart::jws::compact;
+use ferrohealth_smart::jws::jwk::Jwk;
 use secrecy::ExposeSecret;
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -237,6 +240,59 @@ fn a_private_key_jwt_client_needs_its_key_file() -> Result<(), Box<dyn std::erro
         ),
         "{error:?}"
     );
+    Ok(())
+}
+
+/// Returns a fresh ML-DSA-65 private key as a PKCS #8 PEM (RFC 9881 §6).
+fn ml_dsa_pem() -> Result<String, Box<dyn std::error::Error>> {
+    use base64::Engine as _;
+    let pair =
+        aws_lc_rs::signature::PqdsaKeyPair::generate(&aws_lc_rs::signature::ML_DSA_65_SIGNING)
+            .map_err(|_unspecified| "an ML-DSA-65 key pair")?;
+    let der = pair
+        .to_pkcs8v1()
+        .map_err(|_unspecified| "a PKCS #8 document")?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(der.as_ref());
+    let mut pem = String::from("-----BEGIN PRIVATE KEY-----\n");
+    for line in encoded.as_bytes().chunks(64) {
+        pem.push_str(std::str::from_utf8(line)?);
+        pem.push('\n');
+    }
+    pem.push_str("-----END PRIVATE KEY-----\n");
+    Ok(pem)
+}
+
+// NOTE: RFC 9964 §5, an ML-DSA key signs with its parameter set's algorithm, and RFC 7523 §3
+// has the authorization server verify the assertion with the client's published key.
+#[test]
+fn an_ml_dsa_key_signs_a_client_assertion_its_published_key_verifies()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut file = tempfile::NamedTempFile::new()?;
+    file.write_all(ml_dsa_pem()?.as_bytes())?;
+    let grant = grant(&text(
+        "",
+        &format!(
+            concat!(
+                "token_endpoint = \"https://as.example.org/token\"\n",
+                "client_id = \"ferrobridge\"\n",
+                "client_auth = \"private_key_jwt\"\n",
+                "private_key_file = {:?}\n",
+            ),
+            file.path()
+        ),
+    ))?;
+    assert_eq!(ClientAuth::PrivateKeyJwt, grant.client_auth);
+    let keys = grant.assertion_keys.ok_or("the grant holds its key")?;
+    let key = keys.current();
+    let assertion = key.assertion("ferrobridge", "https://as.example.org/token", "JWT")?;
+    let decoded = compact::decode(&assertion)?;
+    assert_eq!(Algorithm::MlDsa65, decoded.header().alg);
+    let published = key.public_jwk();
+    assert_eq!(Some("AKP"), published["kty"].as_str(), "{published}");
+    let jwk: Jwk = serde_json::from_value(published)?;
+    let claims = decoded.verify_claims(&jwk)?;
+    assert_eq!(Some("ferrobridge"), claims["iss"].as_str());
+    assert_eq!(Some("https://as.example.org/token"), claims["aud"].as_str());
     Ok(())
 }
 

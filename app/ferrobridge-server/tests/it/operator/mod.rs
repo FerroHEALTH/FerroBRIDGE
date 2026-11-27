@@ -22,7 +22,10 @@ use http::{Request, StatusCode, header};
 use jsonwebtoken::Algorithm;
 use tower::ServiceExt as _;
 
-use crate::facade::auth::{Issuer, SigningKey, authority, bearing, challenge, ec_key, mint};
+use crate::facade::auth::{
+    Issuer, SigningKey, authority, bearing, challenge, ec_key, mint, ml_dsa_key,
+};
+use ferrohealth_smart::jws::algorithm::Algorithm as Verified;
 
 mod concept_maps;
 mod configuration;
@@ -47,6 +50,16 @@ const OMOCL_FILE: &str = concat!(
 /// The operator scope every admitted token carries.
 const OPERATOR: &str = "__ferrobridge.operator";
 
+/// The key a case's issuer signs its tokens with.
+#[derive(Clone, Copy, Default)]
+enum Signer {
+    /// An ECDSA P-256 key, `ES256`.
+    #[default]
+    Es256,
+    /// An ML-DSA-65 key (RFC 9964 §5), published as an `AKP` JWK.
+    MlDsa65,
+}
+
 /// One case: a mapping tree, an issuer, its key and the router.
 struct Case {
     /// The mapping tree, kept alive for the case.
@@ -70,7 +83,14 @@ impl Case {
     async fn answering(
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(configuration, None, (None, None), (None, None)).await
+        Self::build(
+            Signer::default(),
+            configuration,
+            None,
+            (None, None),
+            (None, None),
+        )
+        .await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -78,7 +98,14 @@ impl Case {
     async fn reporting(
         report: ferrobridge_server::change_feed::report::Report,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, Some(report), (None, None), (None, None)).await
+        Self::build(
+            Signer::default(),
+            None,
+            Some(report),
+            (None, None),
+            (None, None),
+        )
+        .await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -86,7 +113,14 @@ impl Case {
     async fn keeping(
         history: Arc<ferrobridge_server::etl::history::Store>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (Some(history), None), (None, None)).await
+        Self::build(
+            Signer::default(),
+            None,
+            None,
+            (Some(history), None),
+            (None, None),
+        )
+        .await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -94,7 +128,14 @@ impl Case {
     async fn listing(
         directory: Arc<ferrobridge_server::hl7v2::directory::Directory>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (None, Some(directory)), (None, None)).await
+        Self::build(
+            Signer::default(),
+            None,
+            None,
+            (None, Some(directory)),
+            (None, None),
+        )
+        .await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -102,7 +143,14 @@ impl Case {
     async fn sourcing(
         sources: Arc<ferrobridge_server::sources::Sources>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (None, None), (Some(sources), None)).await
+        Self::build(
+            Signer::default(),
+            None,
+            None,
+            (None, None),
+            (Some(sources), None),
+        )
+        .await
     }
 
     /// Builds the tree, the issuer and the router, the operator API
@@ -111,13 +159,21 @@ impl Case {
         sources: Arc<ferrobridge_server::sources::Sources>,
         intake: Arc<ferrobridge_server::inbound::intake::Intake>,
     ) -> Result<Self, Box<dyn Error>> {
-        Self::build(None, None, (None, None), (Some(sources), Some(intake))).await
+        Self::build(
+            Signer::default(),
+            None,
+            None,
+            (None, None),
+            (Some(sources), Some(intake)),
+        )
+        .await
     }
 
-    /// Builds the case over `configuration`, `consumers`, the run history
+    /// Builds the case, its tokens signed by `signer`'s key, over `configuration`, `consumers`, the run history
     /// `history`, the HL7 v2 face's `concept_maps` and the inbound
     /// `sources` and the `intake`.
     async fn build(
+        signer: Signer,
         configuration: Option<ferrobridge_operator_api::configuration::Configuration>,
         consumers: Option<ferrobridge_server::change_feed::report::Report>,
         (history, concept_maps): (
@@ -148,9 +204,19 @@ impl Case {
             ferrobridge_testkit::fixtures::DIAGNOSE_OPT,
         )?;
         std::fs::copy(OMOCL_FILE, omocl.join("Specimen_v1.yml"))?;
-        let key = ec_key("k1", Algorithm::ES256);
+        let (key, algorithms) = match signer {
+            Signer::Es256 => (ec_key("k1", Algorithm::ES256), None),
+            Signer::MlDsa65 => (
+                ml_dsa_key("k1", Verified::MlDsa65),
+                Some(vec![Verified::Es256, Verified::MlDsa65]),
+            ),
+        };
         let issuer = Issuer::start(&[&key]).await;
-        let authority: Arc<Smart> = authority(issuer.settings()).await;
+        let mut settings = issuer.settings();
+        if let Some(algorithms) = algorithms {
+            settings.issuers[0].algorithms = algorithms;
+        }
+        let authority: Arc<Smart> = authority(settings).await;
         let report = check::check(Inputs {
             fhirconnect: Some(&mappings),
             templates: Some(Templates::Directory(&templates)),
@@ -336,6 +402,20 @@ async fn every_route_answers_403_without_the_operator_scope() -> Result<(), Box<
             "{route}"
         );
     }
+    Ok(())
+}
+
+// NOTE: RFC 9964 §5, an issuer that signs with ML-DSA-65 and publishes its key as an `AKP` JWK
+// (§3) reaches the operator API as an ECDSA one does.
+#[tokio::test]
+async fn an_ml_dsa_token_reaches_the_operator_api() -> Result<(), Box<dyn Error>> {
+    let case = Case::build(Signer::MlDsa65, None, None, (None, None), (None, None)).await?;
+    let response = case.get("/operator/state", Some(OPERATOR)).await?;
+    assert_eq!(StatusCode::OK, response.status());
+    let response = case
+        .get("/operator/state", Some("system/*.cruds openid"))
+        .await?;
+    assert_eq!(StatusCode::FORBIDDEN, response.status());
     Ok(())
 }
 
