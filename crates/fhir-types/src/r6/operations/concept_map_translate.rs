@@ -175,6 +175,13 @@ pub struct ConceptMapTranslateResponseMatch {
     /// system, so the target code has not been validated (IG 1.11.0,
     /// \`$translate\`, The result).
     pub note: Option<super::super::primitives::String>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. The target concept in its code system's normal form,
+    /// the one \`$validate-code\` reports in \`normalized-code\`, when
+    /// \`concept\` is not in it; \`concept\` stays the target as the map states
+    /// it (IG 1.11.0, \`$translate\`, The result, §207).
+    pub normalized_concept: Option<super::super::coding::Coding>,
 }
 
 /// The parts of the `property` parameter.
@@ -1597,6 +1604,7 @@ impl ConceptMapTranslateResponseMatch {
         let mut field_target_comment: Option<super::super::primitives::String> = None;
         let mut field_no_map: Option<super::super::primitives::Boolean> = None;
         let mut field_note: Option<super::super::primitives::String> = None;
+        let mut field_normalized_concept: Option<super::super::coding::Coding> = None;
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -1942,6 +1950,36 @@ impl ConceptMapTranslateResponseMatch {
                         }
                     });
                 }
+                "normalized-concept" => {
+                    if field_normalized_concept.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "match.normalized-concept",
+                        });
+                    }
+                    field_normalized_concept = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::Coding(value)) => {
+                            (**value).clone()
+                        }
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "match.normalized-concept",
+                                    expected: "Coding",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "match.normalized-concept",
+                                },
+                            );
+                        }
+                    });
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -1964,12 +2002,13 @@ impl ConceptMapTranslateResponseMatch {
             target_comment: field_target_comment,
             no_map: field_no_map,
             note: field_note,
+            normalized_concept: field_normalized_concept,
         })
     }
     /// Writes the fields as a parameter list, by move.
     #[must_use]
     pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
-        let mut out = Vec::with_capacity(11);
+        let mut out = Vec::with_capacity(12);
         if let Some(value) = self.relationship {
             out.push(super::super::parameters::ParametersParameter {
                 name: "relationship".into(),
@@ -2057,6 +2096,15 @@ impl ConceptMapTranslateResponseMatch {
                 name: "note".into(),
                 value: Some(super::super::parameters::ParametersParameterValue::String(
                     value,
+                )),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.normalized_concept {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "normalized-concept".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::Coding(
+                    Box::new(value),
                 )),
                 ..Default::default()
             });
@@ -2953,6 +3001,18 @@ pub const CONCEPT_MAP_TRANSLATE: super::super::super::operation::Operation =
                             max: Some(1),
                         },
                         type_code: Some("string"),
+                        scope: &[],
+                        source: super::super::super::operation::ParameterSource::Ecosystem,
+                        parts: &[],
+                    },
+                    super::super::super::operation::Parameter {
+                        name: "normalized-concept",
+                        usage: super::super::super::operation::ParameterUse::Out,
+                        cardinality: super::super::super::operation::Cardinality {
+                            min: 0,
+                            max: Some(1),
+                        },
+                        type_code: Some("Coding"),
                         scope: &[],
                         source: super::super::super::operation::ParameterSource::Ecosystem,
                         parts: &[],

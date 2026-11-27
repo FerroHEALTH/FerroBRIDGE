@@ -659,6 +659,33 @@ fn a_symmetric_or_unknown_algorithm_is_refused() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+// NOTE: RFC 9964 §8.1.4 registers the JWS algorithm names ML-DSA-44, ML-DSA-65 and ML-DSA-87.
+#[test]
+fn the_ml_dsa_algorithms_read_by_their_registered_names() -> Result<(), Box<dyn std::error::Error>>
+{
+    let auth = settings(&format!(
+        "{MINIMAL}algorithms = [\"ML-DSA-44\", \"ML-DSA-65\", \"ML-DSA-87\", \"ES256\"]\n"
+    ))?
+    .ok_or("auth is on")?;
+    assert_eq!(
+        vec![
+            Algorithm::MlDsa44,
+            Algorithm::MlDsa65,
+            Algorithm::MlDsa87,
+            Algorithm::Es256
+        ],
+        auth.issuers[0].algorithms
+    );
+    for algorithm in ["ML-DSA-99", "MLDSA65", "ml-dsa-65", "ML-DSA-65-ES256"] {
+        let error = refusal(&format!("{MINIMAL}algorithms = [\"{algorithm}\"]\n"))?;
+        assert!(
+            matches!(error, Error::Parse { .. }),
+            "{algorithm}: {error:?}"
+        );
+    }
+    Ok(())
+}
+
 #[test]
 fn an_unknown_profile_key_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let error = refusal(&format!("{MINIMAL}token_shape = \"opaque\"\n"))?;

@@ -23,6 +23,7 @@ mod forwarding;
 mod grants;
 mod introspection;
 mod launch_task;
+mod ml_dsa;
 mod onward;
 mod routes;
 mod scope;
@@ -42,6 +43,8 @@ use ferrobridge_server::smart::Smart;
 use ferrobridge_server::smart::SmartSettings;
 use ferrobridge_server::state::AppState;
 use ferrohealth_health::registry::Registry;
+use ferrohealth_smart::jws::algorithm::Algorithm as Verified;
+use ferrohealth_smart::jws::key::PrivateKey;
 use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_smart::resource::Settings;
 use http::Request;
@@ -75,12 +78,18 @@ const TOKEN_PATH: &str = "/token";
 pub(crate) struct SigningKey {
     /// The `kid` the key is published and used under.
     kid: String,
-    /// The algorithm it signs with.
-    alg: Algorithm,
-    /// The private half.
-    encoding: EncodingKey,
+    /// The private half, with the algorithm it signs with.
+    signer: Signer,
     /// The public half as a JWK.
     jwk: serde_json::Value,
+}
+
+/// The private half of a [`SigningKey`].
+enum Signer {
+    /// An RSA or ECDSA key `jsonwebtoken` signs with.
+    Jose(Algorithm, EncodingKey),
+    /// An ML-DSA key (RFC 9964), which `jsonwebtoken` has no algorithm for.
+    MlDsa(ferrohealth_smart::jws::key::SigningKey),
 }
 
 /// Returns a fresh ECDSA key for `alg` (ES256 or ES384) published as `kid`.
@@ -98,8 +107,24 @@ pub(crate) fn ec_key(kid: &str, alg: Algorithm) -> SigningKey {
     jwk["use"] = serde_json::json!("sig");
     SigningKey {
         kid: kid.to_owned(),
-        alg,
-        encoding,
+        signer: Signer::Jose(alg, encoding),
+        jwk,
+    }
+}
+
+/// Returns a fresh ML-DSA key of `alg`'s parameter set (RFC 9964 §5),
+/// published as `kid` in an `AKP` JWK (§3).
+pub(crate) fn ml_dsa_key(kid: &str, alg: Verified) -> SigningKey {
+    let mut seed = [0_u8; 32];
+    aws_lc_rs::rand::fill(&mut seed).expect("a random seed");
+    let private = PrivateKey::from_ml_dsa_seed(alg, &seed).expect("an ML-DSA key");
+    let signing = ferrohealth_smart::jws::key::SigningKey::new(private, alg).expect("a signer");
+    let mut jwk = signing.public_jwk().to_value();
+    jwk["kid"] = serde_json::json!(kid);
+    jwk["use"] = serde_json::json!("sig");
+    SigningKey {
+        kid: kid.to_owned(),
+        signer: Signer::MlDsa(signing),
         jwk,
     }
 }
@@ -250,15 +275,31 @@ pub(crate) fn now() -> i64 {
 
 /// Returns `claims` signed by `key` with `typ` of `at+jwt`.
 pub(crate) fn mint(key: &SigningKey, claims: &serde_json::Value) -> String {
-    let mut header = Header::new(key.alg);
-    header.kid = Some(key.kid.clone());
-    header.typ = Some(String::from("at+jwt"));
-    mint_with(key, &header, claims)
+    match key.signer {
+        Signer::Jose(alg, _) => {
+            let mut header = Header::new(alg);
+            header.kid = Some(key.kid.clone());
+            header.typ = Some(String::from("at+jwt"));
+            mint_with(key, &header, claims)
+        }
+        Signer::MlDsa(ref signing) => {
+            let mut header = ferrohealth_smart::jws::compact::Header::new(signing.algorithm());
+            header.kid = Some(key.kid.clone());
+            header.typ = Some(String::from("at+jwt"));
+            ferrohealth_smart::jws::compact::encode(&header, claims, signing)
+                .expect("the token signs")
+        }
+    }
 }
 
-/// Returns `claims` signed by `key` under `header`.
+/// Returns `claims` signed by `key`, an RSA or ECDSA key, under `header`.
 pub(super) fn mint_with(key: &SigningKey, header: &Header, claims: &serde_json::Value) -> String {
-    jsonwebtoken::encode(header, claims, &key.encoding).expect("the token signs")
+    let encoding = match key.signer {
+        Signer::Jose(_, ref encoding) => Some(encoding),
+        Signer::MlDsa(_) => None,
+    }
+    .expect("jsonwebtoken signs with an RSA or ECDSA key alone");
+    jsonwebtoken::encode(header, claims, encoding).expect("the token signs")
 }
 
 /// Returns the resource server `settings` describe.
