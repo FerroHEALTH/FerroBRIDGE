@@ -8,7 +8,10 @@
 # is written for it (no specification governs the pairing: our own design).
 # The sequence number (at0025, "for example: vaccine sequence number") is the
 # dose number, and the territory the composition was written in is the
-# vaccination country.
+# vaccination country. The vaccine, the time, the route, the sequence number
+# and the comment are the elements the profile has a place for; a run out of
+# openEHR declares every other element of the action the composition holds,
+# each one the euvac project lists as left out.
 grammar: FHIRConnect/v1.0.0
 type: model
 metadata:
