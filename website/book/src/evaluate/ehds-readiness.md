@@ -35,14 +35,14 @@ publishes no template for the category.
 
 ### Article 14(1)(a): Patient summaries
 
-HL7 Europe Patient Summary 1.0.0-ballot is pinned for the profile validator; no context maps its Composition yet. The Base and Core profiles below are its building blocks.
+The interoperability component (`eehrxf`) maps HL7 Europe Patient Summary 1.0.0-ballot over FerroBRIDGE's patient summary template, a template over published CKM archetypes, because the openEHR international CKM publishes no patient summary template; the facade serves it as `Patient/$summary`. The Base and Core profiles below are its building blocks.
 
 | Target profile | Package | Committed template | Transform proven |
 |---|---|---|---|
 | `patient-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Person | `the_profile_elements_of_patient_eu_core_survive_the_round_trip` |
 | `condition-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Diagnose | `the_profile_elements_of_condition_eu_core_survive_the_round_trip` |
 | `medicalTestResult-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_test_result_survive_the_round_trip` |
-| `Patient summary Composition` | hl7.fhir.eu.eps 1.0.0-ballot | none: no patient summary template in the openEHR international CKM | no |
+| `composition-eu-eps` | hl7.fhir.eu.eps 1.0.0-ballot | FerroBRIDGE patient summary template over CKM archetypes | `the_summary_holds_the_medicine_and_the_vaccine_in_their_sections` |
 
 ### Article 14(1)(b): Electronic prescriptions
 
