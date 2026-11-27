@@ -283,3 +283,60 @@ fn each_other_reference_range_of_a_result_is_served_with_its_type() -> Result<()
     assert_eq!(declared, Vec::<String>::new(), "{warnings:?}");
     Ok(())
 }
+
+/// The composition the report `report` of the result `result` maps into.
+fn received(
+    result: &Value,
+    report: &Value,
+) -> Result<eehrxf::receive::openehr::ReceivedComposition, Box<dyn Error>> {
+    let document = ReceivedDocument::read(&received_text_of(result, report)?)?;
+    Ok(mapping()?.to_openehr(&document, &settings())?)
+}
+
+// NOTE: RM Release 1.1.0, Common IM, FEEDER_AUDIT_DETAILS.other_details carries "any custom
+// meta-data"; a report the run carries whole is stored with no declaration.
+#[test]
+fn a_report_carried_whole_names_nothing_in_its_feeder_audit() -> Result<(), Box<dyn Error>> {
+    let composition = received(&result(), &report())?;
+    assert!(
+        composition.not_carried().is_empty(),
+        "{:?}",
+        composition.not_carried()
+    );
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    assert!(
+        canonical["feeder_audit"]["feeder_system_audit"]["other_details"].is_null(),
+        "{}",
+        canonical["feeder_audit"]["feeder_system_audit"]
+    );
+    assert!(canonical["feeder_audit"]["original_content"].is_object());
+    Ok(())
+}
+
+#[test]
+fn a_reference_range_text_is_named_in_the_feeder_audit_and_the_composition_validates()
+-> Result<(), Box<dyn Error>> {
+    let mut described = result();
+    described["referenceRange"][0]["text"] = Value::from("Synthetic range text.");
+    let composition = received(&described, &report())?;
+    assert_eq!(
+        composition.not_carried(),
+        ["Observation.referenceRange[0].text"]
+    );
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let items = canonical["feeder_audit"]["feeder_system_audit"]["other_details"]["items"]
+        .as_array()
+        .ok_or("the declared elements")?;
+    assert_eq!(
+        items
+            .iter()
+            .filter_map(|item| item["name"]["value"].as_str())
+            .collect::<Vec<_>>(),
+        ["Observation.referenceRange[0].text"]
+    );
+    let template = openehr_mapping_core::template::TemplateSource::opt14(
+        ferrobridge_testkit::fixtures::KDS_LABORBERICHT_OPT,
+    )?;
+    openehr_mapping_core::index::WebTemplateIndex::build(&template)?.accept(canonical)?;
+    Ok(())
+}
