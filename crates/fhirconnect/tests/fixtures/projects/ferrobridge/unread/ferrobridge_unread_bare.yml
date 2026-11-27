@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# A FerroBRIDGE-authored model mapping of the CKM ACTION.medication.v1 that
+# reads the medication item alone.
+grammar: FHIRConnect/v1.0.0
+type: model
+metadata:
+  name: ferrobridge_unread_bare
+  version: 1.0.0
+spec:
+  system: FHIR
+  version: R4
+  openEhrConfig:
+    archetype: openEHR-EHR-ACTION.medication.v1
+  fhirConfig:
+    structureDefinition: http://hl7.org/fhir/StructureDefinition/MedicationAdministration
+
+mappings:
+  - name: "medication"
+    with:
+      fhir: "$resource.medication.as(CodeableConcept)"
+      openehr: "$archetype/description[at0017]/items[at0020]"

@@ -363,6 +363,8 @@ pub(super) const PATHS: &[Path] = &[
         "header.documentCategory",
         Some("Composition.category"),
     ),
+    // NOTE: HL7 Europe Imaging Report 1.0.0-ballot CompositionEuImaging and R4 Composition have no
+    // element or extension for the country a document comes from.
     path(
         Annex::Vii,
         "EHDSImagingReport",
@@ -373,38 +375,40 @@ pub(super) const PATHS: &[Path] = &[
         Annex::Vii,
         "EHDSImagingReport",
         "body.exposureInformation.summary",
-        None,
+        Some("Composition.section:procedure.extension:radiationDose"),
     ),
     path(
         Annex::Vii,
         "EHDSImagingReport",
         "body.exposureInformation.structuredDose",
-        None,
+        Some("Composition.section:procedure.entry:radiation-dose"),
     ),
     path(
         Annex::Vii,
         "EHDSImagingReport",
         "body.exposureInformation.structuredDose.doseQuantity",
-        None,
+        Some("Observation.component.value[x]"),
     ),
     path(
         Annex::Vii,
         "EHDSImagingReport",
         "body.exposureInformation.structuredDose.doseModality",
-        None,
+        Some("Observation.component.value[x]"),
     ),
     path(
         Annex::Vii,
         "EHDSImagingReport",
         "body.exposureInformation.structuredDose.bodySite",
-        None,
+        Some("Observation.bodySite"),
     ),
     path(
         Annex::Vii,
         "EHDSImagingReport",
         "body.exposureInformation.structuredDose.numberOfSeries",
-        None,
+        Some("Observation.component.value[x]"),
     ),
+    // NOTE: HL7 Europe Imaging Report 1.0.0-ballot ImagingStudyEuImaging and R4 ImagingStudy have
+    // no attachment for a PDF version of the study.
     path(Annex::Vii, "EHDSImagingStudy", "presentedForm", None),
     path(
         Annex::Vii,

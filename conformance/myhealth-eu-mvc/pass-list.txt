@@ -40,6 +40,7 @@ eehrxf-euvac-vaccination-history.0.Composition Composition.type http://loinc.org
 eehrxf-euvac-vaccination-history.5.Immunization Immunization.vaccineCode http://snomed.info/sct|836398006
 eehrxf-imaging-mapped.0.Composition Composition.section.code http://loinc.org|11329-0
 eehrxf-imaging-mapped.0.Composition Composition.section.code http://loinc.org|55115-0
+eehrxf-imaging-mapped.0.Composition Composition.type http://loinc.org|24802-1,http://loinc.org|18748-4
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition Composition.section.code http://loinc.org|10160-0
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition Composition.section.code http://loinc.org|11369-6
 eehrxf-ips-summary-medicine-and-vaccine.0.Composition Composition.section.code http://loinc.org|11450-4

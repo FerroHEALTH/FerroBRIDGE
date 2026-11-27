@@ -34,6 +34,29 @@ pub const UPDATE_VARIABLE: &str = "FERROBRIDGE_CONFORMANCE_UPDATE";
 /// The prefix of the one line of a pass list that records the case count.
 const TOTAL: &str = "total ";
 
+/// A count a corpus records beside its verdicts, which the gate names after
+/// the badge fraction so it stays in view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Count {
+    /// The passing cases whose two sources differ, each resolved by a
+    /// recorded decision.
+    Differ,
+}
+
+impl Count {
+    /// Every count, in the order a pass list writes them.
+    const ALL: [Self; 1] = [Self::Differ];
+
+    /// Returns the word that opens the count's line in a pass list and names
+    /// it in the result.
+    #[must_use]
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Differ => "differ",
+        }
+    }
+}
+
 /// One corpus the instrument measures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Corpus {
@@ -306,8 +329,9 @@ pub enum ConformanceError {
         #[source]
         source: std::num::ParseIntError,
     },
-    /// The committed pass list is not one id per line and one total line.
-    #[error("{} line {line} is not a case id or the total line", path.display())]
+    /// The committed pass list is not one id per line, one total line and
+    /// its count lines.
+    #[error("{} line {line} is not a case id, the total line or a count line", path.display())]
     MalformedList {
         /// The list.
         path: PathBuf,
@@ -345,6 +369,31 @@ pub fn record_set_aside(
     cases: &[Case],
     set_aside: &BTreeMap<String, usize>,
 ) -> Result<Outcome, ConformanceError> {
+    record_with(corpus, cases, set_aside, &BTreeMap::new())
+}
+
+/// Records the verdicts of one corpus as [`record`] does, with `counts`
+/// written beside the cases in the result and after the total line in the
+/// pass list.
+///
+/// # Errors
+///
+/// Returns what [`record`] returns.
+pub fn record_counted(
+    corpus: Corpus,
+    cases: &[Case],
+    counts: &BTreeMap<Count, usize>,
+) -> Result<Outcome, ConformanceError> {
+    record_with(corpus, cases, &BTreeMap::new(), counts)
+}
+
+/// Records the verdicts, the set-aside inputs and the counts of one corpus.
+fn record_with(
+    corpus: Corpus,
+    cases: &[Case],
+    set_aside: &BTreeMap<String, usize>,
+    counts: &BTreeMap<Count, usize>,
+) -> Result<Outcome, ConformanceError> {
     let mut verdicts: BTreeMap<&str, &Case> = BTreeMap::new();
     for case in cases {
         if case.id.is_empty() || case.id.chars().any(char::is_whitespace) {
@@ -360,10 +409,10 @@ pub fn record_set_aside(
             });
         }
     }
-    write_result(corpus, &verdicts, set_aside)?;
+    write_result(corpus, &verdicts, set_aside, counts)?;
     let list = corpus.pass_list();
     if std::env::var(UPDATE_VARIABLE).is_ok_and(|value| value == "1") {
-        write_list(&list, &verdicts)?;
+        write_list(&list, &verdicts, counts)?;
     }
     let listed = read_list(&list)?;
     Ok(compare(&verdicts, &listed))
@@ -402,6 +451,7 @@ fn write_result(
     corpus: Corpus,
     verdicts: &BTreeMap<&str, &Case>,
     set_aside: &BTreeMap<String, usize>,
+    counts: &BTreeMap<Count, usize>,
 ) -> Result<(), ConformanceError> {
     let rendered: Vec<serde_json::Value> = verdicts
         .values()
@@ -416,12 +466,17 @@ fn write_result(
             })
         })
         .collect();
-    let document = serde_json::json!({
+    let mut document = serde_json::json!({
         "corpus": corpus.id(),
         "total": verdicts.len(),
         "set_aside": set_aside,
         "cases": rendered,
     });
+    if let Some(fields) = document.as_object_mut() {
+        for (count, value) in counts {
+            fields.insert(count.word().to_owned(), serde_json::Value::from(*value));
+        }
+    }
     let mut text = serde_json::to_string_pretty(&document)
         .map_err(|source| ConformanceError::Json { corpus, source })?;
     text.push('\n');
@@ -434,8 +489,13 @@ fn write_result(
     std::fs::write(&path, text).map_err(|source| ConformanceError::Io { path, source })
 }
 
-/// Rewrites a pass list: every passing id in byte order, then the total line.
-fn write_list(path: &Path, verdicts: &BTreeMap<&str, &Case>) -> Result<(), ConformanceError> {
+/// Rewrites a pass list: every passing id in byte order, then the total line,
+/// then one line per count.
+fn write_list(
+    path: &Path,
+    verdicts: &BTreeMap<&str, &Case>,
+    counts: &BTreeMap<Count, usize>,
+) -> Result<(), ConformanceError> {
     let mut text = String::new();
     for case in verdicts.values().filter(|case| case.passed()) {
         text.push_str(&case.id);
@@ -444,6 +504,12 @@ fn write_list(path: &Path, verdicts: &BTreeMap<&str, &Case>) -> Result<(), Confo
     text.push_str(TOTAL);
     text.push_str(&verdicts.len().to_string());
     text.push('\n');
+    for (count, value) in counts {
+        text.push_str(count.word());
+        text.push(' ');
+        text.push_str(&value.to_string());
+        text.push('\n');
+    }
     if let Some(directory) = path.parent() {
         std::fs::create_dir_all(directory).map_err(|source| ConformanceError::Io {
             path: directory.to_path_buf(),
@@ -481,6 +547,13 @@ fn parse_list(path: &Path, text: &str) -> Result<BTreeSet<String>, ConformanceEr
                     line: index.saturating_add(1),
                     source,
                 })?;
+            continue;
+        }
+        if Count::ALL.iter().any(|count| {
+            line.strip_prefix(count.word())
+                .and_then(|rest| rest.strip_prefix(' '))
+                .is_some_and(|value| value.parse::<usize>().is_ok())
+        }) {
             continue;
         }
         if line.is_empty() || line.chars().any(char::is_whitespace) {
@@ -560,6 +633,21 @@ mod tests {
         assert!(matches!(
             refused,
             Err(ConformanceError::MalformedTotal { line: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn a_count_line_is_no_case() {
+        let listed = parse_list(Path::new("pass-list.txt"), "a.yml\ntotal 3\ndiffer 2\n");
+        assert_eq!(listed.ok(), Some(BTreeSet::from([String::from("a.yml")])));
+    }
+
+    #[test]
+    fn a_count_line_without_a_number_is_refused() {
+        let refused = parse_list(Path::new("pass-list.txt"), "a.yml\ndiffer many\n");
+        assert!(matches!(
+            refused,
+            Err(ConformanceError::MalformedList { line: 2, .. })
         ));
     }
 
