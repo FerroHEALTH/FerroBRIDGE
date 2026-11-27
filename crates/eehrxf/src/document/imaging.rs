@@ -13,7 +13,9 @@
 
 use crate::category::PRIORITY_SYSTEM;
 use crate::crosswalk::imaging::{IMAGING_COMPOSITION, IMAGING_DIAGNOSTIC_REPORT};
-use crate::document::form::{Authorship, Code, Companion, Form, Kind, SectionRule, Slot};
+use crate::document::form::{
+    Authorship, Code, Companion, EHDSI_PROCEDURE, EHDSI_RESULTS, Form, Kind, SectionRule, Slot,
+};
 use crate::document::language::Language;
 use crate::document::{EU_CORE_PATIENT, LOINC};
 
@@ -53,10 +55,10 @@ pub const IMAGING_CATEGORIES: [Code; 2] = [
 /// Every section slice of `CompositionEuImaging`, in the profile's order;
 /// the first four are required.
 pub const IMAGING_SLOTS: [Slot; 10] = [
-    Slot::new("imagingstudy", "18726-0", "Imaging study"),
+    Slot::new("imagingstudy", "18726-0", "Imaging study").with_ehdsi(EHDSI_RESULTS),
     Slot::new("order", "55115-0", "Order"),
     Slot::new("history", "11329-0", "History"),
-    Slot::new("procedure", "55111-9", "Procedure"),
+    Slot::new("procedure", "55111-9", "Procedure").with_ehdsi(EHDSI_PROCEDURE),
     Slot::new("comparison", "18834-2", "Comparison"),
     Slot::new("findings", "59776-5", "Findings"),
     Slot::new("impression", "19005-8", "Impressions"),

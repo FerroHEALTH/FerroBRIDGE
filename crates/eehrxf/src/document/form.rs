@@ -19,15 +19,46 @@ pub struct Slot {
     pub code: &'static str,
     /// The section title the document writes.
     pub title: &'static str,
+    /// The LOINC code of the `eHDSISection` concept that applies to the
+    /// section, written beside `code` when the slice's code is outside that
+    /// value set, or `None` when no concept of it applies.
+    pub ehdsi: Option<&'static str>,
 }
 
 impl Slot {
     /// Creates the slot of the slice `slice`, coded `code`, titled `title`.
     #[must_use]
     pub const fn new(slice: &'static str, code: &'static str, title: &'static str) -> Self {
-        Self { slice, code, title }
+        Self {
+            slice,
+            code,
+            title,
+            ehdsi: None,
+        }
+    }
+
+    /// Returns the slot with the `eHDSISection` concept `ehdsi` written
+    /// beside its code.
+    ///
+    /// MyHealth@EU Core `composition-myhealtheu-core` binds
+    /// `Composition.section.code` `extensible` to `eHDSISection`, and FHIR R4
+    /// terminologies.html §4.1.5.3 then requires a concept of the value set
+    /// whenever one applies, so a slice whose own code the set lacks carries
+    /// the concept that covers it as a second coding.
+    #[must_use]
+    pub const fn with_ehdsi(mut self, ehdsi: &'static str) -> Self {
+        self.ehdsi = Some(ehdsi);
+        self
     }
 }
+
+/// The `eHDSISection` concept Relevant diagnostic tests/laboratory data
+/// Narrative, which covers a section that reports a study's results.
+pub const EHDSI_RESULTS: &str = "30954-2";
+
+/// The `eHDSISection` concept Procedure Narrative, which covers a section
+/// that describes a procedure.
+pub const EHDSI_PROCEDURE: &str = "29554-3";
 
 /// Every section slice of the `composition-eu-eps` profile, in the profile's
 /// order.
