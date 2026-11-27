@@ -117,7 +117,8 @@ macro_rules! equivalence_match {
 }
 
 /// Returns `$base` with the match parts R4 to R6 declare alike: `originMap`,
-/// `noMap`, `sourceConcept`, the two comments and `note`.
+/// `noMap`, `sourceConcept`, the two comments, `note` and
+/// `normalized-concept`.
 #[cfg(any(feature = "r4", feature = "r4b", feature = "r5", feature = "r6"))]
 macro_rules! match_notes {
     ($found:expr, $base:expr) => {
@@ -134,6 +135,7 @@ macro_rules! match_notes {
                 .as_ref()
                 .and_then(|text| text.value.clone()),
             note: $found.note.as_ref().and_then(|text| text.value.clone()),
+            normalized_concept: $found.normalized_concept.as_ref().map(concept),
             ..$base
         }
     };

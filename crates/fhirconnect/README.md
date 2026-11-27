@@ -33,10 +33,10 @@ uses it:
 
 ```toml
 [dependencies]
-fhirconnect = "0.14"
+fhirconnect = "0.15"
 ```
 
-Name a patch (`"0.14.N"`) when you need the first release that carries what
+Name a patch (`"0.15.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## The model module

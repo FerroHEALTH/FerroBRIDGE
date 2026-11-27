@@ -203,6 +203,7 @@ fn matched(found: &Match) -> ConceptMapTranslateResponseMatch {
             .map(|equivalence| Code::from(equivalence.as_str())),
         concept: found.concept.as_ref().map(coding),
         source: found.source.as_deref().map(Canonical::from),
+        normalized_concept: found.normalized_concept.as_ref().map(coding),
         ..ConceptMapTranslateResponseMatch::default()
     }
 }
