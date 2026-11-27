@@ -49,6 +49,8 @@ pub mod authored;
 #[cfg(feature = "discharge")]
 pub mod discharge;
 pub mod display;
+#[cfg(feature = "imaging")]
+pub mod exposure;
 pub mod form;
 #[cfg(feature = "imaging")]
 pub mod imaging;
@@ -284,6 +286,11 @@ pub enum DocumentError {
         /// The `fullUrl` of the custodian the document names.
         full_url: String,
     },
+    /// A structured dose carries no value and the exposure no summary, so the
+    /// radiation dose entry has no text for the value
+    /// `ObservationRadiationDoseEuImaging` requires.
+    #[error("a structured dose carries no value and the exposure no summary")]
+    EmptyDose,
     /// Draft `EEHRxF` Annex III allows more values of an element than FHIR R4
     /// has a place for.
     #[error("{given} values of {element}, where FHIR R4 holds one")]
@@ -807,6 +814,7 @@ fn composition_section(section: &Section) -> CompositionSection {
             coding: vec![loinc(section.slot.code)],
             ..CodeableConcept::default()
         }),
+        extension: section.extensions.clone(),
         author: section.authors.iter().map(|url| reference(url)).collect(),
         text: Some(narrative(section.slot.title, &section.paragraphs)),
         entry: section.entries.iter().map(|url| reference(url)).collect(),

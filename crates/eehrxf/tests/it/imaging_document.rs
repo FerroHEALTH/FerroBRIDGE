@@ -15,10 +15,15 @@
 use std::error::Error;
 use std::io::Read;
 
+use eehrxf::crosswalk::imaging::IMAGING_RADIATION_DOSE;
+use eehrxf::document::exposure::{
+    ExposureInformation, RADIATION_DOSE_CODE, RADIATION_DOSE_EXTENSION, StructuredDose,
+};
 use eehrxf::document::form::SectionRule;
 use eehrxf::document::imaging::{
     IMAGING_BUNDLE, IMAGING_CATEGORIES, IMAGING_REPORT, IMAGING_REPORT_FORM, IMAGING_SLOTS,
 };
+use eehrxf::document::manifest::DCM;
 use eehrxf::document::section::{EmptyReason, Section};
 use eehrxf::document::{Document, DocumentError, LOINC};
 use eehrxf::receive::ReceivedDocument;
@@ -35,6 +40,7 @@ use fhir_types::r4::imaging_study::ImagingStudy;
 use fhir_types::r4::meta::Meta;
 use fhir_types::r4::organization::Organization;
 use fhir_types::r4::patient::Patient;
+use fhir_types::r4::quantity::Quantity;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use flate2::read::GzDecoder;
@@ -141,6 +147,15 @@ fn reference(url: &str) -> Reference {
 /// A synthetic imaging report document, its report coded `code` and
 /// performed by the radiology department.
 pub(crate) fn document(code: Option<&str>) -> Result<Document, Box<dyn Error>> {
+    document_with(code, None)
+}
+
+/// The document of [`document`], its procedure section holding `exposure`
+/// when one is given.
+fn document_with(
+    code: Option<&str>,
+    exposure: Option<&ExposureInformation>,
+) -> Result<Document, Box<dyn Error>> {
     let mut document = Document::of(
         &IMAGING_REPORT_FORM,
         BASE,
@@ -203,13 +218,12 @@ pub(crate) fn document(code: Option<&str>) -> Result<Document, Box<dyn Error>> {
     ])?;
     let study = added.get(1).ok_or("the study's fullUrl")?.clone();
     for slot in IMAGING_SLOTS.iter().take(4) {
-        let mut section = Section::new(slot, vec![format!("{}.", slot.title)]);
-        section = if slot.slice == "imagingstudy" {
-            section.with_entry(study.clone())
-        } else {
-            section.empty_because(EmptyReason::NilKnown)
-        };
-        document.with_section(section)?;
+        let section = Section::new(slot, vec![format!("{}.", slot.title)]);
+        match (slot.slice, exposure) {
+            ("imagingstudy", _) => document.with_section(section.with_entry(study.clone()))?,
+            ("procedure", Some(exposure)) => document.with_exposure(section, exposure, &study)?,
+            _ => document.with_section(section.empty_because(EmptyReason::NilKnown))?,
+        }
     }
     document.with_report(DiagnosticReport {
         id: Some(String::from("imaging-report")),
@@ -598,5 +612,296 @@ fn an_imaging_report_naming_its_custodian_validates_against_bundle_report_eu_ima
     runtime
         .block_on(received.validate(set, IMAGING_BUNDLE, None::<&Client>))
         .map_err(|error| format!("{error:?}"))?;
+    Ok(())
+}
+
+/// A synthetic exposure: one dose of `milligray` with no other value, under
+/// `summary`.
+fn exposure(summary: Option<&str>, milligray: Option<&str>) -> ExposureInformation {
+    ExposureInformation {
+        summary: summary.map(str::to_owned),
+        doses: vec![StructuredDose {
+            quantity: milligray.map(|value| Quantity {
+                value: Some(value.into()),
+                unit: Some("mGy".into()),
+                system: Some("http://unitsofmeasure.org".into()),
+                code: Some("mGy".into()),
+                ..Quantity::default()
+            }),
+            ..StructuredDose::default()
+        }],
+    }
+}
+
+// NOTE: HL7 Europe Imaging Report 1.0.0-ballot ObservationRadiationDoseEuImaging.value[x] is a
+// string 1..1, "Dose Summary text."; a dose under no summary is valued by its own text.
+#[test]
+fn a_dose_under_no_summary_is_valued_by_its_own_text() -> Result<(), Box<dyn Error>> {
+    let exposed = exposure(None, Some("1.5"));
+    let bundle =
+        serde_json::to_value(document_with(Some(MR_BRAIN), Some(&exposed))?.into_bundle()?)?;
+    let dose = the(&bundle, "Observation")?;
+    assert_eq!(dose["valueString"], "1.5 mGy", "{dose}");
+    let composition = the(&bundle, "Composition")?;
+    let procedure = composition["section"]
+        .as_array()
+        .ok_or("sections")?
+        .iter()
+        .find(|section| section["code"]["coding"][0]["code"] == "55111-9")
+        .ok_or("the procedure section")?;
+    assert!(
+        procedure["extension"].is_null(),
+        "no summary, no extension: {procedure}"
+    );
+    assert!(procedure["emptyReason"].is_null(), "{procedure}");
+    Ok(())
+}
+
+#[test]
+fn a_dose_with_no_value_under_no_summary_is_refused() {
+    let exposed = exposure(None, None);
+    let refused = document_with(Some(MR_BRAIN), Some(&exposed))
+        .err()
+        .and_then(|error| error.downcast::<DocumentError>().ok());
+    assert!(
+        matches!(refused.as_deref(), Some(DocumentError::EmptyDose)),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn an_exposure_outside_the_procedure_section_or_of_an_unheld_study_is_refused()
+-> Result<(), Box<dyn Error>> {
+    let exposed = exposure(Some("A synthetic dose."), Some("1.5"));
+    let mut document = document(Some(MR_BRAIN))?;
+    let findings = IMAGING_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "findings")
+        .ok_or("the findings slot")?;
+    let study = document.full_url("ImagingStudy", "study-1");
+    assert!(matches!(
+        document.with_exposure(Section::new(findings, Vec::new()), &exposed, &study),
+        Err(DocumentError::Foreign { slice: "findings" })
+    ));
+    let procedure = IMAGING_SLOTS
+        .iter()
+        .find(|slot| slot.slice == "procedure")
+        .ok_or("the procedure slot")?;
+    assert!(matches!(
+        document.with_exposure(Section::new(procedure, Vec::new()), &exposed, &study),
+        Err(DocumentError::Repeated { slice: "procedure" })
+    ));
+    let mut fresh = Document::of(
+        &IMAGING_REPORT_FORM,
+        BASE,
+        IDENTIFIER.to_owned(),
+        String::from("2026-10-25T12:00:00Z"),
+        String::from("Imaging report"),
+    );
+    fresh.with_patient(Patient {
+        id: Some(String::from("patient-1")),
+        ..Patient::default()
+    })?;
+    assert!(matches!(
+        fresh.with_exposure(Section::new(procedure, Vec::new()), &exposed, &study),
+        Err(DocumentError::Dangling { slice: "procedure" })
+    ));
+    Ok(())
+}
+
+/// A synthetic exposure: a summary and one CT dose in milligray over three
+/// series of the chest.
+fn ct_exposure() -> ExposureInformation {
+    let mut exposed = exposure(Some("A synthetic CT dose of 4.2 mGy."), Some("4.2"));
+    if let Some(dose) = exposed.doses.first_mut() {
+        dose.modality = Some(CodeableConcept {
+            coding: vec![Coding {
+                system: Some(DCM.into()),
+                code: Some("CT".into()),
+                display: Some("Computed Tomography".into()),
+                ..Coding::default()
+            }],
+            ..CodeableConcept::default()
+        });
+        dose.body_site = Some(CodeableConcept {
+            text: Some("Chest".into()),
+            ..CodeableConcept::default()
+        });
+        dose.number_of_series = Some(3);
+    }
+    exposed
+}
+
+// NOTE: HL7 Europe Imaging Report 1.0.0-ballot CompositionEuImaging.section:procedure carries the
+// RadiationDose summary extension and the entry:radiation-dose slice of ObservationRadiationDoseEuImaging.
+#[test]
+fn the_exposure_is_the_procedure_section_s_radiation_dose() -> Result<(), Box<dyn Error>> {
+    let exposed = ct_exposure();
+    let bundle =
+        serde_json::to_value(document_with(Some(MR_BRAIN), Some(&exposed))?.into_bundle()?)?;
+    let composition = the(&bundle, "Composition")?;
+    let procedure = composition["section"]
+        .as_array()
+        .ok_or("sections")?
+        .iter()
+        .find(|section| section["code"]["coding"][0]["code"] == "55111-9")
+        .ok_or("the procedure section")?;
+    assert_eq!(
+        procedure["extension"],
+        serde_json::json!([{"url": RADIATION_DOSE_EXTENSION, "valueString": "A synthetic CT dose of 4.2 mGy."}]),
+        "{procedure}"
+    );
+    let dose = the(&bundle, "Observation")?;
+    let study = format!("{BASE}/ImagingStudy/study-1");
+    let listed = procedure["entry"][0]["reference"]
+        .as_str()
+        .ok_or("the procedure section lists the dose")?;
+    assert!(
+        bundle["entry"]
+            .as_array()
+            .ok_or("entries")?
+            .iter()
+            .any(|entry| entry["fullUrl"] == listed
+                && entry["resource"]["resourceType"] == "Observation"),
+        "{listed}"
+    );
+    assert_eq!(
+        dose["meta"]["profile"],
+        serde_json::json!([IMAGING_RADIATION_DOSE]),
+        "{dose}"
+    );
+    assert_eq!(
+        dose["code"]["coding"][0]["code"], RADIATION_DOSE_CODE,
+        "{dose}"
+    );
+    assert_eq!(dose["subject"]["reference"], "Patient/patient-1", "{dose}");
+    assert_eq!(
+        dose["valueString"], "A synthetic CT dose of 4.2 mGy.",
+        "{dose}"
+    );
+    assert_eq!(dose["partOf"][0]["reference"], study.as_str(), "{dose}");
+    assert_eq!(dose["bodySite"]["text"], "Chest", "{dose}");
+    assert_eq!(
+        dose["component"][0]["valueQuantity"]["code"], "mGy",
+        "{dose}"
+    );
+    assert_eq!(
+        dose["component"][1]["valueCodeableConcept"]["coding"][0]["code"], "CT",
+        "{dose}"
+    );
+    assert_eq!(dose["component"][2]["valueInteger"], 3, "{dose}");
+    Ok(())
+}
+
+#[test]
+fn an_imaging_report_with_its_exposure_validates_against_bundle_report_eu_imaging()
+-> Result<(), Box<dyn Error>> {
+    let Some(set) = profile_set()? else {
+        return Ok(());
+    };
+    let exposed = ct_exposure();
+    let text =
+        serde_json::to_string(&document_with(Some(MR_BRAIN), Some(&exposed))?.into_bundle()?)?;
+    let received = ReceivedDocument::read(&text)?;
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime
+        .block_on(received.validate(set, IMAGING_BUNDLE, None::<&Client>))
+        .map_err(|error| format!("{error:?}"))?;
+    Ok(())
+}
+
+/// The `package/` directory of the fetched profile package `name#version`.
+fn fetched(name: &str, version: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/specs/fhir-packages")
+        .join(format!("{name}#{version}"))
+        .join("package")
+}
+
+/// The resource of `kind` whose `url` is `url` among the files of `package`.
+fn canonical(package: &std::path::Path, kind: &str, url: &str) -> Result<Value, Box<dyn Error>> {
+    for file in std::fs::read_dir(package)? {
+        let file = file?.path();
+        let named = file
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(&format!("{kind}-")));
+        if !named {
+            continue;
+        }
+        let resource: Value = serde_json::from_str(&std::fs::read_to_string(&file)?)?;
+        if resource["url"] == url {
+            return Ok(resource);
+        }
+    }
+    Err(format!("{} holds no {kind} {url}", package.display()).into())
+}
+
+/// The concepts, as `system|code`, of the value set `url`, read from
+/// `packages` in order, following each included value set.
+fn concepts(packages: &[std::path::PathBuf], url: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let set = packages
+        .iter()
+        .find_map(|package| canonical(package, "ValueSet", url).ok())
+        .ok_or_else(|| format!("no package defines {url}"))?;
+    let mut held = Vec::new();
+    for include in set["compose"]["include"].as_array().ok_or("an include")? {
+        for included in include["valueSet"].as_array().into_iter().flatten() {
+            held.extend(concepts(
+                packages,
+                included.as_str().ok_or("a value set url")?,
+            )?);
+        }
+        let system = include["system"].as_str().unwrap_or_default();
+        for concept in include["concept"].as_array().into_iter().flatten() {
+            held.push(format!(
+                "{system}|{}",
+                concept["code"].as_str().ok_or("a code")?
+            ));
+        }
+    }
+    Ok(held)
+}
+
+// NOTE: MyHealth@EU imaging 9.1.1 composition-img-myhealtheu binds Composition.type required to Core
+// 1.0.0 eHDSIDocumentTypes over the 9.1.0 catalogue, met by one coding (FHIR R4 terminologies §4.1.5.1).
+#[test]
+fn the_type_holds_a_coding_the_myhealth_eu_imaging_binding_requires() -> Result<(), Box<dyn Error>>
+{
+    if std::env::var("FERROBRIDGE_SKIP_PROFILE_PACKAGES").is_ok_and(|value| value == "1") {
+        return Ok(());
+    }
+    let packages = [
+        fetched("myhealth.eu.fhir.core", "1.0.0"),
+        fetched("myhealth.eu.fhir.mvc-package", "9.1.0"),
+    ];
+    let allowed = concepts(
+        &packages,
+        "http://fhir.ehdsi.eu/core/ValueSet/eHDSIDocumentTypes",
+    )?;
+    for code in [Some(MR_BRAIN), None] {
+        let bundle = serde_json::to_value(document(code)?.into_bundle()?)?;
+        let codings: Vec<String> = the(&bundle, "Composition")?["type"]["coding"]
+            .as_array()
+            .ok_or("the type's codings")?
+            .iter()
+            .map(|coding| {
+                format!(
+                    "{}|{}",
+                    coding["system"].as_str().unwrap_or_default(),
+                    coding["code"].as_str().unwrap_or_default()
+                )
+            })
+            .collect();
+        assert!(
+            codings.iter().any(|coding| allowed.contains(coding)),
+            "{code:?}: {codings:?} holds none of {allowed:?}"
+        );
+        assert_eq!(
+            codings.first().map(String::as_str),
+            Some(format!("{LOINC}|{}", code.unwrap_or(IMAGING_REPORT)).as_str()),
+            "the report's code stays first"
+        );
+    }
     Ok(())
 }
