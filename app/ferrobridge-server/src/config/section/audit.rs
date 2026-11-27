@@ -11,6 +11,7 @@
 //! `AuditEvent` over the ITI-20 ATX: FHIR Feed. The section's shape is our
 //! own design; no specification governs the configuration.
 
+use ehds_logging::regulatory::Regulatory;
 use ferrohealth_config::units::Duration;
 use ferrohealth_smart::config::endpoint::EndpointSection;
 use serde::{Deserialize, Serialize};
@@ -33,6 +34,10 @@ pub struct Audit {
     pub source_id: String,
     /// The site the bridge runs at (`AuditEvent.source.site`).
     pub site: Option<String>,
+    /// The deployment's regulatory metadata every access record carries: the
+    /// legal basis and the controllers and processors (Xt-EHR D5.2 §7.2.7);
+    /// empty names none, and the record writes none.
+    pub regulatory: Regulatory,
 }
 
 impl Default for Audit {
@@ -49,6 +54,7 @@ impl Default for Audit {
             cleartext: false,
             source_id: String::new(),
             site: None,
+            regulatory: Regulatory::default(),
         }
     }
 }

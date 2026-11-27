@@ -58,6 +58,7 @@ fn settings(
             audit.source_id.clone()
         },
         site: audit.site.clone().filter(|site| !site.is_empty()),
+        regulatory: audit.regulatory.clone(),
     })
 }
 

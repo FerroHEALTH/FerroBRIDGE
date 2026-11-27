@@ -32,6 +32,7 @@ use ehds_logging::balp::BalpSink;
 use std::sync::{PoisonError, RwLock};
 
 use ehds_logging::label::LabelPolicy;
+use ehds_logging::regulatory::Regulatory;
 use ehds_logging::retention::RetentionPolicy;
 use ihe_atna::atna::feed::FeedRepository;
 use ihe_atna::atna::forwarder::Forwarder;
@@ -56,6 +57,8 @@ pub struct Settings {
     pub source_id: String,
     /// The site the bridge runs at.
     pub site: Option<String>,
+    /// The regulatory metadata every access record carries.
+    pub regulatory: Regulatory,
 }
 
 /// The access-record lane: the outbox, its forwarder and what every record
@@ -76,6 +79,8 @@ pub struct AccessLog {
     retention: RetentionPolicy,
     /// The security labels a record carries.
     labels: LabelPolicy,
+    /// The regulatory metadata every record carries.
+    regulatory: Regulatory,
     /// The CDR the facade's data come from, the origin of Annex II 3.2(e).
     origin: String,
     /// The address the facade's requests arrive at.
@@ -130,6 +135,7 @@ impl AccessLog {
             categories,
             retention: RetentionPolicy::default(),
             labels: LabelPolicy::default(),
+            regulatory: settings.regulatory.clone(),
             origin: NetworkAddress::uri(origin).address(),
             endpoint,
         })
@@ -220,6 +226,12 @@ impl AccessLog {
     #[must_use]
     pub const fn labels(&self) -> &LabelPolicy {
         &self.labels
+    }
+
+    /// Returns the regulatory metadata every record carries.
+    #[must_use]
+    pub const fn regulatory(&self) -> &Regulatory {
+        &self.regulatory
     }
 
     /// Returns the CDR the facade's data come from, the origin of Annex II

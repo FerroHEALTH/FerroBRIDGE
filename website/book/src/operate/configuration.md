@@ -1651,6 +1651,8 @@ FerroBRIDGE's own design.
 | `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
+| `regulatory.legal_basis` | none | The legal basis every record states: `lawfulness`, the point of GDPR Art 6(1) (`consent`, `contract`, `legal-obligation`, `vital-interests`, `public-task`, `legitimate-interests`), and `condition`, the point of Art 9(2) (`health-or-social-care`, `public-health`, …) |
+| `regulatory.controllers`, `regulatory.processors` | `[]` | The controller or joint controllers and the processors every record names, each by an identifier the deployment chooses, such as an organisation's registry number |
 
 The category map the records are classified by is the `audit-categories`
 settings register, which the operator API reads and writes
