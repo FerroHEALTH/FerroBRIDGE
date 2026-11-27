@@ -26,6 +26,312 @@ crates on crates.io.
 
 ## [Unreleased]
 
+## [0.0.30] - 2026-11-27
+
+High availability, inbound patient events and the draft EEHRxF implementing
+act. The bridge keeps its state in a PostgreSQL state store every replica
+shares (`[state]`): the identity map, SMART Health Links, the change feed,
+the audit outbox, the outbound delivery record and the console's mapping
+revisions, with runtime settings registers and inbound sources changed
+without a restart. The inbound intake behind `[inbound]` takes webhooks,
+FHIR Subscriptions and HL7 v2 ADT patient triggers, with redelivery,
+reconciliation and a Nedap Ons source template. The facade serves the draft
+EEHRxF Annex X data groups and the IHE MHD Document Responder, keys every EHR
+by the patient's ITI-83 pseudonym, checks each token's eIDAS level of
+assurance and names a required `[facade.custodian]`, and `eehrxf` writes the
+Annex III metadata, the Annex VII imaging manifest and the MyHealth@EU forms.
+Every TLS 1.3 session offers X25519MLKEM768 first. The crates move to
+`openehr-mapping-core` 0.9.2, `fhirconnect` 0.14.1, `ferrobridge-term`
+0.23.0, `ferrobridge-fhirpath` 0.4.1, `ferrobridge-validator` 0.24.1,
+`ferrobridge-hl7v2` 0.38.1 and `eehrxf` 0.46.2, with `fhir-types` 0.3.0.
+Each breaking change below names what an operator or a crate user changes.
+
+### Added
+
+- The inbound workers start on every replica that runs both `[inbound]` and the FHIR facade, and apply each stored item through one handler. An upsert reads the source's patient, keeps only its identifiers, names, birth date, gender and deceased status with the tenant's local identifier, feeds it to the identity source as an ITI-104 Add or Revise Patient (`PUT Patient?identifier=<tenant system>|<local id>`), asks ITI-83 for its pseudonym and ensures exactly one EHR for it. A patient the source states merged into another (a `replaced-by` link) is forwarded as an ITI-104 Resolve Duplicate Patient. A remove sends `Patient.active = false` and never deletes an EHR. A refused feed (`400`, `403`, `422`) parks the item; a `5xx`, `429`, `423` or no answer runs it again. A source that declares no resolution parks its items as `resolution-undeclared`. Under `[audit]`, each feed is recorded as the system's PHI import and each EHR the handler creates as a create on the CDR, beside the BALP ITI-104 Source and ITI-83 Consumer records, all in the audit outbox before the step they record (#2048).
+- `fhir-subscription` inbound sources receive FHIR R4 Subscription
+  notifications of the Subscriptions R5 Backport IG STU 1.1.0 on
+  `POST /inbound/{source}`, verified by the `Subscription.channel.header`
+  value, the client certificate's names under `mtls`, or both. A handshake
+  records the subscription, each `id-only` or `full-resource` event becomes
+  one work item for its patient, and a gap a heartbeat or an `empty` event
+  reveals is recovered through `$events` by the replica that leads the
+  source's recovery. The document gains `mtls`, `subscriptions` and `base` (#2049).
+- FHIR Mapping Language maps are console files of the mapping revision under
+  the `structuremap` root, one `.map` file per map. A save or an apply
+  parses every map and refuses one outside the grammar or a URL two maps
+  carry, and every replica swaps the maps in when the running revision
+  changes. The operator console lists them as FHIR Mapping Language files (#2051).
+- The bridge keeps its own state in a PostgreSQL state store that every replica shares, configured by the new `[state]` section (`url` or `url_file`, `tls_ca` or `tls_ca_file` under the `sslmode` rules of `[cdm]`, `max_connections`, default 10, and `acquire_timeout`, default `5s`) and kept apart from the OMOP CDM database. `serve` opens the store at start, refuses a server older than PostgreSQL 19, and applies the migrations the binary carries under an advisory lock, so replicas that start together migrate once; readiness gains a `state` indicator. `[state.seal]` lists the keys stored bodies are sealed under (`[[state.seal.keys]]` with `id` and `key` or `key_file`, the first one sealing). The store gives a single-consumer lane one leader across replicas through a lease with a fencing generation that refuses a former leader's cursor write, and carries in-memory copies on one `LISTEN` session per replica. Upgrade note: nothing moves yet, and the `redb` files stay in use; each later area that moves onto the store names the keys it removes (#2053).
+- Runtime settings registers in the state store (`0002_baseline_settings.sql`): `GET`, `PUT` and `GET …/history` under `/operator/registers/{register}`. A write appends a version naming, in `If-Match`, the version it replaces, and a stale writer answers `412` (RFC 9110 §13.1.1). The write notifies every replica, which drops its copy, and a replica whose listener is down reads the register on every request. A register with no version holds its default. The first register is `audit-categories`, the Annex II 3.2(c) category map; the problem types `bad-register` and `registers-unavailable` are new (#2059).
+- Inbound sources are versioned rows of the state store, so an operator adds, changes, disables or deletes the source of patient events (a `webhook`, a `fhir-subscription` or an `mllp` sender) without a restart and without a new port. The operator API serves `GET` and `POST /operator/sources`, `GET`, `PUT` and `DELETE /operator/sources/{id}` with the version as the `ETag` (a stale `If-Match` answers `412`, a missing one `428`) and `GET /operator/sources/{id}/versions`, every version kept with its committer, deletions included. One write validates the kind's document, derives the source's tenants and MLLP routes, and notifies every replica, whose `LISTEN` session reloads the source into its snapshot; a replica whose session is down reads the row on every lookup. A document names its secrets (`{"secret": "<name>"}`), which resolve through the new `[secrets]` directory (`dir`, `poll_seconds`, read again without a restart); a write naming a missing secret answers `422` and a secret missing at runtime fails the source closed with `503`. The operator console gains the Sources pages: the list, one source with its versions, and the edit form. New problem types: `invalid-source`, `source-conflict` and `sources-unavailable` (#2060).
+- The inbound intake behind `[inbound]`: `POST /inbound/{source}` verifies
+  each webhook request over its raw body (`hmac`, Standard Webhooks `v1`,
+  `v1a` and `v2a`, `static-header` or `mtls`), reads the event through the
+  source's JSON Pointer event map, and stores it with one work item per
+  entity in the state store (`0009_baseline_inbound.sql`) before it answers.
+  A repeat changes nothing, a wrong signature answers `401` and stores
+  nothing, and above the source's `max_pending` or with the store down the
+  intake answers `503`. Workers on every replica claim the work with
+  `SKIP LOCKED` under a lease and rerun an item an event reached during the
+  work. Each source and tenant has one slot pool across replicas, and failed
+  work retries with backoff, then parks. `GET /operator/sources/{id}/parked`,
+  `POST …/settle` and `POST …/replay` list, settle and replay it. A webhook
+  source's document now names `verify` by `kind`, its `keys`, its `events`
+  map and its `limits` (#2062).
+- With `[inbound]` on, the HL7 v2 face stores the patient of each ADT patient trigger in the inbound intake before it answers: A01, A04, A05 and A08 (IHE ITI-8) and A28 and A31 (IHE ITI-30) as an upsert of the minimised `Patient`, and A40 and A47 as the source's merge statement (MRG-1 replaced by PID-3), which the inbound handler forwards to the identity source as a Resolve Duplicate. The event is keyed by MSH-10 and stamped by EVN-2, or MSH-7 without it; a repeat changes nothing and an older stamp is kept as superseded. The record travels sealed under `[state.seal]` and is cleared once applied, once its parked item is discarded, or after the new `[inbound] parked_body_retention` (default `7d`). `AA` follows the store's commit; a store failure answers `AE` (#2063).
+- Redelivery and reconciliation per inbound source: a webhook source's
+  `recovery` declares a `redeliver` call, made when a replica first leads
+  the source and after a run of `503` answers, and since-cursor `reconcile`
+  polls per tenant that mark every returned entity due again. One replica
+  runs a source's recovery under its lane lease, and a cursor moves only
+  under the lease generation that read it. `[inbound] recovery_tick` sets
+  how often each replica looks for due recovery, and
+  `POST /operator/sources/{id}/reconcile` and `…/redeliver` run the steps on
+  demand (#2064).
+- The Nedap Ons source template, `inbound-templates/nedap-ons.json`: the Ons API webhook verifier, event map, resolution, redelivery and the client xstream reconciliation polls as data, with its map and its logical models (generated from the Ons API OpenAPI document) under `inbound-templates/nedap-ons/` and the gender ConceptMap as the FHIR package `terminology/nedap-ons-values/`. `scripts/vendor/nedap-ons.sh` fetches the Ons API documents into the local cache (#2065).
+- `eehrxf::draft` crosswalks every element of Annexes III to X of the draft
+  EEHRxF implementing act (initiative 17512, 2026-11-23) to the Xt-EHR
+  logical models 1.0.0, with the cardinality on both sides and a verdict
+  per row: same, renamed, cardinality differs, missing in Xt-EHR or missing
+  in the draft. `AnnexCrosswalk::check_xtehr` and `check_annexes` hold the
+  rows to the package and to the annex text, so a change on either side
+  fails the crate's tests. `Cardinality::new` builds a cardinality (#2079).
+- `eehrxf::document::metadata` writes the draft EEHRxF Annex III metadata
+  (initiative 17512, 2026-11-23): `Document::with_metadata` puts the Table 1
+  document metadata on the `Composition` (version, status, language,
+  document category, attestation, legal authentication, period, event
+  category, source), and `DocumentMetadata::describe` writes the
+  `DocumentReference` describing the document in the shape MyHealth@EU
+  DocumentReference-minimal requires. `DocumentMetadata::from_composition`
+  reads the version, language and period from an openEHR composition. With
+  metadata set, every data group takes the document's date and language
+  where it carries none, and a data group with no subject, a document with
+  no author or a second value where FHIR R4 holds one is refused with a
+  typed error (#2080).
+- `eehrxf::document::representation` writes the PDF and narrative-only
+  representations of draft EEHRxF Art 3(1)(a) and (b) (initiative 17512,
+  2026-11-23): `PdfA` accepts a PDF/A-1a or PDF/A-1b document by its XMP
+  identification schema and refuses any other,
+  `DocumentMetadata::describe_pdf` embeds its bytes unchanged in a
+  `DocumentReference` with their size and SHA-1, and
+  `Document::narrative_only` refuses a section with a structured entry.
+  `Declarations` is the configuration of the representations a system
+  declares per category, held to Annex II. `Header` carries the document
+  elements a `DocumentReference` describes (#2081).
+- The EEHRxF draft corpora measure the narrative-only and the PDF
+  representations of draft Art 3(1)(b) and (a): a narrative-only discharge
+  report is one case per Annex IX data group, held when the
+  `Composition.section` slice a per-annex table names for the group carries
+  its narrative, and a laboratory report kept as PDF is one case for the
+  embedded PDF and one per Annex III Table 1 element on its
+  `DocumentReference`. Discharge 135/135, medical test report 137/137
+  (#2084).
+- The European interoperability component maps non-laboratory medical test reports from openEHR to the `EHDSMedicalTestReport` of draft EEHRxF Annex VIII (initiative 17512, 2026-11-23). A new shipped `test-report` FHIRconnect project, over FerroBRIDGE's template of the CKM `OBSERVATION.spirometry_result.v2` and `OBSERVATION.ecg_result.v1`, writes a spirometry or electrocardiogram result as an R4 `DiagnosticReport` (LOINC 18759-1 or 11524-6) in a document that carries the Annex III metadata (`eehrxf::mappings::TEST_REPORT`, `eehrxf::document::test_report`). No HL7 Europe guide profiles such a report, so the document claims the R4 base definitions, and `eehrxf::crosswalk::test_report` records each Annex VIII element against the R4 element that carries it, or none (#2085).
+- The European interoperability component writes the imaging study manifest of draft EEHRxF Annex VII (initiative 17512, 2026-11-23) as an HL7 Europe Imaging Manifest 1.0.0-ballot `EuMadoBundle`: the `EuMadoImagingStudy` with its series, instances and WADO-RS `EuMadoWadoEndpoint`, the patient and the creator organization and device. The study comes from the imaging report mapping. The series, instances and services come from the caller, read from the image archive, and a manifest without them is refused (`eehrxf::document::manifest`). `hl7.fhir.eu.imaging-manifest` 1.0.0-ballot, `ihe.rad.mado` 1.0.0 and `ihe.formatcode.fhir` 1.5.0 join the profile package set (#2086).
+- The facade serves the draft EEHRxF Annex X data groups EHDSDeviceUse and EHDSDevice as a `deviceUseStatement-eu-eps` with the `device-eu-eps` it names (`_include=DeviceUseStatement:device`), EHDSSpecimen as the `Specimen-eu-lab` of each laboratory result, and EHDSDosage as the `dosage` of a served `MedicationStatement`, each searched by the FHIR R4 base `patient` parameter: Annex X groups served, 12 of 33 (#2087).
+- `[facade.endpoint]` serves `Endpoint`, the draft EEHRxF Annex X group EHDSEndpoint, read-only from the configuration: the FHIR base as `Endpoint/fhir` and, under `dicomweb_wado_rs`, the DICOMweb WADO-RS service as `Endpoint/dicom-wado-rs`, with search by `_id`, `connection-type` and `status` (#2087).
+- The facade serves the remaining draft EEHRxF Annex X entry groups through `eehrxf`'s Annex X project, over published CKM archetypes the EHDS record template now holds: EHDSAlert as `flag-patient-eu-core` from `EVALUATION.precaution.v1` (the CKM publishes no alert archetype), EHDSAdvanceDirective as `consent-eu-eps` from `EVALUATION.advance_care_directive.v2` with its document as the EHDSAttachment, EHDSBodyStructure as `bodyStructure-eu-core` from `CLUSTER.anatomical_location.v1`, EHDSCarePlan as `carePlan-eu-hdr`, EHDSCurrentPregnancyStatus and EHDSPregnancyHistory as the IPS pregnancy status and outcome profiles, EHDSTravelHistory as `observation-travel-eu-eps`, EHDSEncounter as `encounter-eu-hdr` from the encounter composition, and EHDSMedicationAdministration as `medicationAdministration-eu-hdr` with its EHDSAdministeredDosage over a template of its own. A `Consent` search without `scope` answers the access directives and the mapped advance directives as one searchset, paged across both, a `scope` of `patient-privacy` or `adr` reaches the one it names, the access directives' search takes `scope` in R4, and a `Consent` read reaches the lane its id belongs to. Two contexts of one resource type may share a template when each starts at an archetype of its own (#2087).
+- The facade serves each analyte of a laboratory report as an `Observation-resultslab-eu-lab`, the draft EEHRxF Annex X data group EHDSLaboratoryObservation, and the report as a `DiagnosticReport-eu-lab` with the v2-0074 category `LAB`, through `eehrxf`'s Annex X project over `KDS_Laborbericht`: the observations answer the IHE QEDm 3.0.0 Simple Observations searches with the category `laboratory`, and the report the Diagnostic Reports searches by category and date with `_include=DiagnosticReport:result` (#2087).
+- The facade serves draft EEHRxF Annex X EHDSLocation as a read-only `location-eu-core` Location from each encounter composition's `EVENT_CONTEXT`, its `location` as the name and its health care facility as the managing organization. FHIRconnect now reads and writes `EVENT_CONTEXT.location` (the Simplified Formats `_location` family), a search declaration may name it as a `string`, and a context whose mappings all run openEHR to FHIR answers a write with `405` and declares no write in the `CapabilityStatement` (#2087).
+- The facade serves the draft EEHRxF Annex X party groups through `eehrxf`'s Annex X project: EHDSPatient as `patient-eu-core` over the reference CDR's patient `PERSON`, with its identifiers' types, its names (EHDSHumanName) and its postal addresses (EHDSAddress), EHDSHealthProfessional as `practitioner-eu-core` and EHDSOrganisation as `organization-eu-core`. A party resource now claims the profile its context names in `meta.profile`, as an entry's resource does (#2087).
+- The facade serves seven data groups of draft EEHRxF Annex X as individual resources (draft act Art 7(2)) through `eehrxf`'s new Annex X project, `eehrxf::mappings::ANNEX_X`: allergies and intolerances, conditions, procedures, immunisations, medication use with the medication it references, and simple observations, each with its HL7 Europe Base and Core 2.0.1 profile (FHIR R4 `bodyweight` for a body weight) and the IHE QEDm 3.0.0 PCC-44 searches of its option declared beside its context. `Project::searches` names the search declarations a project ships, and `conformance/eehrxf-annex-x` counts the groups served out of 33 (#2087).
+- The facade serves the last draft EEHRxF Annex X group, EHDSRelatedPerson, as a FHIR R4 `RelatedPerson` through `eehrxf`'s Annex X project, over FerroBRIDGE's related person `PERSON` definition: its identifiers, name and birth date, the patient as the target of its `PARTY_RELATIONSHIP` and the kind of relationship coded in that relationship's details. Annex X groups served: 33 of 33. A party context maps `PARTY_RELATIONSHIP.target` as `$archetype/relationships[idN]/target`, and the party build writes each relationship's `source` as the party itself (RM Demographic IM, `PARTY` invariant `Relationships_validity`): `WebTemplateIndex::source_relationships` writes it once the uid is known. A create of a party with relationships commits the party, then a second version with the relationships sourced at the uid the CDR assigned; when that second write fails, the facade deletes the party again and answers the CDR's refusal, and when the deletion fails too it answers a `500` naming the party's version and both refusals. An update sources them before its one write. `fhirconnect`'s `engine::rm::PARTY_ROOTS` is `PARTY_REFS` (#2087).
+- The facade serves the draft EEHRxF Annex X group EHDSServiceRequest as a `ServiceRequest-eu-lab` over the published `KDS_Laborauftrag`, with its requester `Organization` and specimen, searched by the FHIR R4 base `patient` parameter (#2087).
+- A search declaration's `node` takes `contains`, a node inside the archetype (its RM class and at-code) bound as `CONTAINS <class> n[<at-code>]` below the root, so a parameter under a repeating node matches when any instance does. The Annex X laboratory `DiagnosticReport` answers IHE QEDm 3.0.0 `patient+category+code` this way, matching the test name under any event of `KDS_Laborbericht` (#2087).
+- The facade's search declarations take a `fixed` token, the one coding a mapping writes as a constant, which a search compares with no query to the CDR, and an `include` list of standard reference parameters a search may name in `_include`: the facade adds each resource the match's own mapping creates and references through that parameter, once, with `search.mode` `include`, and the `CapabilityStatement` names each as `searchInclude`. These carry the category and `_include` searches of IHE QEDm 3.0.0 (PCC-44 2:3.44.4.1.2.1) (#2087).
+- The facade is the IHE MHD 4.2.3 Document Responder behind `[facade.mhd]`, which needs `[facade.identifier_search]`: Find Document References [ITI-67] answers one `DocumentReference` per document a Composition context assembles, the draft EEHRxF Annex III description of `Composition/[id]/$document` under the Composition's id; Find Document Lists [ITI-66] answers one SubmissionSet `List` per CONTRIBUTION that committed a document; Retrieve Document [ITI-68] reads the `$document` URL. Every parameter the Responder SHALL process is matched against the element the description fills, an unsupported parameter is ignored and named in the searchset unless `Prefer: handling=strict` asks for a `400`, both searches take `GET` and `POST`, and every answer is FHIR JSON or, when asked, FHIR XML. The `CapabilityStatement` instantiates `IHE.MHD.DocumentResponder`, and `Endpoint/mhd` names the Responder with the payload type `urn:ihe:iti:xds:2017:mimeTypeSufficient` in both FHIR formats (#2089).
+- Breaking: `fhir-types` 0.2.0 generates the `Provenance` model and its schema behind the `terminology` feature in every FHIR version, so a terminology server reads and serves the provenance of a ConceptMap without the full resource set; each version's `resource::Resource` gains its `Provenance` variant under `terminology`, which breaks an exhaustive match. The same release generates the `r6` module from `hl7.fhir.r6.core` 6.0.0-snapshot1 in place of 6.0.0-ballot5 (#2072): the package drops `Contract`, `EnrollmentRequest`, `EnrollmentResponse`, `InsurancePlan`, `InsuranceProduct`, `Invoice` and `StructureMap` and the `MonetaryComponent` data type, and their `fhir_types::r6` modules go with them; a consumer that names one of them under `r6` moves to R5 or drops the use. The R6 examples corpus follows the snapshot's examples package and passes all 2321 resources, and `ferrobridge-term` reads and writes R6 as before. The crates built on `fhir-types` move a minor with it: `eehrxf` 0.28.0, `ferrobridge-fhirpath` 0.3.0, `ferrobridge-hl7v2` 0.28.0, `ferrobridge-term` 0.19.0, `ferrobridge-validator` 0.20.0 and `fhirconnect` 0.8.0 (#2095).
+- The HL7 v2 face evaluates the guide's `IF CX.4 IN` identifier registry condition. A CX.4 with no namespace id and an `ISO` or `UUID` universal id writes `urn:oid:` or `urn:uuid:` as the identifier system with no lookup. Any other assigning authority is searched as an identifier `NamingSystem` on the terminology server (`GET NamingSystem?kind=identifier&value=<authority>`), and the one registration's `uri` becomes the system. A PID-3 authority no `NamingSystem` registers, or more than one does, is answered `AE` at PID-3 naming it, and a refused search `AR`. `ferrobridge-term` gains `Client::identifier_systems` behind its new `naming-system` feature (#2102).
+- `eehrxf` adds the codings the MyHealth@EU Core 1.0.1 bindings take. A
+  translator given `MYHEALTH_EU_CORE` (`Translator::with_bindings`) asks the
+  terminology server's `ConceptMap/$translate` for the ICD-10 coding of
+  `Condition.code` and the ATC coding of `AllergyIntolerance.code`, and adds
+  it beside the source's SNOMED CT coding with its mapping provenance (draft
+  EEHRxF Art 6(2)). `Translator::unbound` reports each bound concept no
+  translation reaches; no code is invented for it (#2107).
+- `Patient/$summary` takes the MyHealth@EU Core 1.0.1
+  `composition-myhealtheu-core` as its `profile` input (HL7 IPS 2.0.1
+  `OperationDefinition/summary`). The answer is the HL7 Europe Patient
+  Summary document with the ICD-10 coding of each problem and the ATC coding
+  of each allergen the terminology server maps, beside the recorded code
+  (#2107).
+- A laboratory or medical test report document with Annex III metadata
+  carries the draft EEHRxF `documentCategory` on its `Composition.category`
+  and on its `DiagnosticReport.category`, which `Composition-eu-lab` and
+  `DiagnosticReport-eu-lab` 2.0.0 slice open and `Bundle-eu-lab`
+  `dr-comp-category` holds equal. An imaging report keeps it on the
+  `DocumentReference` alone, since its form fixes the category (#2115).
+- The imaging report mapping writes the composition's composer, the
+  reporting clinician, as `ImagingStudy.interpreter`, and the imaging study
+  manifest carries it, the `header.author[x]` of draft EEHRxF Annex VII
+  `EHDSImagingStudy`; the draft imaging corpus holds 90/91 (#2115).
+- FHIRconnect mappings read the identities of a record out of openEHR:
+  `LOCATABLE.uid` (and `$composition/uid`) as an `Identifier` naming the
+  object across its versions, and an `ACTION`'s
+  `instruction_details/instruction_id` as a `Reference` that names the
+  prescription by that identifier. The MPD project writes the composition
+  uid as `MedicationRequest.groupIdentifier`, the `INSTRUCTION` uid as
+  `MedicationRequest.identifier`, the `ACTION` uid as
+  `MedicationDispense.identifier`, and the order the `ACTION` carries out as
+  `MedicationDispense.authorizingPrescription`, so the draft EEHRxF
+  ePrescription and eDispensation corpora hold 25/25 and 15/15 (#2115).
+- The StructureMap engine runs the `translate` transform through the
+  terminology server's `ConceptMap/$translate` and writes the `code`,
+  `system`, `display`, `Coding` or `CodeableConcept` the map asks for. A
+  refused call, no translation or matches naming two concepts stop the map
+  with a typed error (#2118).
+- A FHIRconnect model mapping reads and writes the coded `name` of a structural `LOCATABLE` such as an `ADDRESS`, through a `manual` on `name` or a tail below it: FLAT names no node's name, so `openehr-mapping-core` 0.6.0 writes it into the built composition or party. The draft EEHRxF Annex X patient now maps each electronic address to `telecom`, its system the address's coded name as R4 cpt-2 requires, and EHDSTelecom is served (#2126).
+- The facade checks the eIDAS level of assurance of every access token. Each `[auth.issuer.<name>.assurance]` table maps the issuer's `acr` values to `low`, `substantial` or `high`, and the new `[assurance]` section names the level the FHIR routes (`fhir`) and the SMART Health Link routes (`shl`) require. A token below the level, a token with no mapped `acr` and a Basic credential answer `401` with an `OperationOutcome` and the RFC 9470 §3 challenge `Bearer error="insufficient_user_authentication"`, naming the accepted values in `acr_values`. An issuer's own `minimum` now holds on every guarded route. The facade's access record carries the level of each admitted caller. A minimum no issuer reaches, or one set while `[auth]` is off, refuses the start (#2137).
+- The `$translate` contracts of `fhir-types` 0.3.0 (R4, R4B, R5 and R6) carry the terminology ecosystem IG 1.11.0 `error` output, one `string` per returned target code that is not valid in its code system, and the `note` part of a match whose target code system the server does not know. `ferrobridge-term` 0.22.0 reads both into `TranslateOutcome::errors` and `Match::note` (#2166).
+- `eehrxf` 0.36.0 writes the MyHealth@EU vaccination history
+  (`myhealth.eu.fhir.euvac` 10.0.0-preview, a preview) behind the new
+  `vaccination` feature: the shipped `euvac` FHIRconnect project maps the
+  immunisations of the patient summary template to
+  `vaccination-myhealtheu-euvac`, and `VACCINATION_HISTORY_FORM` writes the
+  `bundle-euvac-myhealtheu` document. HL7's FHIR Validator checks it against
+  the pinned guide, and its README badge counts the result (#2168).
+- `eehrxf` 0.35: `DocumentMetadata::describe_at` writes the
+  `DocumentReference` that describes a document from its `Header`, this
+  metadata and an attachment the caller names, with no written `Bundle`, so a
+  document list describes each document before it writes it, in the
+  MyHealth@EU DocumentReference-minimal shape `describe` writes (#2187).
+- `fhirconnect` exports `tree::json_kind`, which names a JSON value's kind
+  without its content, and `operations::contract::parameters::body_object`
+  and `parameters_from_object`, the two steps `parameters_from_json` reads a
+  request body in (#2222).
+- A webhook source declares under `resolve` the `GET` calls below each tenant's `base` that read the entity a notification names, and the FHIR Mapping Language map that renders their answers as the R4 `Patient` the inbound handler feeds; a `404` on the first call applies as a remove, and the logical models the map reads are JSON files of the `structuremap` root, generated from an OpenAPI schema with `ferrobridge mapping logical-model` (#2225).
+- `fhir-types` 0.3.0 puts `NamingSystem` in the `terminology` root set, as a resource of the FHIR terminology module, so `naming_system` and `Resource::NamingSystem` of every version build under the `terminology` feature without `resources`. The new `Resource` variant breaks an exhaustive match (#2228).
+- `eehrxf` writes the discharge report in the MyHealth@EU Hospital Discharge
+  Report 9.2.0 form (`MYHEALTHEU_DISCHARGE_REPORT_FORM`), which a national
+  contact point sends: its language is held to eHDSILanguage, and its author
+  is the one the record names, never the gateway's `Device`
+  (`Authorship::Record`). `recorded_author` writes the composition's
+  identified composer as a `Practitioner`, or else its health care facility
+  as an `Organization`, and refuses a composition that names neither.
+  `MYHEALTHEU_PATIENT` moves from `document::vaccination` to `document` (#2233).
+- The HL7 FHIR Validator lane holds the discharge report `eehrxf` writes in
+  the MyHealth@EU form to MyHealth@EU Hospital Discharge Report 9.2.0, which
+  finds it valid. The MyHealth@EU HDR badge reads 1 of 4 discharge
+  documents valid; the other three are the HL7 Europe form, whose `Device`
+  author MyHealth@EU does not allow (#2240).
+- `[state]` and `[cdm]` take `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `statement_cache_capacity`, `max_lifetime` and `idle_timeout`. Both PostgreSQL clients start every session with the three timeouts in the startup `options` parameter, read them back from `pg_settings` once connected, and refuse a server that does not hold them. The state store defaults to 30 s, 5 s and 60 s; the CDM sets no statement timeout, 60 s for a lock and 10 minutes idle in a transaction. Upgrade note: a connection URL that carries `options` is refused; set the timeouts in the section instead (#2246).
+- The book explains how FerroBRIDGE maps, from FHIRconnect contexts compiled into programs to the facade over the CDR, the OMOP ETL, the inbound engine, the outbound lane and the state store, naming the specification that governs each part and where FerroBRIDGE's own design takes over (#2290).
+
+### Changed
+
+- The outbound FHIR lane commits its delivery record with its watermark. Once the endpoint accepts a transaction Bundle, the lane stages what each composition stands at, and the follower writes the record (`outbound_delivered` in the state store) in the transaction that moves the lane's watermark under its lease generation, so a lane stopped before or after the endpoint answers sends the same idempotent Bundle again and a lane stopped after the commit sends nothing again: each effect lands once at the endpoint. A retry of a parked event is settled in the same transaction. Upgrade note: `fhir_outbound.emitted` is removed with no replacement key, and its `redb` file is no longer read; the lane needs `[state]` (#2047).
+- The book gains the inbound sources, named secrets, state store and high availability, and upgrade pages. Upgrade note, every key the move to the state store removes: `[facade] identity_store`, `subject_namespace`, `subject_id_form` and `subject_type`; `[shl] store`, `[facade.app_state] store` and `[facade.launch_task] store`; `change_feed.watermarks` and `change_feed.dead_letters`; `audit.spool_dir`, `audit.max_records`, `audit.max_size` and `audit.write_timeout`; `[audit.categories]`, moved to the `audit-categories` register; `[operator] mapping_dir`; and `[hl7v2] senders`, `profiles`, `default_charset`, `unmapped_entries`, `facility_identifier_issuer`, `ehr_policy` and `log_outcomes`, moved to `mllp` sources. The upgrade page says how each one's state carries across (#2052).
+- The FHIR facade keeps its identity map in the PostgreSQL state store, which every replica shares, in place of a `redb` file. Each binding is recorded once, so two replicas recording one binding agree on the one that stands. No identifier value is stored in clear: a subject identifier and every `Resource.identifier` value are stored as an HMAC-SHA-256 under the new `[state.seal] lookup_key` (or `lookup_key_file`), and the subject an EHR was recorded for is sealed with AES-256-GCM under a `[state.seal]` key. The store pins the identity derivation and the lookup key's fingerprint, and refuses to start under another. Upgrade note: `[facade] identity_store` is removed; an enabled facade needs `[state]` and `[state.seal]` with a `lookup_key`, the map starts empty, and the old `redb` file is no longer read (#2054).
+- SMART Health Links, SMART App State and the SMART launch `Task`s live in the PostgreSQL state store, which every replica shares, in place of their `redb` files. Each change of a link holds its row, so two replicas behind one address serve a file location once, count the passcode attempts and the answers across both, and refuse a revoked link alike (SMART Health Cards and Links 1.0.0); the expiry sweep runs on one replica at a time. A link's manifest id, its handle and each location token are stored as their SHA-256, and the handle is also sealed under a `[state.seal]` key so its owner can list it. A conditional write of App State or a launch `Task` holds the resource's row, so two replicas racing on one version cannot both win. Upgrade note: `[shl] store`, `[facade.app_state] store` and `[facade.launch_task] store` are removed; the links need `[state]` and `[state.seal]`, App State and launch `Task`s need `[state]`, and the old `redb` files are no longer read (#2055).
+- The change feed keeps its state in the PostgreSQL state store, so the bridge runs its change-feed consumers on several replicas. Each reader (the events lane, the incremental OMOP load, the outbound FHIR lane) has one leader across replicas through a lease in the store, renewed every third of the new `[change_feed] lease` (default `30s`); the other replicas stand by and report the new consumer state `standby`, and once a leader's lease runs out another replica takes the reader over and resumes at the first event the watermark does not cover. The watermarks of the `aql` source, the parked events and their poisoned-pass counts are store rows, and every write a follower makes carries its lease generation, so a former leader moves no watermark. An operator settles a parked event by a retry or a discard with a reason: `POST /operator/events/{consumer}/parked/{id}/retry` (`202`) or `…/discard` (`204`), with the reason in the `ferrobridge-reason` header, and the row keeps who decided, the decision and the reason, which `GET /operator/events` shows on each parked event; the console's Events page gives each parked event a reason field and Retry and Discard buttons. Upgrade note: `[change_feed]` now needs a `[state]` section; `change_feed.watermarks`, `change_feed.dead_letters` and `POST /operator/events/{consumer}/parked/{id}/replay` are removed with no replacement key, and the `redb` files they named are no longer read, so a reader on the `aql` source starts again where `start` says (#2056).
+- The access-record lane keeps its audit outbox in the PostgreSQL state store. Each BALP `AuditEvent` is committed to `audit_outbox` before the answer, and every replica runs an `ihe-atna` forwarder over the one outbox that claims the oldest unclaimed record for a lease with `FOR UPDATE SKIP LOCKED`, deletes it once the Audit Record Repository answers `2xx` and moves a refused one to `audit_quarantine`, so two replicas never send one record and a replica that stops after it admitted an access loses no record. Recording still fails closed: an access is refused with `503` before the CDR is called while the outbox does not answer. Upgrade note: `[audit]` now needs `[state]`; `audit.spool_dir`, `audit.max_records`, `audit.max_size` and `audit.write_timeout` are removed with no replacement key, and records left in an old spool directory are not read, so let a running bridge drain its spool before the upgrade (#2057).
+- The operator console's mapping files and their revisions live in the PostgreSQL state store (`0011_baseline_mappings.sql`). A save or an apply records the running revision and notifies every replica, which compiles it and swaps its programs, so a save on one replica runs on all of them; a draft that does not compile records nothing. The first start on an empty store records the baseline, revision 1: the provisioned tree with no console file, which an apply restores. The operator API saves when `[state]` is configured, and `etl run` reads the running revision's OMOCL files beside `[mappings] omocl`. Every FHIRconnect, search declaration and OMOCL load compiles an in-memory tree of files, which a provisioned directory and the running revision both produce (#2058).
+- HL7 v2 senders are `mllp` inbound sources of the state store, routed by MSH-3 and MSH-4, so adding a device is one `POST /operator/sources` call that every replica takes up without a restart. A route holds the certificate subject the TLS listener checks against the client certificate's SAN, or the CIDR networks the plain listener checks against the peer address per message, and carries the sender's settings (`origin`, `device_identifier_issuer`, `profiles`, `unmapped_entries`, `ehr_policy`, `default_charset`, `facility_identifier_issuer`, `log_outcomes`). A message whose route the connection does not match is answered `AR` and its plain connection closes; a message the store cannot route is answered `AE`. The TLS listener reads its client CA file again when it changes. `[hl7v2]` now needs `[state]`, and its `senders`, `profiles`, `default_charset`, `unmapped_entries`, `facility_identifier_issuer`, `ehr_policy` and `log_outcomes` keys are removed: to upgrade, write each former sender as an `mllp` source through the operator API. The health document's HL7 v2 lane no longer lists senders (#2061).
+- The `eehrxf` coding rule follows draft EEHRxF Art 6 (initiative 17512,
+  2026-11-23). A translation the terminology server states `equivalent` or
+  `equal` carries the concept map that made it in the `elementSource`
+  extension, and `Translator::mapped` records each one with its original
+  coding, equivalence and map. With `Translator::for_non_english`, a code no
+  map covers takes its English designation from `$lookup`, as its display
+  or in the `translation` extension of its display, and
+  `Translator::unmapped` counts the gaps. Breaking for a consumer:
+  `Terminology::translate` answers `Translated` values in place of codings,
+  `Match` gains `source`, and `TerminologyServer` gains `designation`, which
+  an implementation answers from the `designation` parts of `$lookup` (#2082).
+- A `Patient` written through a party context of the `patient-eu-core` profile is refused with `422` and a `required` issue at the identifier when any identifier carries no type, as draft EEHRxF Annex X gives `EHDSPatient.identifier.type` the cardinality 1..1. NI and SS take HL7 v2-0203, and HI, HIN, REGPID and REGION the FerroTERM code system `https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type` (#2087).
+- The FHIR facade keys every EHR by the patient's ITI-83 pseudonym, asked of the new top-level `[identity_source]` (a PIXm Manager such as FerroPIX: `endpoint`, `pseudonym_domain` and the ordered `source_domains`) by `POST`, so no direct identifier reaches the CDR or a URL. A subject named by identifier, and a `Patient`, is asked for by its identifier in the first accepted domain it carries. The `Patient` logical id is the party's `versioned_object_uid` where a `Patient` party context is loaded, which the state store records against the pseudonym, and the pseudonym elsewhere. A patient-scoped token's launch patient and every search subject resolve the same way, so a `Patient` whose party the state store has not yet recorded is resolved through the party read and ITI-83. A failed question answers `422` when the identity source holds no single pseudonym, `503` when a repeat may succeed and `502` otherwise, each naming the upstream status. An enabled facade refuses to start without `[identity_source]`. Under `[audit]`, each ITI-83 exchange is recorded in the audit outbox as the BALP PIXm Query Consumer `AuditEvent` (PIXm 3.1.0 §2:3.83.5.1.1) (#2102).
+- The openEHR crates move to 0.5.1, whose `openehr-sdt` Web Template places
+  `ACTION.time` and `HISTORY.origin`, so a search declaration's `date`
+  parameter on either instant is placed by the Web Template alone, and the
+  facade no longer accepts the two paths by name (#2122).
+- An MLLP route bound to both a `certificate_subject` and `source_cidrs` now needs a connection that proves both: on the TLS listener the client certificate must carry the subject and the peer address must lie in one of the networks, and the plain listener refuses such a route, since a plain connection carries no certificate. A route bound to one of the two reads and is checked as before. Upgrade note: a route that names both so that one sender can reach either listener splits into two senders, or drops the proof it does not need. A webhook source refuses the new `network` verifier kind, which binds MLLP routes only (#2154).
+- The bridge moves to `ferrohealth-smart` 0.35 and `ferrohealth-session` 0.30, which verify every JWS in one module and add ML-DSA (RFC 9964). `[[auth.issuers]] algorithms` now also takes `RS512`, `PS512`, `EdDSA`, `ML-DSA-44`, `ML-DSA-65` and `ML-DSA-87`, and a symmetric `HS*` algorithm there fails to parse as an unknown value, where it was refused as a rule before (#2158).
+- The inbound recovery calls (a webhook source's `redeliver` call, its `reconcile` polls and a FHIR Subscription source's `$events` recovery) and the facade's reference fetches now go through the family's outbound client, the one the audit feed and the outbound FHIR lane use. A recovery client is built once per source version and credential and again when the credential's secret changes, in place of a new client on every call; it keeps the 30-second limit and the single try, and it now follows no redirect, so a source that answers a recovery call with a redirect gets the call refused with that status (#2158).
+- `eehrxf` 0.36.0: `Form` has the field `legal_authentication`, and
+  `SectionRule` the variant `Entered`, a section that must hold an entry.
+  `Document::into_bundle` refuses a document whose form requires a legal
+  authentication when its metadata names none (#2168).
+- Every TLS 1.3 session the bridge and the console take part in offers the
+  hybrid key exchange X25519MLKEM768 (RFC 10024) first, then X25519, P-256
+  and P-384 for a peer without it: the HTTP listeners and the endpoint
+  clients through `ferrohealth-server` 0.12.4, and the MLLP listener, the
+  PostgreSQL clients and every other rustls client through rustls's
+  `prefer-post-quantum` feature. `docs/post-quantum.md` and
+  `conformance/post-quantum.tsv` list every cryptographic use and whether it
+  resists a quantum computer, and the README carries a post-quantum badge
+  counted from them (#2177).
+- The bridge takes openehr-* 0.5.0. A template names a pre-release (alpha or beta) archetype by its full identifier, because openEHR BASE §Referencing matches such a version only by that identifier, and an ADL 1.4 archetype now resolves under the identity its `revision` gives it. openehr-mapping-core 0.8.0, fhirconnect 0.12.0, eehrxf 0.33.0 and ferrobridge-hl7v2 0.32.0 follow the new RM types (#2184).
+- `eehrxf` 0.40: `DocumentMetadata::describe`, `describe_at` and
+  `describe_pdf` write one `DocumentReference` that satisfies both HL7
+  Europe EU Health Data API `EehrxfMhdDocumentReference` and MyHealth@EU
+  DocumentReference-minimal. It claims the EehrxfMhd profile, carries the
+  Annex III documentCategory and the Art 14(1) priority category as two
+  codings of its one `category`, names the priority category's `Bundle`
+  profile as its `format`, requires a custodian, marks its masterIdentifier
+  `usual` and writes no `docStatus`, which the IHE MHD Minimal base of
+  EehrxfMhd holds to none.
+  `DocumentMetadata::new` and `from_composition` take the priority category,
+  none for a document outside Art 14(1) (#2200).
+- The MHD Document Responder serves Retrieve Document [ITI-68] only at the
+  `$document` URL each `DocumentReference` names, and the facade's
+  `CapabilityStatement` keeps listing no `Binary` read while it instantiates
+  `IHE.MHD.DocumentResponder`, which R4 allows for a server that implements
+  a subset and states its full capabilities (#2201).
+- **Breaking:** an enabled facade requires `[facade.custodian]` (`name`,
+  `identifier_system`, `identifier_value`): the healthcare provider that
+  holds the records behind the CDR. Every document the bridge writes,
+  `Composition/$document`, the documents the MHD Document Responder
+  describes, and `Patient/$summary`, names it as its custodian (FHIR R4
+  `Composition.custodian`, HL7 Europe EU Health Data API
+  `EehrxfMhdDocumentReference`). A configuration without it refuses the
+  start, naming the missing key (#2206).
+- Breaking: `eehrxf` 0.42 writes a document's language as one RFC 5646
+  language-region tag built from the openEHR composition's `language` and
+  `territory` (`DocumentLanguage::new`, `DocumentLanguage::of_composition`),
+  for example `en-GB`, never a bare language.
+  `Document::with_language` takes a `DocumentLanguage`, and a form whose
+  `Composition` profile binds the language `required` takes only the
+  `HeldLanguage` that the terminology server's `ValueSet/$validate-code`
+  gives (`DocumentLanguage::held`, `Document::with_held_language`). A refused
+  or unreachable terminology answer refuses the language. `Form::language`
+  is a `Language` naming whether the profiles require the language and the
+  value set they bind it to. `DocumentMetadata::with_language` is removed:
+  the metadata, the data groups and the description (`Header::with_language`)
+  carry the document's one language (#2232).
+
+### Removed
+
+- `[facade] identity_store` and the `redb` identity file: the identity map lives in the `[state]` store (#2054).
+- `[shl] store`, `[facade.app_state] store` and `[facade.launch_task] store`, with their `redb` files: the links and the facade's own resources live in the `[state]` store (#2055).
+- `[operator] mapping_dir`, the `..revisions` directory beside it, and the `reload` origin of a revision; the console's files and their history move to the state store with no migration of the files on disk (#2058).
+- `[audit.categories]`: the access records are classified by the `audit-categories` settings register, which every record names by revision (`audit-categories/<version>` as the map digest). A replica refuses to start without the register, and classifies with the newest revision it holds while the register cannot be read. Write the map you kept under `[audit.categories]` to `PUT /operator/registers/audit-categories` (#2059).
+- `[facade] subject_namespace`, `subject_id_form` and `subject_type`, with the configured subject link: every EHR subject is the ITI-83 pseudonym in `[identity_source] pseudonym_domain`, a `PARTY_REF` of type `PERSON`. A configuration that still names one of the three keys refuses to start (#2102).
+- `ferrobridge-term` 0.23.0 drops its `naming-system` feature.
+  `Client::identifier_systems` builds with the `client` feature, because
+  `fhir-types` 0.3.0 carries `NamingSystem` in its `terminology` root set, so
+  the identifier search no longer compiles every FHIR resource of every
+  release the build enables. `ferrobridge-hl7v2`'s `map` feature names it no
+  more (#2264).
+
+### Fixed
+
+- The `DocumentReference` that describes a document, a PDF one included,
+  leaves out `context` when it holds no event, period or practice setting,
+  where it wrote an empty object that R4 `ele-1` refuses (#2084).
+- The European interoperability component writes a document's language on `Composition.language` as well as `Bundle.language`, so a discharge report matches the `composition` slice of MyHealth@EU HDR 9.2.0's `bundle-hdr-myhealtheu` (#2099).
+- The inbound operator writes (`POST /operator/sources/{id}/settle`, `…/replay`, `…/reconcile` and `…/redeliver`) each log one operator audit line under the `ferrobridge::audit` target, naming the subject, the action (`retry`, `discard`, `replay`, `reconcile` or `redeliver`), the source id and the status, as every other operator write does. The line carries no value of the event and no reason (#2155).
+- The SMART Health Links sweeper ends on the drain's stop signal, between two sweeps, and the drain waits for it within `server.shutdown_timeout` as it waits for the change-feed followers and the inbound recovery. A sweep no longer runs on while the process stops (#2156).
+- `eehrxf` 0.41 writes the `DocumentReference` of a document exchanged as an
+  embedded PDF (draft EEHRxF Art 3(1)(a)) without claiming HL7 Europe
+  `EehrxfMhdDocumentReference`, which holds `attachment.data` to 0..0. The
+  embedded PDF/A stays, as the act asks, and the Annex III `status` is
+  written as `docStatus` again. Every description writes its
+  `masterIdentifier.type` as IHE MHD `uniqueId`, which
+  `IHE.MHD.UniqueIdIdentifier` 4.2.5 requires (#2229).
+- `eehrxf` 0.45.0: the discharge report's medication orders carry `MedicationRequest.authoredOn` and `requester`, written from the record's context end time and composer, which MyHealth@EU HDR 9.2.0 `medicationRequest-hdr-myhealtheu` requires (1..1 each). A document in the MyHealth@EU form whose record gives neither is refused with `DocumentError::EntryElement`, naming the element and the profile. Upgrade note: `Form` has a new `entries` field, the elements a form's entry profiles require (`EntryRule`) (#2245).
+- The book's configuration example and variable mapping, the settings registers route, the OMOP ETL page's account of the ported Data Quality Dashboard checks and the EHDS readiness row of the patient summary Composition agree with the code (#2289).
+
 ## [0.0.29] - 2026-11-24
 
 The patient summary and SMART Health Links. The facade answers
@@ -7213,7 +7519,8 @@ release lane with this content and is superseded by this release.
   after each version. Every header, the README badge and licensing section,
   and the community and governance documents name it (#12).
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.29...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.30...HEAD
+[0.0.30]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.29...v0.0.30
 [0.0.29]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.28...v0.0.29
 [0.0.28]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.27...v0.0.28
 [0.0.27]: https://github.com/FerroHEALTH/FerroBRIDGE/compare/v0.0.26...v0.0.27

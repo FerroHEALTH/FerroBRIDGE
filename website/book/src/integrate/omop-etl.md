@@ -403,8 +403,7 @@ design, and each hop stays governed by its own specification.
 - **What reaches the CDM** is what the two mapping sets cover. The published
   FHIRconnect library's Procedure and MedicationAdministration mappings are
   left out at load (`mapping check` names why), so a site maps those
-  resources with mappings of its own; a Procedure's `performed[x]` does not
-  yet reach `ACTION.time` (#1226). An Encounter reaches no VISIT_OCCURRENCE,
+  resources with mappings of its own. An Encounter reaches no VISIT_OCCURRENCE,
   and the job derives no visit, since the visit query reads a CDR.
 - **Nothing disappears.** A resource no FHIRconnect program maps, one the
   FHIRconnect run refuses, one with no id or no subject, and a composition
@@ -439,8 +438,8 @@ design, and each hop stays governed by its own specification.
 
 ## Checking a populated database with the Data Quality Dashboard
 
-The bridge carries a Rust port of the OHDSI Data Quality Dashboard's
-conformance and completeness checks and its seven temporal plausibility
+The bridge carries a Rust port of the OHDSI Data Quality Dashboard's nine
+conformance checks, six completeness checks and seven temporal plausibility
 checks (v2.9.0, Blacketer et al., JAMIA 2021): observation periods that
 overlap, dates before birth or the date they must follow, dates more than 60
 days after death, dates a week outside their visit, and starts after their
@@ -463,7 +462,9 @@ timestamps. With `[etl] quality_checks = true`, `etl run` runs the same
 checks over the tables it wrote and adds their verdicts to the run report; a
 failed check never rolls a committed load back.
 
-The plausibility checks are not ported. To run them, or the R tool's own
+The other plausibility checks (`plausibleValueLow`, `plausibleValueHigh`,
+`plausibleGender`, `plausibleGenderUseDescendants` and
+`plausibleUnitConceptIds`) are not ported. To run them, or the R tool's own
 viewer, run the Dashboard itself as below.
 
 ### Running the R package
