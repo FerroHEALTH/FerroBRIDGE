@@ -39,6 +39,30 @@ a post-quantum or hybrid mechanism, or when it is a symmetric primitive or
 hash. A row whose post-quantum form has no standard yet counts as not safe,
 whatever its `safe` column says.
 
+The README badge counts the safe rows out of the rows whose post-quantum
+form a standard defines (`16/21`). The rows with no standard yet are the
+table's `no standard yet` rows below; they stay out of the fraction and the
+colour, since no change in FerroBRIDGE can move them until a standard
+exists.
+
+Each `no standard yet` was re-checked on 2026-11-27:
+
+- **TLS 1.2 key exchange:** RFC 10024 defines X25519MLKEM768 for TLS 1.3
+  only, and no RFC defines a post-quantum key exchange for TLS 1.2.
+- **TLS certificate authentication:** RFC 9881 defines ML-DSA keys and
+  signatures in X.509 certificates and CRLs, and no TLS handshake use. The
+  TLS 1.3 signature schemes for ML-DSA (`draft-ietf-tls-mldsa-06`) are in
+  the RFC Editor queue, not published.
+- **Inbound webhook signatures, public key:** the Standard Webhooks
+  specification defines `v1` (HMAC-SHA256), `v1a` and `v2a` (Ed25519) and no
+  post-quantum scheme.
+- **Release provenance and SBOM attestations:** the Sigstore algorithm
+  registry lists ML-DSA-44, ML-DSA-65 and ML-DSA-87 as experimental and not
+  operational within Sigstore.
+- **crates.io publishing:** the Trusted Publishing token is a JWS, whose
+  post-quantum form RFC 9964 defines, so the row names RFC 9964 and stays
+  unsafe until GitHub's issuer and crates.io sign and verify with ML-DSA.
+
 ## What FerroBRIDGE does
 
 Every TLS 1.3 session FerroBRIDGE takes part in offers X25519MLKEM768 first,
@@ -75,7 +99,8 @@ place. Three kinds of use stay classical:
   rows move when FerroBRIDGE takes that release and its tables offer the
   option.
 - **Release signing.** crates.io Trusted Publishing and the Sigstore
-  attestations use the keys GitHub and Sigstore issue.
+  attestations use the keys GitHub and Sigstore issue, RS256 for the
+  Trusted Publishing token and ECDSA P-256 for the attestations.
 
 FHIR R4 defines `Attachment.hash` as SHA-1, which FerroBRIDGE writes as the
 specification asks. Its row counts as safe against a quantum computer, since
@@ -110,6 +135,6 @@ collision weakness is classical.
 | OMOP person pseudonyms | HMAC-SHA-256 | yes | NIST IR 8547 4.1.3 | `crates/omop-cdm/src/writer/pseudonym.rs` |
 | Derived identifiers, search cursor fingerprints, event dedupe keys and mapping file digests | SHA-256 | yes | NIST IR 8547 4.1.3 | `crates/fhirconnect/src/engine/identity.rs, crates/fhirconnect/src/engine/seam/identity.rs, crates/ferrobridge-hl7v2/src/map/run/resource.rs, app/ferrobridge-server/src/facade/search/cursor.rs, app/ferrobridge-server/src/inbound/event.rs, app/ferrobridge-server/src/mappings/files.rs` |
 | FHIR Attachment.hash of documents | SHA-1, as FHIR R4 Attachment.hash defines | yes | NIST IR 8547 4.1.3 | `crates/eehrxf/src/document/metadata.rs, crates/fhirconnect/src/engine/lens/encapsulated.rs` |
-| crates.io publishing | Trusted Publishing (OIDC token from GitHub, RS256) | no | no standard yet | `.github/workflows/release.yml, .github/workflows/publish-crates.yml` |
+| crates.io publishing | Trusted Publishing (OIDC token from GitHub, RS256) | no | RFC 9964 | `.github/workflows/release.yml, .github/workflows/publish-crates.yml` |
 | Release provenance and SBOM attestations of the tarballs and images | Sigstore (ECDSA P-256) | no | no standard yet | `.github/workflows/release-build.yml, .github/workflows/release-image.yml, .github/workflows/release-console.yml` |
 <!-- inventory:end -->
