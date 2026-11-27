@@ -1,0 +1,1 @@
+- The book opens with a tutorial, "Your first mapping", whose files and requests a test runs against the server in CI, and a command-line reference generated from the `clap` definition, which a test holds to the code.

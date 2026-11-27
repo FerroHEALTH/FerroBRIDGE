@@ -15,10 +15,12 @@
 )]
 
 mod audit;
+mod book_tutorial;
 mod boot;
 mod cdm;
 mod cdr;
 mod change_feed;
+mod cli_reference;
 mod commands;
 mod config;
 mod consent;
