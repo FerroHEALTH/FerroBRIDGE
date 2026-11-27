@@ -44,6 +44,12 @@ pub const IMAGING_DIAGNOSTIC_REPORT: &str =
 pub const IMAGING_STUDY_PROFILE: &str =
     "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging";
 
+/// The canonical URL of the HL7 Europe Imaging Report
+/// `ObservationRadiationDoseEuImaging` profile, the radiation dose entry of
+/// the report's procedure section.
+pub const IMAGING_RADIATION_DOSE: &str =
+    "http://hl7.eu/fhir/imaging/StructureDefinition/ObservationRadiationDoseEuImaging";
+
 /// The imaging report crosswalk.
 pub static IMAGING_REPORT: Crosswalk<'static> = Crosswalk {
     root: Root {
@@ -137,9 +143,7 @@ const ORDER: &str = "http://hl7.eu/fhir/imaging/StructureDefinition/ServiceReque
 const PROCEDURE: &str = "http://hl7.eu/fhir/imaging/StructureDefinition/ProcedureEuImaging";
 /// HL7 Europe Imaging Report `ObservationFindingEuImaging`.
 const FINDING: &str = "http://hl7.eu/fhir/imaging/StructureDefinition/ObservationFindingEuImaging";
-/// HL7 Europe Imaging Report `ObservationRadiationDoseEuImaging`.
-const RADIATION_DOSE: &str =
-    "http://hl7.eu/fhir/imaging/StructureDefinition/ObservationRadiationDoseEuImaging";
+
 /// FHIR R4 `Observation`.
 const OBSERVATION: &str = "http://hl7.org/fhir/StructureDefinition/Observation";
 /// FHIR R4 `Condition`.

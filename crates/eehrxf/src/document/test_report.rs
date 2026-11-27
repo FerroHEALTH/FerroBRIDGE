@@ -56,6 +56,7 @@ pub const TEST_REPORT_FORM: Form = Form {
             system: LOINC,
             code: STUDY_REPORT,
         },
+        beside: &[],
     },
     categories: &[],
     authorship: Authorship::Gateway,

@@ -1,3 +1,6 @@
+eehrxf-discharge-full
+eehrxf-discharge-mapped
 eehrxf-discharge-myhealtheu
 eehrxf-discharge-myhealtheu-medication
+eehrxf-narrative-discharge
 total 5

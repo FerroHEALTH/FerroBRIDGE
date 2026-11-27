@@ -226,15 +226,16 @@ fn inject(metadata: &mut Value, from: &str, to: &str, kind: &Value) {
 #[test]
 fn the_console_links_only_the_three_allowed_workspace_crates() {
     let metadata = metadata(None);
-    let (workspace, _) = closure(&metadata, CONSOLE);
+    let (workspace, other) = closure(&metadata, CONSOLE);
     assert_eq!(
         BTreeSet::new(),
         outside(&workspace, &ALLOWED),
         "the console links a workspace crate the boundary does not allow"
     );
+    // TODO(#2251): find fhir-types among the members again once the workspace takes 0.4.0.
     assert!(
-        workspace.contains("fhir-types") && workspace.contains("ferrobridge-operator-api"),
-        "the walk reaches the console's own dependencies: {workspace:?}"
+        other.contains("fhir-types") && workspace.contains("ferrobridge-operator-api"),
+        "the walk reaches the console's own dependencies: {workspace:?} {other:?}"
     );
 }
 
@@ -303,7 +304,7 @@ fn an_injected_dependency_reached_through_an_allowed_crate_is_refused() {
     let mut metadata = metadata(None);
     inject(
         &mut metadata,
-        "fhir-types",
+        "openehr-mapping-core",
         "ferrobridge-term",
         &json!("build"),
     );

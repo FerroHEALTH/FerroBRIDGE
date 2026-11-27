@@ -20,7 +20,9 @@
 #                  read (the fetch is a no-op when they are on disk at their
 #                  pins; without them most of those tests skip locally, and
 #                  the eehrxf validator tests fail unless
-#                  FERROBRIDGE_SKIP_PROFILE_PACKAGES=1 is set)
+#                  FERROBRIDGE_SKIP_PROFILE_PACKAGES=1 is set); in a
+#                  linked worktree the fetch first copies each corpus the
+#                  primary checkout holds and this tree lacks
 #   --dry-run      print the plan and run nothing
 #
 # Each step is one cargo invocation over the whole reached set, so a shared
@@ -101,8 +103,35 @@ has() {
   case " $list " in *" $item "*) return 0 ;; *) return 1 ;; esac
 }
 
+# The roots the build-time corpora are fetched under, each git-ignored below.
+corpus_roots=(tools/fhir-codegen/vendor tools/ferrobridge-testkit/vendor
+  crates/ferrobridge-hl7v2/vendor docs/specs)
+
+# Copies each corpus tree a linked worktree lacks from the primary checkout,
+# as a copy-on-write clone where the filesystem has one, so the vendor scripts
+# below find it, check it against its pin and fetch only what does not match
+# (#2368). No specification governs this: our own design.
+seed_corpora() {
+  local primary here tree
+  primary="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+  here="$(pwd -P)"
+  [[ -n "$primary" && -d "$primary" ]] || return 0
+  [[ "$(cd "$primary" && pwd -P)" != "$here" ]] || return 0
+  echo "+ seed the build-time corpora from $primary"
+  [[ "$dry" = false ]] || return 0
+  while IFS= read -r tree; do
+    tree="${tree%/}"
+    [[ -n "$tree" && ! -e "$tree" && "$(basename "$tree")" != .DS_Store ]] || continue
+    mkdir -p "$(dirname "$tree")"
+    cp -Rpc "$primary/$tree" "$tree" 2> /dev/null ||
+      cp -Rpl "$primary/$tree" "$tree" 2> /dev/null ||
+      cp -Rp "$primary/$tree" "$tree"
+  done < <(git -C "$primary" ls-files --others --ignored --exclude-standard --directory -- "${corpus_roots[@]}")
+}
+
 # The build-time corpora, for the packages whose tests read them.
 if [[ "$fetch" = true ]]; then
+  seed_corpora
   if has "$packages" fhir-codegen; then
     run scripts/vendor/v2ig.sh
     run scripts/vendor/v2-legacy.sh

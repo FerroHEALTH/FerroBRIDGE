@@ -15,7 +15,10 @@
 # runs: our own design. crate-version-guard.sh runs it on a pull request and
 # in the merge queue against the target branch, and the release plan runs it
 # against crates.io over the crates the release publishes
-# (scripts/release/publish-crates.sh semver).
+# (scripts/release/publish-crates.sh semver). A version steps once per publish
+# (#2367), so a crate whose version at the target branch is above its newest
+# release, unpublished, is judged against that release: the change is part of
+# the step the next publish carries.
 #
 # Each crate is judged on more than one feature set, because the
 # cargo-semver-checks README (v0.51.0) says it does not catch "breaking
@@ -34,8 +37,10 @@
 #
 #   semver.sh [--baseline-rev <rev>] [<crate>...]
 #       Judge the named crates, or every crate past 0.0.0, against <rev> or,
-#       without it, against each crate's newest release on crates.io. A crate
-#       at its baseline's version, or new since it, is left out.
+#       without it, against each crate's newest release on crates.io. With
+#       <rev>, a crate whose version there is unpublished is judged against
+#       its newest release. A crate at its baseline's version, or new since
+#       it, is left out.
 #   semver.sh --pin
 #       Print the cargo-semver-checks version docs/VERSIONS.md pins.
 #   semver.sh --self-test
@@ -64,6 +69,19 @@ same_line() {
     [[ "$(cut -d. -f1-2 <<<"$a")" == "$(cut -d. -f1-2 <<<"$b")" ]]
   else
     [[ "${a%%.*}" == "${b%%.*}" ]]
+  fi
+}
+
+# The baseline a crate is judged against when the target branch holds version
+# $1 and its newest release is $2: `rev` while the branch is at that release
+# or has none above it, `release` while the branch holds an unpublished step.
+baseline_kind() {
+  local at_rev="$1" released="$2"
+  if [[ -n "$released" ]] && [[ "$at_rev" != "$released" ]] &&
+    [[ "$(printf '%s\n%s\n' "$at_rev" "$released" | sort -V | tail -n 1)" == "$at_rev" ]]; then
+    echo release
+  else
+    echo rev
   fi
 }
 
@@ -151,6 +169,20 @@ self_test() {
   tree 0.0.135 1.0.0 0.3.0 1.0.0 '"serde_json"'
   expect 0 "an undeclared jiff on another line with a patch step" 0.1.4 0.1.3
 
+  kind() {
+    local want="$1" label="$2" got
+    got="$(baseline_kind "$3" "$4")"
+    if [[ "$got" != "$want" ]]; then
+      echo "semver: self-test: $label: $got, wanted $want" >&2
+      failures=$((failures + 1))
+    fi
+  }
+  kind rev "a branch at its newest release" 0.1.3 0.1.3
+  kind release "a branch holding an unpublished patch" 0.1.4 0.1.3
+  kind release "a branch holding an unpublished minor" 0.2.0 0.1.3
+  kind rev "a crate with no release" 0.1.0 ""
+  kind rev "a branch below its newest release" 0.1.2 0.1.3
+
   if [[ "$failures" -ne 0 ]]; then
     echo "semver: self-test: $failures case(s) failed" >&2
     return 1
@@ -209,12 +241,13 @@ newest_release() {
   crates_io "$1" | jq -r '.crate.max_stable_version // empty' || true
 }
 
-# The version crate $1 has at the baseline: its manifest at the baseline
-# revision, or its newest stable release on crates.io; empty when it has none.
+# The version crate $1 has at the baseline: its manifest at the revision the
+# crate is judged against, or its newest stable release on crates.io; empty
+# when it has none.
 baseline_version() {
   local crate="$1"
-  if [[ -n "$baseline_rev" ]]; then
-    git show "$baseline_rev:crates/$crate/Cargo.toml" 2>/dev/null | package_version || true
+  if [[ -n "$crate_rev" ]]; then
+    git show "$crate_rev:crates/$crate/Cargo.toml" 2>/dev/null | package_version || true
   else
     newest_release "$crate"
   fi
@@ -235,10 +268,10 @@ release_lines() {
 # A third-party crate the tree or the baseline declares counts on both (#1851).
 moved_since() {
   local crate="$1" previous="$2" current published moved="" declared
-  declared="$(declared_of "$crate" "$baseline_rev")"
+  declared="$(declared_of "$crate" "$crate_rev")"
   current="$(tree_lines "$crate" "$declared")"
-  if [[ -n "$baseline_rev" ]]; then
-    moved="$(moved_lines "$(revision_lines "$crate" "$baseline_rev" "$declared")" "$current")"
+  if [[ -n "$crate_rev" ]]; then
+    moved="$(moved_lines "$(revision_lines "$crate" "$crate_rev" "$declared")" "$current")"
     published="$(newest_release "$crate")"
     if [[ -n "$published" ]] && ! same_line "$published" "$previous"; then published=""; fi
   else
@@ -285,7 +318,6 @@ fi
 
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
-against="${baseline_rev:-crates.io}"
 failed=""
 for crate in "${crates[@]}"; do
   [[ -f "crates/$crate/Cargo.toml" ]] || { echo "semver: no crate crates/$crate" >&2; exit 2; }
@@ -294,6 +326,15 @@ for crate in "${crates[@]}"; do
     echo "semver: $crate is a 0.0.0 name reservation with no release, skipped"
     continue
   fi
+  crate_rev="$baseline_rev"
+  if [[ -n "$baseline_rev" ]]; then
+    at_rev="$(git show "$baseline_rev:crates/$crate/Cargo.toml" 2>/dev/null | package_version || true)"
+    if [[ "$(baseline_kind "$at_rev" "$(newest_release "$crate")")" == release ]]; then
+      echo "semver: $crate is at the unpublished $at_rev at $baseline_rev, so it is judged against its newest release"
+      crate_rev=""
+    fi
+  fi
+  against="${crate_rev:-crates.io}"
   previous="$(baseline_version "$crate")"
   if [[ -z "$previous" ]] || [[ "$previous" == "0.0.0" ]]; then
     echo "semver: $crate has no release at $against to compare with"
@@ -306,7 +347,7 @@ for crate in "${crates[@]}"; do
   echo "semver: $crate $previous -> $current against $against"
   # The array is never empty, so bash 3.2 under `set -u` expands it.
   args=(check-release --package "$crate")
-  [[ -z "$baseline_rev" ]] || args+=(--baseline-rev "$baseline_rev")
+  [[ -z "$crate_rev" ]] || args+=(--baseline-rev "$crate_rev")
   judged=true
   while IFS= read -r selection; do
     run=("${args[@]}")

@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The conformance gate (#24): runs the seventeen corpus tests, compares what they
+# The conformance gate (#24): runs the sixteen corpus tests, compares what they
 # measured with the committed pass lists under conformance/, and renders one
 # shields.io endpoint badge per corpus (https://shields.io/badges/endpoint-badge),
 # one per HL7 v2 message family and one per HL7 v2 version (#366), and the
-# README block between badges:begin and badges:end from those badges.
+# README block between badges:begin and badges:end from those badges, with
+# conformance/README.md, the page every corpus badge links to.
 #
 #   scripts/checks/conformance.sh            # run and compare; warn on drift
 #   scripts/checks/conformance.sh --update   # run and rewrite lists, badges, README block
 #   scripts/checks/conformance.sh --check    # run and fail on any drift (CI)
 #   scripts/checks/conformance.sh --update fhir-r4b   # one corpus: its test, list, badge
 #   scripts/checks/conformance.sh --self-test         # the badge and upstream-row cases
+#   scripts/checks/conformance.sh --render            # rewrite the badges, page and README block from the lists
 #
 # The MyHealth@EU corpora (#2083) are measured by HL7's FHIR Validator in
 # scripts/checks/fhir-validator.sh --myhealth-eu, which writes their results
@@ -37,14 +39,19 @@
 # badge in the README, carries a logo from scripts/checks/badge-logos/, and a
 # badge without one fails --check, as does a README without the caption
 # under the conformance heading that says once what the badges count (owner
-# decision, 2026-11-25).
+# decision, 2026-11-25). A badge shows its count alone: a label past 30
+# characters or a message past 20 fails every mode (owner decision,
+# 2026-11-27). conformance/README.md, rendered from the same lists and rows,
+# breaks each count down: the cases an upstream holds with their issues, the
+# unmapped and reviewed counts, and the edition a corpus reads; --check fails
+# when it disagrees.
 #
 # A failing case an open upstream-report issue holds (#2334, owner decision on
 # #2333 of 2026-11-27) is a row of conformance/<corpus>/upstream.tsv: a case<TAB>issue
 # header, then the case id and the issue number, tab-separated. The badge
-# names their count after the fraction (`, k upstream`), keeps them in the
-# denominator and colours by the rest: green when every case the upstream
-# does not hold passes. The rows are committed, so a badge is rendered from
+# keeps them in the denominator and is yellowgreen when every case the
+# upstream does not hold passes, green only when every case passes;
+# conformance/README.md names their count and issues. The rows are committed, so a badge is rendered from
 # the tree alone; scripts/checks/upstream-rows.sh holds each issue to open and
 # labelled upstream-report on the tracker, so a row whose issue closes leaves
 # the file and counts against the colour again. A malformed row, a repeated
@@ -87,17 +94,18 @@ readonly CORPUS_TESTS=(
   'fhirpath-r4 ferrobridge-fhirpath conformance_fhirpath_r4'
   'fhirpath-r4-stu3 ferrobridge-fhirpath conformance_fhirpath_r4_stu3'
   'validator-agreement ferrobridge-validator conformance_the_validator_agrees_with_the_hl7_validator_on_its_corpus'
-  'xtehr-crosswalk eehrxf conformance_the_xtehr_crosswalk_holds_its_pass_list'
   'eehrxf-annex-x ferrobridge-server conformance_the_annex_x_groups_hold_their_pass_list'
 )
 # The corpora measured outside this script, whose results it reads and never
 # produces: the MyHealth@EU corpora HL7's FHIR Validator measures
-# (scripts/checks/fhir-validator.sh --myhealth-eu) and the EEHRxF draft
+# (scripts/checks/fhir-validator.sh --myhealth-eu), the EEHRxF draft
 # corpora the eehrxf draft corpus suite measures over the documents the other
-# eehrxf suites emitted (EEHRXF_DRAFT_CORPUS_DIR), each after those suites run.
+# eehrxf suites emitted (EEHRXF_DRAFT_CORPUS_DIR), each after those suites run,
+# and the Xt-EHR crosswalk, which that suite measures with every eehrxf
+# feature on, since a row resolves only through the category crosswalks.
 readonly DRAFT_CORPORA=(eehrxf-draft-patient-summary eehrxf-draft-eprescription eehrxf-draft-edispensation
   eehrxf-draft-medical-test-report eehrxf-draft-imaging eehrxf-draft-discharge)
-readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac "${DRAFT_CORPORA[@]}")
+readonly EXTERNAL_CORPORA=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac "${DRAFT_CORPORA[@]}" xtehr-crosswalk)
 
 # Whether $1 equals one of the remaining arguments.
 contains() {
@@ -135,7 +143,7 @@ test_of() {
 }
 
 usage() {
-  echo "usage: $0 [--update|--check] [corpus]" >&2
+  echo "usage: $0 [--update|--check] [corpus] | --render | --self-test" >&2
   echo "corpora: ${CORPORA[*]} ${EXTERNAL_CORPORA[*]}" >&2
   exit 2
 }
@@ -143,11 +151,16 @@ usage() {
 mode=compare
 only=""
 self_test=0
+render_only=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --update) mode=update ;;
     --check) mode=check ;;
     --self-test) self_test=1 ;;
+    --render)
+      mode=update
+      render_only=1
+      ;;
     -*) usage ;;
     *)
       [[ -z "$only" ]] || usage
@@ -159,8 +172,9 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+[[ "$render_only" -eq 0 || -z "$only" ]] || usage
 external_only=0
-if [[ "$self_test" -eq 1 ]]; then
+if [[ "$self_test" -eq 1 || "$render_only" -eq 1 ]]; then
   external_only=1
 fi
 if [[ -n "$only" ]] && contains "$only" "${EXTERNAL_CORPORA[@]}"; then
@@ -180,11 +194,12 @@ readonly OUT=target/conformance
 # The tree of the pass lists and upstream rows; the self-test points it elsewhere.
 root=conformance
 readonly UPSTREAM_HEADER=$'case\tissue'
-# The counts a pass list records after its total line, each named after the
-# badge fraction: unmapped annex elements (the EEHRxF draft corpora) and
-# reviewed extensible-binding misses (myhealth-eu-mvc).
-readonly COUNT_KINDS=(unmapped reviewed)
-readonly COUNT_LINE='^(total|unmapped|reviewed) '
+# The counts a pass list records after its total line, each named on
+# conformance/README.md: unmapped annex elements (the EEHRxF draft corpora) and
+# reviewed extensible-binding misses (myhealth-eu-mvc), and annex elements
+# whose Xt-EHR element differs (xtehr-crosswalk).
+readonly COUNT_KINDS=(unmapped reviewed differ)
+readonly COUNT_LINE='^(total|unmapped|reviewed|differ) '
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
 readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2F'
@@ -199,7 +214,7 @@ readonly PROJECT_BADGES=(
 # The compliance markers, on their own line under the conformance badges; the
 # post-quantum badge is scripts/checks/post-quantum.sh's.
 readonly COMPLIANCE_BADGES=(
-  '[![CRA](https://img.shields.io/badge/CRA-information%20for%20users-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)'
+  '[![CRA](https://img.shields.io/badge/CRA-user%20information-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)'
   "[![Post-quantum](${ENDPOINT}post-quantum.json)](docs/post-quantum.md)"
 )
 readonly QUALITY_BADGES=(
@@ -211,8 +226,8 @@ readonly QUALITY_BADGES=(
   '[![SLSA Build L3](https://slsa.dev/images/gh-badge-level3.svg)](SECURITY.md#verifying-a-release)'
 )
 
-# The line under the caption that says what a suffix after a fraction counts.
-readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour; k extensible misses reviewed: codes outside an extensible value set that a review found no concept for (FHIR R4 terminologies 4.1.5.3), counted as passing'
+# The page every corpus badge links to, which breaks its count down.
+readonly PAGE=conformance/README.md
 
 # The badge label of a corpus.
 label_of() {
@@ -222,28 +237,28 @@ label_of() {
     roundtrip) echo "FHIR round-trip laws" ;;
     rest-api) echo "FHIRconnect REST API" ;;
     hl7v2) echo "HL7 v2 message corpora" ;;
-    hl7v2-smoke) echo "HL7 v2 smoke corpora (NIST, AIRA)" ;;
+    hl7v2-smoke) echo "HL7 v2 smoke (NIST, AIRA)" ;;
     fhir-stu3) echo "FHIR STU3" ;;
     fhir-r4) echo "FHIR R4" ;;
     fhir-r4b) echo "FHIR R4B" ;;
     fhir-r5) echo "FHIR R5" ;;
     fhir-r6) echo "FHIR R6" ;;
     fhir-r4-facade) echo "FHIR R4 facade" ;;
-    fhirpath-r4) echo "FHIRPath R4 test suite, N1" ;;
-    fhirpath-r4-stu3) echo "FHIRPath R4 test suite, 3.0.0 STU functions" ;;
-    validator-agreement) echo "R4 profile validator, agreement with the HL7 FHIR Validator" ;;
-    xtehr-crosswalk) echo "Xt-EHR models 1.0.0 crosswalk, $(draft_label)" ;;
-    eehrxf-draft-patient-summary) echo "$(draft_label), Patient Summary" ;;
-    eehrxf-draft-eprescription) echo "$(draft_label), ePrescription" ;;
-    eehrxf-draft-edispensation) echo "$(draft_label), eDispensation" ;;
-    eehrxf-draft-medical-test-report) echo "$(draft_label), Medical test report" ;;
-    eehrxf-draft-imaging) echo "$(draft_label), Imaging report and study" ;;
-    eehrxf-draft-discharge) echo "$(draft_label), Discharge report" ;;
-    myhealth-eu-core) echo "MyHealth@EU Core $(ci_build_version myhealth.eu.fhir.core) (CI)" ;;
-    myhealth-eu-laboratory) echo "MyHealth@EU Laboratory $(ci_build_version myhealth.eu.fhir.laboratory) (CI)" ;;
-    myhealth-eu-hdr) echo "MyHealth@EU HDR $(ci_build_version myhealth.eu.fhir.hdr) (CI)" ;;
-    myhealth-eu-mvc) echo "MyHealth@EU MVC $(ci_build_version myhealth.eu.fhir.mvc-package) (CI)" ;;
-    myhealth-eu-euvac) echo "MyHealth@EU EuVAC $(pinned_version myhealth.eu.fhir.euvac)" ;;
+    fhirpath-r4) echo "FHIRPath R4 suite, N1" ;;
+    fhirpath-r4-stu3) echo "FHIRPath R4 suite, 3.0.0 STU" ;;
+    validator-agreement) echo "R4 profile validator agreement" ;;
+    xtehr-crosswalk) echo "Xt-EHR 1.0.0 crosswalk" ;;
+    eehrxf-draft-patient-summary) echo "EEHRxF Patient Summary" ;;
+    eehrxf-draft-eprescription) echo "EEHRxF ePrescription" ;;
+    eehrxf-draft-edispensation) echo "EEHRxF eDispensation" ;;
+    eehrxf-draft-medical-test-report) echo "EEHRxF Medical test report" ;;
+    eehrxf-draft-imaging) echo "EEHRxF Imaging report" ;;
+    eehrxf-draft-discharge) echo "EEHRxF Discharge report" ;;
+    myhealth-eu-core) echo "Core $(ci_build_version myhealth.eu.fhir.core)" ;;
+    myhealth-eu-laboratory) echo "Laboratory $(ci_build_version myhealth.eu.fhir.laboratory)" ;;
+    myhealth-eu-hdr) echo "HDR $(ci_build_version myhealth.eu.fhir.hdr)" ;;
+    myhealth-eu-mvc) echo "MVC $(ci_build_version myhealth.eu.fhir.mvc-package)" ;;
+    myhealth-eu-euvac) echo "EuVAC $(pinned_version myhealth.eu.fhir.euvac)" ;;
     eehrxf-annex-x) echo "EEHRxF Annex X groups served" ;;
     *) return 1 ;;
   esac
@@ -263,15 +278,37 @@ logo_of() {
   esac
 }
 
-# What a corpus's N / M counts, after the fraction in its badge message; empty
-# for a corpus whose label says it.
+# What a corpus's N/M counts, one word after the fraction in its badge
+# message; empty for a corpus whose label says it.
 unit_of() {
   case "$1" in
     myhealth-eu-core | myhealth-eu-laboratory | myhealth-eu-hdr | myhealth-eu-euvac) echo " valid" ;;
-    myhealth-eu-mvc) echo " codes that meet their binding" ;;
-    xtehr-crosswalk) echo " elements aligned" ;;
-    eehrxf-draft-*) echo " annex elements held" ;;
+    myhealth-eu-mvc) echo " codes" ;;
+    xtehr-crosswalk) echo " resolved" ;;
+    eehrxf-draft-*) echo " held" ;;
     *) echo "" ;;
+  esac
+}
+
+# What the N/M of a corpus counts, in full, for conformance/README.md.
+measure_of() {
+  case "$1" in
+    myhealth-eu-*) [[ "$1" = myhealth-eu-mvc ]] && echo "codes that meet their binding" || echo "documents valid" ;;
+    xtehr-crosswalk) echo "elements resolved" ;;
+    eehrxf-draft-*) echo "annex elements held" ;;
+    *) echo "cases passing" ;;
+  esac
+}
+
+# The edition corpus $1 reads, beyond the version its label names, for
+# conformance/README.md; "-" when the label says it all.
+edition_of() {
+  case "$1" in
+    myhealth-eu-euvac) echo "MyHealth@EU, the pinned preview package" ;;
+    myhealth-eu-*) echo "MyHealth@EU, the CI build" ;;
+    xtehr-crosswalk) echo "Xt-EHR models 1.0.0 against the $(draft_label)" ;;
+    eehrxf-draft-*) echo "the $(draft_label)" ;;
+    *) echo "-" ;;
   esac
 }
 
@@ -305,7 +342,7 @@ pinned_version() {
 # The badge colour of k passing out of n, by the shared rule (owner decision,
 # 2026-11-25): green when all pass, yellow when some do, red when none do.
 colour_of() {
-  badge_count_color "$1" "$2"
+  badge_count_color "$1" "$2" "${3:-0}"
 }
 
 # The badge JSON of a label, k passing out of n, and logo $4, the message
@@ -314,8 +351,8 @@ colour_of() {
 fraction_badge() {
   local label="$1" passed="$2" total="$3" logo unit="${5:-}" held="${6:-0}"
   logo="$(badge_logo_fields "$4")"
-  jq -cn --arg label "$label" --arg message "$passed / $total$unit" \
-    --arg color "$(colour_of "$passed" "$((total - held))")" \
+  jq -cn --arg label "$label" --arg message "$passed/$total$unit" \
+    --arg color "$(colour_of "$passed" "$total" "$held")" \
     --argjson logo "$logo" '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo'
 }
 
@@ -350,55 +387,128 @@ held_of() {
     wc -l | tr -d ' '
 }
 
-# What count $2 of kind $1 reads as after a badge fraction.
-count_suffix() {
+# What count $2 of kind $1 reads as on conformance/README.md.
+count_words() {
   case "$1" in
-    unmapped) echo ", $2 unmapped" ;;
-    reviewed) echo ", $2 extensible misses reviewed" ;;
+    unmapped) echo "$2 unmapped" ;;
+    reviewed) echo "$2 extensible misses reviewed" ;;
+    differ) echo "$2 differ from Xt-EHR" ;;
   esac
 }
 
-# The badge JSON a pass list implies; each count the list records is named
-# after the fraction, and so are the upstream rows, so the badge never hides
-# them.
-badge_of() {
-  local corpus="$1" list="$root/$1/pass-list.txt" passed total kind count unit held
+# The passing and total count of the pass list of corpus $1, as "<k> <n>".
+fraction_of_list() {
+  local list="$root/$1/pass-list.txt" passed total
   passed="$(grep -vEc "$COUNT_LINE" "$list" || true)"
   total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   [[ -n "$total" ]] || { echo "conformance: $list has no total line" >&2; return 2; }
-  held="$(held_of "$corpus")" || return 2
-  unit="$(unit_of "$corpus")"
-  for kind in "${COUNT_KINDS[@]}"; do
-    count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
-    [[ -z "$count" ]] || unit="$unit$(count_suffix "$kind" "$count")"
-  done
-  [[ "$held" -eq 0 ]] || unit="$unit, $held upstream"
-  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(logo_of "$corpus")" "$unit" "$held"
+  echo "$passed $total"
 }
 
-# Fails for each badge file whose message names `, k upstream` and whose
-# colour is not the one its count gives with those k cases out of it.
+# The badge JSON a pass list implies: the count alone, coloured with the
+# cases an upstream holds out of it; conformance/README.md names the rest.
+badge_of() {
+  local corpus="$1" fraction passed total held
+  fraction="$(fraction_of_list "$corpus")" || return 2
+  read -r passed total <<<"$fraction"
+  held="$(held_of "$corpus")" || return 2
+  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(logo_of "$corpus")" "$(unit_of "$corpus")" "$held"
+}
+
+# The issues that hold the failing upstream rows of corpus $1, as markdown
+# links, ascending; "-" for none.
+held_issues_of() {
+  local rows
+  rows="$(upstream_rows "$1")" || return 2
+  LC_ALL=C join -t $'\t' -v 1 <(LC_ALL=C sort <<<"$rows" | sed '/^$/d') <(listed_cases "$1" | sed '/^$/d') |
+    cut -f2 | sort -nu |
+    awk '{ out = out (out == "" ? "" : ", ") "[#" $1 "](https://github.com/FerroHEALTH/FerroBRIDGE/issues/" $1 ")" }
+      END { print (out == "" ? "-" : out) }'
+}
+
+# The row of corpus $1 on conformance/README.md.
+page_row() {
+  local corpus="$1" list="$root/$1/pass-list.txt" fraction passed total held issues kind count also=""
+  fraction="$(fraction_of_list "$corpus")" || return 2
+  read -r passed total <<<"$fraction"
+  held="$(held_of "$corpus")" || return 2
+  issues="$(held_issues_of "$corpus")" || return 2
+  for kind in "${COUNT_KINDS[@]}"; do
+    count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
+    [[ -z "$count" ]] || also="${also:+$also, }$(count_words "$kind" "$count")"
+  done
+  if [[ "$held" -eq 0 ]]; then held="-"; else held="$held ($issues)"; fi
+  printf '| %s | %s of %s %s | %s | %s | %s | [pass list](%s/pass-list.txt) |\n' "$(label_of "$corpus")" \
+    "$passed" "$total" "$(measure_of "$corpus")" "$held" "${also:--}" "$(edition_of "$corpus")" "$corpus"
+}
+
+# The corpus badges of the README, in its order, by group.
+readonly CONFORMANCE_BADGES=(fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6
+  roundtrip fhir-r4-facade eehrxf-annex-x fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke)
+readonly MYHEALTH_EU_BADGES=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac)
+
+# conformance/README.md: every corpus badge's count broken down.
+render_page() {
+  local name
+  echo '<!-- SPDX-FileCopyrightText: Cadasto B.V. -->'
+  echo '<!-- SPDX-License-Identifier: BUSL-1.1 -->'
+  echo '<!-- Generated by scripts/checks/conformance.sh from the pass lists and upstream rows. Do not edit. -->'
+  echo
+  echo '# Conformance'
+  echo
+  echo 'Each README conformance badge shows one count. This page breaks every'
+  echo 'count down, from the same pass lists and upstream rows the badges are'
+  echo "rendered from; \`scripts/checks/conformance.sh --check\` fails when it"
+  echo 'disagrees with them. The counts are self-tested; none is a'
+  echo 'certification.'
+  echo
+  echo '- **Held upstream:** failing cases an open upstream-report issue holds'
+  echo "  (\`upstream.tsv\` beside the pass list). They stay in the total. A badge is"
+  echo '  green only when every case passes, and yellowgreen when every case that'
+  echo '  does not pass is held upstream.'
+  echo '- **Also counted:** unmapped annex elements; codes outside an'
+  echo '  extensible value set that a review found no concept for (FHIR R4'
+  echo '  terminologies 4.1.5.3), counted as passing; and annex elements whose'
+  echo '  Xt-EHR element differs, passing when a decision records where each goes.'
+  echo
+  echo '| Badge | Count | Held upstream | Also counted | Edition | Pass list |'
+  echo '|---|---|---|---|---|---|'
+  for name in "${CONFORMANCE_BADGES[@]}" "${DRAFT_CORPORA[@]}" xtehr-crosswalk "${MYHEALTH_EU_BADGES[@]}"; do
+    page_row "$name" || return 2
+  done
+}
+
+# Fails for each badge file of a corpus whose upstream rows hold failing
+# cases and whose colour is not the one its pass list gives with those cases
+# out of the count.
 upstream_color_check() {
-  local file message color want failures=0
+  local file corpus color want fraction passed total held failures=0
   for file in "$@"; do
-    message="$(jq -r .message "$file")"
+    corpus="$(basename "$file" .json)"
+    [[ -f "$root/$corpus/upstream.tsv" ]] || continue
+    held="$(held_of "$corpus")" || return 1
+    [[ "$held" -gt 0 ]] || continue
+    fraction="$(fraction_of_list "$corpus")" || return 1
+    read -r passed total <<<"$fraction"
+    want="$(badge_count_color "$passed" "$total" "$held")"
     color="$(jq -r .color "$file")"
-    [[ "$message" =~ ^([0-9]+)\ /\ ([0-9]+).*,\ ([0-9]+)\ upstream(,|$) ]] || continue
-    want="$(badge_count_color "${BASH_REMATCH[1]}" "$((BASH_REMATCH[2] - BASH_REMATCH[3]))")"
     if [[ "$color" != "$want" ]]; then
-      echo "conformance: $file is $color, and its message '$message' asks for $want" >&2
+      echo "conformance: $file is $color, and $passed of $total with $held held upstream asks for $want" >&2
       failures=$((failures + 1))
     fi
   done
   [[ "$failures" -eq 0 ]]
 }
 
-# The badge files of $@ whose message names no upstream count, for the shared
-# colour check, which reads the fraction alone.
+# The badge files of $@ whose corpus holds no failing case upstream, for the
+# shared colour check, which reads the fraction alone.
 without_upstream() {
-  local file
+  local file corpus held
   for file in "$@"; do
-    jq -e '.message | test(", [0-9]+ upstream(,|$)") | not' "$file" >/dev/null && echo "$file"
+    corpus="$(basename "$file" .json)"
+    held=0
+    [[ ! -f "$root/$corpus/upstream.tsv" ]] || held="$(held_of "$corpus")" || return 1
+    [[ "$held" -gt 0 ]] || echo "$file"
   done
   return 0
 }
@@ -489,20 +599,35 @@ run_self_test() {
   }
   st_upstream() { printf '%s\n' "$UPSTREAM_HEADER" "$@" >"$work/$corpus/upstream.tsv"; }
 
+  st_row() {
+    local row
+    row="$(page_row "$corpus")" || { st_fail "$3 renders no page row"; return 1; }
+    if [[ "$row" != *"| $1 | $2 |"* ]]; then
+      st_fail "$3 reads the page row $row, not held '$1' and also '$2'"
+      return 1
+    fi
+  }
+
   printf '%s\n' a b 'total 4' >"$work/$corpus/pass-list.txt"
-  st_expect '2 / 4' yellow "no upstream file" || return 1
+  st_expect '2/4' yellow "no upstream file" || return 1
+  st_row - - "no upstream file" || return 1
   st_upstream $'c\t632' $'d\t632'
-  st_expect '2 / 4, 2 upstream' brightgreen "every other case held upstream" || return 1
+  st_expect '2/4' yellowgreen "every other case held upstream" || return 1
+  st_row '2 ([#632](https://github.com/FerroHEALTH/FerroBRIDGE/issues/632))' - "every other case held upstream" || return 1
   st_upstream $'c\t632'
-  st_expect '2 / 4, 1 upstream' yellow "one failing case held, one not" || return 1
+  st_expect '2/4' yellow "one failing case held, one not" || return 1
   printf '%s\n' 'total 2' >"$work/$corpus/pass-list.txt"
   st_upstream $'a\t632'
-  st_expect '0 / 2, 1 upstream' red "no case passing" || return 1
+  st_expect '0/2' red "no case passing" || return 1
   printf '%s\n' a b 'total 4' 'unmapped 3' >"$work/$corpus/pass-list.txt"
   st_upstream $'c\t632' $'d\t2112'
-  st_expect '2 / 4, 3 unmapped, 2 upstream' brightgreen "unmapped and upstream named together" || return 1
+  st_expect '2/4' yellowgreen "unmapped and upstream together" || return 1
+  st_row '2 ([#632](https://github.com/FerroHEALTH/FerroBRIDGE/issues/632), [#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112))' \
+    '3 unmapped' "unmapped and upstream named on the page" || return 1
   printf '%s\n' a b 'total 4' 'reviewed 1' >"$work/$corpus/pass-list.txt"
-  st_expect '2 / 4, 1 extensible misses reviewed, 2 upstream' brightgreen "reviewed misses named before the upstream rows" || return 1
+  st_expect '2/4' yellowgreen "reviewed misses and upstream rows" || return 1
+  st_row '2 ([#632](https://github.com/FerroHEALTH/FerroBRIDGE/issues/632), [#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112))' \
+    '1 extensible misses reviewed' "reviewed misses named on the page" || return 1
   printf '%s\n' a b 'total 4' 'unmapped 3' >"$work/$corpus/pass-list.txt"
 
   st_upstream $'c\t632' $'c\t2112'
@@ -518,7 +643,8 @@ run_self_test() {
   status=0
   upstream_check "$corpus" >/dev/null 2>&1 || status=$?
   [[ "$status" -eq 3 ]] || { st_fail "a held case that passes answers $status, not 3"; return 1; }
-  st_expect '2 / 4, 3 unmapped, 1 upstream' yellow "a held case that passes counts as passing only" || return 1
+  st_expect '2/4' yellow "a held case that passes counts as passing only" || return 1
+  st_row '1 ([#632](https://github.com/FerroHEALTH/FerroBRIDGE/issues/632))' '3 unmapped' "a held case that passes leaves the held count" || return 1
   jq -n '{total: 4, cases: [{id: "a", passed: true}, {id: "b", passed: true}, {id: "c", passed: false}]}' >"$work/result.json"
   st_upstream $'c\t632' $'z\t632'
   status=0
@@ -527,13 +653,34 @@ run_self_test() {
   st_upstream $'c\t632'
   upstream_check "$corpus" "$work/result.json" >/dev/null 2>&1 || { st_fail "a held failing case is refused"; return 1; }
 
-  jq -n '{message: "2 / 4, 2 upstream", color: "brightgreen"}' >"$work/badge.json"
-  upstream_color_check "$work/badge.json" 2>/dev/null || { st_fail "a green badge whose rest all pass is refused"; return 1; }
-  [[ -z "$(without_upstream "$work/badge.json")" ]] || { st_fail "the shared colour check reads an upstream badge"; return 1; }
-  jq -n '{message: "2 / 4, 1 upstream", color: "brightgreen"}' >"$work/badge.json"
-  if upstream_color_check "$work/badge.json" 2>/dev/null; then st_fail "a green badge with an unheld failing case passes"; return 1; fi
-  jq -n '{message: "2 / 4", color: "yellow"}' >"$work/badge.json"
-  [[ -n "$(without_upstream "$work/badge.json")" ]] || { st_fail "the shared colour check skips a plain badge"; return 1; }
+  printf '%s\n' a b 'total 4' >"$work/$corpus/pass-list.txt"
+  st_upstream $'c\t632' $'d\t632'
+  jq -n '{message: "2/4", color: "yellowgreen"}' >"$work/$corpus.json"
+  upstream_color_check "$work/$corpus.json" 2>/dev/null || { st_fail "a yellowgreen badge whose rest all pass is refused"; return 1; }
+  jq -n '{message: "2/4", color: "brightgreen"}' >"$work/green.json"
+  cp "$work/green.json" "$work/$corpus.json"
+  if upstream_color_check "$work/$corpus.json" 2>/dev/null; then st_fail "a green badge with held cases passes"; return 1; fi
+  jq -n '{message: "2/4", color: "yellowgreen"}' >"$work/$corpus.json"
+  [[ -z "$(without_upstream "$work/$corpus.json")" ]] || { st_fail "the shared colour check reads an upstream badge"; return 1; }
+  st_upstream $'c\t632'
+  if upstream_color_check "$work/$corpus.json" 2>/dev/null; then st_fail "a yellowgreen badge with an unheld failing case passes"; return 1; fi
+  rm "$work/$corpus/upstream.tsv"
+  [[ -n "$(without_upstream "$work/$corpus.json")" ]] || { st_fail "the shared colour check skips a plain badge"; return 1; }
+
+  local name
+  for name in "${CORPORA[@]}" "${EXTERNAL_CORPORA[@]}"; do
+    label_of "$name" >"$work/label" || { st_fail "$name has no label"; return 1; }
+    jq -n --rawfile label "$work/label" '{label: ($label | rtrimstr("\n")), message: "9999/9999 codes"}' >"$work/badge.json"
+    badge_length_check "$work/badge.json" || { st_fail "the badge of $name runs past the length limits"; return 1; }
+  done
+  jq -n '{label: "FHIR R4", message: "5295/5309, 14 upstream"}' >"$work/badge.json"
+  if badge_length_check "$work/badge.json" 2>/dev/null; then st_fail "a message past 20 characters passes"; return 1; fi
+  badge_length_self_test >/dev/null || { st_fail "the shared length check"; return 1; }
+  badge_count_color_self_test >/dev/null || { st_fail "the shared colour rule"; return 1; }
+  printf '[![x](https://img.shields.io/badge/CRA-information%%20for%%20users-blue?logo=x)](x)\n' >"$work/README.md"
+  if badge_length_readme "$work/README.md" 2>/dev/null; then st_fail "a static badge past 20 characters passes"; return 1; fi
+  printf '%s\n' "${COMPLIANCE_BADGES[@]}" "${PROJECT_BADGES[@]}" "${QUALITY_BADGES[@]}" >"$work/README.md"
+  badge_length_readme "$work/README.md" || { st_fail "a static badge of the README block runs long"; return 1; }
 
   rm -rf "$work"
   root=conformance
@@ -545,138 +692,158 @@ if [[ "$self_test" -eq 1 ]]; then
   exit
 fi
 
-# A MyHealth@EU corpus named alone reads the result the validator lane left.
-[[ "$external_only" -eq 1 ]] || rm -rf "$OUT"
-export FERROBRIDGE_CONFORMANCE_OUT="$PWD/$OUT"
-if [[ "$mode" = update ]]; then
-  export FERROBRIDGE_CONFORMANCE_UPDATE=1
-fi
-# The hl7v2-smoke corpus reads the HL7 v2 sets fetched at build time; the
-# script keeps a tree already at its pinned digest without a download. A run
-# of one corpus fetches only what that corpus reads.
-if [[ "$external_only" -eq 0 ]] && [[ -z "$only" || "$only" = hl7v2* ]] && ! scripts/vendor/hl7v2-samples.sh --build-time; then
-  echo "conformance: the build-time HL7 v2 sets could not be fetched" >&2
-  exit 2
-fi
-
-# The FHIR corpora read the examples packages fetched at build time, kept the
-# same way at their pinned count and digest.
-if [[ "$external_only" -eq 0 ]] && [[ -z "$only" || "$only" = fhir-* ]] && ! scripts/vendor/fhir-packages.sh --build-time; then
-  echo "conformance: the FHIR examples packages could not be fetched" >&2
-  exit 2
-fi
-
-# The R4 profile validator's package set (#435), fetched at build time and
-# kept the same way, so the validator corpus finds it on disk.
-if [[ -z "$only" || "$only" = validator-agreement ]] && ! scripts/vendor/profile-packages.sh; then
-  echo "conformance: the profile packages could not be fetched" >&2
-  exit 2
-fi
-# Runs the conformance tests that filter $1 selects in the packages after it.
-measure() {
-  local test_filter="$1" package
-  shift
-  local args=()
-  for package in "$@"; do
-    args+=(-p "$package")
-  done
-  if ! cargo nextest run --locked "${args[@]}" --no-tests=fail --no-fail-fast -E "$test_filter"; then
-    echo "conformance: a corpus test of $* failed; a case its list records no longer passes"
-    failed=1
+# Runs the corpus tests the run selects, compares each result with its pass
+# list, and emits its badge.
+measure_and_compare() {
+  # A MyHealth@EU corpus named alone reads the result the validator lane left.
+  [[ "$external_only" -eq 1 ]] || rm -rf "$OUT"
+  export FERROBRIDGE_CONFORMANCE_OUT="$PWD/$OUT"
+  if [[ "$mode" = update ]]; then
+    export FERROBRIDGE_CONFORMANCE_UPDATE=1
   fi
-}
-
-# Runs the one test that measures corpus $1.
-measure_corpus() {
-  local corpus_name="$1"
-  local package test
-  read -r package test < <(test_of "$corpus_name")
-  measure "test(/(^|::)${test}\$/)" "$package"
-}
-
-# Every package in one invocation, so each workspace crate compiles once with
-# the features of the whole set. The CI test lane runs the same tests one
-# package at a time, with each package's own features.
-if [[ -z "$only" ]]; then
-  measure 'test(/conformance_/)' "${PACKAGES[@]}"
-fi
-selected=("${CORPORA[@]}" "${EXTERNAL_CORPORA[@]}")
-if [[ "$external_only" -eq 1 ]]; then
-  selected=("$only")
-elif [[ -n "$only" ]]; then
-  selected=("$only")
-  measure_corpus "$only"
-  # The other HL7 v2 corpus is measured for the family and version badges,
-  # with its own list left as it is.
-  case "$only" in
-    hl7v2) sibling=hl7v2-smoke ;;
-    hl7v2-smoke) sibling=hl7v2 ;;
-    *) sibling="" ;;
-  esac
-  if [[ -n "$sibling" ]]; then
-    FERROBRIDGE_CONFORMANCE_UPDATE=0 measure_corpus "$sibling"
-  fi
-fi
-
-for corpus in "${selected[@]}"; do
-  result="$OUT/$corpus.json"
-  list="conformance/$corpus/pass-list.txt"
-  if [[ ! -f "$result" ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}" && [[ -z "$only" ]]; then
-    echo "conformance: $corpus is measured outside this script, not in this run"
-    upstream_verdict "$corpus"
-    emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
-    continue
-  fi
-  if [[ ! -f "$result" ]]; then
-    echo "conformance: no test reported $corpus ($result is missing)" >&2
+  # The hl7v2-smoke corpus reads the HL7 v2 sets fetched at build time; the
+  # script keeps a tree already at its pinned digest without a download. A run
+  # of one corpus fetches only what that corpus reads.
+  if [[ "$external_only" -eq 0 ]] && [[ -z "$only" || "$only" = hl7v2* ]] && ! scripts/vendor/hl7v2-samples.sh --build-time; then
+    echo "conformance: the build-time HL7 v2 sets could not be fetched" >&2
     exit 2
   fi
-  # The validator lane writes no pass list, so --update writes it here.
-  if [[ "$mode" = update ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}"; then
-    mkdir -p "conformance/$corpus"
-    {
-      jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort
-      echo "total $(jq -r '.total' "$result")"
-      for kind in "${COUNT_KINDS[@]}"; do
-        jq -r --arg kind "$kind" 'select(.[$kind] != null) | "\($kind) \(.[$kind])"' "$result"
-      done
-    } >"$list"
+
+  # The FHIR corpora read the examples packages fetched at build time, kept the
+  # same way at their pinned count and digest.
+  if [[ "$external_only" -eq 0 ]] && [[ -z "$only" || "$only" = fhir-* ]] && ! scripts/vendor/fhir-packages.sh --build-time; then
+    echo "conformance: the FHIR examples packages could not be fetched" >&2
+    exit 2
   fi
-  passing="$(jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort)"
-  measured_total="$(jq -r '.total' "$result")"
-  listed="$(grep -vE "$COUNT_LINE" "$list" | LC_ALL=C sort || true)"
-  listed_total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
-  regressed="$(LC_ALL=C comm -23 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
-  new="$(LC_ALL=C comm -13 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
-  count="$(printf '%s\n' "$passing" | sed '/^$/d' | wc -l | tr -d ' ')"
-  echo "conformance: $corpus $count / $measured_total"
-  if [[ -n "$regressed" ]]; then
-    echo "conformance: $corpus regressed:"
-    while IFS= read -r id; do
-      echo "  $id: $(jq -r --arg id "$id" '(.cases[] | select(.id == $id) | .failure) // "the corpus no longer holds it"' "$result")"
-    done <<<"$regressed"
-    failed=1
+
+  # The R4 profile validator's package set (#435), fetched at build time and
+  # kept the same way, so the validator corpus finds it on disk.
+  if [[ -z "$only" || "$only" = validator-agreement ]] && ! scripts/vendor/profile-packages.sh; then
+    echo "conformance: the profile packages could not be fetched" >&2
+    exit 2
   fi
-  if [[ -n "$new" ]]; then
-    echo "conformance: $corpus passes cases its list does not record; run $0 --update:"
-    printf '  %s\n' "$new"
-    if [[ "$mode" = check ]]; then failed=1; fi
+  # Runs the conformance tests that filter $1 selects in the packages after it.
+  measure() {
+    local test_filter="$1" package
+    shift
+    local args=()
+    for package in "$@"; do
+      args+=(-p "$package")
+    done
+    if ! cargo nextest run --locked "${args[@]}" --no-tests=fail --no-fail-fast -E "$test_filter"; then
+      echo "conformance: a corpus test of $* failed; a case its list records no longer passes"
+      failed=1
+    fi
+  }
+
+  # Runs the one test that measures corpus $1.
+  measure_corpus() {
+    local corpus_name="$1"
+    local package test
+    read -r package test < <(test_of "$corpus_name")
+    measure "test(/(^|::)${test}\$/)" "$package"
+  }
+
+  # Every package in one invocation, so each workspace crate compiles once with
+  # the features of the whole set. The CI test lane runs the same tests one
+  # package at a time, with each package's own features.
+  if [[ -z "$only" ]]; then
+    measure 'test(/conformance_/)' "${PACKAGES[@]}"
   fi
-  for kind in "${COUNT_KINDS[@]}"; do
-    measured_count="$(jq -r --arg kind "$kind" '.[$kind] // empty' "$result")"
-    listed_count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
-    if [[ "$measured_count" != "$listed_count" ]]; then
-      echo "conformance: $corpus measures ${measured_count:-no} $kind and its list records ${listed_count:-none}; run $0 --update"
+  selected=("${CORPORA[@]}" "${EXTERNAL_CORPORA[@]}")
+  if [[ "$external_only" -eq 1 ]]; then
+    selected=("$only")
+  elif [[ -n "$only" ]]; then
+    selected=("$only")
+    measure_corpus "$only"
+    # The other HL7 v2 corpus is measured for the family and version badges,
+    # with its own list left as it is.
+    case "$only" in
+      hl7v2) sibling=hl7v2-smoke ;;
+      hl7v2-smoke) sibling=hl7v2 ;;
+      *) sibling="" ;;
+    esac
+    if [[ -n "$sibling" ]]; then
+      FERROBRIDGE_CONFORMANCE_UPDATE=0 measure_corpus "$sibling"
+    fi
+  fi
+
+  for corpus in "${selected[@]}"; do
+    result="$OUT/$corpus.json"
+    list="conformance/$corpus/pass-list.txt"
+    if [[ ! -f "$result" ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}" && [[ -z "$only" ]]; then
+      echo "conformance: $corpus is measured outside this script, not in this run"
+      upstream_verdict "$corpus"
+      emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
+      continue
+    fi
+    if [[ ! -f "$result" ]]; then
+      echo "conformance: no test reported $corpus ($result is missing)" >&2
+      exit 2
+    fi
+    # The validator lane writes no pass list, so --update writes it here.
+    if [[ "$mode" = update ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}"; then
+      mkdir -p "conformance/$corpus"
+      {
+        jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort
+        echo "total $(jq -r '.total' "$result")"
+        for kind in "${COUNT_KINDS[@]}"; do
+          jq -r --arg kind "$kind" 'select(.[$kind] != null) | "\($kind) \(.[$kind])"' "$result"
+        done
+      } >"$list"
+    fi
+    passing="$(jq -r '.cases[] | select(.passed) | .id' "$result" | LC_ALL=C sort)"
+    measured_total="$(jq -r '.total' "$result")"
+    listed="$(grep -vE "$COUNT_LINE" "$list" | LC_ALL=C sort || true)"
+    listed_total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
+    regressed="$(LC_ALL=C comm -23 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
+    new="$(LC_ALL=C comm -13 <(printf '%s\n' "$listed" | sed '/^$/d') <(printf '%s\n' "$passing" | sed '/^$/d'))"
+    count="$(printf '%s\n' "$passing" | sed '/^$/d' | wc -l | tr -d ' ')"
+    echo "conformance: $corpus $count / $measured_total"
+    if [[ -n "$regressed" ]]; then
+      echo "conformance: $corpus regressed:"
+      while IFS= read -r id; do
+        echo "  $id: $(jq -r --arg id "$id" '(.cases[] | select(.id == $id) | .failure) // "the corpus no longer holds it"' "$result")"
+      done <<<"$regressed"
+      failed=1
+    fi
+    if [[ -n "$new" ]]; then
+      echo "conformance: $corpus passes cases its list does not record; run $0 --update:"
+      printf '  %s\n' "$new"
       if [[ "$mode" = check ]]; then failed=1; fi
     fi
+    for kind in "${COUNT_KINDS[@]}"; do
+      measured_count="$(jq -r --arg kind "$kind" '.[$kind] // empty' "$result")"
+      listed_count="$(sed -n "s/^$kind \([0-9][0-9]*\)\$/\1/p" "$list")"
+      if [[ "$measured_count" != "$listed_count" ]]; then
+        echo "conformance: $corpus measures ${measured_count:-no} $kind and its list records ${listed_count:-none}; run $0 --update"
+        if [[ "$mode" = check ]]; then failed=1; fi
+      fi
+    done
+    if [[ "$measured_total" != "$listed_total" ]]; then
+      echo "conformance: $corpus holds $measured_total cases and its list records $listed_total; run $0 --update"
+      if [[ "$mode" = check ]]; then failed=1; fi
+    fi
+    upstream_verdict "$corpus" "$result"
+    emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
   done
-  if [[ "$measured_total" != "$listed_total" ]]; then
-    echo "conformance: $corpus holds $measured_total cases and its list records $listed_total; run $0 --update"
-    if [[ "$mode" = check ]]; then failed=1; fi
-  fi
-  upstream_verdict "$corpus" "$result"
-  emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
-done
+}
+
+# Emits every corpus badge from its committed pass list and upstream rows,
+# running no test: the render-only mode after a change to the badge format.
+render_from_lists() {
+  local corpus
+  for corpus in "${CORPORA[@]}" "${EXTERNAL_CORPORA[@]}"; do
+    upstream_verdict "$corpus"
+    emit_badge "$corpus" "$(badge_of "$corpus")" "conformance/$corpus/pass-list.txt"
+  done
+}
+
+if [[ "$render_only" -eq 1 ]]; then
+  render_from_lists
+else
+  measure_and_compare
+fi
 
 families=()
 versions=()
@@ -750,7 +917,8 @@ badge_link() {
 }
 
 # The README block with its markers, in a fixed order: the project and quality
-# rows, then the conformance row, closing on the HL7 v2 family and version badges.
+# rows, then the conformance rows linked to conformance/README.md, closing on
+# the HL7 v2 family and version badges.
 render_block() {
   local name
   echo '<!-- badges:begin -->'
@@ -762,16 +930,20 @@ render_block() {
   echo
   echo '**Conformance and compliance**<br>'
   echo "$badge_caption<br>"
-  echo "<sub>$BADGE_LEGEND</sub><br>"
-  for name in fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade eehrxf-annex-x fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke; do
-    badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
+  for name in "${CONFORMANCE_BADGES[@]}"; do
+    badge_link "$(label_of "$name")" "$name" "$PAGE"
   done
   echo '<br>'
   printf '%s\n' "${COMPLIANCE_BADGES[@]}"
   echo
-  echo '**EHDS and EEHRxF**<br>'
-  for name in "${DRAFT_CORPORA[@]}" xtehr-crosswalk myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac; do
-    badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
+  echo "**EHDS and $(draft_label)**<br>"
+  for name in "${DRAFT_CORPORA[@]}" xtehr-crosswalk; do
+    badge_link "$(label_of "$name")" "$name" "$PAGE"
+  done
+  echo
+  echo '**MyHealth@EU**<br>'
+  for name in "${MYHEALTH_EU_BADGES[@]}"; do
+    badge_link "$(label_of "$name")" "$name" "$PAGE"
   done
   # The per-family and per-version badges fold into a collapsed block, so the
   # per-corpus badges stay in view; GitHub renders Markdown inside <details>
@@ -822,6 +994,18 @@ elif [[ "$(sed -n '/^<!-- badges:begin -->$/,/^<!-- badges:end -->$/p' README.md
   echo "conformance: the README.md badge block disagrees with the badge files; run $0 --update"
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
+
+page="$(render_page)" || exit 2
+if [[ "$mode" = update ]]; then
+  printf '%s\n' "$page" >"$PAGE"
+elif [[ "$(cat "$PAGE" 2>/dev/null)" != "$page" ]]; then
+  echo "conformance: $PAGE disagrees with the pass lists and upstream rows; run $0 --update"
+  if [[ "$mode" = check ]]; then failed=1; fi
+fi
+
+# A long badge fails every mode: its breakdown belongs on the page.
+badge_length_check "$BADGES"/*.json || failed=1
+badge_length_readme README.md || failed=1
 
 mapfile -t plain_badges < <(without_upstream "$BADGES"/*.json)
 if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md || ! badge_caption_check README.md ||

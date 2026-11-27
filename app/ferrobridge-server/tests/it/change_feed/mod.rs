@@ -134,6 +134,7 @@ pub(crate) async fn led(url: &str) -> Result<(Store, Term), Box<dyn Error>> {
         connection: omop_cdm::connection::CdmConnection::new(url, None)?,
         max_connections: 4,
         acquire_timeout: Duration::from_secs(5),
+        identity_copy_entries: 0,
         seal: None,
     })
     .await?;

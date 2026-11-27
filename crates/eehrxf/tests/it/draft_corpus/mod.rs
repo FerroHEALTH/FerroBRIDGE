@@ -19,8 +19,11 @@
 //! [`described::DESCRIBED`]. The suite runs over the directory `EEHRXF_DRAFT_CORPUS_DIR` names, after the
 //! other suites wrote it, and writes one result per category for
 //! `scripts/checks/conformance.sh`; HL7's FHIR Validator result for the same
-//! documents is the `fhir-validator` job's. No specification governs how the
-//! documents are measured: our own design.
+//! documents is the `fhir-validator` job's. The `xtehr-crosswalk` corpus is
+//! measured here as well, since a divergent annex element counts as resolved
+//! only when the category crosswalks, [`paths::PATHS`] or
+//! [`described::DESCRIBED`] record where it goes. No specification governs
+//! how the documents are measured: our own design.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -46,7 +49,8 @@ use eehrxf::document::form::{SLOTS, Slot};
 use eehrxf::document::imaging::IMAGING_SLOTS;
 use eehrxf::document::laboratory::LAB_SLOTS;
 use eehrxf::document::metadata::{COMPOSITION_VERSION, DOCUMENT_REFERENCE_VERSION, PDF};
-use eehrxf::draft::{Annex, AnnexCrosswalk, Row, SHIPPED};
+use eehrxf::draft::{Annex, AnnexCrosswalk, Row, SHIPPED, Verdict};
+use ferrobridge_testkit::conformance::{self, Case, Corpus, Count};
 use serde_json::{Value, json};
 
 use described::DESCRIBED;
@@ -259,6 +263,25 @@ fn tabled(row: &Row) -> Option<&'static Tabled> {
             && path.model == row.xtehr_model()
             && Some(path.element) == row.draft_element()
     })
+}
+
+/// Whether the annex `row` has a recorded decision: the crosswalk of its
+/// category carries it to an HL7 Europe element, [`paths::PATHS`] names the
+/// element that carries it or records that none does, or, for an Annex III
+/// Table 1 element, [`DESCRIBED`] names its `DocumentReference` element or
+/// why it has none.
+fn resolved(row: &Row) -> bool {
+    if row.annex() == Annex::Iii && row.draft_model() == "Document metadata" {
+        return DESCRIBED
+            .iter()
+            .any(|(element, _)| Some(*element) == row.draft_element());
+    }
+    CATEGORIES
+        .iter()
+        .find(|category| category.annex == row.annex())
+        .is_some_and(|category| {
+            carried(row, category.crosswalks).is_some() || tabled(row).is_some()
+        })
 }
 
 /// Whether every parent of the annex element `element` among `rows` passes
@@ -505,6 +528,50 @@ fn conformance_the_eehrxf_draft_corpus_measures_the_emitted_documents() -> Resul
     Ok(())
 }
 
+// NOTE: no specification governs this: our own design; an annex element counts as resolved
+// when it matches the Xt-EHR models 1.0.0, or its divergence has a recorded decision; every
+// divergence is counted as `differ`.
+#[test]
+fn conformance_the_xtehr_crosswalk_holds_its_pass_list() -> Result<(), Box<dyn Error>> {
+    let crosswalk: AnnexCrosswalk = SHIPPED.parse()?;
+    let mut differ = 0_usize;
+    let mut cases = Vec::new();
+    for row in crosswalk.rows() {
+        let Some(element) = row.draft_element() else {
+            continue;
+        };
+        let id = format!(
+            "{}:{}:{element}",
+            row.annex().numeral(),
+            row.draft_model().replace(' ', "_")
+        );
+        if row.verdict() == Verdict::Same {
+            cases.push(Case::pass(id));
+            continue;
+        }
+        differ = differ.saturating_add(1);
+        if resolved(row) {
+            cases.push(Case::pass(id));
+        } else {
+            cases.push(Case::fail(
+                id,
+                format!(
+                    "{}, and no crosswalk or path records where the element goes",
+                    row.verdict()
+                ),
+            ));
+        }
+    }
+    let counts = BTreeMap::from([(Count::Differ, differ)]);
+    let outcome = conformance::record_counted(Corpus::XtehrCrosswalk, &cases, &counts)?;
+    assert!(
+        outcome.regressed.is_empty(),
+        "cases the pass list records that fail: {:?}",
+        outcome.regressed
+    );
+    Ok(())
+}
+
 #[test]
 fn an_element_id_finds_its_section_slice() {
     let bundle = json!({"entry": [{"resource": {
@@ -581,6 +648,9 @@ fn profile_of(annex: Annex, resource: &str) -> Option<&'static str> {
         }
         (Annex::Vii, "Composition") => {
             "http://hl7.eu/fhir/imaging/StructureDefinition/CompositionEuImaging"
+        }
+        (Annex::Vii, "Observation") => {
+            "http://hl7.eu/fhir/imaging/StructureDefinition/ObservationRadiationDoseEuImaging"
         }
         (Annex::Vii, "ImagingStudy") => {
             "http://hl7.eu/fhir/imaging/StructureDefinition/ImagingStudyEuImaging"

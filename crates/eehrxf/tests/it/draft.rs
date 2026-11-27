@@ -18,8 +18,6 @@ use eehrxf::draft::DraftError;
 use eehrxf::draft::SHIPPED;
 use eehrxf::draft::Verdict;
 
-use ferrobridge_testkit::conformance::{self, Case, Corpus};
-
 use super::support::xtehr;
 
 /// The extracted text of the vendored Annexes I to X.
@@ -151,36 +149,6 @@ fn a_row_missing_from_an_annex_table_fails_the_text_check() -> Result<(), Box<dy
             .iter()
             .any(|d| d.to_string().starts_with("Annex X Table 26:")),
         "{found:?}"
-    );
-    Ok(())
-}
-
-// NOTE: no specification governs this: our own design; an annex element counts as aligned
-// when the crosswalk finds it in the Xt-EHR models 1.0.0 under the same name and cardinality.
-#[test]
-fn conformance_the_xtehr_crosswalk_holds_its_pass_list() -> Result<(), Box<dyn Error>> {
-    let cases: Vec<Case> = shipped()?
-        .rows()
-        .iter()
-        .filter_map(|row| {
-            let element = row.draft_element()?;
-            let id = format!(
-                "{}:{}:{element}",
-                row.annex().numeral(),
-                row.draft_model().replace(' ', "_")
-            );
-            Some(if row.verdict() == Verdict::Same {
-                Case::pass(id)
-            } else {
-                Case::fail(id, row.verdict().as_str())
-            })
-        })
-        .collect();
-    let outcome = conformance::record(Corpus::XtehrCrosswalk, &cases)?;
-    assert!(
-        outcome.regressed.is_empty(),
-        "cases the pass list records that fail: {:?}",
-        outcome.regressed
     );
     Ok(())
 }

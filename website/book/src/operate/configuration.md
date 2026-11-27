@@ -622,6 +622,7 @@ lock, so replicas that start together migrate once; readiness carries a
 | `statement_cache_capacity` | `100` | no | How many prepared statements each pooled connection keeps; `0` keeps none |
 | `max_lifetime` | `30m` | no | The longest a pooled connection lives before the pool replaces it; more than `0s` |
 | `idle_timeout` | `10m` | no | The longest a pooled connection stays idle before the pool closes it; more than `0s` |
+| `identity_copy_entries` | `10000` | no | The most entries the replica keeps in memory from each identity table whose rows are never changed (a person's EHR, an EHR's person, a resource's internal id and its binding); `0` keeps none and reads every lookup from the store |
 
 The URL and the CA follow the rules of `[cdm]` above: the same four
 `sslmode` values, the same refusals of `prefer`, `allow`, a missing mode,
@@ -1651,6 +1652,8 @@ FerroBRIDGE's own design.
 | `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
+| `regulatory.legal_basis` | none | The legal basis every record states: `lawfulness`, the point of GDPR Art 6(1) (`consent`, `contract`, `legal-obligation`, `vital-interests`, `public-task`, `legitimate-interests`), and `condition`, the point of Art 9(2) (`health-or-social-care`, `public-health`, …) |
+| `regulatory.controllers`, `regulatory.processors` | `[]` | The controller or joint controllers and the processors every record names, each by an identifier the deployment chooses, such as an organisation's registry number |
 
 The category map the records are classified by is the `audit-categories`
 settings register, which the operator API reads and writes

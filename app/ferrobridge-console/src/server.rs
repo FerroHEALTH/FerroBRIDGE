@@ -39,6 +39,7 @@ use ferrohealth_session::cookies::{CookieNames, HOST_PREFIX};
 use ferrohealth_session::record::{Credential, Held};
 use ferrohealth_session::routes::{SignIn, keep_session};
 use ferrohealth_session::sessions::Sessions;
+use ferrohealth_smart::jws::algorithm::Algorithm;
 use ferrohealth_smart::oidc::RelyingParty;
 use http::header::CONTENT_TYPE;
 use http::{HeaderValue, Method, StatusCode};
@@ -113,15 +114,20 @@ impl ConsoleState {
     /// Returns the errors of [`ConsoleState::new`].
     pub async fn with_clock(settings: Settings, clock: Clock) -> Result<Self, StateError> {
         let bridge = Bridge::new(&settings.bridge)?;
-        let party =
-            match &settings.oidc {
-                Some(oidc) => Some(oidc.checked.relying_party().await.map_err(|source| {
-                    StateError::Provider {
+        let party = match &settings.oidc {
+            // NOTE: RFC 9964 §5, the ML-DSA parameter sets are JWS algorithms beside RFC 7518's,
+            // and `Algorithm` has no symmetric or `none` value (RFC 8725 §3.1, §3.2).
+            Some(oidc) => Some(
+                oidc.checked
+                    .relying_party()
+                    .await
+                    .map_err(|source| StateError::Provider {
                         source: Box::new(source),
-                    }
-                })?),
-                None => None,
-            };
+                    })?
+                    .with_algorithms(Algorithm::all().iter().copied()),
+            ),
+            None => None,
+        };
         let sessions = Sessions::with_clock(
             settings.session.clone(),
             CookieNames::for_console(COOKIES),

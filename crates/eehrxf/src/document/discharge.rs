@@ -6,12 +6,14 @@
 //! `discharge`).
 //!
 //! A `bundle-eu-hdr` whose `composition-eu-hdr` names the encounter it
-//! reports on, in the language `Bundle.language` states. The MyHealth@EU
+//! reports on, in the language `Bundle.language` states, authored by the
+//! `Practitioner`, `PractitionerRole` or `Organization` the record names,
+//! never the gateway `Device` that writes it, so the report is also the
+//! MyHealth@EU one where the two profiles agree. The MyHealth@EU
 //! form, which a national contact point sends, narrows it: its
 //! `composition-hdr-myhealtheu` requires `Composition.language` from the
-//! eHDSILanguage value set and allows only the authors the record names, and
-//! its `medicationRequest-hdr-myhealtheu` requires each order's authoring
-//! time and requester.
+//! eHDSILanguage value set, and its `medicationRequest-hdr-myhealtheu`
+//! requires each order's authoring time and requester.
 
 use crate::crosswalk::discharge::HDR_COMPOSITION;
 use crate::document::form::{Authorship, Code, EntryRule, Form, Kind, SectionRule, Slot};
@@ -106,7 +108,8 @@ pub const DISCHARGE_REPORT_FORM: Form = Form {
         code: DISCHARGE_SUMMARY,
     }),
     categories: &[],
-    authorship: Authorship::Gateway,
+    // NOTE: composition-hdr-myhealtheu Composition.author admits no Device; the record holder authors both forms.
+    authorship: Authorship::Record,
     slots: &HDR_SLOTS,
     report: None,
     encounter: Some(HDR_ENCOUNTER),
@@ -132,8 +135,6 @@ pub const MYHEALTHEU_DISCHARGE_REPORT_FORM: Form = Form {
         required: true,
         binding: Some(EHDSI_LANGUAGE),
     },
-    // NOTE: composition-hdr-myhealtheu Composition.author: practitioner, practitionerRole or organization.
-    authorship: Authorship::Record,
     // NOTE: medicationRequest-hdr-myhealtheu MedicationRequest.authoredOn and requester, each 1..1.
     entries: &[EntryRule {
         resource: "MedicationRequest",

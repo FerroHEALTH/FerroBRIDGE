@@ -55,6 +55,7 @@ pub(crate) async fn state() -> Result<Option<(containers::Postgres, Store)>, Box
         connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
         max_connections: 4,
         acquire_timeout: Duration::from_secs(30),
+        identity_copy_entries: 0,
         seal: None,
     })
     .await?;
@@ -100,6 +101,7 @@ pub(crate) async fn access_log(
         feed: ferrobridge_server::audit::feed::repository(client, true)?,
         source_id: String::from("ferrobridge.test"),
         site: None,
+        regulatory: ehds_logging::regulatory::Regulatory::default(),
     };
     let log =
         Arc::new(AccessLog::open(&settings, (&BASE_URL.parse()?, cdr), store, registers).await?);
