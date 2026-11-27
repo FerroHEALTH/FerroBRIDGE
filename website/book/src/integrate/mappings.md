@@ -27,7 +27,7 @@ Beside a context you may add a search declaration, a file whose name ends in
 `.search.yml`, stating which FHIR search parameters the facade answers for it
 and the AQL path each one compares. It is FerroBRIDGE's own format, because
 FHIRconnect leaves search out, and the FHIRconnect loader skips it.
-[The FHIR facade](fhir-facade.md#search) describes it.
+[The FHIR facade](facade-search.md#search) describes it.
 
 On the OMOP side you supply OMOCL files: a flat list of records keyed by CDM
 target, each record's keys drawn from OMOCL's own column vocabulary (`value`,

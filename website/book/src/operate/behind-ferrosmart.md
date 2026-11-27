@@ -77,7 +77,7 @@ start. Every other key of the issuer table (`algorithms`, `clock_skew`,
 
 The launch context FerroSMART puts in the token (`patient`, `encounter` and
 `fhirUser`) needs no key. A `patient/` scope holds the caller to the patient
-its `patient` claim names, as the [facade's Security section](../integrate/fhir-facade.md#security)
+its `patient` claim names, as the [facade's Security section](../integrate/facade-security.md#security)
 describes.
 
 A patient's own token is the person's own access (Regulation (EU) 2025/327
