@@ -53,10 +53,12 @@ use eehrxf::draft::{Annex, AnnexCrosswalk, Row, SHIPPED, Verdict};
 use ferrobridge_testkit::conformance::{self, Case, Corpus, Count};
 use serde_json::{Value, json};
 
+use common::COMMON;
 use described::DESCRIBED;
 use groups::GROUPS;
 use paths::{PATHS, Path as Tabled};
 
+mod common;
 mod described;
 mod groups;
 mod paths;
@@ -269,8 +271,12 @@ fn tabled(row: &Row) -> Option<&'static Tabled> {
 /// category carries it to an HL7 Europe element, [`paths::PATHS`] names the
 /// element that carries it or records that none does, or, for an Annex III
 /// Table 1 element, [`DESCRIBED`] names its `DocumentReference` element or
-/// why it has none.
+/// why it has none, or, for an Annex III Table 2 or Annex X element,
+/// [`COMMON`] records where it goes.
 fn resolved(row: &Row) -> bool {
+    if common_decision(row).is_some() {
+        return true;
+    }
     if row.annex() == Annex::Iii && row.draft_model() == "Document metadata" {
         return DESCRIBED
             .iter()
@@ -282,6 +288,15 @@ fn resolved(row: &Row) -> bool {
         .is_some_and(|category| {
             carried(row, category.crosswalks).is_some() || tabled(row).is_some()
         })
+}
+
+/// The decision [`COMMON`] records on the annex `row`.
+fn common_decision(row: &Row) -> Option<&'static common::Decision> {
+    COMMON.iter().find(|decision| {
+        decision.annex == row.annex()
+            && decision.model == row.draft_model()
+            && Some(decision.element) == row.draft_element()
+    })
 }
 
 /// Whether every parent of the annex element `element` among `rows` passes
@@ -789,5 +804,72 @@ fn every_row_the_crosswalks_miss_has_a_path() -> Result<(), Box<dyn Error>> {
         missing.is_empty(),
         "annex elements with no path: {missing:?}"
     );
+    Ok(())
+}
+
+/// The definition at the canonical `url`: an R4 core definition from the
+/// vendored core package, else a profile of a fetched HL7 Europe guide.
+fn definition(url: &str) -> Result<Value, Box<dyn Error>> {
+    if let Some(name) = url.strip_prefix("http://hl7.org/fhir/StructureDefinition/") {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
+            "../../tools/fhir-codegen/vendor/hl7.fhir.r4.core/package/StructureDefinition-{name}.json"
+        ));
+        return Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?);
+    }
+    snapshot(url)
+}
+
+#[test]
+fn every_common_decision_names_an_element_of_its_definition() -> Result<(), Box<dyn Error>> {
+    if std::env::var("FERROBRIDGE_SKIP_PROFILE_PACKAGES").is_ok_and(|value| value == "1") {
+        return Ok(());
+    }
+    let mut definitions: BTreeMap<&str, Value> = BTreeMap::new();
+    for decision in COMMON {
+        assert!(!decision.why.is_empty(), "{}: no reason", decision.element);
+        let Some(carried) = decision.carried else {
+            continue;
+        };
+        if !definitions.contains_key(decision.definition) {
+            definitions.insert(decision.definition, definition(decision.definition)?);
+        }
+        let read = definitions
+            .get(decision.definition)
+            .ok_or("a read definition")?;
+        let held = read["snapshot"]["element"]
+            .as_array()
+            .ok_or("a snapshot")?
+            .iter()
+            .any(|element| element["id"] == carried);
+        assert!(
+            held,
+            "{} {}: {carried} is no element of {}",
+            decision.model, decision.element, decision.definition
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn every_common_decision_is_one_divergent_annex_row() -> Result<(), Box<dyn Error>> {
+    let crosswalk: AnnexCrosswalk = SHIPPED.parse()?;
+    for decision in COMMON {
+        let rows: Vec<&Row> = crosswalk
+            .rows()
+            .iter()
+            .filter(|row| {
+                row.annex() == decision.annex
+                    && row.draft_model() == decision.model
+                    && row.draft_element() == Some(decision.element)
+            })
+            .collect();
+        assert_eq!(rows.len(), 1, "{} {}", decision.model, decision.element);
+        assert!(
+            rows.iter().all(|row| row.verdict() != Verdict::Same),
+            "{} {}: the texts agree, so no decision is needed",
+            decision.model,
+            decision.element
+        );
+    }
     Ok(())
 }
