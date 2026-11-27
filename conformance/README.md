@@ -47,5 +47,5 @@ certification.
 | Core 1.0.1 | 78 of 80 documents valid | 2 ([#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112)) | - | MyHealth@EU, the CI build | [pass list](myhealth-eu-core/pass-list.txt) |
 | Laboratory 9.2.0 | 1 of 1 documents valid | - | - | MyHealth@EU, the CI build | [pass list](myhealth-eu-laboratory/pass-list.txt) |
 | HDR 9.2.0 | 5 of 5 documents valid | - | - | MyHealth@EU, the CI build | [pass list](myhealth-eu-hdr/pass-list.txt) |
-| MVC 10.1.0 | 98 of 106 codes that meet their binding | 5 ([#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112)) | 4 extensible misses reviewed | MyHealth@EU, the CI build | [pass list](myhealth-eu-mvc/pass-list.txt) |
+| MVC 10.1.0 | 101 of 106 codes that meet their binding | 5 ([#2112](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2112)) | 4 extensible misses reviewed | MyHealth@EU, the CI build | [pass list](myhealth-eu-mvc/pass-list.txt) |
 | EuVAC 10.0.0-preview | 1 of 1 documents valid | - | - | MyHealth@EU, the pinned preview package | [pass list](myhealth-eu-euvac/pass-list.txt) |
