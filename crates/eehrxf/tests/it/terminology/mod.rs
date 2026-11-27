@@ -13,6 +13,8 @@ mod displays;
 mod ehn;
 #[cfg(feature = "openehr")]
 mod local;
+#[cfg(feature = "laboratory")]
+mod myhealth_bindings;
 mod server;
 #[cfg(feature = "openehr")]
 mod system;
