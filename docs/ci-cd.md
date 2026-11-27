@@ -253,7 +253,12 @@ The README shows each badge through
 shields.io endpoint schema (<https://shields.io/badges/endpoint-badge>):
 `schemaVersion` 1, a label, the message `k / n`, a colour by the count
 (`brightgreen` when all pass, `yellow` when some do, `red` when none do),
-and a logo. A badge measured against an EU act shows the EU emblem (`namedLogo`
+and a logo. A failing case an open `upstream-report` issue holds is a row of
+`conformance/<corpus>/upstream.tsv`: the message names their count
+(`k / n, h upstream`) and the colour counts `k` against `n - h` (owner
+decision on #2333). `scripts/checks/upstream-rows.sh`, in the `todo-issues`
+job, fails a row whose issue the tracker does not answer as open and labelled
+`upstream-report`. A badge measured against an EU act shows the EU emblem (`namedLogo`
 `europeanunion`) on an EU blue label; every other badge shows a pictogram
 from the FerroHEALTH badge set under `scripts/checks/badge-logos/` as
 `logoSvg`, whose master copy lives in FerroSMART. Every static badge in the

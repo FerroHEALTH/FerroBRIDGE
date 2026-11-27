@@ -11,6 +11,7 @@
 #   scripts/checks/conformance.sh --update   # run and rewrite lists, badges, README block
 #   scripts/checks/conformance.sh --check    # run and fail on any drift (CI)
 #   scripts/checks/conformance.sh --update fhir-r4b   # one corpus: its test, list, badge
+#   scripts/checks/conformance.sh --self-test         # the badge and upstream-row cases
 #
 # The MyHealth@EU corpora (#2083) are measured by HL7's FHIR Validator in
 # scripts/checks/fhir-validator.sh --myhealth-eu, which writes their results
@@ -37,6 +38,18 @@
 # badge without one fails --check, as does a README without the caption
 # under the conformance heading that says once what the badges count (owner
 # decision, 2026-11-25).
+#
+# A failing case an open upstream-report issue holds (#2334, owner decision on
+# #2333 of 2026-11-27) is a row of conformance/<corpus>/upstream.tsv: a case<TAB>issue
+# header, then the case id and the issue number, tab-separated. The badge
+# names their count after the fraction (`, k upstream`), keeps them in the
+# denominator and colours by the rest: green when every case the upstream
+# does not hold passes. The rows are committed, so a badge is rendered from
+# the tree alone; scripts/checks/upstream-rows.sh holds each issue to open and
+# labelled upstream-report on the tracker, so a row whose issue closes leaves
+# the file and counts against the colour again. A malformed row, a repeated
+# case, and (with a result) a case the corpus does not hold fail every mode; a
+# held case that passes fails --check, and --update drops its row.
 #
 # The family and version badges count the cases of both HL7 v2 corpora by the
 # family (MSH-9.1) and the version (MSH-12) the corpus test records per case:
@@ -129,10 +142,12 @@ usage() {
 
 mode=compare
 only=""
+self_test=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --update) mode=update ;;
     --check) mode=check ;;
+    --self-test) self_test=1 ;;
     -*) usage ;;
     *)
       [[ -z "$only" ]] || usage
@@ -145,6 +160,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 external_only=0
+if [[ "$self_test" -eq 1 ]]; then
+  external_only=1
+fi
 if [[ -n "$only" ]] && contains "$only" "${EXTERNAL_CORPORA[@]}"; then
   external_only=1
 fi
@@ -159,6 +177,9 @@ cd "$(dirname "$0")/../.."
 source scripts/checks/badge-logos/logo.sh
 
 readonly OUT=target/conformance
+# The tree of the pass lists and upstream rows; the self-test points it elsewhere.
+root=conformance
+readonly UPSTREAM_HEADER=$'case\tissue'
 readonly BADGES=conformance/badges
 # The shields.io endpoint prefix every conformance badge file is read through.
 readonly ENDPOINT='https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFerroHEALTH%2FFerroBRIDGE%2Fmain%2Fconformance%2Fbadges%2F'
@@ -184,6 +205,9 @@ readonly QUALITY_BADGES=(
   '[![Signed releases](https://img.shields.io/badge/releases-signed-brightgreen?logo=github)](SECURITY.md#verifying-a-release)'
   '[![SLSA Build L3](https://slsa.dev/images/gh-badge-level3.svg)](SECURITY.md#verifying-a-release)'
 )
+
+# The line under the caption that says what a suffix after a fraction counts.
+readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour'
 
 # The badge label of a corpus.
 label_of() {
@@ -280,25 +304,123 @@ colour_of() {
 }
 
 # The badge JSON of a label, k passing out of n, and logo $4, the message
-# closing on the unit $5 when given.
+# closing on the unit $5 when given, coloured as if the $6 cases an upstream
+# holds were out of the count.
 fraction_badge() {
-  local label="$1" passed="$2" total="$3" logo unit="${5:-}"
+  local label="$1" passed="$2" total="$3" logo unit="${5:-}" held="${6:-0}"
   logo="$(badge_logo_fields "$4")"
-  jq -cn --arg label "$label" --arg message "$passed / $total$unit" --arg color "$(colour_of "$passed" "$total")" \
+  jq -cn --arg label "$label" --arg message "$passed / $total$unit" \
+    --arg color "$(colour_of "$passed" "$((total - held))")" \
     --argjson logo "$logo" '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo'
 }
 
+# The rows of the upstream file of corpus $1 as case<TAB>issue, none when it
+# has no file, or status 2 naming the first malformed line.
+upstream_rows() {
+  local file="$root/$1/upstream.tsv"
+  [[ -f "$file" ]] || return 0
+  awk -F'\t' -v header="$UPSTREAM_HEADER" -v file="$file" '
+    /^(#|$)/ { next }
+    !seen { seen = 1; if ($0 != header) { printf "conformance: %s does not open on the header case<TAB>issue\n", file > "/dev/stderr"; bad = 1; exit } next }
+    NF != 2 || $1 == "" || $2 !~ /^[1-9][0-9]*$/ {
+      printf "conformance: %s line %d is not a case id and an issue number\n", file, NR > "/dev/stderr"; bad = 1; exit
+    }
+    ($1 in rows) { printf "conformance: %s line %d repeats the case %s\n", file, NR, $1 > "/dev/stderr"; bad = 1; exit }
+    { rows[$1] = 1; print }
+    END { if (bad) exit 2 }
+  ' "$file"
+}
+
+# The passing case ids of the pass list of corpus $1, sorted.
+listed_cases() {
+  grep -vE '^(total|unmapped) ' "$root/$1/pass-list.txt" | LC_ALL=C sort || true
+}
+
+# The count of upstream rows of corpus $1 whose case its pass list does not
+# record, or status 2 for a malformed file.
+held_of() {
+  local rows
+  rows="$(upstream_rows "$1")" || return 2
+  LC_ALL=C comm -23 <(cut -f1 <<<"$rows" | sed '/^$/d' | LC_ALL=C sort) <(listed_cases "$1" | sed '/^$/d') |
+    wc -l | tr -d ' '
+}
+
 # The badge JSON a pass list implies; a list that records unmapped elements
-# names their count after the fraction, so the badge never hides them.
+# names their count after the fraction, and so do the upstream rows, so the
+# badge never hides them.
 badge_of() {
-  local corpus="$1" list="conformance/$1/pass-list.txt" passed total unmapped unit
+  local corpus="$1" list="$root/$1/pass-list.txt" passed total unmapped unit held
   passed="$(grep -vEc '^(total|unmapped) ' "$list" || true)"
   total="$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' "$list")"
   [[ -n "$total" ]] || { echo "conformance: $list has no total line" >&2; return 2; }
   unmapped="$(sed -n 's/^unmapped \([0-9][0-9]*\)$/\1/p' "$list")"
+  held="$(held_of "$corpus")" || return 2
   unit="$(unit_of "$corpus")"
   [[ -z "$unmapped" ]] || unit="$unit, $unmapped unmapped"
-  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(logo_of "$corpus")" "$unit"
+  [[ "$held" -eq 0 ]] || unit="$unit, $held upstream"
+  fraction_badge "$(label_of "$corpus")" "$passed" "$total" "$(logo_of "$corpus")" "$unit" "$held"
+}
+
+# Fails for each badge file whose message names `, k upstream` and whose
+# colour is not the one its count gives with those k cases out of it.
+upstream_color_check() {
+  local file message color want failures=0
+  for file in "$@"; do
+    message="$(jq -r .message "$file")"
+    color="$(jq -r .color "$file")"
+    [[ "$message" =~ ^([0-9]+)\ /\ ([0-9]+).*,\ ([0-9]+)\ upstream(,|$) ]] || continue
+    want="$(badge_count_color "${BASH_REMATCH[1]}" "$((BASH_REMATCH[2] - BASH_REMATCH[3]))")"
+    if [[ "$color" != "$want" ]]; then
+      echo "conformance: $file is $color, and its message '$message' asks for $want" >&2
+      failures=$((failures + 1))
+    fi
+  done
+  [[ "$failures" -eq 0 ]]
+}
+
+# The badge files of $@ whose message names no upstream count, for the shared
+# colour check, which reads the fraction alone.
+without_upstream() {
+  local file
+  for file in "$@"; do
+    jq -e '.message | test(", [0-9]+ upstream(,|$)") | not' "$file" >/dev/null && echo "$file"
+  done
+  return 0
+}
+
+# Holds the upstream rows of corpus $1 to its pass list and, when given, its
+# result file $2: status 1 for a malformed file or a case the corpus does not
+# hold, status 3 for a held case that passes, whose row --update drops.
+upstream_check() {
+  local corpus="$1" result="${2:-}" rows status=0 file="$root/$1/upstream.tsv" passing unknown
+  rows="$(upstream_rows "$corpus")" || return 1
+  [[ -n "$rows" ]] || return 0
+  if [[ -n "$result" ]]; then
+    unknown="$(LC_ALL=C comm -23 <(cut -f1 <<<"$rows" | LC_ALL=C sort) <(jq -r '.cases[].id' "$result" | LC_ALL=C sort))"
+    if [[ -n "$unknown" ]]; then
+      echo "conformance: $file names cases $corpus does not hold:" >&2
+      printf '  %s\n' "$unknown" >&2
+      status=1
+    fi
+  fi
+  passing="$(LC_ALL=C comm -12 <(cut -f1 <<<"$rows" | LC_ALL=C sort) <(
+    {
+      listed_cases "$corpus"
+      [[ -z "$result" ]] || jq -r '.cases[] | select(.passed) | .id' "$result"
+    } | sed '/^$/d' | LC_ALL=C sort -u
+  ))"
+  if [[ -n "$passing" ]]; then
+    if [[ "$mode" = update ]]; then
+      echo "conformance: $corpus passes cases an upstream held; their rows leave $file:"
+      awk -F'\t' 'NR == FNR { pass[$0] = 1; next } !($1 in pass)' <(printf '%s\n' "$passing") "$file" >"$file.new"
+      mv "$file.new" "$file"
+    else
+      echo "conformance: $corpus passes cases $file says an upstream holds; run $0 --update:"
+      [[ "$status" -ne 0 ]] || status=3
+    fi
+    printf '  %s\n' "$passing"
+  fi
+  return "$status"
 }
 
 failed=0
@@ -316,6 +438,94 @@ emit_badge() {
     if [[ "$mode" = check ]]; then failed=1; fi
   fi
 }
+
+# Runs upstream_check on corpus $1 (and result $2) and records its verdict:
+# a malformed file or an unknown case fails every mode, a held case that
+# passes fails --check.
+upstream_verdict() {
+  local status=0
+  upstream_check "$@" || status=$?
+  case "$status" in
+    0) ;;
+    3) if [[ "$mode" = check ]]; then failed=1; fi ;;
+    *) failed=1 ;;
+  esac
+}
+
+# The cases of the badge rendering and the upstream rows, over a pass list
+# and an upstream file written to a scratch tree.
+run_self_test() {
+  local work corpus=fhir-r4 status
+  work="$(mktemp -d)"
+  root="$work"
+  mkdir -p "$work/$corpus"
+  st_fail() {
+    echo "conformance: self-test FAILED: $1" >&2
+    rm -rf "$work"
+    return 1
+  }
+  st_expect() {
+    local document
+    document="$(badge_of "$corpus")" || { st_fail "$3 renders no badge"; return 1; }
+    if [[ "$(jq -r '.message + " " + .color' <<<"$document")" != "$1 $2" ]]; then
+      st_fail "$3 reads $(jq -r '.message + " " + .color' <<<"$document"), not $1 $2"
+      return 1
+    fi
+  }
+  st_upstream() { printf '%s\n' "$UPSTREAM_HEADER" "$@" >"$work/$corpus/upstream.tsv"; }
+
+  printf '%s\n' a b 'total 4' >"$work/$corpus/pass-list.txt"
+  st_expect '2 / 4' yellow "no upstream file" || return 1
+  st_upstream $'c\t632' $'d\t632'
+  st_expect '2 / 4, 2 upstream' brightgreen "every other case held upstream" || return 1
+  st_upstream $'c\t632'
+  st_expect '2 / 4, 1 upstream' yellow "one failing case held, one not" || return 1
+  printf '%s\n' 'total 2' >"$work/$corpus/pass-list.txt"
+  st_upstream $'a\t632'
+  st_expect '0 / 2, 1 upstream' red "no case passing" || return 1
+  printf '%s\n' a b 'total 4' 'unmapped 3' >"$work/$corpus/pass-list.txt"
+  st_upstream $'c\t632' $'d\t2112'
+  st_expect '2 / 4, 3 unmapped, 2 upstream' brightgreen "unmapped and upstream named together" || return 1
+
+  st_upstream $'c\t632' $'c\t2112'
+  if badge_of "$corpus" >/dev/null 2>&1; then st_fail "a repeated case renders"; return 1; fi
+  st_upstream $'c\t#632'
+  if badge_of "$corpus" >/dev/null 2>&1; then st_fail "an issue that is no number renders"; return 1; fi
+  printf '%s\n' 'case issue' $'c\t632' >"$work/$corpus/upstream.tsv"
+  if badge_of "$corpus" >/dev/null 2>&1; then st_fail "another header renders"; return 1; fi
+  st_upstream $'c\t632\textra'
+  if badge_of "$corpus" >/dev/null 2>&1; then st_fail "a row of three columns renders"; return 1; fi
+
+  st_upstream $'b\t632' $'c\t632'
+  status=0
+  upstream_check "$corpus" >/dev/null 2>&1 || status=$?
+  [[ "$status" -eq 3 ]] || { st_fail "a held case that passes answers $status, not 3"; return 1; }
+  st_expect '2 / 4, 3 unmapped, 1 upstream' yellow "a held case that passes counts as passing only" || return 1
+  jq -n '{total: 4, cases: [{id: "a", passed: true}, {id: "b", passed: true}, {id: "c", passed: false}]}' >"$work/result.json"
+  st_upstream $'c\t632' $'z\t632'
+  status=0
+  upstream_check "$corpus" "$work/result.json" >/dev/null 2>&1 || status=$?
+  [[ "$status" -eq 1 ]] || { st_fail "a case the corpus does not hold answers $status, not 1"; return 1; }
+  st_upstream $'c\t632'
+  upstream_check "$corpus" "$work/result.json" >/dev/null 2>&1 || { st_fail "a held failing case is refused"; return 1; }
+
+  jq -n '{message: "2 / 4, 2 upstream", color: "brightgreen"}' >"$work/badge.json"
+  upstream_color_check "$work/badge.json" 2>/dev/null || { st_fail "a green badge whose rest all pass is refused"; return 1; }
+  [[ -z "$(without_upstream "$work/badge.json")" ]] || { st_fail "the shared colour check reads an upstream badge"; return 1; }
+  jq -n '{message: "2 / 4, 1 upstream", color: "brightgreen"}' >"$work/badge.json"
+  if upstream_color_check "$work/badge.json" 2>/dev/null; then st_fail "a green badge with an unheld failing case passes"; return 1; fi
+  jq -n '{message: "2 / 4", color: "yellow"}' >"$work/badge.json"
+  [[ -n "$(without_upstream "$work/badge.json")" ]] || { st_fail "the shared colour check skips a plain badge"; return 1; }
+
+  rm -rf "$work"
+  root=conformance
+  echo "conformance: self-test OK"
+}
+
+if [[ "$self_test" -eq 1 ]]; then
+  run_self_test
+  exit
+fi
 
 # A MyHealth@EU corpus named alone reads the result the validator lane left.
 [[ "$external_only" -eq 1 ]] || rm -rf "$OUT"
@@ -395,6 +605,7 @@ for corpus in "${selected[@]}"; do
   list="conformance/$corpus/pass-list.txt"
   if [[ ! -f "$result" ]] && contains "$corpus" "${EXTERNAL_CORPORA[@]}" && [[ -z "$only" ]]; then
     echo "conformance: $corpus is measured outside this script, not in this run"
+    upstream_verdict "$corpus"
     emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
     continue
   fi
@@ -441,6 +652,7 @@ for corpus in "${selected[@]}"; do
     echo "conformance: $corpus holds $measured_total cases and its list records $listed_total; run $0 --update"
     if [[ "$mode" = check ]]; then failed=1; fi
   fi
+  upstream_verdict "$corpus" "$result"
   emit_badge "$corpus" "$(badge_of "$corpus")" "$list"
 done
 
@@ -528,6 +740,7 @@ render_block() {
   echo
   echo '**Conformance and compliance**<br>'
   echo "$badge_caption<br>"
+  echo "<sub>$BADGE_LEGEND</sub><br>"
   for name in fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 roundtrip fhir-r4-facade eehrxf-annex-x fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke; do
     badge_link "$(label_of "$name")" "$name" "conformance/$name/pass-list.txt"
   done
@@ -588,8 +801,9 @@ elif [[ "$(sed -n '/^<!-- badges:begin -->$/,/^<!-- badges:end -->$/p' README.md
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
+mapfile -t plain_badges < <(without_upstream "$BADGES"/*.json)
 if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md || ! badge_caption_check README.md ||
-  ! badge_color_check "$BADGES"/*.json; then
+  ! badge_color_check ${plain_badges[@]+"${plain_badges[@]}"} || ! upstream_color_check "$BADGES"/*.json; then
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
