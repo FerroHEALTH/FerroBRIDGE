@@ -7,10 +7,10 @@
 # in the shape the shared badge helper reads (scripts/checks/badge-logos/logo.sh):
 # use, algorithm, safe, pq_standard and location, tab-separated, which the
 # helper's badge_post_quantum_count reads. The badge is FerroBRIDGE's own
-# (#2324): its fraction counts the safe rows out of the rows whose
-# post-quantum form a standard defines, and its message names the rows with
-# no standard yet after it (`16/21, 4 without a post-quantum standard`), so
-# the rows no change here can move stay in view and out of the colour. The
+# (#2324): its message is the safe rows out of the rows whose post-quantum
+# form a standard defines (`16/21`), within the family's length limits, so
+# the rows no change here can move stay out of the colour; the table of
+# docs/post-quantum.md names them. The
 # script also holds every repository path a location names to the tree, and
 # docs/post-quantum.md to the same rows as a table between its
 # inventory:begin and inventory:end markers. No specification governs the
@@ -55,13 +55,11 @@ pq_counts() {
 
 # The endpoint JSON of the badge of the inventory $1.
 pq_badge() {
-  local counts safe with without message logo
+  local counts safe with logo
   counts="$(pq_counts "$1")" || return 1
-  read -r safe with without <<<"$counts"
-  message="$safe/$with"
-  [[ "$without" -eq 0 ]] || message="$message, $without without a post-quantum standard"
+  read -r safe with _ <<<"$counts"
   logo="$(badge_logo_fields key)"
-  jq -cn --arg message "$message" --arg color "$(badge_count_color "$safe" "$with")" --argjson logo "$logo" \
+  jq -cn --arg message "$safe/$with" --arg color "$(badge_count_color "$safe" "$with")" --argjson logo "$logo" \
     '{schemaVersion: 1, label: "post-quantum", message: $message, color: $color} + $logo'
 }
 
@@ -129,12 +127,16 @@ self_test() {
     fi
   }
   printf '%s\n' "$badge_post_quantum_header" $'a\tA\tyes\tRFC 10024\tx' $'b\tB\tno\tno standard yet\tx' >"$scratch/pq.tsv"
-  pq_expect "1/1, 1 without a post-quantum standard brightgreen" "a row without a standard beside a safe one"
+  pq_expect "1/1 brightgreen" "a row without a standard beside a safe one"
   printf '%s\n' "$badge_post_quantum_header" $'a\tA\tyes\tRFC 10024\tx' $'b\tB\tno\tRFC 9964\tx' >"$scratch/pq.tsv"
   pq_expect "1/2 yellow" "an unsafe row with a standard"
   printf '%s\n' "$badge_post_quantum_header" $'a\tA\tyes\tno standard yet\tx' $'b\tB\tno\tRFC 9964\tx' >"$scratch/pq.tsv"
-  pq_expect "0/1, 1 without a post-quantum standard red" "a no-standard-yet row marked yes"
+  pq_expect "0/1 red" "a no-standard-yet row marked yes"
   pq_badge "$scratch/pq.tsv" >"$scratch/pq.json"
+  if ! badge_length_check "$scratch/pq.json" 2>/dev/null; then
+    echo "post-quantum self-test: the badge runs past the length limits" >&2
+    failures=$((failures + 1))
+  fi
   if ! pq_badge_check "$scratch/pq.tsv" "$scratch/pq.json" 2>/dev/null; then
     echo "post-quantum self-test: a fresh badge is refused" >&2
     failures=$((failures + 1))
