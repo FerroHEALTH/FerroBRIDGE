@@ -1,1 +1,0 @@
-- `[facade] identity_store` and the `redb` identity file: the identity map lives in the `[state]` store.
