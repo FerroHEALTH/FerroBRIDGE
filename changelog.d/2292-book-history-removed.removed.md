@@ -1,0 +1,1 @@
+- The book no longer repeats the Nedap Ons source template on two pages or the state store's identity map on the container page, and drops the `ferrobridge-viewer` rename notes, the migration from FerroEHR 5.5's own AMQP publisher and the release history inside pages; the changelog holds history.

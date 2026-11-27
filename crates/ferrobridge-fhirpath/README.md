@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-fhirpath = "0.5"
+ferrobridge-fhirpath = "0.4"
 ```
 
-Name a patch (`"0.5.N"`) when you need the first release that carries what
+Name a patch (`"0.4.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does

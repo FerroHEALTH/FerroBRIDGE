@@ -3,15 +3,21 @@
 
 # The OMOP ETL
 
+**Audience:** integrators and data stewards who load an OMOP CDM from an
+openEHR CDR.
+
 The OMOP side of FerroBRIDGE turns openEHR content into rows in an OMOP Common
 Data Model v5.4 database, driven by OMOCL mapping files. OMOP is a relational
-analytics schema rather than an API, so the deliverable is populated tables.
-The sink, the runner, the OMOCL engine and `ferrobridge cdm init` are built,
-and `ferrobridge etl run` maps each composition with the files in
+analytics schema, so the deliverable is populated tables. `ferrobridge cdm
+init` creates the tables and `ferrobridge etl run` maps each composition with the files in
 `[mappings] omocl` and, when the operator API is on with `[state]`, the
 OMOCL files of the console's running revision. A provisioned file owns a path
 both hold, and two files that define the same mapping refuse the
 run.
+
+Two tasks have pages of their own: [loading FHIR into the CDM with no
+CDR](omop-fhir-load.md), and [checking the CDM](omop-quality.md) with the
+Data Quality Dashboard and the vocabulary check of OMOCL files.
 
 <!-- toc -->
 
@@ -375,166 +381,6 @@ Leave leaf paths through a repeated node, such as two values of one
 `events` list, out of the `SELECT`: AQL 1.1.0 does not define which node
 each of them comes from, and a CDR may pair values of two different nodes in
 one row.
-
-## Loading FHIR with no CDR
-
-A site that exposes FHIR R4 and runs no openEHR CDR loads the CDM with
-`ferrobridge etl fhir PATH`. The job reads a Bundle, one resource or an NDJSON
-file of resources (the FHIR Bulk Data format), and runs each resource through
-the two mapping languages in turn: the FHIRconnect set of `[mappings]
-directory`, compiled against the templates of `[mappings] templates`, maps it
-into an openEHR composition held in memory, and the OMOCL set of `[mappings]
-omocl` maps that composition to CDM rows the writer commits. No composition is
-stored anywhere. The job reads `[etl]` for the type concepts and the
-vocabulary aliases, and `[cdm]` for the database; it needs no `[cdr]` and no
-`[etl] aql`. No specification governs the chaining: it is FerroBRIDGE's own
-design, and each hop stays governed by its own specification.
-
-- **Identity.** A composition built in memory has no identifiers a CDR issued,
-  so the job derives them: the versioned composition from the resource's type
-  and id, the version from `meta.versionId` when it is a positive integer
-  (`1` otherwise), and the EHR from the reference the resource names its
-  subject by, a Patient naming itself. Running the job again over the same
-  input writes the same rows under the same ids, and a resource whose
-  `meta.versionId` moves replaces its rows.
-- **Time.** A resource is mapped at its `meta.lastUpdated`, so a composition
-  field FHIRconnect defaults to the run time takes the same value on every
-  run. A resource without one takes the time the job started.
-- **What reaches the CDM** is what the two mapping sets cover. The published
-  FHIRconnect library's Procedure and MedicationAdministration mappings are
-  left out at load (`mapping check` names why), so a site maps those
-  resources with mappings of its own; a Procedure's `performed[x]` does not
-  yet reach `ACTION.time` (#1226). An Encounter reaches no VISIT_OCCURRENCE,
-  and the job derives no visit, since the visit query reads a CDR.
-- **Nothing disappears.** A resource no FHIRconnect program maps, one the
-  FHIRconnect run refuses, one with no id or no subject, and a composition
-  OMOCL refuses are each counted and listed in the run report, which adds a
-  `resources` line (read, mapped, unmapped, refused, and the losses the
-  FHIRconnect run declared).
-- **Every element has an outcome.** The JSON report carries a `ledger`: per
-  input resource, every element with a value and one of four outcomes:
-  `mapped` (with the openEHR node it reached and the `table.column` targets
-  that read it), `dropped` (a mapping declared it does not run, with the
-  loss), `refused` (with the reason), or `unmapped` (no mapping names it, or
-  no OMOCL column reads where it went). A data-type cell reads its element
-  whole, so the elements below one share its outcome, and the text report
-  adds a `ledger` line with the counts.
-- **Every row names its resource.** The bridge schema's `resource_origin`
-  table ties each composition to the resource type, id and `meta.versionId`
-  it was mapped from, and through the natural-key side table each CDM row to
-  that resource. To find where a row came from, or every row a resource
-  became:
-
-  ```sql
-  SELECT o.resource_type, o.resource_id, o.resource_version
-  FROM ferrobridge.record r
-  JOIN ferrobridge.resource_origin o USING (versioned_object_uid)
-  WHERE r.cdm_table = 'condition_occurrence' AND r.surrogate_id = 1;
-
-  SELECT r.cdm_table, r.surrogate_id
-  FROM ferrobridge.resource_origin o
-  JOIN ferrobridge.record r USING (versioned_object_uid)
-  WHERE o.resource_type = 'Condition' AND o.resource_id = 'c-1';
-  ```
-
-## Checking a populated database with the Data Quality Dashboard
-
-The bridge carries a Rust port of the OHDSI Data Quality Dashboard's
-conformance and completeness checks and its seven temporal plausibility
-checks (v2.9.0, Blacketer et al., JAMIA 2021): observation periods that
-overlap, dates before birth or the date they must follow, dates more than 60
-days after death, dates a week outside their visit, and starts after their
-ends. Each is planned where the Dashboard's own settings enable them, with their
-thresholds:
-
-```sh
-ferrobridge dq check                 # one line per failing check, then the counts
-ferrobridge dq check --format json   # the Dashboard's result fields
-```
-
-The job reads the `[cdm]` section, runs every check over the CDM schema
-(the vocabulary tables left out, as the Dashboard leaves them out by
-default), and exits `1` when a check fails or cannot be evaluated. A check
-of a missing or empty table, or of a missing or unpopulated field, is marked
-not applicable with its reason, as the Dashboard marks it, and counts as
-neither. The JSON document holds `CheckResults` (one object per check, in the
-Dashboard's result columns), `Overview` (its counts) and the run's
-timestamps. With `[etl] quality_checks = true`, `etl run` runs the same
-checks over the tables it wrote and adds their verdicts to the run report; a
-failed check never rolls a committed load back.
-
-The plausibility checks are not ported. To run them, or the R tool's own
-viewer, run the Dashboard itself as below.
-
-### Running the R package
-
-The Dashboard itself is an R package
-(<https://ohdsi.github.io/DataQualityDashboard/>), with no container image of
-its own, so you run it from any R session that can reach the database:
-
-1. Populate the database: `ferrobridge cdm init`, load the vocabulary, then
-   `ferrobridge etl run`. The CDM tables are in `[cdm] schema` (`cdm` by
-   default); the bridge's own tables are in `[cdm] bridge_schema` and are not
-   part of the CDM, so the dashboard is never pointed at them.
-2. Create a schema for the results, for example `CREATE SCHEMA dqd_results;`.
-3. In R, install the package and the PostgreSQL driver:
-
-   ```r
-   install.packages("DataQualityDashboard")
-   DatabaseConnector::downloadJdbcDrivers("postgresql", pathToDriver = "~/jdbc")
-   ```
-
-4. Connect and run the checks against CDM v5.4:
-
-   ```r
-   connectionDetails <- DatabaseConnector::createConnectionDetails(
-     dbms = "postgresql",
-     server = "localhost/ferrobridge",
-     port = 5432,
-     user = "ferrobridge",
-     password = Sys.getenv("CDM_PASSWORD"),
-     pathToDriver = "~/jdbc"
-   )
-   DataQualityDashboard::executeDqChecks(
-     connectionDetails = connectionDetails,
-     cdmDatabaseSchema = "cdm",
-     resultsDatabaseSchema = "dqd_results",
-     cdmSourceName = "FerroBRIDGE",
-     cdmVersion = "5.4",
-     outputFolder = "dqd-output",
-     writeToTable = TRUE
-   )
-   ```
-
-   The `server` argument is `host/database`, as `DatabaseConnector` documents
-   for PostgreSQL.
-5. Open the result with `DataQualityDashboard::viewDqDashboard()` on the JSON
-   file the run writes into `dqd-output`, and record every failing check with
-   its adjudication.
-
-## Validating OMOCL files
-
-OMOCL publishes no JSON schema, so FerroBRIDGE authors one from the grammar
-tables and the published mapping library, validates every file against it
-before running anything, and offers that schema upstream. The grammar also
-leaves the reading of `alternatives` open; FerroBRIDGE tries them in order and
-the first present value wins, which is the only reading the published library
-is consistent with. A `CustomMapping` names a converter compiled into the
-binary, and an unknown name refuses the file. A mapping that fails validation
-is refused at load time.
-
-A literal concept id (`code: 3004249`, or a value of a `conceptMap`) is a
-concept of the OHDSI vocabulary, so it can only be checked against a loaded
-one. With `[cdm]` configured and a vocabulary loaded,
-
-```sh
-ferrobridge mapping check --vocabulary
-```
-
-adds a diagnostic for every literal the vocabulary does not hold and every
-literal whose domain is not one the CDM field definitions name for its column
-(`omocl-unknown-concept`, `omocl-domain-mismatch`). Concept `0` is exempt.
-Without `[cdm]` or `[mappings] omocl` the flag refuses to start.
 
 ## The incremental load
 

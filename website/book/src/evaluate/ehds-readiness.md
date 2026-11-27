@@ -35,14 +35,16 @@ publishes no template for the category.
 
 ### Article 14(1)(a): Patient summaries
 
-HL7 Europe Patient Summary 1.0.0-ballot is pinned for the profile validator; no context maps its Composition yet. The Base and Core profiles below are its building blocks.
+The interoperability component (`eehrxf`) maps HL7 Europe Patient Summary 1.0.0-ballot over FerroBRIDGE's patient summary template, a template over published CKM archetypes, because the openEHR international CKM publishes no patient summary template; the facade serves it as `Patient/$summary`. The Base and Core profiles below are its building blocks.
 
 | Target profile | Package | Committed template | Transform proven |
 |---|---|---|---|
 | `patient-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Person | `the_profile_elements_of_patient_eu_core_survive_the_round_trip` |
 | `condition-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Diagnose | `the_profile_elements_of_condition_eu_core_survive_the_round_trip` |
 | `medicalTestResult-eu-core` | hl7.fhir.eu.base 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_test_result_survive_the_round_trip` |
-| `Patient summary Composition` | hl7.fhir.eu.eps 1.0.0-ballot | none: no patient summary template in the openEHR international CKM | no |
+| `composition-eu-eps` | hl7.fhir.eu.eps 1.0.0-ballot | FerroBRIDGE patient summary template over CKM archetypes | `the_summary_holds_the_medicine_and_the_vaccine_in_their_sections` |
+| `Composition-uv-ips`; the IPS form `eehrxf::document` writes from the same sections, the default of `Patient/$summary` | hl7.fhir.uv.ips 2.0.1 | FerroBRIDGE patient summary template over CKM archetypes | `the_summary_in_the_ips_form_validates_against_bundle_uv_ips` |
+| `composition-myhealtheu-core` (produced, not claimed); `Patient/$summary` answers the HL7 Europe form this profile constrains, with the ICD-10 and ATC codings its required bindings take | myhealth.eu.fhir.core 1.0.1 | FerroBRIDGE patient summary template over CKM archetypes | `the_myhealth_eu_profile_adds_the_codings_its_core_bindings_take` |
 
 ### Article 14(1)(b): Electronic prescriptions
 

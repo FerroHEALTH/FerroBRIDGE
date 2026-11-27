@@ -33,6 +33,9 @@ pub struct Inbound {
     pub idle: Duration,
     /// How often each replica looks for a source whose recovery is due.
     pub recovery_tick: Duration,
+    /// How long a parked item's event bodies are kept before they are
+    /// cleared (GDPR Art 5(1)(e)).
+    pub parked_body_retention: Duration,
 }
 
 impl Default for Inbound {
@@ -47,6 +50,7 @@ impl Default for Inbound {
             max_attempts: 10,
             idle: Duration::from_secs(5),
             recovery_tick: Duration::from_secs(30),
+            parked_body_retention: Duration::from_secs(7 * 24 * 60 * 60),
         }
     }
 }

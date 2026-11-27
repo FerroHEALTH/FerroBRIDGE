@@ -617,7 +617,7 @@ macro_rules! per_release {
             /// Returns the `uri` unique id of every `identifier` `NamingSystem`
             /// the `searchset` `body` carries that is not retired and holds a
             /// unique id equal to `value`, each once, in entry order.
-            #[cfg(feature = "naming-system")]
+            #[cfg(feature = "client")]
             pub(crate) fn identifier_systems(body: &str, value: &str) -> Result<Vec<String>, BodyError> {
                 let bundle = searchset(body)?;
                 let mut systems: Vec<String> = Vec::new();

@@ -229,7 +229,7 @@ default branch.
 | `openehr-term` | 0.5.1 (Apache-2.0 AND CC-BY-SA-3.0) | the openEHR terminology; the server names its `audit_change_type` and `version_lifecycle_state` concepts (`codes`) for the `change_type` and `lifecycle_state` a commit carries |
 | `openehr-am` | 0.5.1 (Apache-2.0) | the generated AM 2.4 model: the AOM2 `OPERATIONAL_TEMPLATE` and `ARCHETYPE_HRID` types an ADL 2 template decodes into (section 3); taken directly because the bridge names those types |
 | `openehr-adl` | not taken in the first cut (0.1.1, BUSL-1.1) | the ADL 2 text parser, flattener and OPT2 generator; the bridge fetches an ADL 2 template as AOM2 canonical JSON, so it never parses ADL source (section 3); taken later only if a CDR serves ADL 2 templates as text alone |
-| `fhir-types` | 0.4.0 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
+| `fhir-types` | 0.3.0 (the line starts one patch above the sibling terminology server's 0.1.97 of 2026-09-12 and moves with every change to the packaged content) | the FHIR model, generated here by `tools/fhir-codegen` from the vendored HL7 packages (section 4.1); the crate and its generator now live here and the sibling consumes the crate from crates.io |
 | openFHIR, the FHIRconnect reference engine | 3.0.1 (2026-09-09), read for behaviour only | never an oracle; section 4.4 records the 3.0.0 behaviour changes and what the bridge takes |
 | Eos, the OMOCL reference engine | 0.0.62 (2024-03-20), last commit 2026-03-09 | never an oracle; dormant, so its behaviour is prior art with no expected movement |
 | FHIR terminology operations | R4, R4B tolerant | `CodeSystem/$lookup`, `ConceptMap/$translate`, `ValueSet/$validate-code`, `ValueSet/$expand`, `CodeSystem/$subsumes`; a server may answer R4 or R4B; the reference server selects the version by path (section 6) |
@@ -2532,9 +2532,10 @@ the intake is our own design, built on the standard of each step.
 intake and the HL7 v2 face prove a sender through one
 `inbound::verify::Proofs` set of `Verifier` proofs, every one of which must
 hold, and either commit a clinical message through `facade::ingest` or
-store a patient event in the inbox for the workers' one `Handler`, where
-every inbound step is written, so a new inbound feature adds a step there
-and never a second pipeline beside it. Behind
+store a patient event in the inbox. The one `Handler` the workers run,
+`inbound::apply::Apply`, is where every inbound step is written, so a new
+inbound feature adds a step there and never a second pipeline beside it.
+Behind
 `[inbound]`, `POST /inbound/{source}` serves every webhook source of `0008`.
 The raw body is read within the source's `limits.body_limit` and
 `[inbound] body_limit`. The source's verifier runs over the raw bytes before
@@ -2590,6 +2591,22 @@ no resolution parks its items as `resolution-undeclared`. Under `[audit]`
 each feed is recorded as the system's PHI import and each EHR the handler
 creates as a create on the CDR, beside the BALP ITI-104 Source and ITI-83
 Consumer records, each place taken in the audit outbox before its step.
+An HL7 v2 sender cannot be asked for its patient again, so the face stores
+the ADT patient triggers (A01, A04, A05 and A08 of IHE ITI-8, A28 and A31
+of ITI-30) with the minimised `Patient` the v2-to-FHIR maps wrote as the
+event's body, and A40 and A47 with the source's merge statement, MRG-1
+`replaced-by` PID-3. The body is sealed under `[state.seal]`, keyed by
+MSH-10 and stamped by EVN-2 or MSH-7, and the work item names the event
+that moved it to its generation, so the handler applies the body of that
+event and never another in flight for the same patient. The body is
+cleared in the transaction that marks the item done, when an operator
+discards its park, and once it has been parked past
+`[inbound] parked_body_retention` (GDPR Art 5(1)(c) and (e)); an event
+carrying a body whose stamp is older than the one its patient applied or
+waits on is stored as superseded, with no body, and moves no item. The face
+answers `AA` only after the store commits and `AE` when it cannot, so the
+sender sends the message again. The trigger set and the storage rule are
+our own design.
 Recovery is the receiver's job for a webhook source that retries nothing on
 its own: a source declares a `redeliver` call, made when a replica first
 leads the source and after a run of `503` answers, and `reconcile` polls
@@ -2699,6 +2716,40 @@ engine stays synchronous behind a `Translate` seam: the lane runs it with
 `Engine::transform_blocking` on a blocking thread, where the terminology
 call waits with `Handle::block_on`. `dateOp` and `escape`, which R4 leaves
 undocumented, are refused.
+
+**One owner per concern (#2148, #2247).** Each concern of the server has
+exactly one module under `app/ferrobridge-server/src` that owns it, named in
+that module's doc. The book's architecture page lists each owner with its
+callers. No specification governs the split: our own design.
+
+- **Requests:** the FHIR facade `facade` (its route permissions in
+  `facade::guard`, the write in `facade::ingest`); the FHIRconnect operations
+  `operations`; the operator API `operator`; the HL7 v2 face `hl7v2`; every
+  inbound transport `inbound`; SMART Health Links `shl`; access tokens
+  `smart`; assurance levels `assurance`; problem details `problem`; shared
+  routes `mount`.
+- **State:** the pool, migrations, row claims, lane leases and change
+  notification `store`; the identity map, subject link and EHR resolution
+  `identity`; owned resources `facade::owned`; the delivery record
+  `outbound::delivered`; watermarks and dead letters `change_feed`; inbound
+  sources `sources`; the inbox, work items, slots and cursors
+  `inbound::store`; mapping revisions `mappings::revisions`; settings
+  registers `settings`; link records `shl::store`; the audit outbox
+  `audit::outbox`.
+- **Outbound calls:** the CDR `cdr`, one `CdrClient` per process that every
+  lane shares; the bridge's own token `credentials`; terminology
+  `terminology`; the identity source `identity_source`; FHIR delivery
+  `outbound::sink`; the ITI-20 feed `audit::feed`; inbound recovery calls
+  `inbound::clients`; the CDM database `etl`.
+- **Background work:** lane start `lanes`; boot `boot`; the change feed
+  `change_feed`; the events lane `events`; the outbound lane `outbound`;
+  inbound workers `inbound::worker`; the ETL `etl`; batch jobs `jobs`;
+  backoff and the retry or park verdict `retry`.
+- **Configuration:** the typed tree `config`; checked AQL `aql`; the mapping
+  load path `mappings::compile`; the directory walk `walk`; the mapping
+  checker `check`.
+- **Audit and reporting:** the access record `audit`; the usage report
+  `usage_report`; the startup summary `startup`; the boot banner `banner`.
 
 ## 8. What each seam carries
 

@@ -25,15 +25,18 @@ pub(super) fn workers(
     ) else {
         return None;
     };
+    let inbox = crate::inbound::store::InboxStore::new(store.pool().clone())
+        .with_seal(store.seal().cloned());
     let handler = crate::inbound::apply::Apply::new(
         Arc::new(crate::inbound::resolve::Declared::new(Arc::clone(sources))),
         facade.settings().subject.identity_handle(),
         facade.client().clone(),
         facade.store_handle(),
     )
-    .with_access_log(state.access_log().cloned());
+    .with_access_log(state.access_log().cloned())
+    .with_inbox(Some(inbox.clone()));
     Some(Arc::new(crate::inbound::worker::Pool::new(
-        crate::inbound::store::InboxStore::new(store.pool().clone()),
+        inbox,
         Arc::clone(sources),
         Arc::new(handler),
         inbound.workers,

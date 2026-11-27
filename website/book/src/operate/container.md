@@ -92,36 +92,25 @@ upload directory, and every secret is read once at boot. It keeps the
 `ferrobridge-state`, mounted at `/home/nonroot`, the image's home directory,
 which its runtime user owns. The FHIR facade keeps its identity map in the
 state store, a PostgreSQL database, and the facade is off in the quickstart;
-[the identity store](#the-identity-store) says what it needs when you turn it
-on.
+[the state store](#the-state-store) says what it needs when you turn it on.
 
-## The identity store
+## The state store
 
-With `[facade] enabled = true`, the server keeps its identity map in the
-state store ([`[state]`](configuration.md#state)), a PostgreSQL 19 database
-every replica shares. The map records each subject's `ehr_id`, each FHIR
-resource id and the composition it came from, and the source identity of
-every resource the facade consumed. It holds no clinical content, and no
-identifier value in clear: a subject identifier and every
-`Resource.identifier` value are stored as an HMAC under the
-`[state.seal] lookup_key`, and the subject an EHR was recorded for is sealed
-under a `[state.seal]` key. The server refuses to start the facade without
-`[state]` and `[state.seal]`.
+The facade, and every other lane that keeps state, needs the state store
+([`[state]`](configuration.md#state) and
+[`[state.seal]`](configuration.md#stateseal)), a PostgreSQL 19 database every
+replica shares; [The state store and high availability](high-availability.md)
+says what it holds. In the container:
 
 - **What it needs:** the `[state]` URL and the `[state.seal]` keys, each
   through its `_file` sibling from a mounted secret. The container writes no
-  file for the map, so a read-only root filesystem needs no volume for it.
+  file for the store, so a read-only root filesystem needs no volume for it.
 - **The lookup key never changes:** every stored digest depends on it, so
   the server pins its fingerprint in the store and refuses to start under
   another key. Back the key up with the database.
-- **Replicas:** every replica opens the same store, and each write records
-  once, so two replicas that record one binding agree on the one that
-  stands. The claims that order overlapping deliveries of one resource live
-  in each process, so point every sender of a feed at one replica, or accept
-  that two replicas may each map one delivery and keep the first binding.
-- **Backups:** back the database up with the CDR. A lost map makes the next
-  create of a resource the CDR already holds write a second composition, and
-  a client's FHIR ids stop resolving
+- **Backups:** back the database up with the CDR. A lost identity map makes
+  the next create of a resource the CDR already holds write a second
+  composition, and a client's FHIR ids stop resolving
   ([Failure and identity behaviour](failure-and-identity.md)).
 
 A Kubernetes pod spec mounts the secrets as files:

@@ -311,3 +311,64 @@ async fn the_sources_need_the_operator_scope() -> Result<(), Box<dyn Error>> {
     assert_eq!(StatusCode::FORBIDDEN, refused.status());
     Ok(())
 }
+
+#[tokio::test]
+async fn the_nedap_ons_template_creates_a_source_once_its_map_runs() -> Result<(), Box<dyn Error>> {
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let postgres = containers::postgres().await?;
+    let store = Store::open(&ferrobridge_server::store::Settings {
+        connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)?,
+        max_connections: 4,
+        acquire_timeout: Duration::from_secs(30),
+        seal: None,
+    })
+    .await?;
+    let secrets = tempfile::tempdir()?;
+    for name in [
+        "nedap-ons-connector-secret",
+        "nedap-ons-environment-certificate",
+    ] {
+        std::fs::write(secrets.path().join(name), "synthetic\n")?;
+    }
+    let sources = Arc::new(Sources::open(
+        &store,
+        Some(&ferrohealth_secret::dir::SecretDirConfig {
+            dir: secrets.path().to_path_buf(),
+            poll_seconds: ferrohealth_secret::dir::PollSeconds::default(),
+        }),
+    )?);
+    let case = Case::sourcing(Arc::clone(&sources)).await?;
+    let template = serde_json::to_value(crate::inbound::nedap_ons::template()?)?;
+    let refused = case
+        .send(
+            Method::POST,
+            "/operator/sources",
+            OPERATOR,
+            None,
+            Some(&template),
+        )
+        .await?;
+    assert_eq!(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        refused.status(),
+        "no map runs yet"
+    );
+    sources
+        .structuremaps()
+        .replace(crate::inbound::nedap_ons::set()?);
+    let created = case
+        .send(
+            Method::POST,
+            "/operator/sources",
+            OPERATOR,
+            None,
+            Some(&template),
+        )
+        .await?;
+    assert_eq!(StatusCode::CREATED, created.status());
+    let (_tag, source) = read(created).await?;
+    assert!(!source.enabled);
+    Ok(())
+}

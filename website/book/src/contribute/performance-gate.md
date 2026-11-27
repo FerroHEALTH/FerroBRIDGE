@@ -123,12 +123,10 @@ a newer push or by a person retries nothing, and an attempt job that failed
 fails the gate. At most two retries run, and the gate passes when the last
 attempt passed. A breach on any other model fails at once.
 
-A stall-prone runner is almost never judgeable: from 7 to 9 November 2026,
-24 of 29 attempts on an AMD EPYC 9V74 could not be judged, against 2 of 42 on
-every other model. Their stalls struck pair 1 as often as pair 4, in either
-half of a window, and in both arms of a pair at once, so the host stalled,
-and neither warm-up nor the order of the pairs explains them
-([#1778](https://github.com/FerroHEALTH/FerroBRIDGE/issues/1778)). An attempt
+A stall-prone runner is almost never judgeable: its stalls strike the first
+pair as often as the last, in either half of a window, and in both arms of a
+pair at once, so the host stalls, and neither warm-up nor the order of the
+pairs explains them. An attempt
 that lands on a model `STALL_PRONE` lists therefore measures nothing and ends
 with exit 2 at once, unless it is the last attempt, which measures wherever
 it lands. The job summary
@@ -138,9 +136,8 @@ verdict's summary names each attempt, a cancelled one with why the next ran.
 The build job builds two crates at a time (`CARGO_BUILD_JOBS=2`), and the
 build step logs the runner's used memory, swap and free disk
 each minute. The hosted runner has 16 GB. A release build of `fhir-types` with
-every resource of all five FHIR releases peaks above it on its own: on #1737
-the log rose from 3.4 to 14.7 GB in the five minutes after that crate started
-and the runner shut down. The bridge therefore compiles only the releases it
+every resource of all five FHIR releases peaks above it on its own, and the
+runner shuts down. The bridge therefore compiles only the releases it
 speaks, through the release features of `ferrobridge-term`, and only the
 resources of each release it asks for, through the per-release resources
 features of `fhir-types`. The bridge still links a second copy of
@@ -164,3 +161,41 @@ bash scripts/perf/gate.sh run
 `bash scripts/perf/gate.sh --self-test` checks the pin reader, the plan's
 placeholders, the seeded Condition, the base resolution and the two plans'
 idle limits on any machine.
+
+## Per-request budgets
+
+Beside the A/B gate, each hot path has fixed budgets that hold whatever the
+runner. No specification governs them: they are FerroBRIDGE's own design.
+
+- **Allocations and database statements.** The e2e lane runs the
+  `facade::budget` case of the server's test binary
+  (`app/ferrobridge-server/tests/it/facade/budget.rs`). It drives the
+  facade's create, read and search of the synthetic Condition over a
+  `wiremock` CDR, and the outbound lane's delivery of the changed
+  composition, each over a real PostgreSQL state store. For each path it
+  counts the allocations of the thread that polls the request, through
+  `allocation-counter`, and the `sqlx::query` events the request sends.
+  `BUDGETS` in that file holds each path's ceilings.
+- **CPU instructions.** The `hot path instructions (callgrind)` job builds
+  the example `hot_path_instructions` in release and counts, with
+  callgrind, the instructions of each path's in-process work: the facade's
+  mapping of the Condition to its composition and back, and the HL7 v2
+  face's parse and acknowledgment of an ORU^R01. `perf/instructions.ceilings`
+  holds each path's ceiling.
+
+A figure over its ceiling fails the job, which prints every path's figure
+beside its ceiling. Lowering a ceiling is a normal change. Raising one needs
+its cause stated in the pull request.
+
+To run them yourself:
+
+```sh
+# The allocation and statement budgets (starts a PostgreSQL container).
+FERROBRIDGE_E2E=1 cargo nextest run -p ferrobridge-server \
+  -E 'test(/facade::budget::/)' --no-capture
+# The instruction ceilings (Linux, with valgrind installed).
+bash scripts/perf/instructions.sh
+```
+
+Instruction counts differ between platforms, so a ceiling is set from the
+CI run's figures, never from a local one.

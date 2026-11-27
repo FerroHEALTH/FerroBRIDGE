@@ -5,4 +5,3 @@
 # reason after a key record why that forwarder stays.
 app/ferrobridge-console/src/markup.rs: h -> Html::raw(markup)	the page-markup vocabulary .claude/rules/console-ui.md section 1 fixes: crate::markup::h over a format! of escaped parts
 app/ferrobridge-console/src/markup.rs: t -> Html::text(text)	the page-markup vocabulary .claude/rules/console-ui.md section 1 fixes: every text of a page goes through crate::markup::t
-app/ferrobridge-server/src/terminology/fetch.rs: shared -> Arc::new(error)	it decides the type: the unsizing coercion of each failure to the shared Arc<dyn Error> every run of the question reads, which as_conversions forbids writing as a cast at the call sites

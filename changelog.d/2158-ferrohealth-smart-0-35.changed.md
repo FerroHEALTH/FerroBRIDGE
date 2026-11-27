@@ -1,1 +1,0 @@
-- The bridge moves to `ferrohealth-smart` 0.35 and `ferrohealth-session` 0.30, which verify every JWS in one module and add ML-DSA (RFC 9964). `[[auth.issuers]] algorithms` now also takes `RS512`, `PS512`, `EdDSA`, `ML-DSA-44`, `ML-DSA-65` and `ML-DSA-87`, and a symmetric `HS*` algorithm there fails to parse as an unknown value, where it was refused as a rule before.

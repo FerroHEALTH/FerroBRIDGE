@@ -69,7 +69,7 @@ async fn searching_with(limits: Limits) -> Harness {
 }
 
 /// Returns one result row: the EHR, the version and the composition.
-fn row(version: &str, composition: &serde_json::Value) -> serde_json::Value {
+pub(super) fn row(version: &str, composition: &serde_json::Value) -> serde_json::Value {
     serde_json::json!([EHR_ID, version, composition])
 }
 
@@ -121,7 +121,7 @@ fn is_count(request: &wiremock::Request) -> bool {
 }
 
 /// Answers every row query with `rows`.
-async fn mount_rows(cdr: &MockServer, rows: &[serde_json::Value]) {
+pub(super) async fn mount_rows(cdr: &MockServer, rows: &[serde_json::Value]) {
     Mock::given(matchers::method("POST"))
         .and(matchers::path(AQL))
         .and(|request: &wiremock::Request| !is_count(request))

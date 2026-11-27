@@ -374,13 +374,18 @@ the newest version section of `CHANGELOG.md` has no pushed tag and
   `main` after the release branch assembled, the release pull request's merge
   group fails the guard. Merge `main` into the release branch, run
   `scripts/release/changelog.sh --assemble X.Y.Z YYYY-MM-DD` again, and queue
-  it again.
+  it again. On a section that is the newest and untagged, the script
+  keeps its summary and its entries, adds the fragments now on the branch after
+  them, writes the new date, leaves the link references as they are and
+  removes the fragments, including those the merge staged and did not commit.
+  It refuses a section that is older than the newest or already tagged.
 - **Tag right after the release commit merges** (below), so the window stays
   short.
 
 `bash scripts/checks/release-window.sh --self-test` covers a fragment
-landing between the cut and the tag. No specification governs the window:
-our own design.
+landing between the cut and the tag. `bash scripts/release/changelog.sh
+--self-test` covers the second assembly after `main` gains fragments. No
+specification governs the window: our own design.
 
 ## Preflight: the plan job, before the tag
 

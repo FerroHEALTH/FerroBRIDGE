@@ -83,6 +83,9 @@ pub struct AppState {
     usage: Arc<ferrohealth_usage_report::window::Window>,
     /// The operator API, when `[operator] enabled` mounts it.
     operator: Option<Arc<crate::operator::Operator>>,
+    /// The one client of the `[cdr]` CDR, when one is configured, shared by
+    /// readiness and every lane that reaches the CDR.
+    cdr: Option<crate::cdr::CdrClient>,
     /// The one client of the `[terminology]` server, when one is configured,
     /// shared by readiness and every lane that translates.
     terminology: Option<ferrobridge_term::client::Client>,
@@ -202,6 +205,7 @@ impl AppState {
             auth: None,
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
+            cdr,
             terminology,
             change_feed: None,
             access_log: None,
@@ -233,6 +237,7 @@ impl AppState {
             auth: None,
             usage: Arc::new(crate::usage_report::window()),
             operator: None,
+            cdr: None,
             terminology: None,
             change_feed: None,
             access_log: None,
@@ -513,6 +518,12 @@ impl AppState {
     #[must_use]
     pub const fn operations_handle(&self) -> Option<&Arc<OperationsLane>> {
         self.operations.as_ref()
+    }
+
+    /// Returns the client of the `[cdr]` CDR, `None` when none is configured.
+    #[must_use]
+    pub const fn cdr(&self) -> Option<&crate::cdr::CdrClient> {
+        self.cdr.as_ref()
     }
 
     /// Returns the client of the `[terminology]` server, `None` when none is

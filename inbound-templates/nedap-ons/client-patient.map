@@ -1,0 +1,23 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+/* The Ons client and its BSN as an R4 Patient; the bridge adds the tenant's local identifier. */
+map "https://ferrobridge.eu/fhir/nedap-ons/StructureMap/client-patient" = NedapOnsClientPatient
+
+uses "https://ferrobridge.eu/fhir/nedap-ons/StructureDefinition/Client" alias Client as source
+uses "https://ferrobridge.eu/fhir/nedap-ons/StructureDefinition/Bsn" alias Bsn as source
+uses "http://hl7.org/fhir/StructureDefinition/Patient" as target
+
+group NedapOnsClientPatient(source client : Client, source bsn : Bsn, target patient : Patient) {
+  bsn.number as number where bsn.idVerified = true
+    -> patient.identifier = id('http://fhir.nl/fhir/NamingSystem/bsn', number) "bsn";
+  client -> patient.name as name then {
+    client.lastName as family -> name.family = family "family";
+    client.firstName as given -> name.given = given "given";
+  } "name";
+  client.dateOfBirth as born -> patient.birthDate = born "birthDate";
+  client.gender as g
+    -> c('https://ferrobridge.eu/fhir/nedap-ons/CodeSystem/gender', g) as coding,
+       patient.gender = translate(coding, 'https://ferrobridge.eu/fhir/nedap-ons/ConceptMap/gender', 'code') "gender";
+  client.deathDate as died -> patient.deceasedDateTime = died "deceased";
+}

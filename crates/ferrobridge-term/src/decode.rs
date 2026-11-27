@@ -147,7 +147,7 @@ pub(crate) fn search_total(version: WireVersion, answer: &Answer) -> Result<u32,
 
 /// Returns the identifier systems of the `NamingSystem` search `answer`
 /// carries for the unique id `value`.
-#[cfg(feature = "naming-system")]
+#[cfg(feature = "client")]
 pub(crate) fn identifier_systems(
     version: WireVersion,
     answer: &Answer,

@@ -36,11 +36,9 @@ OHDSI vocabulary.
 The FHIR model is the `fhir-types` crate, generated in this repository from the
 HL7 FHIR packages (STU3 3.0.2, R4 4.0.1, R4B 4.3.0, R5 5.0.0, R6 6.0.0-snapshot1,
 THO 7.5.0)
-and published to crates.io; its version line continues the one the sibling
-project published up to 0.1.97 before the crate moved here, and the current
-pin is the `fhir-types` row of `docs/VERSIONS.md`. The openEHR model comes
-from seven published crates, pinned together on their 0.0 minor line (0.0.69
-today; the pin matrix is the authority):
+and published to crates.io; the current pin is the `fhir-types` row of
+`docs/VERSIONS.md`. The openEHR model comes from seven published crates,
+pinned together on one version, the `openehr-*` row of the pin matrix:
 
 | Crate | Used for |
 |---|---|
@@ -55,7 +53,7 @@ today; the pin matrix is the authority):
 ## Language and toolchain
 
 The Rust toolchain, edition, resolver, and MSRV are pinned in the matrix and
-adopted by the workspace when it lands. The documentation toolchain is pinned
+in the workspace manifest. The documentation toolchain is pinned
 too: `mdbook`, `mdbook-toc`, and `mdbook-mermaid` all carry an exact version in
 the matrix and in the composite action that installs them, so this book renders
 the same way in CI as it does on a laptop.

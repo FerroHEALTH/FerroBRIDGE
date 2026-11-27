@@ -29,6 +29,10 @@
 #       the fragments, section by section in the Keep a Changelog order, as the
 #       tight list CHANGELOG.md is written in; moves the [Unreleased] link
 #       reference on and adds the version's; then `git rm`s the fragments.
+#       When the newest section is already "## [<version>]" and v<version> is
+#       not tagged (the release window, docs/release.md), it assembles again:
+#       the section keeps its summary and its entries, takes the fragments now
+#       on the branch after them, takes <date>, and keeps the link references.
 #       Exit 1 on any defect, with nothing written.
 #   changelog.sh --preview
 #       Prints CHANGELOG.md with every fragment folded into [Unreleased], as the
@@ -159,6 +163,7 @@ check() {
 # [Unreleased] instead, and touches nothing.
 assemble() {
   local version="$1" date="$2" mode="${3:-cut}" work start end total section file prev base out
+  local again="" vend="" rest
   if [[ "$mode" == cut ]]; then
     [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || die "'$version' is not a version such as 0.0.9 or 0.0.9-rc.1"
     [[ "$date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "'$date' is not a date written YYYY-MM-DD"
@@ -166,9 +171,6 @@ assemble() {
   [[ -f CHANGELOG.md ]] || die "CHANGELOG.md is missing"
   check > /dev/null
 
-  if [[ "$mode" == cut ]] && awk -v heading="## [$version]" 'index($0, heading) == 1 { found = 1 } END { exit !found }' CHANGELOG.md; then
-    die "CHANGELOG.md already has a [$version] section"
-  fi
   start="$(grep -n -m1 -E '^## \[Unreleased\][[:space:]]*$' CHANGELOG.md | cut -d: -f1 || true)"
   [[ -n "$start" ]] || die "CHANGELOG.md has no '## [Unreleased]' heading"
   total="$(wc -l < CHANGELOG.md | tr -d ' ')"
@@ -176,6 +178,19 @@ assemble() {
   # reference block, whichever comes first.
   end="$(awk -v s="$start" 'NR > s && (/^## \[/ || /^\[[^]]+\]: /) { print NR - 1; exit }' CHANGELOG.md)"
   [[ -n "$end" ]] || end="$total"
+
+  # An existing [$version] is assembled again only while it is the newest
+  # section and untagged: a released section is never rewritten.
+  if [[ "$mode" == cut ]] && awk -v heading="## [$version]" 'index($0, heading) == 1 { found = 1 } END { exit !found }' CHANGELOG.md; then
+    awk -v n="$((end + 1))" -v heading="## [$version]" 'NR == n { exit index($0, heading) != 1 } END { if (NR < n) exit 1 }' CHANGELOG.md ||
+      die "CHANGELOG.md already has a [$version] section, and it is not the newest one"
+    if version_tagged "v$version"; then
+      die "CHANGELOG.md already has a [$version] section, and v$version is tagged"
+    fi
+    again=1
+    vend="$(awk -v s="$((end + 1))" 'NR > s && (/^## \[/ || /^\[[^]]+\]: /) { print NR - 1; exit }' CHANGELOG.md)"
+    [[ -n "$vend" ]] || vend="$total"
+  fi
 
   # The link reference label matches in either case (CHANGELOG.md writes
   # "[unreleased]"), and the cut keeps the spelling it found.
@@ -208,6 +223,33 @@ assemble() {
     }
     section != "" { print > (dir "/old." section) }
   ' || exit 1
+
+  # Assembling again: the section's summary (the text above its first
+  # heading) and its entries, which go before the [Unreleased] entries.
+  if [[ -n "$again" ]]; then
+    sed -n "$((end + 2)),${vend}p" CHANGELOG.md | awk -v dir="$work" -v ver="$version" '
+      /^### / {
+        heading = substr($0, 5)
+        sub(/[[:space:]]+$/, "", heading)
+        section = tolower(heading)
+        if (section !~ /^(added|changed|deprecated|removed|fixed|security)$/) {
+          print "changelog: [" ver "] has a section \"" heading "\", which Keep a Changelog 1.1.0 does not define." > "/dev/stderr"
+          exit 1
+        }
+        next
+      }
+      section == "" { print > (dir "/summary") }
+      section != "" { print > (dir "/sec." section) }
+    ' || exit 1
+    for section in "${SECTIONS[@]}"; do
+      [[ -f "$work/sec.$section" ]] || continue
+      {
+        trim "$work/sec.$section"
+        [[ ! -f "$work/old.$section" ]] || trim "$work/old.$section"
+      } > "$work/both.$section"
+      mv "$work/both.$section" "$work/old.$section"
+    done
+  fi
 
   # Each section of the release: the [Unreleased] entries first, in their
   # order, then the fragments by file name. The Security section opens with
@@ -259,14 +301,23 @@ assemble() {
   {
     sed -n "1,${start}p" CHANGELOG.md
     printf '\n## [%s] - %s\n' "$version" "$date"
+    if [[ -n "$again" && -f "$work/summary" && -n "$(trim "$work/summary")" ]]; then
+      printf '\n'
+      trim "$work/summary"
+    fi
     for section in "${SECTIONS[@]}"; do
       [[ -s "$work/new.$section" ]] || continue
       printf '\n### %s\n\n' "$(title "$section")"
       cat "$work/new.$section"
     done
     printf '\n'
-    if [[ "$end" -lt "$total" ]]; then
-      sed -n "$((end + 1)),${total}p" CHANGELOG.md | awk -v ver="$version" -v prev="$prev" -v base="$base" -v label="$label" '
+    # Assembling again, the link references already name the version.
+    rest="$end"
+    [[ -z "$again" ]] || rest="$vend"
+    if [[ -n "$again" && "$rest" -lt "$total" ]]; then
+      sed -n "$((rest + 1)),${total}p" CHANGELOG.md
+    elif [[ "$rest" -lt "$total" ]]; then
+      sed -n "$((rest + 1)),${total}p" CHANGELOG.md | awk -v ver="$version" -v prev="$prev" -v base="$base" -v label="$label" '
         /^\[[Uu]nreleased\]: / {
           print "[" label "]: " base "/compare/v" ver "...HEAD"
           print "[" ver "]: " base "/compare/" prev "...v" ver
@@ -278,10 +329,31 @@ assemble() {
   } > "$out"
 
   cat "$out" > CHANGELOG.md
+  # A fragment a merge of main staged and did not commit is removed too (-f):
+  # what was folded in is its working-tree content, which tracked() checked.
   if [[ "${#fragments[@]}" -gt 0 ]]; then
-    git rm -q -- "${fragments[@]}"
+    git rm -q -f -- "${fragments[@]}"
   fi
-  echo "changelog: [$version] - $date assembled from ${#fragments[@]} fragment(s) and the [Unreleased] entries; review CHANGELOG.md and commit."
+  if [[ -n "$again" ]]; then
+    echo "changelog: [$version] - $date assembled again, with ${#fragments[@]} more fragment(s) and the [Unreleased] entries after its own; review CHANGELOG.md and commit."
+  else
+    echo "changelog: [$version] - $date assembled from ${#fragments[@]} fragment(s) and the [Unreleased] entries; review CHANGELOG.md and commit."
+  fi
+}
+
+# version_tagged TAG: 0 when TAG exists here or at origin, 1 when it exists in
+# neither. A repository with no origin is answered by its own tags; an origin
+# that cannot be asked fails the cut.
+version_tagged() {
+  local tag="$1" rc=0
+  git rev-parse -q --verify "refs/tags/$tag" > /dev/null && return 0
+  git remote get-url origin > /dev/null 2>&1 || return 1
+  git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null 2>&1 || rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    2) return 1 ;;
+    *) die "cannot ask origin whether $tag exists" ;;
+  esac
 }
 
 # tracked FILE MODE: refuses an untracked fragment at the cut; the preview reads
@@ -375,7 +447,7 @@ self_test() {
   # caller's reaches it.
   stub_git() {
     git -C "$work" -c user.name=self-test -c user.email=self-test@example.org \
-      -c commit.gpgsign=false -c core.hooksPath=/dev/null "$@"
+      -c commit.gpgsign=false -c tag.gpgsign=false -c core.hooksPath=/dev/null "$@"
   }
   flunk() {
     echo "changelog: self-test failed: $*" >&2
@@ -468,11 +540,13 @@ EOF
   fragment 5-x.security.md '- Fragment 5-x.'
   stub_git add -A
   stub_git commit -q -m "the stub"
+  stub_git tag v0.0.1
 
   expect "a version that is no version" 1 --assemble 0.0 2026-10-10
   expect "a date that is no date" 1 --assemble 0.0.2 10-10-2026
   expect "a missing argument" 2 --assemble 0.0.2
-  expect "an existing version" 1 --assemble 0.0.1 2026-10-10
+  expect "an existing, tagged version" 1 --assemble 0.0.1 2026-10-10
+  grep -q 'v0.0.1 is tagged' "$work/out" || flunk "the tagged version was not named."
   expect "the cut" 0 --assemble 0.0.2 2026-10-10
 
   cat > "$work/want" <<'EOF'
@@ -528,6 +602,82 @@ EOF
   stub_git commit -q -a -m "the cut"
   expect "a release with no entry" 1 --assemble 0.0.3 2026-10-11
   grep -q 'would be empty' "$work/out" || flunk "the empty release was not named."
+
+  # Assembling again in the release window (docs/release.md): the release
+  # branch wrote its summary, then merged main, which gained a fragment the
+  # merge stages without committing. The section keeps its summary and its
+  # entries, takes the fragment after them and the new date, and keeps the
+  # link references; the staged fragment is removed.
+  awk '{ print } /^## \[0\.0\.2\]/ { print ""; print "The second release, in one paragraph." }' \
+    "$work/CHANGELOG.md" > "$work/summary" && cat "$work/summary" > "$work/CHANGELOG.md"
+  stub_git commit -q -a -m "the summary"
+  stub_git switch -q -c later HEAD~2
+  fragment 30-late.fixed.md '- A fix that landed on main after the cut.'
+  fragment 31-late.removed.md '- A removal that landed on main after the cut.'
+  stub_git add -- "$FRAGMENT_DIR"
+  stub_git commit -q -m "main gains fragments"
+  stub_git switch -q main
+  stub_git merge -q --no-ff --no-commit later > /dev/null 2>&1 || flunk "the stub merge of main did not apply."
+  expect "an older version" 1 --assemble 0.0.1 2026-10-14
+  grep -q 'not the newest' "$work/out" || flunk "the older version was not named."
+  expect "the cut assembled again" 0 --assemble 0.0.2 2026-10-14
+  cat > "$work/want" <<'EOF'
+# Changelog
+
+## [Unreleased]
+
+## [0.0.2] - 2026-10-14
+
+The second release, in one paragraph.
+
+### Added
+
+- An entry written into CHANGELOG.md
+  before the fragments.
+- A second entry written into CHANGELOG.md.
+- Fragment 12-b (#12).
+- Fragment 12-b names another issue (#99) and its own (#12) already.
+- An entry that runs
+  over two lines (#3).
+  - and nests a list item.
+- A second entry of fragment 3, unpunctuated (#3)
+
+### Changed
+
+- Fragment 7-y (#7).
+
+### Removed
+
+- A removal that landed on main after the cut (#31).
+
+### Fixed
+
+- A fix written into CHANGELOG.md.
+- A fix that landed on main after the cut (#30).
+
+### Security
+
+- Fragment 5-x (#5).
+
+## [0.0.1] - 2026-10-01
+
+### Added
+
+- The first release.
+
+[unreleased]: https://example.org/r/compare/v0.0.2...HEAD
+[0.0.2]: https://example.org/r/compare/v0.0.1...v0.0.2
+[0.0.1]: https://example.org/r/releases/tag/v0.0.1
+EOF
+  diff -u "$work/want" "$work/CHANGELOG.md" > "$work/out" || flunk "the CHANGELOG.md assembled again differs from the expected one."
+  if [[ -n "$(stub_git ls-files -- "$FRAGMENT_DIR" | grep -v '/README.md$' || true)" ]] ||
+    [[ -e "$work/$FRAGMENT_DIR/30-late.fixed.md" ]]; then
+    flunk "a fragment survived the cut assembled again."
+  fi
+  stub_git commit -q -a -m "merge main and assemble again"
+  stub_git tag v0.0.2
+  expect "a version tagged after its cut" 1 --assemble 0.0.2 2026-10-15
+  grep -q 'v0.0.2 is tagged' "$work/out" || flunk "the tagged version was not named."
   printf '%s\n' '# Changelog' '' '## [Unreleased]' '' '### Improved' '' "$entry" '' \
     '[Unreleased]: https://example.org/r/compare/v0.0.2...HEAD' > "$work/CHANGELOG.md"
   cp "$work/CHANGELOG.md" "$work/before"

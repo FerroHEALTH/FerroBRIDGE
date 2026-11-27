@@ -129,7 +129,7 @@ essential functionalities and information about the security properties;"
     and audience, and every request then needs a valid SMART App Launch 2.x
     access token or the configured Basic credential of a person. A route under `/fhir` the guard does not
     classify is refused with `403`
-    ([the FHIR facade, security](../integrate/fhir-facade.md#security)).
+    ([the FHIR facade, security](../integrate/facade-security.md#security)).
   - The request log carries the matched route and never a body, and a query
     parameter value reaches it only when you name the parameter
     ([`[telemetry]`](../operate/configuration.md#telemetry)).
@@ -172,7 +172,7 @@ The ones to know before you deploy:
 - **A lost identity store or lookup key.** A lost state database makes the
   next create of a resource the CDR already holds write a second composition,
   and a lost `[state.seal] lookup_key` leaves every stored digest unreadable
-  ([the identity store](../operate/container.md#the-identity-store)).
+  ([the identity store](../operate/container.md#the-state-store)).
 - **The operator scope rewrites mappings.** With `[operator]` and `[state]`
   set, a token that carries `[auth] product_scope` can save and reload the
   mappings that decide what the facade writes into the CDR
@@ -233,7 +233,7 @@ lifetime of the product with digital elements to ensure its secure use;"
   facade, the operations or the operator API, and pass every secret through
   its `_file` sibling ([configuring the server](../operate/configuration.md)).
   Back the state database and its keys up with the CDR
-  ([the identity store](../operate/container.md#the-identity-store)). Connect
+  ([the identity store](../operate/container.md#the-state-store)). Connect
   to the CDM database with `sslmode=verify-full`
   ([`[cdm]`](../operate/configuration.md#cdm)). Check the mapping set with
   `ferrobridge mapping check` and the deployment with the probes
@@ -286,7 +286,7 @@ then replace the binary or deploy the new image by digest and restart. On
 `SIGTERM` the server drains its requests for up to
 `[server] shutdown_timeout` before it exits. Every replica shares the state
 store, so a rolling update keeps the identity map, the links and the facade's
-own resources ([the identity store](../operate/container.md#the-identity-store)).
+own resources ([the identity store](../operate/container.md#the-state-store)).
 
 ### 8(d) Secure decommissioning, and removing user data
 

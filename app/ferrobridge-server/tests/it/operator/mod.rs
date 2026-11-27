@@ -192,7 +192,12 @@ impl Case {
             Some(intake) => state.with_intake(intake),
             None => state,
         };
-        let app = ferrobridge_server::router(Arc::new(state), &crate::support::settings());
+        // A source document such as a shipped template is larger than 1 KiB.
+        let settings = ferrohealth_server::section::ServerSection {
+            body_limit: ferrohealth_config::units::ByteSize::from_bytes(64 * 1024),
+            ..crate::support::settings()
+        };
+        let app = ferrobridge_server::router(Arc::new(state), &settings);
         Ok(Self {
             tree,
             issuer,

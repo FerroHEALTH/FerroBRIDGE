@@ -9,7 +9,9 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use ferrobridge_server::cdr::ids::EhrId;
+use ferrobridge_server::cdr::CdrClient;
+use ferrobridge_server::cdr::config::CdrConfig;
+use ferrobridge_server::cdr::ids::{EhrId, SubjectId, SubjectNamespace};
 use ferrobridge_server::identity::PersonId;
 use ferrobridge_server::identity::store::{MemoryStore, Store};
 use ferrobridge_server::inbound::apply::{Apply, Resolve, Resolved, Step};
@@ -18,8 +20,10 @@ use ferrobridge_server::inbound::store::{Claimed, WorkKey};
 use ferrobridge_server::inbound::worker::Handler;
 use ferrobridge_server::sources::Source;
 use ferrobridge_server::sources::document::Tenant;
+use ferrobridge_testkit::containers;
 use ferrobridge_testkit::stubs::its_rest;
 use fhir_types::codec::Value;
+use openehr_its::rest::generated::ehr::client::EhrGetBySubjectOutcome;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 
 use crate::facade::{EHR_ID, client};
@@ -546,6 +550,138 @@ async fn each_feed_and_ehr_create_is_recorded_in_the_outbox() -> Result<(), Box<
         7,
         second.len(),
         "an EHR found again is no create: {second:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_hl7v2_merge_carried_in_its_event_reaches_the_identity_source_as_resolve_duplicate()
+-> Result<(), Box<dyn Error>> {
+    // PIXm 3.1.0 §2:3.104.4.2.2: an A40's MRG-1 replaced by its PID-3, read from the
+    // sealed body of the event the item was claimed at.
+    let Some((_postgres, store)) = crate::store::sealed_store().await? else {
+        return Ok(());
+    };
+    let secrets = tempfile::tempdir()?;
+    let sources = crate::inbound::store::sources(&store, secrets.path())?;
+    let mllp = crate::inbound::store::create(
+        &sources,
+        &ferrobridge_operator_api::sources::Write {
+            name: String::from("northhosp-adt"),
+            kind: ferrobridge_operator_api::sources::Kind::Mllp,
+            enabled: true,
+            document: serde_json::json!({"routes": [{
+                "sending_application": "ADMIT", "sending_facility": "NORTHHOSP",
+                "source_cidrs": ["127.0.0.0/8"]
+            }]}),
+        },
+    )
+    .await?;
+    let inbox = ferrobridge_server::inbound::store::InboxStore::new(store.pool().clone())
+        .with_seal(store.seal().cloned());
+    let statement = serde_json::json!({
+        "resourceType": "Patient",
+        "identifier": [{"system": LOCAL, "value": "local-0001"}],
+        "link": [{
+            "other": {"identifier": {"system": LOCAL, "value": "local-0002"}},
+            "type": "replaced-by"
+        }]
+    });
+    inbox
+        .accept_with_body(
+            mllp.id,
+            LOCAL,
+            &ferrobridge_server::inbound::event::Event {
+                change: Change::Upsert,
+                tenant: Some(LOCAL.to_owned()),
+                entity: String::from("local-0001"),
+                dedupe_key: ferrobridge_server::inbound::event::DedupeKey::of(vec![
+                    serde_json::json!("hl7v2"),
+                    serde_json::json!("MSG-A40"),
+                    serde_json::json!(0),
+                ]),
+                stamp: Some(String::from("2026-11-25T10:00:00Z")),
+            },
+            &ferrobridge_server::inbound::store::Body::new(statement.to_string().into_bytes()),
+        )
+        .await?;
+    let claimed = inbox
+        .claim(uuid::Uuid::new_v4(), std::time::Duration::from_secs(30), 1)
+        .await?
+        .remove(0);
+    let upstreams = Upstreams::start().await;
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .connect_lazy("postgres://nobody:nothing@127.0.0.1:1/none?sslmode=disable")?;
+    let sources = Arc::new(ferrobridge_server::sources::Sources::new(pool, None));
+    let handler = upstreams
+        .handler(Arc::new(
+            ferrobridge_server::inbound::resolve::Declared::new(sources),
+        ))
+        .with_inbox(Some(inbox));
+    handler
+        .apply(&mllp, &claimed)
+        .await
+        .map_err(|failed| failed.reason)?;
+    let fed = upstreams.fed().await?;
+    assert_eq!(1, fed.len());
+    let (condition, patient) = &fed[0];
+    assert!(condition.contains("local-0001"), "{condition}");
+    assert_eq!(statement["link"], patient["link"]);
+    assert_eq!(0, upstreams.count("POST", "/ehr").await);
+    Ok(())
+}
+
+#[tokio::test]
+async fn against_the_reference_cdr_an_upsert_ensures_one_ehr_under_the_pseudonym()
+-> Result<(), Box<dyn Error>> {
+    // ITS-REST 1.1.0 ehr.html: the EHR is created with EHR_STATUS.subject.external_ref
+    // naming the pseudonym, and found again by that subject.
+    if !containers::e2e_enabled() {
+        return Ok(());
+    }
+    let cdr = containers::cdr().await?;
+    let client = CdrClient::new(&CdrConfig::new(cdr.base_url().parse()?))?;
+    let pix = MockServer::start().await;
+    mount_feed(&pix, 201).await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path(PIX_PATH))
+        .respond_with(pseudonym_answer(DOMAIN, PSEUDONYM))
+        .mount(&pix)
+        .await;
+    let handler = |store: &Arc<MemoryStore>| {
+        let identity = identity_source_accepting(&format!("{}/pix", pix.uri()), DOMAIN, &[LOCAL]);
+        Apply::new(
+            Arc::new(Holding),
+            identity,
+            client.clone(),
+            crate::facade::handle(store),
+        )
+    };
+    let first = Arc::new(MemoryStore::default());
+    handler(&first)
+        .apply(&source(), &item("local-0001", Change::Upsert))
+        .await
+        .map_err(|failed| failed.reason)?;
+    let person = PersonId::new(DOMAIN, PSEUDONYM)?;
+    let created = first.ehr_of(&person).await?.ok_or("the EHR is bound")?;
+    let found = client
+        .ehr_by_subject(&SubjectId::new(PSEUDONYM)?, &SubjectNamespace::new(DOMAIN)?)
+        .await?;
+    let EhrGetBySubjectOutcome::Ok { body, .. } = found.outcome else {
+        return Err("the CDR holds an EHR for the pseudonym".into());
+    };
+    assert_eq!(created.as_str(), body.ehr_id.value());
+    let second = Arc::new(MemoryStore::default());
+    for change in [Change::Upsert, Change::Remove] {
+        handler(&second)
+            .apply(&source(), &item("local-0001", change))
+            .await
+            .map_err(|failed| failed.reason)?;
+    }
+    assert_eq!(
+        Some(created),
+        second.ehr_of(&person).await?,
+        "a replica with an empty identity map finds the one EHR and creates none"
     );
     Ok(())
 }

@@ -41,8 +41,8 @@ levels. Case does not matter; single underscores inside a key name stay as
 they are.
 
 ```text
-FERROBRIDGE__SERVER__LISTEN            -> [server] listen
-FERROBRIDGE__CDR__ENDPOINT__URL             -> [cdr] base_url
+FERROBRIDGE__SERVER__LISTEN                      -> [server] listen
+FERROBRIDGE__CDR__ENDPOINT__URL                  -> [cdr] endpoint.url
 FERROBRIDGE__CDR__ENDPOINT__RETRY__MAX_ATTEMPTS  -> [cdr.endpoint.retry] max_attempts
 ```
 
@@ -710,6 +710,7 @@ live in its document, within these.
 | `max_attempts` | `10` | no | The attempts before a failing item parks for an operator, at least 1 |
 | `idle` | `5s` | no | How long an idle worker waits for a notification before it looks for due work again; more than `0s` |
 | `recovery_tick` | `30s` | no | How often each replica looks for a source whose redelivery or reconciliation is due ([Recover what an outage lost](../integrate/inbound.md#recover-what-an-outage-lost)); more than `0s` |
+| `parked_body_retention` | `7d` | no | How long the sealed patient record an HL7 v2 patient event carries is kept once its item parks, before it is cleared; more than `0s` |
 
 ```toml
 [inbound]
@@ -728,7 +729,7 @@ refuses every job.
 | `aql` | none | no | The composition query, which `etl run` needs and `etl fhir` does not read; `etl run` refuses to start without it. It aliases `ehr_id`, `version_uid` and the whole `composition`, carries an `ORDER BY` that ends in `v/uid/value` and no `LIMIT`. Every `COMPOSITION` it reads sits below `VERSION v[LATEST_VERSION]` ([The composition query](../integrate/omop-etl.md#the-composition-query)). It may name `$since`, which `--since` binds. It may also alias `versioned_object_uid`, which the runner then checks against the version; when it does not, the runner reads it from the `version_uid`, whose `object_id` part names the versioned object (openEHR RM Common 1.1.0, `OBJECT_VERSION_ID`) |
 | `page_size` | `100` | no | The `fetch` of each page of either query, and the number of watermarks each batch of the deletion check reads |
 | `deletions` | `remove` | no | What a run does with a composition the CDR reports deleted: `remove` deletes its rows, links and watermark, `report` lists it in the run report and keeps them. Any other value refuses the start ([Deleted compositions](../integrate/omop-etl.md#deleted-compositions)) |
-| `quality_checks` | `false` | no | With `true`, `etl run` runs the ported Data Quality Dashboard checks over the tables it wrote, `PERSON` and the derived tables once the load is done, and the run report carries their verdicts and every failing check id. A failed check never rolls the committed load back. `ferrobridge dq check` runs the same checks over the whole CDM ([Checking a populated database](../integrate/omop-etl.md#checking-a-populated-database-with-the-data-quality-dashboard)) |
+| `quality_checks` | `false` | no | With `true`, `etl run` runs the ported Data Quality Dashboard checks over the tables it wrote, `PERSON` and the derived tables once the load is done, and the run report carries their verdicts and every failing check id. A failed check never rolls the committed load back. `ferrobridge dq check` runs the same checks over the whole CDM ([Checking a populated database](../integrate/omop-quality.md#checking-a-populated-database-with-the-data-quality-dashboard)) |
 | `derived_tables` | `owned_persons` | no | Which rows of `OBSERVATION_PERIOD`, `CONDITION_ERA` and `DRUG_ERA` a run rebuilds: `owned_persons`, the rows of the persons the bridge writes, keeping every other person's rows, or `whole_table`, every row from every row in the schema. Any other value refuses the start ([One writer per CDM table](deployment-shape.md#one-writer-per-cdm-table)) |
 | `type_concept_id` | none, required | no | The `*_type_concept_id` the mappings write, the provenance of the records |
 | `observation_period_type_concept_id` | none, required | no | The `period_type_concept_id` of every observation period |
@@ -924,7 +925,7 @@ source identity of every resource the facade consumed. It lives in the state sto
 `[state.seal]`, and every replica shares it. No clinical content and no
 identifier value in clear is written into it. Back the database up with the
 CDR, because a lost map means the next create writes a second composition for a
-resource the CDR already holds ([the identity store](container.md#the-identity-store)).
+resource the CDR already holds ([the identity store](container.md#the-state-store)).
 
 ### `[facade.references]`
 
@@ -964,7 +965,7 @@ fragment, is a boot error naming `facade.references.fetch_bases`.
 
 The origins a browser app may call the facade's REST routes from, through
 cross-origin resource sharing (the Integrate page,
-[Browser apps](../integrate/fhir-facade.md#browser-apps-cors)). SMART App
+[Browser apps](../integrate/facade-security.md#browser-apps-cors)). SMART App
 Launch 2.2.0 asks a server that supports purely browser-based apps to admit
 a client's registered origins on its FHIR REST API; the facade holds no
 client registry, so this list is that registration. The
@@ -987,7 +988,7 @@ caller's token, so they answer only an origin you name.
 ### `[facade.consent]`
 
 The exchange of a patient's access directives as FHIR `Consent`, IHE BPPC and
-IHE APPC (the Integrate page, [Consent and access directives](../integrate/fhir-facade.md#consent-and-access-directives)).
+IHE APPC (the Integrate page, [Consent and access directives](../integrate/facade-consent.md#consent-and-access-directives)).
 Off, `Consent` is no resource type of the facade and the `CapabilityStatement`
 lists none. On, the facade reads and writes the `EHR_ACCESS` of the patient's
 EHR on the CDR, through the CDR's `EHR_ACCESS` read and a CONTRIBUTION, always
@@ -1016,7 +1017,7 @@ own design.
 
 SMART App State (SMART App Launch 2.2.0, Persisting App State), served as
 `Basic` at the facade's base (the Integrate page,
-[SMART App State](../integrate/fhir-facade.md#smart-app-state)). Off, `Basic`
+[SMART App State](../integrate/facade-smart.md#smart-app-state)). Off, `Basic`
 is an ordinary resource type a program may map. On, `Basic` is the App State
 endpoint, the discovery document lists `smart-app-state`, and the
 `CapabilityStatement` instantiates `smart-app-state-server`; a context that
@@ -1035,7 +1036,7 @@ is FerroBRIDGE's own design.
 
 SMART launch `Task`s (SMART App Launch 2.2.0, Task profile for requesting a
 SMART launch), served as `Task` at the facade's base (the Integrate page,
-[SMART launch Tasks](../integrate/fhir-facade.md#smart-launch-tasks)). Off,
+[SMART launch Tasks](../integrate/facade-smart.md#smart-launch-tasks)). Off,
 `Task` is an ordinary resource type a program may map. On, `Task` serves the
 `task-ehr-launch` and `task-standalone-launch` profiles; a context that maps
 `Task` is then a boot error, and a reload that adds one is refused.
@@ -1069,7 +1070,7 @@ Each key is settable as `FERROBRIDGE__FACADE__ENDPOINT__<KEY>`.
 
 The IHE MHD 4.2.3 Document Responder over the documents the Composition
 contexts assemble (the Integrate page,
-[The IHE MHD Document Responder](../integrate/fhir-facade.md#the-ihe-mhd-document-responder)).
+[The IHE MHD Document Responder](../integrate/facade-documents.md#the-ihe-mhd-document-responder)).
 Off, `DocumentReference` and `List` are ordinary resource types a program may
 map. On, the facade serves them itself, a context that maps either is a boot
 error, and `[facade.identifier_search]` must be on, since both searches take a
@@ -1085,7 +1086,7 @@ Each key is settable as `FERROBRIDGE__FACADE__MHD__<KEY>`.
 
 The patient summary, `GET /fhir/Patient/{id}/$summary` (HL7 IPS 2.0.1,
 `OperationDefinition/summary`; the Integrate page,
-[Patient summary](../integrate/fhir-facade.md#patientsummary-writes-the-patient-summary)).
+[Patient summary](../integrate/facade-documents.md#patientsummary-writes-the-patient-summary)).
 On, the server needs `[cdr] demographic` and a loaded `Patient` party
 context, fetches the `eehrxf` patient summary template from the CDR and
 reads the packages at boot; a template the CDR does not hold, or a package
@@ -1212,7 +1213,7 @@ health routes, and the jobs (`cdm init`, `etl run`, `mapping check`), read no
 `[auth]`. **While it is off, the facade authenticates no caller and serves
 every request that reaches it**, reads and writes of patient data included,
 and the server logs a warning saying so at start-up. The
-[FHIR facade](../integrate/fhir-facade.md#security) page says what a caller
+[FHIR facade](../integrate/facade-security.md#security) page says what a caller
 sends and what each refusal looks like.
 
 | Key | Default | Meaning |
@@ -1804,7 +1805,19 @@ name = "Example Hospital"
 identifier_system = "urn:oid:2.999.1.1"
 identifier_value = "example-hospital"
 
-[auth]
+[state]
+url_file = "/run/secrets/state-url"
+
+[state.seal]
+lookup_key_file = "/run/secrets/state-lookup-key"
+
+[[state.seal.keys]]
+id = "2026-11"
+key_file = "/run/secrets/state-seal-2026-11"
+
+[auth.issuer.clinic]
 issuer = "https://auth.example.org/realms/clinic"
-audience = ["https://bridge.example.org/fhir"]
 ```
+
+The issuer's tokens are for the facade when their `aud` names
+`[facade] base_url`, the default `audience` of an issuer table.

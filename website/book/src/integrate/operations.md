@@ -7,15 +7,15 @@ FerroBRIDGE serves the two operations the FHIRconnect specification defines for
 its engine: `$tofhir` turns an openEHR composition into FHIR resources, and
 `$toopenehr` turns FHIR resources back into a composition. Both are pure
 transformations. Neither reaches a CDR, and neither changes server state, so
-you can call them from a facade, a test harness or a shell.
+you can call them from a facade, a test or a shell.
 
 <!-- toc -->
 
 ## The chapter and its pin
 
-The REST API chapter merged into the FHIRconnect specification on 2026-10-06
-(pull request #93). FerroBRIDGE implements it at the specification commit
-recorded in `docs/VERSIONS.md` and vendors the chapter with its FSH operation
+FerroBRIDGE implements the REST API chapter of the FHIRconnect specification
+(FHIRconnect, Engine, REST API) at the specification commit the [pinned
+versions](../evaluate/versions.md) name, with the chapter's FSH operation
 definitions. The `context` fields are a fixed list: a call that supplies any
 other part under `context` is refused with a `structure` issue, as the
 chapter requires.
