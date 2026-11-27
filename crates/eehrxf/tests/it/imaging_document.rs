@@ -809,3 +809,99 @@ fn an_imaging_report_with_its_exposure_validates_against_bundle_report_eu_imagin
         .map_err(|error| format!("{error:?}"))?;
     Ok(())
 }
+
+/// The `package/` directory of the fetched profile package `name#version`.
+fn fetched(name: &str, version: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/specs/fhir-packages")
+        .join(format!("{name}#{version}"))
+        .join("package")
+}
+
+/// The resource of `kind` whose `url` is `url` among the files of `package`.
+fn canonical(package: &std::path::Path, kind: &str, url: &str) -> Result<Value, Box<dyn Error>> {
+    for file in std::fs::read_dir(package)? {
+        let file = file?.path();
+        let named = file
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(&format!("{kind}-")));
+        if !named {
+            continue;
+        }
+        let resource: Value = serde_json::from_str(&std::fs::read_to_string(&file)?)?;
+        if resource["url"] == url {
+            return Ok(resource);
+        }
+    }
+    Err(format!("{} holds no {kind} {url}", package.display()).into())
+}
+
+/// The concepts, as `system|code`, of the value set `url`, read from
+/// `packages` in order, following each included value set.
+fn concepts(packages: &[std::path::PathBuf], url: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let set = packages
+        .iter()
+        .find_map(|package| canonical(package, "ValueSet", url).ok())
+        .ok_or_else(|| format!("no package defines {url}"))?;
+    let mut held = Vec::new();
+    for include in set["compose"]["include"].as_array().ok_or("an include")? {
+        for included in include["valueSet"].as_array().into_iter().flatten() {
+            held.extend(concepts(
+                packages,
+                included.as_str().ok_or("a value set url")?,
+            )?);
+        }
+        let system = include["system"].as_str().unwrap_or_default();
+        for concept in include["concept"].as_array().into_iter().flatten() {
+            held.push(format!(
+                "{system}|{}",
+                concept["code"].as_str().ok_or("a code")?
+            ));
+        }
+    }
+    Ok(held)
+}
+
+// NOTE: MyHealth@EU imaging 9.1.1 composition-img-myhealtheu binds Composition.type required to Core
+// 1.0.0 eHDSIDocumentTypes over the 9.1.0 catalogue, met by one coding (FHIR R4 terminologies §4.1.5.1).
+#[test]
+fn the_type_holds_a_coding_the_myhealth_eu_imaging_binding_requires() -> Result<(), Box<dyn Error>>
+{
+    if std::env::var("FERROBRIDGE_SKIP_PROFILE_PACKAGES").is_ok_and(|value| value == "1") {
+        return Ok(());
+    }
+    let packages = [
+        fetched("myhealth.eu.fhir.core", "1.0.0"),
+        fetched("myhealth.eu.fhir.mvc-package", "9.1.0"),
+    ];
+    let allowed = concepts(
+        &packages,
+        "http://fhir.ehdsi.eu/core/ValueSet/eHDSIDocumentTypes",
+    )?;
+    for code in [Some(MR_BRAIN), None] {
+        let bundle = serde_json::to_value(document(code)?.into_bundle()?)?;
+        let codings: Vec<String> = the(&bundle, "Composition")?["type"]["coding"]
+            .as_array()
+            .ok_or("the type's codings")?
+            .iter()
+            .map(|coding| {
+                format!(
+                    "{}|{}",
+                    coding["system"].as_str().unwrap_or_default(),
+                    coding["code"].as_str().unwrap_or_default()
+                )
+            })
+            .collect();
+        assert!(
+            codings.iter().any(|coding| allowed.contains(coding)),
+            "{code:?}: {codings:?} holds none of {allowed:?}"
+        );
+        assert_eq!(
+            codings.first().map(String::as_str),
+            Some(format!("{LOINC}|{}", code.unwrap_or(IMAGING_REPORT)).as_str()),
+            "the report's code stays first"
+        );
+    }
+    Ok(())
+}
