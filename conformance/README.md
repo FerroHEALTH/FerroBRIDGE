@@ -11,9 +11,9 @@ disagrees with them. The counts are self-tested; none is a
 certification.
 
 - **Held upstream:** failing cases an open upstream-report issue holds
-  (`upstream.tsv` beside the pass list). They stay in the total and out of
-  the colour: a badge is green when every case the upstream does not hold
-  passes.
+  (`upstream.tsv` beside the pass list). They stay in the total. A badge is
+  green only when every case passes, and yellowgreen when every case that
+  does not pass is held upstream.
 - **Also counted:** unmapped annex elements; codes outside an
   extensible value set that a review found no concept for (FHIR R4
   terminologies 4.1.5.3), counted as passing; and annex elements whose
