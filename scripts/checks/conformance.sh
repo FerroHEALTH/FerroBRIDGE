@@ -214,7 +214,7 @@ readonly QUALITY_BADGES=(
 )
 
 # The line under the caption that says what a suffix after a fraction counts.
-readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour; k extensible misses reviewed: codes outside an extensible value set that a review found no concept for (FHIR R4 terminologies 4.1.5.3), counted as passing; k differ from Xt-EHR: annex elements whose Xt-EHR element differs, passing when a decision records where each goes'
+readonly BADGE_LEGEND='k upstream: failing cases an open upstream-report issue holds, in the total and out of the colour; k extensible misses reviewed: codes outside an extensible value set that a review found no concept for (FHIR R4 terminologies 4.1.5.3), counted as passing; k differ from Xt-EHR: annex elements whose Xt-EHR element differs, passing when a decision records where each goes; post-quantum: safe uses out of those a post-quantum standard covers, k without a post-quantum standard'
 
 # The badge label of a corpus.
 label_of() {
