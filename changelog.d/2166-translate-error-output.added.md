@@ -1,1 +1,0 @@
-- The `$translate` contracts of `fhir-types` 0.3.0 (R4, R4B, R5 and R6) carry the terminology ecosystem IG 1.11.0 `error` output, one `string` per returned target code that is not valid in its code system, and the `note` part of a match whose target code system the server does not know. `ferrobridge-term` 0.22.0 reads both into `TranslateOutcome::errors` and `Match::note`.
