@@ -60,7 +60,7 @@ certification.
 | Imaging report | 96 of 97 annex elements held | 1 ([#2120](https://github.com/FerroHEALTH/FerroBRIDGE/issues/2120)) | 2 unmapped | the EEHRxF draft 2026-11-23 | [pass list](eehrxf-draft-imaging/pass-list.txt) |
 | Discharge report | 263 of 263 annex elements held | - | 9 unmapped | the EEHRxF draft 2026-11-23 | [pass list](eehrxf-draft-discharge/pass-list.txt) |
 | Annex X groups served | 33 of 33 cases passing | - | - | - | [pass list](eehrxf-annex-x/pass-list.txt) |
-| Xt-EHR 1.0.0 crosswalk | 797 of 852 elements resolved | - | 140 differ from Xt-EHR | Xt-EHR models 1.0.0 against the EEHRxF draft 2026-11-23 | [pass list](xtehr-crosswalk/pass-list.txt) |
+| Xt-EHR 1.0.0 crosswalk | 852 of 852 elements resolved | - | 140 differ from Xt-EHR | Xt-EHR models 1.0.0 against the EEHRxF draft 2026-11-23 | [pass list](xtehr-crosswalk/pass-list.txt) |
 
 ## MyHealth@EU
 
