@@ -1,0 +1,14 @@
+case	issue
+HighBoundary/HighBoundaryDateTimeMillisecond1	815
+HighBoundary/HighBoundaryDateTimeMillisecond3	815
+HighBoundary/HighBoundaryDecimal15	815
+HighBoundary/HighBoundaryDecimal16	815
+HighBoundary/HighBoundaryQuantity	815
+LowBoundary/LowBoundaryDateTimeMillisecond1	815
+LowBoundary/LowBoundaryDecimal15	815
+LowBoundary/LowBoundaryQuantity	815
+period/testPeriodInvariantNew	815
+testLargeExponents/testHugeQtyLowBoundaryPrecision	2330
+testLargeExponents/testLargeExponentQtyLowBoundary	2330
+testSort/testSort10	815
+testSort/testSort8	815

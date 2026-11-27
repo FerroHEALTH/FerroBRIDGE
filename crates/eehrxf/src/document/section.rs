@@ -84,6 +84,24 @@ impl Section {
         self
     }
 
+    /// Returns this section with one paragraph of its narrative for each
+    /// path of `paths`, naming an element the source composition holds that
+    /// the section's entries do not carry, by its openEHR path and never by
+    /// its value (`eehrxf::mapping::left_out` reads them from a run).
+    ///
+    /// A reader of the section's narrative is then told the record holds
+    /// more than the document shows. No specification governs where the
+    /// declaration goes: our own design.
+    #[must_use]
+    pub fn with_left_out<I: IntoIterator<Item = String>>(mut self, paths: I) -> Self {
+        self.paragraphs.extend(paths.into_iter().map(|path| {
+            format!(
+                "The source record holds the element {path}, which this document does not carry."
+            )
+        }));
+        self
+    }
+
     /// Returns this section with `reason` as the reason it has no entry,
     /// which the document writes only while it has none (`cmp-2`). A
     /// [`super::form::SectionRule::Reasoned`] rule of the document's form
