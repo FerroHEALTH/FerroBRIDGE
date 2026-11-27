@@ -30,6 +30,7 @@ pub(crate) async fn replica(url: &str) -> Result<Store, Box<dyn Error>> {
         connection: omop_cdm::connection::CdmConnection::new(url, None)?,
         max_connections: 8,
         acquire_timeout: Duration::from_secs(30),
+        identity_copy_entries: 0,
         seal: None,
     })
     .await?)

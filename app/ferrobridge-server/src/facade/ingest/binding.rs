@@ -24,13 +24,14 @@ use crate::facade::outcome::IssueType;
 use crate::facade::programs::Loaded;
 use crate::facade::request::Inbound;
 use crate::facade::status;
+use crate::identity::ExternalResourceId;
 use crate::identity::FhirResourceId;
 use crate::identity::derive;
 use crate::identity::derive::EntryKey;
 use crate::identity::record::CompositionBinding;
-use crate::identity::record::ConsumedSource;
 use crate::identity::record::Identifier;
 use crate::identity::record::SourceVersion;
+use crate::identity::store::EntryWrite;
 use crate::terminology::Direction;
 use ferrohealth_server::run::chain;
 
@@ -299,17 +300,16 @@ impl Ingest<'_> {
         version: &ObjectVersionId,
         composition: &CanonicalComposition,
     ) -> Result<Written, Refused> {
-        let (id, stood) = self
-            .bind(
-                program,
-                inbound.resource_type(),
-                ehr_id,
-                version,
-                composition,
-            )
-            .await?;
-        self.finish_write(inbound, id, &stood, ehr_id, version, composition.clone())
-            .await
+        let entry = only_entry(program, composition)?;
+        self.written_entry(
+            program,
+            inbound,
+            (ehr_id, version),
+            composition,
+            &entry,
+            composition.clone(),
+        )
+        .await
     }
 
     /// Records the identity of a committed update of the entry `path` names,
@@ -336,54 +336,20 @@ impl Ingest<'_> {
                 ),
             )
         })?;
-        let (id, stood) = self
-            .bind_entry(
-                program,
-                inbound.resource_type(),
-                ehr_id,
-                version,
-                composition,
-                &entry,
-            )
-            .await?;
-        self.finish_write(
+        let narrowed = entry.isolate(composition);
+        self.written_entry(
+            program,
             inbound,
-            id,
-            &stood,
-            ehr_id,
-            version,
-            entry.isolate(composition),
+            (ehr_id, version),
+            composition,
+            &entry,
+            narrowed,
         )
         .await
     }
 
-    /// Indexes and consumes the source of one bound write, and returns what
-    /// stands.
-    async fn finish_write(
-        &self,
-        inbound: &Inbound,
-        id: FhirResourceId,
-        stood: &CompositionBinding,
-        ehr_id: &EhrId,
-        version: &ObjectVersionId,
-        composition: CanonicalComposition,
-    ) -> Result<Written, Refused> {
-        self.index(inbound, &id).await?;
-        if let Some(source) = resource_source(inbound) {
-            self.consume(&source, stood, &id).await?;
-        }
-        Ok(Written {
-            id,
-            ehr_id: ehr_id.clone(),
-            version: version.clone(),
-            composition,
-            delivery: Delivery::Committed,
-            losses: Vec::new(),
-        })
-    }
-
-    /// Binds and consumes each mapped entry at the version `stored` pairs with
-    /// it, in entry order.
+    /// Binds, indexes and consumes each mapped entry at the version `stored`
+    /// pairs with it, in entry order.
     ///
     /// The identity is read from the composition the CDR stored at that
     /// version, so a retry that maps the resource again binds what the first
@@ -400,19 +366,17 @@ impl Ingest<'_> {
         let mut placed = Vec::with_capacity(stored.len());
         for ((entry, (version, held)), source) in mapped.iter().zip(stored).zip(sources) {
             let composition = canonical_of(&held, &entry.built)?;
-            let (id, stood) = self
-                .bind(
+            let first = only_entry(&entry.program, &composition)?;
+            let (id, _stood) = self
+                .write_entry(
                     &entry.program,
-                    entry.inbound.resource_type(),
-                    ehr_id,
-                    &version,
+                    &entry.inbound,
+                    (ehr_id, &version),
                     &composition,
+                    &first,
+                    source.as_ref(),
                 )
                 .await?;
-            self.index(&entry.inbound, &id).await?;
-            if let Some(source) = source {
-                self.consume(source, &stood, &id).await?;
-            }
             placed.push(Placed {
                 id,
                 version,
@@ -432,15 +396,7 @@ impl Ingest<'_> {
         version: &ObjectVersionId,
         composition: &CanonicalComposition,
     ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
-        let entry = engine::entry::entry_of(program.program(), program.index(), composition)?
-            .ok_or_else(|| {
-                Refused::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Issue::error(IssueType::Exception).diagnosing(
-                    "the committed composition carries no entry of the archetype the program maps",
-                ),
-            )
-            })?;
+        let entry = only_entry(program, composition)?;
         self.bind_entry(program, resource_type, ehr_id, version, composition, &entry)
             .await
     }
@@ -459,68 +415,147 @@ impl Ingest<'_> {
         composition: &CanonicalComposition,
         entry: &engine::entry::Entry,
     ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
+        let bound = Bound::of(
+            program,
+            resource_type,
+            (ehr_id, version),
+            composition,
+            entry,
+        );
+        self.store
+            .record_entry(&bound.write(resource_type, &[], None))
+            .await
+            .map_err(|error| store_refusal(&error))
+    }
+
+    /// Records the entry of a written resource with the source it names,
+    /// and returns the committed write of `narrowed`.
+    async fn written_entry(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        (ehr_id, version): (&EhrId, &ObjectVersionId),
+        composition: &CanonicalComposition,
+        entry: &engine::entry::Entry,
+        narrowed: CanonicalComposition,
+    ) -> Result<Written, Refused> {
+        let source = resource_source(inbound);
+        let (id, _stood) = self
+            .write_entry(
+                program,
+                inbound,
+                (ehr_id, version),
+                composition,
+                entry,
+                source.as_ref(),
+            )
+            .await?;
+        Ok(Written {
+            id,
+            ehr_id: ehr_id.clone(),
+            version: version.clone(),
+            composition: narrowed,
+            delivery: Delivery::Committed,
+            losses: Vec::new(),
+        })
+    }
+
+    /// Records the binding of one entry of a written resource with every
+    /// `Resource.identifier` it carries, so a conditional create's
+    /// `identifier` search finds it (<https://hl7.org/fhir/R4/http.html#ccreate>),
+    /// and the `source` it consumed, in one store write.
+    async fn write_entry(
+        &self,
+        program: &Loaded,
+        inbound: &Inbound,
+        located: (&EhrId, &ObjectVersionId),
+        composition: &CanonicalComposition,
+        entry: &engine::entry::Entry,
+        source: Option<&SourceVersion>,
+    ) -> Result<(FhirResourceId, CompositionBinding), Refused> {
+        let resource_type = inbound.resource_type();
+        let bound = Bound::of(program, resource_type, located, composition, entry);
+        let identifiers = identifiers_of(inbound);
+        self.store
+            .record_entry(&bound.write(resource_type, &identifiers, source))
+            .await
+            .map_err(|error| store_refusal(&error))
+    }
+}
+
+/// The first entry of the program's archetype in `composition`.
+fn only_entry(
+    program: &Loaded,
+    composition: &CanonicalComposition,
+) -> Result<engine::entry::Entry, Refused> {
+    engine::entry::entry_of(program.program(), program.index(), composition)?.ok_or_else(|| {
+        Refused::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Issue::error(IssueType::Exception).diagnosing(
+                "the committed composition carries no entry of the archetype the program maps",
+            ),
+        )
+    })
+}
+
+/// The key, the derived id and the binding one committed entry is recorded
+/// under.
+struct Bound {
+    /// The key the internal id is recorded under.
+    key: ExternalResourceId,
+    /// The internal id derived for the entry.
+    derived: FhirResourceId,
+    /// Where the entry lives.
+    binding: CompositionBinding,
+}
+
+impl Bound {
+    /// Returns the record of `entry` in the composition committed at
+    /// `located`, served as `resource_type`.
+    fn of(
+        program: &Loaded,
+        resource_type: &str,
+        (ehr_id, version): (&EhrId, &ObjectVersionId),
+        composition: &CanonicalComposition,
+        entry: &engine::entry::Entry,
+    ) -> Self {
         // NOTE: no specification governs this: our own design, every further resource
         // of a split is bound as a created resource of its own when the entry is
         // rendered, so the entry's identity is its first occurrence.
         let path = entry.identity_path().to_owned();
         let key = EntryKey::new(version.versioned_object_id(), path.as_str());
-        let map_key = derive::map_key(&key);
-        let id = self
-            .store
-            .record_internal(resource_type, &map_key, &derive::entry_id(&key))
-            .await
-            .map_err(|error| store_refusal(&error))?;
-        let binding = CompositionBinding {
-            ehr_id: String::from(ehr_id.as_str()),
-            versioned_object_uid: String::from(version.versioned_object_id().value()),
-            template_id: String::from(composition.template_id()),
-            resource_type: String::from(resource_type),
-            entry_path: path,
-            split: 0,
-            context: program.program().context().to_string(),
-            derivation: Some(derive::DERIVATION),
-            created: None,
-        };
-        let stood = self
-            .store
-            .record_binding(resource_type, &id, &binding)
-            .await
-            .map_err(|error| store_refusal(&error))?;
-        Ok((id, stood))
-    }
-
-    /// Records every `Resource.identifier` of `inbound` against `id`, so a
-    /// conditional create's `identifier` search finds the resource
-    /// (<https://hl7.org/fhir/R4/http.html#ccreate>).
-    async fn index(&self, inbound: &Inbound, id: &FhirResourceId) -> Result<(), Refused> {
-        for identifier in identifiers_of(inbound) {
-            self.store
-                .record_identifier(inbound.resource_type(), &identifier, id)
-                .await
-                .map_err(|error| store_refusal(&error))?;
+        Self {
+            key: derive::map_key(&key),
+            derived: derive::entry_id(&key),
+            binding: CompositionBinding {
+                ehr_id: String::from(ehr_id.as_str()),
+                versioned_object_uid: String::from(version.versioned_object_id().value()),
+                template_id: String::from(composition.template_id()),
+                resource_type: String::from(resource_type),
+                entry_path: path,
+                split: 0,
+                context: program.program().context().to_string(),
+                derivation: Some(derive::DERIVATION),
+                created: None,
+            },
         }
-        Ok(())
     }
 
-    /// Records that `source` was consumed by the composition `stood` binds.
-    async fn consume(
-        &self,
-        source: &SourceVersion,
-        stood: &CompositionBinding,
-        id: &FhirResourceId,
-    ) -> Result<(), Refused> {
-        self.store
-            .record_consumed(
-                source,
-                &ConsumedSource {
-                    ehr_id: stood.ehr_id.clone(),
-                    versioned_object_uid: stood.versioned_object_uid.clone(),
-                    internal_id: String::from(id.as_str()),
-                    context: stood.context.clone(),
-                },
-            )
-            .await
-            .map_err(|error| store_refusal(&error))?;
-        Ok(())
+    /// Returns the store write of this record with `identifiers` and the
+    /// consumed `source`.
+    fn write<'a>(
+        &'a self,
+        resource_type: &'a str,
+        identifiers: &'a [Identifier],
+        source: Option<&'a SourceVersion>,
+    ) -> EntryWrite<'a> {
+        EntryWrite {
+            resource_type,
+            key: &self.key,
+            derived: &self.derived,
+            binding: &self.binding,
+            identifiers,
+            source,
+        }
     }
 }

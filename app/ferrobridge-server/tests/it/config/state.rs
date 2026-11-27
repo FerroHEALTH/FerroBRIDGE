@@ -246,3 +246,28 @@ fn a_url_that_carries_options_is_refused_naming_the_url() {
         Err(Error::StateConnection { key, .. }) if key == "state.url"
     ));
 }
+
+#[test]
+fn the_identity_copy_holds_ten_thousand_entries_unless_configured()
+-> Result<(), Box<dyn std::error::Error>> {
+    let state = resolve(&with_state(""))?
+        .state
+        .ok_or("the store is configured")?;
+    assert_eq!(10_000, state.identity_copy_entries);
+    let environment = BTreeMap::from([
+        (
+            String::from("FERROBRIDGE__STATE__URL"),
+            String::from("postgres://bridge@db.invalid/state?sslmode=disable"),
+        ),
+        (
+            String::from("FERROBRIDGE__STATE__IDENTITY_COPY_ENTRIES"),
+            String::from("0"),
+        ),
+    ]);
+    let none = Config::from_sources(None, &environment)?
+        .resolve(Process::Job)?
+        .state
+        .ok_or("the store is configured")?;
+    assert_eq!(0, none.identity_copy_entries);
+    Ok(())
+}

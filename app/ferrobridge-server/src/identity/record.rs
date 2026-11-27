@@ -128,6 +128,18 @@ impl CompositionBinding {
 }
 
 impl ConsumedSource {
+    /// Returns the record of a source consumed as the resource `id` that the
+    /// binding `stood` places.
+    #[must_use]
+    pub fn of(stood: &CompositionBinding, id: &FhirResourceId) -> Self {
+        Self {
+            ehr_id: stood.ehr_id.clone(),
+            versioned_object_uid: stood.versioned_object_uid.clone(),
+            internal_id: String::from(id.as_str()),
+            context: stood.context.clone(),
+        }
+    }
+
     /// Returns the EHR the consumed source was committed into.
     ///
     /// # Errors
