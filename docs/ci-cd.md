@@ -171,6 +171,14 @@ through cargo hack. It treats the CI configuration
 and its own pair as inert, since they change no cargo result. CI stays the
 full gate.
 
+In a linked worktree, `fast.sh` first copies each build-time corpus tree
+the worktree lacks from the primary checkout of the repository, as a
+copy-on-write clone where the filesystem has one (`cp -c` on APFS), else as
+hard links, else as a copy, with the file times kept. The vendor scripts then
+check every tree against its pin and fetch only a tree that is missing or
+does not match, so a fresh worktree does not download about 2 GB before
+rustfmt starts. `--no-fetch` skips the copy with the fetch.
+
 When the change reaches `ferrobridge-validator` or `fhirconnect`, `fast.sh`
 runs `scripts/vendor/profile-packages.sh`, which hashes each profile package
 tree (about 970 MB) only when its stamp no longer describes it. The stamp, one
