@@ -6,17 +6,17 @@ expression: ledger
   "resource": "Observation/o-1",
   "elements": [
     {
+      "path": "Observation.code.text",
+      "outcome": "refused",
+      "reason": "the resource names no subject"
+    },
+    {
       "path": "Observation.id",
       "outcome": "refused",
       "reason": "the resource names no subject"
     },
     {
       "path": "Observation.status",
-      "outcome": "refused",
-      "reason": "the resource names no subject"
-    },
-    {
-      "path": "Observation.code.text",
       "outcome": "refused",
       "reason": "the resource names no subject"
     }
