@@ -3,6 +3,11 @@ source: crates/fhirconnect/tests/it/mapping_library/ips_entries.rs
 expression: declared
 ---
 {
+  "added": [
+    "code.text = \"Cashew nuts\"",
+    "reaction[0].manifestation[0].text = \"Anaphylaxis\""
+  ],
+  "changed": [],
   "first_leg": [
     "DV_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
     "DV_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
@@ -12,13 +17,8 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [
     "patient.reference = \"Patient/synthetic-1\""
   ],
-  "added": [
-    "code.text = \"Cashew nuts\"",
-    "reaction[0].manifestation[0].text = \"Anaphylaxis\""
-  ],
-  "changed": []
+  "second_leg": []
 }

@@ -164,7 +164,7 @@ fn kds_cause_of_death() -> serde_json::Value {
 fn putget_holds_on_the_kds_cause_of_death() -> Result<(), Box<dyn Error>> {
     let (program, index) = kds_todesursache_program()?;
     let declared = laws::putget(&program, &index, &kds_cause_of_death(), &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_todesursache_putget", declared);
+    json_snapshot!("kds_todesursache_putget", declared);
     Ok(())
 }
 
@@ -337,6 +337,6 @@ fn the_kds_todesursache_chain_as_published_is_refused_exactly() -> Result<(), Bo
     )
     .err()
     .ok_or("the todesursache chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_todesursache_chain_as_published", rows(&diagnostics));
+    json_snapshot!("kds_todesursache_chain_as_published", rows(&diagnostics));
     Ok(())
 }

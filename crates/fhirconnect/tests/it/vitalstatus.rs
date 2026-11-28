@@ -149,7 +149,7 @@ fn kds_vital_status() -> serde_json::Value {
 fn putget_holds_on_the_kds_vital_status() -> Result<(), Box<dyn Error>> {
     let (program, index) = kds_vitalstatus_program()?;
     let declared = laws::putget(&program, &index, &kds_vital_status(), &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_vitalstatus_putget", declared);
+    json_snapshot!("kds_vitalstatus_putget", declared);
     Ok(())
 }
 
@@ -195,6 +195,6 @@ fn the_kds_vitalstatus_chain_as_published_is_refused_exactly() -> Result<(), Box
     )
     .err()
     .ok_or("the vital status chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_vitalstatus_chain_as_published", rows(&diagnostics));
+    json_snapshot!("kds_vitalstatus_chain_as_published", rows(&diagnostics));
     Ok(())
 }

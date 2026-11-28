@@ -3,6 +3,14 @@ source: crates/fhirconnect/tests/it/laborauftrag.rs
 expression: declared
 ---
 {
+  "added": [
+    "category[0].coding[0].display = \"Laboratory\"",
+    "code.text = \"Synthetic blood count panel\""
+  ],
+  "changed": [
+    "requester.reference: \"#einsender\" became \"Organization/768bf573c28b33629dc25336956dc1ccad0e5a70345239b0d0a29b04e53c8381\"",
+    "specimen[0].reference: \"#probe\" became \"Specimen/115f06d65552df7a7b2941d2789e51d8e84c9c8fd09c5cbe853409be92d7a451\""
+  ],
   "first_leg": [
     "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
     "the engine filled /composer",
@@ -11,7 +19,6 @@ expression: declared
     "the engine filled /territory",
     "the engine filled /content[openEHR-EHR-INSTRUCTION.service_request.v1,'Laborleistung']/narrative"
   ],
-  "second_leg": [],
   "lost": [
     "contained[0].id = \"einsender\"",
     "contained[0].identifier[0].system = \"http://example.org/fhir/sid/einsender\"",
@@ -28,12 +35,5 @@ expression: declared
     "id = \"ferrobridge-kds-labrequest-1\"",
     "meta.profile[0] = \"https://www.medizininformatik-initiative.de/fhir/core/modul-labor/StructureDefinition/ServiceRequestLab\""
   ],
-  "added": [
-    "category[0].coding[0].display = \"Laboratory\"",
-    "code.text = \"Synthetic blood count panel\""
-  ],
-  "changed": [
-    "requester.reference: \"#einsender\" became \"Organization/768bf573c28b33629dc25336956dc1ccad0e5a70345239b0d0a29b04e53c8381\"",
-    "specimen[0].reference: \"#probe\" became \"Specimen/115f06d65552df7a7b2941d2789e51d8e84c9c8fd09c5cbe853409be92d7a451\""
-  ]
+  "second_leg": []
 }

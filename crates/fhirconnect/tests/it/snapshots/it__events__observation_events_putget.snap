@@ -3,6 +3,8 @@ source: crates/fhirconnect/tests/it/events.rs
 expression: declared
 ---
 {
+  "added": [],
+  "changed": [],
   "first_leg": [
     "the mapping status did not run: its unidirectional marker names the other direction",
     "the mapping code did not run: its unidirectional marker names the other direction",
@@ -12,8 +14,6 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [],
-  "added": [],
-  "changed": []
+  "second_leg": []
 }

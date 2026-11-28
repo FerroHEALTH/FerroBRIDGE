@@ -154,7 +154,7 @@ fn kds_procedure() -> serde_json::Value {
 fn putget_holds_on_the_kds_procedure() -> Result<(), Box<dyn Error>> {
     let (program, index) = kds_prozedur_program()?;
     let declared = laws::putget(&program, &index, &kds_procedure(), &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_prozedur_putget", declared);
+    json_snapshot!("kds_prozedur_putget", declared);
     Ok(())
 }
 
@@ -185,7 +185,7 @@ fn the_published_procedure_model_is_refused_at_load() -> Result<(), Box<dyn Erro
     let diagnostics = load_set(files, &StaticMappingCodes::default())
         .err()
         .ok_or("the published procedure model loads")?;
-    insta::assert_json_snapshot!("kds_prozedur_model_at_load", rows(&diagnostics));
+    json_snapshot!("kds_prozedur_model_at_load", rows(&diagnostics));
     Ok(())
 }
 
@@ -211,6 +211,6 @@ fn the_kds_prozedur_chain_as_published_is_refused_exactly() -> Result<(), Box<dy
     )
     .err()
     .ok_or("the procedure chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_prozedur_chain_as_published", rows(&diagnostics));
+    json_snapshot!("kds_prozedur_chain_as_published", rows(&diagnostics));
     Ok(())
 }

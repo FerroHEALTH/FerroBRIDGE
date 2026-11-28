@@ -336,7 +336,7 @@ fn the_kds_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Error>>
     )
     .err()
     .ok_or("the chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_chain_as_published", rows(&diagnostics));
+    json_snapshot!("kds_chain_as_published", rows(&diagnostics));
     Ok(())
 }
 
@@ -387,7 +387,7 @@ fn putget_holds_on_the_synthetic_diagnosis_chain() -> Result<(), Box<dyn Error>>
         &synthetic_condition()?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("synthetic_putget", declared);
+    json_snapshot!("synthetic_putget", declared);
     Ok(())
 }
 
@@ -401,7 +401,7 @@ fn getput_holds_on_the_synthetic_diagnosis_chain() -> Result<(), Box<dyn Error>>
         &synthetic_composition(&index)?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("synthetic_getput", declared);
+    json_snapshot!("synthetic_getput", declared);
     Ok(())
 }
 
@@ -470,7 +470,7 @@ fn the_kds_flat_fixture_builds_a_composition_the_template_admits() -> Result<(),
 fn putget_holds_on_the_kds_condition() -> Result<(), Box<dyn Error>> {
     let (program, index) = kds_program()?;
     let declared = laws::putget(&program, &index, &kds_condition()?, &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_putget", declared);
+    json_snapshot!("kds_putget", declared);
     Ok(())
 }
 
@@ -483,7 +483,7 @@ fn getput_holds_on_the_kds_composition() -> Result<(), Box<dyn Error>> {
         &kds_composition(&index)?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("kds_getput", declared);
+    json_snapshot!("kds_getput", declared);
     Ok(())
 }
 

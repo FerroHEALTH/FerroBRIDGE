@@ -92,7 +92,7 @@ fn the_kds_studienteilnahme_chain_as_published_is_refused_exactly() -> Result<()
     )
     .err()
     .ok_or("the study participation chain as published compiles")?;
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "kds_studienteilnahme_chain_as_published",
         rows(&diagnostics)
     );

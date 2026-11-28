@@ -315,7 +315,7 @@ fn putget_holds_on_a_synthetic_contact_type() -> Result<(), Box<dyn Error>> {
     let (program, index) = contact_type()?;
     let encounter = contact_type_encounter();
     let declared = laws::putget(&program, &index, &encounter, &laws::untouched)?;
-    insta::assert_json_snapshot!("library_contact_type_putget", declared);
+    json_snapshot!("library_contact_type_putget", declared);
     Ok(())
 }
 
@@ -340,7 +340,7 @@ fn putget_holds_on_a_synthetic_observation_entry() -> Result<(), Box<dyn Error>>
     let (program, index) = entry()?;
     let observation = observation_entry();
     let declared = laws::putget(&program, &index, &observation, &laws::untouched)?;
-    insta::assert_json_snapshot!("library_observation_entry_putget", declared);
+    json_snapshot!("library_observation_entry_putget", declared);
     Ok(())
 }
 
@@ -377,7 +377,7 @@ fn putget_holds_on_a_synthetic_diagnosis_use() -> Result<(), Box<dyn Error>> {
     let (program, index) = diagnosis_use()?;
     let encounter = diagnosis_encounter();
     let declared = laws::putget(&program, &index, &encounter, &laws::untouched)?;
-    insta::assert_json_snapshot!("library_diagnosis_use_putget", declared);
+    json_snapshot!("library_diagnosis_use_putget", declared);
     Ok(())
 }
 

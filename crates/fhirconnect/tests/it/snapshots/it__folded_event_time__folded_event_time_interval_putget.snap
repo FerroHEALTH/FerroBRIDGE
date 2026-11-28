@@ -3,6 +3,8 @@ source: crates/fhirconnect/tests/it/folded_event_time.rs
 expression: interval
 ---
 {
+  "added": [],
+  "changed": [],
   "first_leg": [
     "the mapping status did not run: its unidirectional marker names the other direction",
     "the mapping code did not run: its unidirectional marker names the other direction",
@@ -12,8 +14,6 @@ expression: interval
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [],
-  "added": [],
-  "changed": []
+  "second_leg": []
 }

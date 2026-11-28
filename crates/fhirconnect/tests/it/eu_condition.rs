@@ -216,6 +216,6 @@ fn the_profile_elements_of_condition_eu_core_survive_the_round_trip() -> Result<
 fn putget_holds_on_the_eu_condition() -> Result<(), Box<dyn Error>> {
     let (program, index) = eu_condition_program()?;
     let declared = laws::putget(&program, &index, &condition(), &laws::untouched)?;
-    insta::assert_json_snapshot!("eu_condition_putget", declared);
+    json_snapshot!("eu_condition_putget", declared);
     Ok(())
 }

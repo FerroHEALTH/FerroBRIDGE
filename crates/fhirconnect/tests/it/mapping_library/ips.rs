@@ -159,7 +159,7 @@ fn the_medication_section_goes_out_with_its_title_and_code() -> Result<(), Box<d
     let document = outbound
         .value()
         .to_serde_json(&mut fhir_types::codec::Path::root("Composition"))?;
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "library_ips_medication_section",
         document.pointer("/section")
     );

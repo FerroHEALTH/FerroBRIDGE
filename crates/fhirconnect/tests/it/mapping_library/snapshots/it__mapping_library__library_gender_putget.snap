@@ -3,6 +3,8 @@ source: crates/fhirconnect/tests/it/mapping_library/mod.rs
 expression: declared
 ---
 {
+  "added": [],
+  "changed": [],
   "first_leg": [
     "the engine filled /composer",
     "the engine filled /context/start_time",
@@ -10,8 +12,6 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [],
-  "added": [],
-  "changed": []
+  "second_leg": []
 }

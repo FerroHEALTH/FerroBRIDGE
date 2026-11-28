@@ -3,6 +3,12 @@ source: crates/fhirconnect/tests/it/eu_condition.rs
 expression: declared
 ---
 {
+  "added": [
+    "clinicalStatus.text = \"active\"",
+    "code.text = \"Hypertensive disorder, systemic arterial\"",
+    "recorder.display = \"FHIRconnect\""
+  ],
+  "changed": [],
   "first_leg": [
     "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
     "the mapping metaURL did not run: its unidirectional marker names the other direction",
@@ -12,14 +18,8 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [
     "subject.reference = \"Patient/synthetic-patient\""
   ],
-  "added": [
-    "clinicalStatus.text = \"active\"",
-    "code.text = \"Hypertensive disorder, systemic arterial\"",
-    "recorder.display = \"FHIRconnect\""
-  ],
-  "changed": []
+  "second_leg": []
 }

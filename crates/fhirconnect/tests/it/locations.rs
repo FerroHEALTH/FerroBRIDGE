@@ -526,7 +526,7 @@ fn the_kds_round_trip_locates_its_one_way_rows_and_its_skips() -> Result<(), Box
         &Seams::default(),
         &CallContext::new(),
     )?;
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "kds_located",
         serde_json::json!({
             "first_leg": rows(inbound.warnings()),

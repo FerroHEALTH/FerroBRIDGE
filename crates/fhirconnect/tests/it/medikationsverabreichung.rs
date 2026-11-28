@@ -229,7 +229,7 @@ fn putget_holds_on_the_kds_medication_administration() -> Result<(), Box<dyn Err
         &laws::untouched,
         &seams,
     )?;
-    insta::assert_json_snapshot!("kds_medikationsverabreichung_putget", declared);
+    json_snapshot!("kds_medikationsverabreichung_putget", declared);
 
     let inbound = to_openehr(
         &program,
@@ -253,7 +253,7 @@ fn putget_holds_on_the_kds_medication_administration() -> Result<(), Box<dyn Err
         .iter()
         .map(|resource| resource.to_serde_json(&mut Path::root("Medication")))
         .collect::<Result<Vec<serde_json::Value>, _>>()?;
-    insta::assert_json_snapshot!("kds_medikationsverabreichung_medication", created);
+    json_snapshot!("kds_medikationsverabreichung_medication", created);
     Ok(())
 }
 
@@ -313,7 +313,7 @@ fn the_kds_medikationsverabreichung_chain_as_published_is_refused_exactly()
     )
     .err()
     .ok_or("the medication administration chain as published compiles")?;
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "kds_medikationsverabreichung_chain_as_published",
         rows(&diagnostics)
     );
@@ -390,6 +390,6 @@ fn putget_holds_on_a_kds_substance() -> Result<(), Box<dyn Error>> {
         "code": {"coding": [{"display": "Ramipril"}]}
     });
     let declared = laws::putget(&program, &index, &substance, &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_substance_putget", declared);
+    json_snapshot!("kds_substance_putget", declared);
     Ok(())
 }

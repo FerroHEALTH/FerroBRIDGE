@@ -362,7 +362,7 @@ fn putget_holds_for_a_point_and_an_interval_event() -> Result<(), Box<dyn Error>
         &observation("effectiveDateTime", json!("2026-09-12T08:30:00+02:00")),
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("event_time_point_putget", point);
+    json_snapshot!("event_time_point_putget", point);
     let interval = laws::putget(
         &program,
         &index,
@@ -372,7 +372,7 @@ fn putget_holds_for_a_point_and_an_interval_event() -> Result<(), Box<dyn Error>
         ),
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("event_time_interval_putget", interval);
+    json_snapshot!("event_time_interval_putget", interval);
     Ok(())
 }
 
@@ -386,13 +386,13 @@ fn getput_holds_for_a_point_and_an_interval_event() -> Result<(), Box<dyn Error>
         &point_reading(&index, "2026-09-12T08:30:00+02:00")?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("event_time_point_getput", point);
+    json_snapshot!("event_time_point_getput", point);
     let interval = laws::getput(
         &program,
         &index,
         &interval_reading(&index, "2026-09-12T08:30:00+02:00", "PT2H30M", "640")?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("event_time_interval_getput", interval);
+    json_snapshot!("event_time_interval_getput", interval);
     Ok(())
 }

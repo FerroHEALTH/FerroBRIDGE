@@ -3,23 +3,6 @@ source: crates/fhirconnect/tests/it/medikationsverabreichung.rs
 expression: declared
 ---
 {
-  "first_leg": [
-    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
-    "the mapping ISMTransitionOpenEhrToFhir did not run: its unidirectional marker names the other direction",
-    "the mapping metaURL did not run: its unidirectional marker names the other direction",
-    "the engine filled /composer",
-    "the engine filled /context/setting",
-    "the engine filled /language",
-    "the engine filled /territory"
-  ],
-  "second_leg": [
-    "the mapping effectivePeriod did not run: its unidirectional marker names the other direction",
-    "the mapping ISMTransitionFhirToOpenEhr did not run: its unidirectional marker names the other direction",
-    "the mapping effectiveDateTimeContext did not run: its unidirectional marker names the other direction"
-  ],
-  "lost": [
-    "subject.reference = \"Patient/synthetic-1\""
-  ],
   "added": [
     "category.coding[0].code = \"community\"",
     "category.coding[0].display = \"Community\"",
@@ -29,5 +12,22 @@ expression: declared
   ],
   "changed": [
     "medicationReference.reference: \"Medication/synthetic-medication-1\" became \"Medication/6a4c638532aec8869a2fd9cd2c1c02c63cc11ae16579f8b838d50144127064db\""
+  ],
+  "first_leg": [
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "the mapping ISMTransitionOpenEhrToFhir did not run: its unidirectional marker names the other direction",
+    "the mapping metaURL did not run: its unidirectional marker names the other direction",
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "lost": [
+    "subject.reference = \"Patient/synthetic-1\""
+  ],
+  "second_leg": [
+    "the mapping effectivePeriod did not run: its unidirectional marker names the other direction",
+    "the mapping ISMTransitionFhirToOpenEhr did not run: its unidirectional marker names the other direction",
+    "the mapping effectiveDateTimeContext did not run: its unidirectional marker names the other direction"
   ]
 }

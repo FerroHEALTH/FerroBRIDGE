@@ -185,7 +185,7 @@ fn putget_holds_on_the_observation_events_chain() -> Result<(), Box<dyn Error>> 
         &reading("2026-09-12T08:30:00+02:00", 70),
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("observation_events_putget", declared);
+    json_snapshot!("observation_events_putget", declared);
     Ok(())
 }
 
@@ -199,7 +199,7 @@ fn getput_holds_on_the_observation_events_chain() -> Result<(), Box<dyn Error>> 
         &readings(&index, &[("2026-09-12T08:30:00+02:00", 70)])?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("observation_events_getput", declared);
+    json_snapshot!("observation_events_getput", declared);
     Ok(())
 }
 
