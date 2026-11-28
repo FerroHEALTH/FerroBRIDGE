@@ -802,7 +802,7 @@ fn add_findings(value: &mut Value, items: &[Value]) -> bool {
 
 // NOTE: no element of DiagnosticReportEuImaging or CompositionEuImaging the project writes holds
 // a findings narrative, a differential, a comparison, a clinical summary, a recommendation or a
-// comment, so a served report declares each the composition records.
+// comment, so a served report declares each the composition records, the received losses too.
 #[test]
 fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), Box<dyn Error>> {
     let mut canonical: Value = serde_json::from_str(&composition_of(&report())?)?;
@@ -849,14 +849,15 @@ fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), 
     unread.sort();
     assert_eq!(
         unread,
-        ["at0008", "at0014", "at0023", "at0056", "at0058", "at0059"],
-        "{warnings:?}"
+        ["at0007", "at0008", "at0014", "at0023", "at0056", "at0058", "at0059"],
+        "the findings and the composition's comment on what the received report lost: \
+         {warnings:?}"
     );
     let bundle = serde_json::to_value(run.bundle())?;
     let outcome = only(&bundle, "OperationOutcome")?;
     assert_eq!(
         outcome["issue"].as_array().map(Vec::len),
-        Some(6),
+        Some(7),
         "the run's outcome names each: {outcome}"
     );
     Ok(())

@@ -75,8 +75,9 @@ pub struct Note {
     pub element_name: &'static str,
     /// The section slice of the document form whose narrative names the
     /// comment when a run out of openEHR leaves it unread
-    /// ([`Project::slice_of`]), or `None` when the project's run reads no
-    /// node of the composition's context.
+    /// ([`Project::slice_of`]), or `None` when the project's form names its
+    /// left-out elements in no section narrative and the run's
+    /// `OperationOutcome` alone declares the comment.
     pub slice: Option<&'static str>,
 }
 
