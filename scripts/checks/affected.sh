@@ -256,7 +256,7 @@ classify() {
     scripts/vendor/consent.sh) echo "packages ferrobridge-server" ;;
     # The corpora only the eehrxf tests read, and the script that writes them.
     docs/specs/eu-xtehr-models/* | docs/specs/eu-hl7-*/* | docs/specs/fhir-r4/*) echo "only eehrxf" ;;
-    docs/specs/ehdsi-mvc/* | docs/specs/ehdsi-imaging/* | docs/specs/fr-ans/*) echo "only eehrxf" ;;
+    docs/specs/ehdsi-mvc/* | docs/specs/ehdsi-imaging/* | docs/specs/ehdsi-euvac/* | docs/specs/fr-ans/*) echo "only eehrxf" ;;
     docs/specs/ehds-eehrxf-draft/* | docs/specs/ehds-testing-draft/* | docs/specs/xtehr-deliverables/*) echo "only eehrxf" ;;
     scripts/vendor/eehrxf.sh | scripts/vendor/ehds-drafts.sh | scripts/vendor/lib/pinned.sh) echo "only eehrxf" ;;
     crates/* | app/* | tools/*) echo member ;;

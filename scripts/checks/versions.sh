@@ -747,6 +747,7 @@ docs/specs/eu-hl7-imaging|HL7 Europe Imaging Report
 docs/specs/eu-hl7-hdr|HL7 Europe Hospital Discharge Report
 docs/specs/ehdsi-mvc|MyHealth@EU Master Value Sets Catalogue
 docs/specs/ehdsi-imaging|MyHealth@EU Imaging
+docs/specs/ehdsi-euvac|MyHealth@EU Vaccination
 docs/specs/fr-ans|HL7 France FR Core
 docs/specs/fhir-r4|FHIR R4 core specification pages
 crates/ferrobridge-fhirpath/vendor/ucum|UCUM essence
