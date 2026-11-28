@@ -312,6 +312,29 @@ impl Client {
             .await
     }
 
+    /// Resolves `code` in `system` with its display and designations wanted
+    /// in `language`, a BCP 47 tag sent as the `displayLanguage` input
+    /// (<https://hl7.org/fhir/R4/codesystem-operation-lookup.html>).
+    ///
+    /// # Errors
+    /// As [`Client::lookup`].
+    pub async fn lookup_in(
+        &self,
+        system: &str,
+        code: &str,
+        version: Option<&str>,
+        language: &str,
+    ) -> Result<LookupOutcome, Error> {
+        self.send_lookup(Request::Lookup {
+            system: system.to_owned(),
+            code: code.to_owned(),
+            version: version.map(str::to_owned),
+            date: None,
+            display_language: Some(language.to_owned()),
+        })
+        .await
+    }
+
     /// Returns the outcome of the `$lookup` `request`.
     async fn send_lookup(&self, request: Request) -> Result<LookupOutcome, Error> {
         let answer = self.operation(&request).await?;
