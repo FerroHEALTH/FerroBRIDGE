@@ -12,8 +12,9 @@
 # Prescription and Dispense, Laboratory Report, Imaging Report, Hospital
 # Discharge Report), each at the one version the component reads, with the
 # MyHealth@EU Master Value Sets Catalogue and HL7 France FR Core, whose value
-# sets the terminology tests read, and the MyHealth@EU Vaccination guide, whose
-# profiles the vaccination history is written to. One corpus per package, each under
+# sets the terminology tests read, the MyHealth@EU Vaccination guide, whose
+# profiles the vaccination history is written to, and the MyHealth@EU Imaging
+# guide, whose bindings the translation binding sets are held to. One corpus per package, each under
 # docs/specs/.
 #
 # Each package is the FHIR package registry's tarball (Simplifier's for FR
@@ -150,6 +151,17 @@ pinned_corpus ehdsi-euvac "MyHealth@EU Vaccination" \
 preview and not a release, canonical \`http://fhir.ehdsi.eu/euvac\`, committed
 under CC-BY-4.0 with the copyright its ImplementationGuide resource carries." "" \
   $'#2168 (the eehrxf vaccination crosswalk and document tests,\n  crates/eehrxf/tests/it/, which read the EuVAC profiles)'
+
+pin commit myhealth.eu.fhir.imaging-9.1.1.tgz "9.1.1, a CI build (FHIR 4.0.1, built 2026-05-05)" \
+  https://build-fhir.ehdsi.eu/imaging/package.tgz \
+  286eebc30bc4be9c95b2478152e1dce95a6f23bc31f42f4587fd846ae04a982d "$cc0" \
+  "$whole A CI build that build-fhir.ehdsi.eu overwrites in place, so the sha256 is the pin. Its dependency hl7.fhir.eu.imaging 1.0.0-alpha is published nowhere (#2371), so it stays outside the profile validator's package set."
+pinned_corpus ehdsi-imaging "MyHealth@EU Imaging" \
+  "the MyHealth@EU Imaging FHIR IG myhealth.eu.fhir.imaging" \
+  "The MyHealth@EU imaging report and study on FHIR in its 9.1.1 CI build,
+canonical \`http://fhir.ehdsi.eu/imaging\`, committed under CC0-1.0, whose
+required bindings the translation binding sets are held to." "" \
+  $'#2403 (the MyHealth@EU binding test,\n  crates/eehrxf/tests/it/terminology/myhealth_bindings.rs)'
 
 pin commit hl7.fhir.fr.core-2.2.0.tgz "2.2.0" \
   https://packages.simplifier.net/hl7.fhir.fr.core/2.2.0 \
