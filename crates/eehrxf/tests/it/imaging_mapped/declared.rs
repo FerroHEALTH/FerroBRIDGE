@@ -38,10 +38,15 @@ fn the_project_declares_every_element_of_the_result_it_leaves_out() -> Result<()
     )?;
     let named = left_out(&warnings);
     let declared = IMAGING.left_out();
+    let comment = IMAGING.note().ok_or("the project's comment")?.value_path();
     assert_eq!(
         named.len(),
-        declared.len(),
-        "the run leaves out exactly the elements the project declares: {named:#?}"
+        declared.len() + 1,
+        "the run leaves out exactly the elements the project declares and its comment: {named:#?}"
+    );
+    assert!(
+        named.contains(&comment),
+        "the composition's comment is named: {named:#?}"
     );
     for element in declared {
         let at = format!("[{}]/{}", element.archetype, element.path);
