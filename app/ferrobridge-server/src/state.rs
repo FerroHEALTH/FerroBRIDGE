@@ -125,6 +125,7 @@ impl AppState {
             Vec::new();
         let mut cdr = None;
         if let Some(config) = settings.cdr.as_ref() {
+            name_unchecked_roots(config);
             let client = crate::cdr::CdrClient::new(config).map_err(|source| {
                 crate::config::error::Error::Client {
                     upstream: "cdr",
@@ -601,6 +602,23 @@ impl AppState {
             self.auth.is_some(),
             Arc::clone(&self.usage),
         )
+    }
+}
+
+/// Names at the start the roots the CDR's TLS trusts with no revocation
+/// check (`trust_roots_without_revocation_file`), as the family's split
+/// outbound verification asks of a product.
+fn name_unchecked_roots(config: &crate::cdr::config::CdrConfig) {
+    if let Some(roots) = config
+        .tls
+        .as_ref()
+        .and_then(ferrohealth_smart::client::PresentedTls::unchecked_roots)
+    {
+        tracing::warn!(
+            lane = "cdr",
+            roots,
+            "the CDR's TLS trusts these roots with no revocation check"
+        );
     }
 }
 

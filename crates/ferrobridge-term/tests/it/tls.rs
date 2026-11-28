@@ -165,6 +165,7 @@ impl TlsBuilder for Pem<'_> {
         &self,
         _key: &str,
         _section: &ferrohealth_config::tls::TlsClientSection,
+        _endpoints: &[url::Url],
     ) -> Result<PresentedTls, BoxError> {
         let provider = Arc::new(aws_lc_rs::default_provider());
         let mut roots = RootCertStore::empty();

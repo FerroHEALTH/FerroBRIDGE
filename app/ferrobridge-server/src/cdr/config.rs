@@ -53,9 +53,10 @@ pub struct CdrConfig {
     /// How long opening the connection may take; `None`, only `timeout`
     /// bounds it.
     pub connect_timeout: Option<Duration>,
-    /// The TLS the engine speaks, built from `[cdr.endpoint.tls]`; `None`,
-    /// the engine's own default.
-    pub tls: Option<std::sync::Arc<rustls::ClientConfig>>,
+    /// The TLS the engine speaks, built from `[cdr.endpoint.tls]`, with the
+    /// clearing that keeps the CDR cleared for revocation while it lives;
+    /// `None`, the engine's own default.
+    pub tls: Option<ferrohealth_smart::client::PresentedTls>,
     /// The onward lane a facade request reaches the CDR under its caller
     /// through, when `[cdr.endpoint.credentials.onward]` declares one.
     pub onward: Option<crate::cdr::onward::CdrOnward>,
@@ -94,7 +95,7 @@ impl CdrConfig {
 
     /// Returns this configuration speaking the TLS `tls` describes.
     #[must_use]
-    pub fn with_tls(mut self, tls: std::sync::Arc<rustls::ClientConfig>) -> Self {
+    pub fn with_tls(mut self, tls: ferrohealth_smart::client::PresentedTls) -> Self {
         self.tls = Some(tls);
         self
     }

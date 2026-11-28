@@ -30,6 +30,7 @@ impl TlsBuilder for NoMaterial {
         &self,
         _key: &str,
         _section: &ferrohealth_config::tls::TlsClientSection,
+        _endpoints: &[url::Url],
     ) -> Result<PresentedTls, Box<dyn std::error::Error + Send + Sync>> {
         let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
         let config = rustls::ClientConfig::builder_with_provider(provider)

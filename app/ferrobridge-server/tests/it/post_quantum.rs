@@ -38,7 +38,8 @@ const ANSWER: &[u8] =
 const FEED: &str = "[auth]\nenabled = false\n\n[state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n\n[change_feed]\nenabled = true\n\n[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\nendpoint.url = \"http://127.0.0.1:9/fhir\"\n\n[facade]\nenabled = true\ncomposition_language = \"en\"\ncomposition_territory = \"GB\"\ncustodian.name = \"Synthetic Hospital\"\ncustodian.identifier_system = \"urn:oid:2.999.1.1\"\ncustodian.identifier_value = \"synthetic-hospital\"\n\n";
 
 /// The synthetic material of one case, with the CA written where an
-/// endpoint's `tls.trust_roots_file` names it.
+/// endpoint's `tls.trust_roots_without_revocation_file` names it: the test CA
+/// publishes no revocation service.
 struct Material {
     pki: Pki,
     directory: tempfile::TempDir,
@@ -65,7 +66,7 @@ impl Material {
     /// `localhost` under `path`, trusting the synthetic CA.
     fn endpoint(&self, port: u16, path: &str) -> String {
         format!(
-            "endpoint.url = \"https://localhost:{port}{path}\"\nendpoint.tls.trust_roots_file = \"{}\"\n",
+            "endpoint.url = \"https://localhost:{port}{path}\"\nendpoint.tls.trust_roots_without_revocation_file = \"{}\"\n",
             self.path("ca.pem").display()
         )
     }

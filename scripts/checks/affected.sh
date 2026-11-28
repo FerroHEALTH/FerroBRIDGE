@@ -659,12 +659,9 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
     "+ferrobridge-fhirpath +ferrobridge-validator +fhir-codegen +ferrobridge-hl7v2 -fhir-types"
   check "hl7v2-types reaches its dependants and its generator" "crates/hl7v2-types/src/lib.rs" false \
     "+ferrobridge-hl7v2 +hl7v2-types +ferrobridge-server +fhir-codegen -fhir-types"
-  # The workspace requires the published fhir-types 0.4.0 while
-  # crates/fhir-types is 0.5.0, so the crate reaches only its generator.
-  # TODO(#2404): expect its dependants again once the workspace takes 0.5.0.
-  check "fhir-types reaches its generator while the workspace builds on the published release" \
+  check "fhir-types reaches its dependants, its dev-dependants and its generator" \
     "crates/fhir-types/src/lib.rs" false \
-    "+fhir-types +fhir-codegen -ferrobridge-testkit -fhirconnect -ferrobridge-validator -ferrobridge-server -omop-cdm-codegen"
+    "+fhir-types +ferrobridge-testkit +fhirconnect +ferrobridge-validator +ferrobridge-server +fhir-codegen -omop-cdm-codegen"
   check "the testkit reaches every member testing with it" "tools/ferrobridge-testkit/src/lib.rs" false \
     "+ferrobridge-testkit +openehr-mapping-core +omocl +omop-cdm +ferrobridge-server -fhir-types -fhir-codegen"
   # The testkit's console journeys run the server, so they are its one
@@ -703,9 +700,8 @@ source = ${q}registry+https://github.com/rust-lang/crates.io-index${q}"
   check "the stray-literal baseline reaches the console alone" \
     "scripts/checks/stray-literals.baseline" false \
     "+ferrobridge-console -ferrobridge-server -fhir-codegen"
-  # TODO(#2404): expect +ferrobridge-console again once the workspace takes 0.5.0.
-  check "fhir-types leaves the console on the published release" "crates/fhir-types/src/lib.rs" false \
-    "-ferrobridge-console"
+  check "fhir-types reaches the console that links it" "crates/fhir-types/src/lib.rs" false \
+    "+ferrobridge-console"
   check "the operator contract reaches the server and the console" \
     "crates/ferrobridge-operator-api/src/lib.rs" false \
     "+ferrobridge-operator-api +ferrobridge-server +ferrobridge-console -fhir-types"

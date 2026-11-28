@@ -117,13 +117,22 @@ collector over OTLP/gRPC:
 | `traces` | `true` | Whether the spans are exported |
 | `metrics` | `true` | Whether the metrics are pushed |
 | `sample_ratio` | `1.0` | The share of the traces that are sampled |
-| `tls.trust_roots_file` | unset | A PEM bundle of trust roots beside the platform's |
+| `tls.trust_roots_file` | unset | A PEM bundle of trust roots beside the platform's; a chain to one of them is verified by webpki and connects only once a revocation check cleared it |
+| `tls.trust_roots_without_revocation_file` | unset | A PEM bundle of trust roots for a private PKI that publishes no CRL and no OCSP responder; a chain to one of them is verified by webpki with no revocation check, named at the start and logged at each connection |
 | `tls.client_identity_file` | unset | The client certificate chain and its key in one PEM, for mutual TLS (or `tls.client_identity` inline) |
 | `tls.min_version` | `"1.3"` | The oldest TLS version spoken; `"1.2"` lowers it |
 
 The bridge reads `tls` with the family's outbound TLS reader and dials an
-`https://` collector through the platform verifier with those roots beside
-it. TLS material beside an endpoint that is not `https://` refuses the start.
+`https://` collector over it. Every outbound `tls` table of the bridge
+verifies a peer by its root. A chain to a root of `trust_roots_file` is
+verified by webpki on every operating system, ML-DSA certificates included,
+and a connection opens only once a revocation check cleared it: the check
+runs at the start and every 4 minutes, and it fails closed when no CRL or
+OCSP source answers. A chain to a root of
+`trust_roots_without_revocation_file` is trusted with no revocation check,
+and the start names those roots. Any other chain goes to the platform's
+verifier. TLS material beside an endpoint that is not `https://` refuses the
+start.
 
 ### The console
 
@@ -201,7 +210,7 @@ server says so once at start-up, naming the section and never a value.
 | `endpoint.url` | none, required | | The openEHR REST API root, usually ending in `/v1` |
 | `endpoint.timeout` | `"30s"` | | How long one call may take, connection included |
 | `endpoint.connect_timeout` | unset | | How long opening the connection may take; unset, only `timeout` bounds it |
-| `endpoint.tls` | the platform's roots | | `trust_roots_file`, `client_identity_file` or `client_identity` (secret), and `min_version` (`"1.3"`): the TLS of the CDR's connection, for a CDR behind a private root or one that asks for a client certificate |
+| `endpoint.tls` | the platform's roots | | `trust_roots_file`, `trust_roots_without_revocation_file`, `client_identity_file` or `client_identity` (secret), and `min_version` (`"1.3"`): the TLS of the CDR's connection, for a CDR behind a private root or one that asks for a client certificate |
 | `demographic` | `false` | | Whether the bridge reaches the CDR's ITS-REST 1.1.0 Demographic API, which the release marks `x-status: DEVELOPMENT` |
 | `committer_issuer` | unset | | The issuer the CDR names the Basic user of `endpoint.credentials` under, so a transaction's CONTRIBUTION states the committer placeholder of that issuer and the user; needs a Basic `endpoint.credentials.user`. Unset, a CONTRIBUTION under a Basic user names the bridge by `system_id` |
 
@@ -285,7 +294,7 @@ SMART tokens on writes, takes the same arrangement under
 | `resource` | none | | The `resource` parameter, an absolute URI with no fragment (RFC 8707 §2) |
 | `refresh_margin` | `"30s"` | | How long before the token expires a new one is fetched |
 | `timeout` | `"10s"` | | How long one call to the authorization server may take |
-| `tls.trust_roots_file`, `tls.client_identity_file`, `tls.min_version` | none, none, `"1.3"` | | The TLS to the authorization server: trust roots beside the platform's, the client certificate chain and key in one PEM for mutual TLS (or `tls.client_identity` inline), and the oldest TLS version spoken |
+| `tls.trust_roots_file`, `tls.trust_roots_without_revocation_file`, `tls.client_identity_file`, `tls.min_version` | none, none, none, `"1.3"` | | The TLS to the authorization server: trust roots beside the platform's (the second with no revocation check), the client certificate chain and key in one PEM for mutual TLS (or `tls.client_identity` inline), and the oldest TLS version spoken |
 
 Set exactly one of `token_endpoint` and `issuer`; both, or neither, is a boot
 error. With an `issuer`, the bridge reads the RFC 8414 metadata at
@@ -471,7 +480,7 @@ with no display keeps its code as the value.
 | `wire_version` | `r4` | `stu3`, `r4` or `r4b`, the release the server answers in |
 | `endpoint.timeout` | `"30s"` | How long one call may take, connection included |
 | `endpoint.connect_timeout` | unset | How long opening the connection may take |
-| `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`), for a server behind a private root or one that asks for a client certificate |
+| `endpoint.tls` | the platform's roots | `trust_roots_file`, `trust_roots_without_revocation_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`), for a server behind a private root or one that asks for a client certificate |
 | `display_fallback` | `false` | For a code the server does not know: `true` writes the code as the value of the `DV_CODED_TEXT` or `DV_TEXT`, `false` refuses the resource. A failed call refuses either way |
 
 As an environment variable, `display_fallback` reads
@@ -1606,7 +1615,7 @@ specification governs the lane: it is FerroBRIDGE's own design.
 | `endpoint.timeout` | `"30s"` | How long one delivery may take |
 | `endpoint.connect_timeout` | unset | How long opening the connection may take; unset, only `timeout` bounds it |
 | `endpoint.retry` | 3 attempts, `"200ms"` doubling to `"5s"` | `max_attempts`, `initial_backoff` and `max_backoff`: a delivery that got no answer or a `5xx` is tried again |
-| `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`), for an endpoint behind a private root or one that asks for a client certificate |
+| `endpoint.tls` | the platform's roots | `trust_roots_file`, `trust_roots_without_revocation_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`), for an endpoint behind a private root or one that asks for a client certificate |
 | `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[fhir_outbound.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
 
 The `endpoint` table is the family's outbound endpoint table, sent through
@@ -1687,7 +1696,7 @@ FerroBRIDGE's own design.
 | `endpoint.timeout` | `"10s"` | How long one delivery to the repository may take |
 | `endpoint.connect_timeout` | unset | How long opening the connection may take |
 | `endpoint.retry` | 3 tries, `"200ms"` doubling to `"1min"` | The tries of one delivery, and `max_backoff` the wait between two rounds of tries |
-| `endpoint.tls` | the platform's roots | `trust_roots_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`) |
+| `endpoint.tls` | the platform's roots | `trust_roots_file`, `trust_roots_without_revocation_file`, `client_identity_file` or `client_identity`, and `min_version` (`"1.3"`) |
 | `endpoint.credentials` | none | `user` with `password` or `password_file`, or `[audit.endpoint.credentials.oauth]`, the same table `[cdr.endpoint.credentials]` takes |
 | `source_id` | `[facade] system_id` | How the bridge names itself as the recording system (`AuditEvent.source.observer`) |
 | `site` | none | The site the bridge runs at (`AuditEvent.source.site`) |
