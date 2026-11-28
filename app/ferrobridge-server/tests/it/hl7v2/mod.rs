@@ -319,6 +319,7 @@ pub(crate) fn listeners() -> Hl7v2Settings {
         listen: "127.0.0.1:0".parse().expect("a socket address"),
         timeouts: Timeouts::default(),
         frame_limit: 1024 * 1024,
+        authority_max_age: Duration::from_secs(600),
         tls: Some(Tls {
             acceptor: ferrobridge_hl7v2::mllp::tls::acceptor(
                 PKI.server_certificate().as_bytes(),
@@ -402,10 +403,16 @@ impl Serving {
     ) -> Result<Self, Box<dyn Error>> {
         let (terminology_server, terminology) = terminology_stub().await;
         let usage = Arc::new(ferrobridge_server::usage_report::window());
-        let face = Face::new(facade, Some(terminology), routes)
-            .with_usage(Arc::clone(&usage))
-            .with_access_log(log, listeners.listen)
-            .with_inbox(inbox);
+        let face = Face::new(
+            facade,
+            Some(ferrobridge_hl7v2::map::terminology::Terminology::new(
+                terminology,
+            )),
+            routes,
+        )
+        .with_usage(Arc::clone(&usage))
+        .with_access_log(log, listeners.listen)
+        .with_inbox(inbox);
         // A configured plain listener is the one the case drives.
         let face = Arc::new(match listeners.plain {
             Some(bind) => face.on_plain(bind),

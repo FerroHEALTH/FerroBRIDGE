@@ -10,6 +10,7 @@
 use std::error::Error;
 
 use ferrobridge_hl7v2::map::maps::Maps;
+use ferrobridge_hl7v2::map::terminology::Terminology;
 use ferrobridge_hl7v2::map::{Outcome, inverse, single};
 use ferrobridge_hl7v2::parse::Delimiters;
 use ferrobridge_hl7v2::parse::structure::segment_of;
@@ -36,7 +37,10 @@ async fn a_pid_maps_and_writes_back_through_the_reference_terminology_server()
         return Ok(());
     }
     let server = containers::v2_terminology().await?;
-    let client = Client::new(Config::new(server.base_url("r4").parse()?, WireVersion::R4))?;
+    let client = Terminology::new(Client::new(Config::new(
+        server.base_url("r4").parse()?,
+        WireVersion::R4,
+    ))?);
     // An ISO OID authority needs no identifier registry lookup, so the case
     // rests on `$translate` alone.
     let pid: &[u8] = b"PID|1||PAT-1^^^&2.999.1&ISO||Doe^Ann^^^^^L||19800229|F|||||^PRS^CP^^^^^^^^^+31600000000~^WPN^PH^^^^^^^^^+31207654321";

@@ -393,6 +393,9 @@ jobs:
       # The conformance badge rendering and the upstream rows a badge names
       # as `, k upstream` (#2334), against scratch trees and a stub gh.
       - run: bash scripts/checks/conformance.sh --self-test
+      # The local gate names a member the lock holds twice as `name@version`
+      # (#2420), against fixed metadata.
+      - run: bash scripts/checks/fast.sh --self-test
       - run: bash scripts/checks/upstream-rows.sh --self-test
       # Every released changelog section against its text at its tag, which
       # it fetches from origin when the shallow checkout lacks it.

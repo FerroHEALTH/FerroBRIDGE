@@ -73,8 +73,9 @@ pub struct Face {
     facade: Arc<Facade>,
     /// The directory of the maps, with the messages each one served.
     directory: Arc<directory::Directory>,
-    /// The terminology server the table maps are translated on.
-    terminology: Option<ferrobridge_term::client::Client>,
+    /// The terminology server the table maps are translated on, with the
+    /// assigning authorities it resolved.
+    terminology: Option<ferrobridge_hl7v2::map::terminology::Terminology>,
     /// Where each message's MLLP source is found.
     routes: Arc<dyn Routes>,
     /// The listener this face answers on.
@@ -200,7 +201,7 @@ impl Face {
     #[must_use]
     pub fn new(
         facade: Arc<Facade>,
-        terminology: Option<ferrobridge_term::client::Client>,
+        terminology: Option<ferrobridge_hl7v2::map::terminology::Terminology>,
         routes: Arc<dyn Routes>,
     ) -> Self {
         let directory = Arc::new(directory::Directory::new(
