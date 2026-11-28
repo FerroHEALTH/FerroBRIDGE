@@ -154,5 +154,7 @@ fn resolve_cache(
         },
         feed_url: cache.feed_url.clone(),
         feed_clients: cache.feed_clients.clone(),
+        registry: client.url().clone(),
+        recorder: None,
     })
 }
