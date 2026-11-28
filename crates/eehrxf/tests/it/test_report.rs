@@ -5,7 +5,8 @@
 //! mapped from openEHR through the shipped medical test report project, over
 //! FerroBRIDGE's template of published CKM archetypes: a spirometry result and
 //! an electrocardiogram result each become an R4 `DiagnosticReport` that
-//! claims no profile, written into a document with its Annex III metadata.
+//! claims no profile, written into a document with its Annex III metadata,
+//! and received back into a composition of the template.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -26,6 +27,8 @@ use eehrxf::document::test_report::{
 use eehrxf::draft::{Annex, AnnexCrosswalk, SHIPPED};
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::TEST_REPORT;
+use eehrxf::receive::ReceivedDocument;
+use eehrxf::receive::openehr::{COMMENT_LEAD, ReceivedComposition};
 use ferrobridge_testkit::fixtures::{
     CKM_LIBRARY_ARCHETYPES, CKM_TEST_REPORT_ARCHETYPES, FERROBRIDGE_TEST_REPORT_TEMPLATE,
     FERROBRIDGE_TEST_REPORT_TEMPLATE_ID,
@@ -39,6 +42,7 @@ use fhir_types::r4::patient::Patient;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::traverse::defaults::Defaults;
 use fhirconnect::operations::run::Settings;
 use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
@@ -387,4 +391,155 @@ fn the_project_names_its_losses_in_the_comment_the_template_inherits() -> Result
     let value = index.node(&AqlPath::new(note.value_path()))?;
     assert_eq!(value.rm_type(), "DV_TEXT");
     Ok(())
+}
+
+/// The settings a receive run is stamped with.
+fn receive_settings() -> Settings {
+    Settings::new("Device/ferrobridge-eehrxf-test", NOW)
+        .with_defaults(Defaults::at(NOW).with_language("en").with_territory("NL"))
+}
+
+/// The report of `composition` written into a document by the `context` of
+/// the shipped project and received back into a composition by `mapping`.
+fn received(
+    mapping: &Mapping,
+    context: &str,
+    composition: &str,
+    identifier: &str,
+) -> Result<ReceivedComposition, Box<dyn Error>> {
+    let bundle = document_of(context, composition, identifier)?;
+    let document = ReceivedDocument::read(&serde_json::to_string(&bundle)?)?;
+    Ok(mapping.to_openehr(&document, &receive_settings())?)
+}
+
+/// The elements of a spirometry report this suite accounts for beyond the
+/// shipped project, which accounts for none.
+const ACCOUNTED: &[&str] = &[
+    "DiagnosticReport.status",
+    "DiagnosticReport.category",
+    "DiagnosticReport.code",
+    "DiagnosticReport.issued",
+    "DiagnosticReport.performer",
+    "DiagnosticReport.text",
+];
+
+#[test]
+fn a_received_report_maps_into_one_composition_of_the_template() -> Result<(), Box<dyn Error>> {
+    let index = WebTemplateIndex::build(&template()?)?;
+    for (context, composition, archetype, identifier) in [
+        (
+            SPIROMETRY_CONTEXT,
+            spirometry(),
+            "openEHR-EHR-OBSERVATION.spirometry_result.v2",
+            "urn:uuid:5b0c3f7e-0000-4000-8000-00000000e201",
+        ),
+        (
+            ECG_CONTEXT,
+            electrocardiogram(),
+            "openEHR-EHR-OBSERVATION.ecg_result.v1",
+            "urn:uuid:5b0c3f7e-0000-4000-8000-00000000e202",
+        ),
+    ] {
+        let mapping = mapping(context)?;
+        let composition = received(&mapping, context, &composition, identifier)?;
+        assert_eq!(
+            composition.template_id(),
+            FERROBRIDGE_TEST_REPORT_TEMPLATE_ID
+        );
+        let canonical: Value = serde_json::from_str(composition.composition())?;
+        // NOTE: AM Release-2.3.0, Archetype Identification, an ADL 2 archetype id carries its full
+        // version, so the operational template names the CKM archetype with its minor and patch.
+        let node = canonical["content"][0]["archetype_node_id"]
+            .as_str()
+            .ok_or("the entry's archetype")?;
+        assert!(
+            node.strip_prefix(archetype)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('.')),
+            "{node} is {archetype}"
+        );
+        assert_eq!(
+            canonical["feeder_audit"]["original_content"]["formalism"], "application/fhir+json",
+            "the composition keeps the received document"
+        );
+        index.accept(canonical)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn the_received_report_carries_the_result_it_was_sent_with() -> Result<(), Box<dyn Error>> {
+    let mapping = mapping(SPIROMETRY_CONTEXT)?;
+    let composition = received(
+        &mapping,
+        SPIROMETRY_CONTEXT,
+        &spirometry(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000e203",
+    )?;
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let event = &canonical["content"][0]["data"]["events"][0];
+    assert_eq!(event["time"]["value"], "2026-11-20T08:30:00Z", "{event}");
+    let items = event["data"]["items"]
+        .as_array()
+        .ok_or("the event's items")?;
+    assert!(
+        items
+            .iter()
+            .any(|item| item["archetype_node_id"] == "at0130"
+                && item["value"]["value"] == "Synthetic normal spirometry."),
+        "{event}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_fully_carried_report_has_no_comment_on_what_it_does_not_carry() -> Result<(), Box<dyn Error>> {
+    let composition = received(
+        &mapping(SPIROMETRY_CONTEXT)?,
+        SPIROMETRY_CONTEXT,
+        &spirometry(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000e204",
+    )?;
+    assert!(
+        composition.not_carried().is_empty(),
+        "{:?}",
+        composition.not_carried()
+    );
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    assert!(comment(&canonical).is_none(), "{canonical}");
+    Ok(())
+}
+
+// NOTE: openEHR-EHR-COMPOSITION.report-result.v1 at0007 is the composition's Comment, a DV_TEXT
+// in other_context; each element a received report's composition does not carry is named there.
+#[test]
+fn an_element_the_received_report_does_not_carry_is_named_in_its_comment()
+-> Result<(), Box<dyn Error>> {
+    let mapping = mapping(SPIROMETRY_CONTEXT)?.accounting(ACCOUNTED);
+    let composition = received(
+        &mapping,
+        SPIROMETRY_CONTEXT,
+        &spirometry(),
+        "urn:uuid:5b0c3f7e-0000-4000-8000-00000000e205",
+    )?;
+    assert!(
+        !composition.not_carried().is_empty(),
+        "the suite accounts for an element the run leaves"
+    );
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let comment = comment(&canonical).ok_or("the comment")?;
+    assert_eq!(
+        comment["value"]["value"],
+        format!("{COMMENT_LEAD}{}", composition.not_carried().join("; ")),
+        "{comment}"
+    );
+    WebTemplateIndex::build(&template()?)?.accept(canonical)?;
+    Ok(())
+}
+
+/// The comment of the composition `canonical`, when it holds one.
+fn comment(canonical: &Value) -> Option<&Value> {
+    canonical["context"]["other_context"]["items"]
+        .as_array()?
+        .iter()
+        .find(|item| item["archetype_node_id"] == "at0007")
 }
