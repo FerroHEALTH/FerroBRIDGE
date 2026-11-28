@@ -40,7 +40,7 @@ hash. A row whose post-quantum form has no standard yet counts as not safe,
 whatever its `safe` column says.
 
 The README badge counts the safe rows out of the rows whose post-quantum
-form a standard defines (for example `19/21`). The rows with no standard yet are the
+form a standard defines (for example `20/21`). The rows with no standard yet are the
 table's `no standard yet` rows below; they stay out of the fraction and the
 colour, since no change in FerroBRIDGE can move them until a standard
 exists.
@@ -86,20 +86,23 @@ on X25519 with a peer that offers only classical groups.
 
 The key exchange protects what a session carries against an attacker who
 records it now and decrypts it later, the risk the roadmap gives first
-place. Three kinds of use stay classical:
+place.
+
+Every JWS the bridge signs or verifies takes ML-DSA (RFC 9964) through
+`ferrohealth-smart` 0.36. An issuer's `algorithms` list may name
+`ML-DSA-44`, `ML-DSA-65` or `ML-DSA-87` beside the classical algorithms, its
+key set publishing the key as an `AKP` JWK. A `private_key_jwt` client signs
+its assertions, and a `dpop_key_file` signs its DPoP proofs, with an ML-DSA
+key its PEM file holds, each proof carrying the `AKP` public key in its
+`jwk` header (RFC 9449 §4.2). The operator console accepts an ML-DSA ID
+Token.
+
+Two kinds of use stay classical:
 
 - **TLS 1.2 and certificates.** The MLLP listener and the PostgreSQL and
   AMQP clients accept TLS 1.2, whose key exchange is ECDHE. The certificates
   that authenticate a peer are the operator's, and no TLS signature scheme
   for ML-DSA is published as an RFC yet.
-- **DPoP proofs.** FerroBRIDGE signs its JWS with `ferrohealth-smart`
-  0.35, which signs and verifies ML-DSA (RFC 9964). An issuer's
-  `algorithms` list may name `ML-DSA-44`, `ML-DSA-65` or `ML-DSA-87` beside
-  the classical algorithms, its key set publishing the key as an `AKP` JWK;
-  a `private_key_jwt` client signs with an ML-DSA key its PEM file holds;
-  and the operator console accepts an ML-DSA ID Token. The DPoP key of
-  `ferrohealth-smart` 0.35 is ECDSA on P-256 or P-384 alone, so the DPoP row
-  moves when the family crate takes an ML-DSA DPoP key.
 - **Release signing.** crates.io Trusted Publishing and the Sigstore
   attestations use the keys GitHub and Sigstore issue, RS256 for the
   Trusted Publishing token and ECDSA P-256 for the attestations.
@@ -126,7 +129,7 @@ collision weakness is classical.
 | Access token verification at the facade and the operator API | ML-DSA-44, ML-DSA-65, ML-DSA-87 (RFC 9964) where an issuer's algorithms list them, from an AKP key of its key set; RS256, RS384, PS256, PS384, ES256, ES384 by default | yes | RFC 9964 | `app/ferrobridge-server/src/smart.rs, app/ferrobridge-server/src/config/resolve/auth.rs` |
 | Basic credentials of [[auth.basic.users]] | Argon2id PHC hashes | yes | NIST IR 8547 4.1.3 | `app/ferrobridge-server/src/config/resolve/auth.rs` |
 | Client assertions (private_key_jwt) the bridge signs for its own tokens | ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964) for an ML-DSA key; RS256 to PS512, ES256, ES384 or EdDSA, as the configured key holds | yes | RFC 9964 | `app/ferrobridge-server/src/config/credentials.rs, app/ferrobridge-server/src/credentials.rs` |
-| DPoP proofs the bridge signs for its own tokens | ES256 or ES384, as the configured key holds | no | RFC 9964 | `app/ferrobridge-server/src/config/credentials.rs` |
+| DPoP proofs the bridge signs for its own tokens | ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964) for an ML-DSA key; ES256 or ES384, as the configured key holds | yes | RFC 9964 | `app/ferrobridge-server/src/config/credentials.rs` |
 | ID token verification of the operator console's sign-in | ML-DSA-44, ML-DSA-65, ML-DSA-87 (RFC 9964) from an AKP key of the provider's key set; RS256 to PS512, ES256, ES384, EdDSA | yes | RFC 9964 | `app/ferrobridge-console/src/server.rs` |
 | Inbound webhook signatures, HMAC | HMAC-SHA-256 or HMAC-SHA-512 (hmac, Standard Webhooks v1) | yes | NIST IR 8547 4.1.3 | `app/ferrobridge-server/src/inbound/verify.rs` |
 | Inbound webhook signatures, public key | Ed25519 (Standard Webhooks v1a and v2a) | no | no standard yet | `app/ferrobridge-server/src/inbound/verify.rs` |
