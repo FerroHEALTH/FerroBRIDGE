@@ -217,3 +217,33 @@ fn the_report_maps_its_procedure_and_discharge_medication() -> Result<(), Box<dy
     );
     Ok(())
 }
+
+// NOTE: FHIR R4 terminologies-systems.html: ICD-10 is http://hl7.org/fhir/sid/icd-10 and
+// SNOMED CT http://snomed.info/sct; openEHR names them ICD10 and SNOMED-CT.
+#[test]
+fn a_diagnosis_recorded_under_openehr_terminology_ids_is_written_with_fhir_system_uris()
+-> Result<(), Box<dyn Error>> {
+    let recorded = diagnosis()
+        .replace("\"http://hl7.org/fhir/sid/icd-10\"", "\"ICD10\"")
+        .replace("\"http://snomed.info/sct\"", "\"SNOMED-CT\"");
+    assert!(recorded.contains("\"SNOMED-CT\"") && recorded.contains("\"ICD10\""));
+    let run = mapping()?.to_fhir_with(
+        &composition(&[recorded]),
+        &settings(),
+        CallContext::new()
+            .with_patient(reference("Patient/synthetic-patient"))
+            .with_who(reference("Device/gateway")),
+    )?;
+    let condition = only(run.bundle(), "Condition")?;
+    assert_eq!(
+        condition["code"]["coding"][0]["system"],
+        "http://hl7.org/fhir/sid/icd-10"
+    );
+    assert_eq!(condition["code"]["coding"][0]["code"], DIAGNOSIS);
+    assert_eq!(
+        condition["bodySite"][0]["coding"][0]["system"],
+        "http://snomed.info/sct"
+    );
+    assert_eq!(condition["bodySite"][0]["coding"][0]["code"], "39607008");
+    Ok(())
+}
