@@ -2014,17 +2014,17 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.33.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c67e05732186380e01aabaa49d4f89642d5935e437ad41bea1ce6e9469f1cde"
+checksum = "84d171f8fdadd514e0cf0f12e5fd85f12b9274bcb12584e344de2d8635b03e26"
 dependencies = [
  "aws-lc-rs",
  "axum",
  "base64 0.23.1",
  "cookie",
- "ferrohealth-config 0.4.5",
+ "ferrohealth-config 0.5.0",
  "ferrohealth-secret",
- "ferrohealth-smart 0.36.0",
+ "ferrohealth-smart 0.38.0",
  "ferrohealth-ui",
  "http",
  "jiff",
@@ -2060,7 +2060,6 @@ dependencies = [
  "toml",
  "tracing",
  "url",
- "x509-parser",
 ]
 
 [[package]]
@@ -5937,7 +5936,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

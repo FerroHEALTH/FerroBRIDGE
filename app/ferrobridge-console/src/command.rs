@@ -151,16 +151,19 @@ async fn healthcheck(settings: &Settings) -> ExitCode {
 )]
 async fn serve(settings: Settings) -> ExitCode {
     let service = Service::new("ferrobridge-console", env!("CARGO_PKG_VERSION"));
-    let telemetry = match ferrohealth_server::telemetry::build(&settings.telemetry, service) {
-        Ok(telemetry) => telemetry,
-        Err(error) => {
-            eprintln!(
-                "ferrobridge-console: cannot start the log: {}",
-                chain(&error)
-            );
-            return ExitCode::FAILURE;
-        }
-    };
+    // The clearing keeps an `https` collector cleared for revocation, and
+    // stops when dropped, so it lives as long as the process serves.
+    let (telemetry, _clearing) =
+        match ferrohealth_server::telemetry::build(&settings.telemetry, service) {
+            Ok(built) => built,
+            Err(error) => {
+                eprintln!(
+                    "ferrobridge-console: cannot start the log: {}",
+                    chain(&error)
+                );
+                return ExitCode::FAILURE;
+            }
+        };
     let telemetry = match telemetry
         .install(&settings.telemetry, &Console::detect())
         .map(|_filter| telemetry)
