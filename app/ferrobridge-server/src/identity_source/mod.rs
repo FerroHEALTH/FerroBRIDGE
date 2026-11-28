@@ -63,10 +63,15 @@ pub struct CacheSettings {
     pub feed_url: String,
     /// The client ids of the access tokens the receiver admits.
     pub feed_clients: Vec<String>,
+    /// The identity source's base, the Registry each ITI-93 message comes
+    /// from.
+    pub registry: url::Url,
+    /// What records each received ITI-93 message under `[audit]`.
+    pub recorder: Option<std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>>,
 }
 
 /// The started cache: what the lanes run and the router mounts.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Running {
     /// The cache every replica's lookups read.
     pub cache: PseudonymCache,
@@ -76,6 +81,22 @@ pub struct Running {
     pub feed_url: String,
     /// The client ids of the access tokens the receiver admits.
     pub feed_clients: Vec<String>,
+    /// The identity source's base, the Registry each ITI-93 message comes
+    /// from.
+    pub registry: url::Url,
+    /// What records each received ITI-93 message under `[audit]`.
+    pub recorder: Option<std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>>,
+}
+
+impl std::fmt::Debug for Running {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Running")
+            .field("cache", &self.cache)
+            .field("holder", &self.holder)
+            .field("feed_clients", &self.feed_clients)
+            .field("audited", &self.recorder.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl Running {
@@ -98,6 +119,8 @@ impl Running {
             holder,
             feed_url: settings.feed_url.clone(),
             feed_clients: settings.feed_clients.clone(),
+            registry: settings.registry.clone(),
+            recorder: settings.recorder.clone(),
         })
     }
 }
@@ -123,6 +146,7 @@ impl std::fmt::Debug for CacheSettings {
             .field("bounds", &self.bounds)
             .field("subscription", &self.subscription)
             .field("feed_clients", &self.feed_clients)
+            .field("audited", &self.recorder.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -271,9 +295,10 @@ impl IdentitySource {
     /// Returns this identity source recording every ITI-83 exchange through
     /// `recorder` as the `PIXm` Query Consumer audit profile fixes it, every
     /// ITI-104 exchange as the Feed Source profile does (`PIXm` 3.1.0
-    /// §2:3.83.5.1.1, §2:3.104.5.1.1), and every ITI-94 exchange of the
+    /// §2:3.83.5.1.1, §2:3.104.5.1.1), every ITI-94 exchange of the
     /// cache's subscription as the Subscriber's profiles do (PMIR 1.6.0
-    /// §2:3.94.5.1).
+    /// §2:3.94.5.1), and every ITI-93 message the cache's receiver takes as
+    /// the Consumer's feed profile does (§2:3.93.5.1).
     #[must_use]
     pub fn audited(self, recorder: std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>) -> Self {
         let cache_settings = self.cache_settings.map(|settings| CacheSettings {
@@ -284,6 +309,7 @@ impl IdentitySource {
                     .audited(std::sync::Arc::clone(&recorder)),
                 ..settings.subscription
             },
+            recorder: Some(std::sync::Arc::clone(&recorder)),
             ..settings
         });
         Self {
