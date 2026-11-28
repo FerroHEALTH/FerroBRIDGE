@@ -46,9 +46,11 @@ use fhir_types::codec::Json;
 use fhir_types::codec::Object;
 use fhir_types::codec::Path;
 use fhir_types::codec::Value;
+use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::resource::Resource;
 
+use crate::terminology::Candidate;
 use crate::terminology::Terminology;
 use crate::terminology::TerminologyError;
 use crate::terminology::Translated;
@@ -99,10 +101,11 @@ pub struct Binding {
     /// The canonical URL of the bound value set.
     pub value_set: &'static str,
     /// Every system URI the value set's members are drawn from: a concept
-    /// with a coding in one of them meets the binding.
+    /// with a coding in one of them, outside the targets, is asked of
+    /// `ValueSet/$validate-code` whether it is a member.
     pub systems: &'static [&'static str],
-    /// The systems of [`Binding::systems`] a concept that meets the binding
-    /// in none is asked a translation into.
+    /// The systems of [`Binding::systems`] a concept that is no member is
+    /// asked a translation into; a coding in one of them meets the binding.
     pub targets: &'static [&'static str],
 }
 
@@ -212,6 +215,7 @@ struct Pending<'t> {
     targets: Vec<&'t str>,
     preferred: bool,
     binding: Option<Binding>,
+    verify: bool,
 }
 
 /// The translator of the resources of one document: the configured
@@ -346,10 +350,20 @@ impl<'t> Translator<'t> {
         }
         let mut changed = false;
         for concept in pending {
-            let added = self
-                .equivalents(&concept.originals, &concept.targets)
+            let binding = self
+                .unmet(concept.binding, concept.verify, &concept.originals)
                 .await?;
-            if let Some(binding) = concept.binding {
+            let mut asked = concept.targets.clone();
+            for system in binding.iter().flat_map(|binding| binding.targets) {
+                if !asked.contains(system) {
+                    asked.push(system);
+                }
+            }
+            if asked.is_empty() {
+                continue;
+            }
+            let added = self.equivalents(&concept.originals, &asked).await?;
+            if let Some(binding) = binding {
                 let met = added.iter().any(|(_, held)| {
                     identity(&held.coding)
                         .is_some_and(|(system, _)| binding.systems.contains(&system))
@@ -467,6 +481,38 @@ impl<'t> Translator<'t> {
         Ok(changed)
     }
 
+    /// Returns `binding` unless `originals` already meet it: when `verify`,
+    /// the concept carries a code in one of the binding's systems, and
+    /// `ValueSet/$validate-code` decides whether it is in the value set.
+    // NOTE: MyHealth@EU Core 1.0.1 eHDSIAllergenWithExceptions takes SNOMED CT only through the
+    // 470 enumerated eHDSIAllergenNoDrug concepts, so a code's system does not decide membership.
+    async fn unmet(
+        &self,
+        binding: Option<Binding>,
+        verify: bool,
+        originals: &[(String, String)],
+    ) -> Result<Option<Binding>, TerminologyError> {
+        let Some(binding) = binding.filter(|_| verify) else {
+            return Ok(binding);
+        };
+        let concept = CodeableConcept {
+            coding: originals
+                .iter()
+                .map(|(system, code)| Coding {
+                    system: Some(system.as_str().into()),
+                    code: Some(code.as_str().into()),
+                    ..Coding::default()
+                })
+                .collect(),
+            ..CodeableConcept::default()
+        };
+        let member = self
+            .terminology
+            .validate(binding.value_set, &Candidate::Concept(Box::new(concept)))
+            .await?;
+        Ok((!member).then_some(binding))
+    }
+
     /// Returns every accepted translation of `originals` into `targets`, in
     /// order, leaving out a coding the originals or an earlier translation
     /// already carry.
@@ -540,20 +586,16 @@ fn untranscoded<'t>(
         let binding = bindings
             .iter()
             .find(|binding| binding.element == occurrence.element)
-            .filter(|binding| !carried(&|system| binding.systems.contains(&system)))
+            .filter(|binding| !carried(&|system| binding.targets.contains(&system)))
             .copied();
-        let mut asked: Vec<&'t str> = Vec::new();
-        if !is_preferred {
-            asked.extend(targets);
-        }
-        if let Some(binding) = binding {
-            for system in binding.targets {
-                if !asked.contains(system) {
-                    asked.push(system);
-                }
-            }
-        }
-        if asked.is_empty() {
+        let verify =
+            binding.is_some_and(|binding| carried(&|system| binding.systems.contains(&system)));
+        let asked: Vec<&'t str> = if is_preferred {
+            Vec::new()
+        } else {
+            targets.to_vec()
+        };
+        if asked.is_empty() && binding.is_none() {
             continue;
         }
         let originals: Vec<(String, String)> = codings
@@ -574,6 +616,7 @@ fn untranscoded<'t>(
             targets: asked,
             preferred: is_preferred,
             binding,
+            verify,
         });
     }
     Ok(pending)

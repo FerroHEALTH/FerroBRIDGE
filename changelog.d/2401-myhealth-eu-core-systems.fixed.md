@@ -1,5 +1,7 @@
 - `eehrxf`: each MyHealth@EU binding names every system its value set draws
   on (`Binding::systems`) apart from the systems a translation is asked for
-  (`Binding::targets`). A SNOMED CT allergen now meets `MYHEALTH_EU_CORE`'s
-  allergy binding: it is no longer asked for an ATC code or reported unbound,
-  and an Orphacode or ICD-O-3 problem is no longer asked for ICD-10.
+  (`Binding::targets`). A bound concept that already carries a code in a
+  member system is asked of `ValueSet/$validate-code` whether it is in the
+  value set. A SNOMED CT non-drug allergen, or an Orphacode rare disease the
+  value set holds, is no longer asked for an ATC or ICD-10 code nor reported
+  unbound; a SNOMED CT drug allergen still gains its ATC coding.
