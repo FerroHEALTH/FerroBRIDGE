@@ -13,6 +13,7 @@ use ferrobridge_hl7v2::ack::{self, Code, Stamp};
 use ferrobridge_hl7v2::decode::{self, Charset};
 use ferrobridge_hl7v2::inbound::{self, Received};
 use ferrobridge_hl7v2::map::maps::Maps;
+use ferrobridge_hl7v2::map::terminology::Terminology;
 use ferrobridge_hl7v2::mllp::Malformed;
 use ferrobridge_hl7v2::mllp::listener::{Connection, Handler};
 use ferrobridge_hl7v2::parse::structure::structure_for;
@@ -63,7 +64,7 @@ pub(crate) fn shipped() -> &'static Maps {
 
 /// A terminology stub loaded with the table maps of the guide and of the
 /// value package, and a client of it.
-pub(crate) async fn terminology() -> (MockServer, Client) {
+pub(crate) async fn terminology() -> (MockServer, Terminology) {
     let tables = PackageTables::load(&[&package(), &values()]).expect("the table maps load");
     tables.serve().await.expect("the stub serves")
 }
@@ -147,7 +148,7 @@ impl Tables {
     }
 
     /// Mounts the stub on a new server and returns a client of it.
-    pub(crate) async fn serve(&self) -> (MockServer, Client) {
+    pub(crate) async fn serve(&self) -> (MockServer, Terminology) {
         let server = MockServer::start().await;
         mount_translate(&server, self.clone()).await;
         let base = format!("{}/r4", server.uri()).parse().expect("a base url");
@@ -159,7 +160,7 @@ impl Tables {
                 max_backoff: Duration::from_millis(1),
             });
         let client = Client::new(config).expect("a client");
-        (server, client)
+        (server, Terminology::new(client))
     }
 }
 

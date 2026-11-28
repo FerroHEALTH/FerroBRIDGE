@@ -432,6 +432,9 @@ pub struct Hl7v2Settings {
     pub timeouts: ferrobridge_hl7v2::mllp::listener::Timeouts,
     /// The largest message one frame may carry, in bytes.
     pub frame_limit: usize,
+    /// How long an assigning authority's registry answer is held across
+    /// messages (`[hl7v2] authority_max_age`).
+    pub authority_max_age: std::time::Duration,
     /// The TLS the listener serves, requiring a client certificate; `None`
     /// when no TLS listener runs.
     pub tls: Option<hl7v2::Tls>,
