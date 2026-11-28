@@ -183,7 +183,7 @@ fn evidenced_condition() -> serde_json::Value {
 fn putget_holds_on_a_synthetic_ips_allergy() -> Result<(), Box<dyn Error>> {
     let (program, index) = allergy()?;
     let declared = laws::putget(&program, &index, &allergy_intolerance(), &laws::untouched)?;
-    insta::assert_json_snapshot!("library_ips_allergy_putget", declared);
+    json_snapshot!("library_ips_allergy_putget", declared);
     Ok(())
 }
 
@@ -192,7 +192,7 @@ fn putget_holds_on_a_synthetic_ips_allergy() -> Result<(), Box<dyn Error>> {
 fn putget_holds_on_a_synthetic_evidenced_condition() -> Result<(), Box<dyn Error>> {
     let (program, index) = evidence()?;
     let declared = laws::putget(&program, &index, &evidenced_condition(), &laws::untouched)?;
-    insta::assert_json_snapshot!("library_evidence_putget", declared);
+    json_snapshot!("library_evidence_putget", declared);
     Ok(())
 }
 

@@ -249,7 +249,7 @@ fn the_kds_laborauftrag_flat_fixture_builds_a_composition_the_template_admits()
 fn putget_holds_on_the_kds_service_request() -> Result<(), Box<dyn Error>> {
     let (program, index) = kds_laborauftrag_program()?;
     let declared = laws::putget(&program, &index, &kds_service_request()?, &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_laborauftrag_putget", declared);
+    json_snapshot!("kds_laborauftrag_putget", declared);
     Ok(())
 }
 
@@ -374,7 +374,7 @@ pub(crate) fn laborauftrag_getput() -> Result<serde_json::Value, Box<dyn Error>>
 /// back as the resource the run creates, which the request references.
 #[test]
 fn putget_holds_on_the_requester_organization() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "kds_laborauftrag_organization_putget",
         organization_putget()?
     );
@@ -386,7 +386,7 @@ fn putget_holds_on_the_requester_organization() -> Result<(), Box<dyn Error>> {
 /// which the request references.
 #[test]
 fn putget_holds_on_the_contained_specimen() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "kds_laborauftrag_specimen_putget",
         contained_putget("Specimen", SPECIMEN_ID, "/specimen/0/reference")?
     );
@@ -397,7 +397,7 @@ fn putget_holds_on_the_contained_specimen() -> Result<(), Box<dyn Error>> {
 /// included.
 #[test]
 fn getput_holds_on_the_kds_laborauftrag_composition() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!("kds_laborauftrag_getput", laborauftrag_getput()?);
+    json_snapshot!("kds_laborauftrag_getput", laborauftrag_getput()?);
     Ok(())
 }
 
@@ -553,6 +553,6 @@ fn the_kds_laborauftrag_chain_as_published_is_refused_exactly() -> Result<(), Bo
     )
     .err()
     .ok_or("the laborauftrag chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_laborauftrag_chain_as_published", rows(&diagnostics));
+    json_snapshot!("kds_laborauftrag_chain_as_published", rows(&diagnostics));
     Ok(())
 }

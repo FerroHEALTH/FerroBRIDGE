@@ -3,6 +3,8 @@ source: crates/fhirconnect/tests/it/roundtrip.rs
 expression: declared
 ---
 {
+  "added": [],
+  "changed": [],
   "first_leg": [
     "the mapping recordedDateOutboundOnly did not run: its unidirectional marker names the other direction",
     "the engine filled /composer",
@@ -11,7 +13,6 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [
     "clinicalStatus.coding[0].code = \"active\"",
     "clinicalStatus.coding[0].display = \"Active\"",
@@ -26,6 +27,5 @@ expression: declared
     "verificationStatus.coding[0].display = \"Confirmed\"",
     "verificationStatus.coding[0].system = \"http://terminology.hl7.org/CodeSystem/condition-ver-status\""
   ],
-  "added": [],
-  "changed": []
+  "second_leg": []
 }

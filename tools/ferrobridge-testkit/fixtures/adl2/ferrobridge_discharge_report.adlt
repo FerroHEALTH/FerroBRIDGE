@@ -11,7 +11,7 @@
 -- Discharge Report sections of the same names. Node identifiers are
 -- at-coded, the ADL 1.4 codes of the CKM sources.
 template (adl_version=2.4.0; rm_release=1.1.0)
-    openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.0.0
+    openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.1.0
 
 specialize
     openEHR-EHR-COMPOSITION.transfer_summary.v1

@@ -544,7 +544,8 @@ async fn the_eps_profile_answers_the_hl7_europe_form() -> Result<(), Box<dyn Err
 const ICD_10: &str = "http://hl7.org/fhir/sid/icd-10";
 
 /// Mounts the terminology server's ICD-10 mapping of the synthetic
-/// hypertension, SNOMED CT 38341003, to I10.
+/// hypertension, SNOMED CT 38341003, to I10, and a `$validate-code` that
+/// answers no concept a member.
 async fn mount_icd_10(term: &MockServer) {
     Mock::given(matchers::method("POST"))
         .and(matchers::path("/r4/ConceptMap/$translate"))
@@ -561,6 +562,16 @@ async fn mount_icd_10(term: &MockServer) {
             ]
         })))
         .with_priority(1)
+        .mount(term)
+        .await;
+    // NOTE: MyHealth@EU Core 1.0.1 eHDSIAllergenWithExceptions enumerates its SNOMED CT members, so
+    // the translator asks $validate-code of a SNOMED CT allergen; this one is no member.
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/r4/ValueSet/$validate-code"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "Parameters",
+            "parameter": [{"name": "result", "valueBoolean": false}]
+        })))
         .mount(term)
         .await;
 }

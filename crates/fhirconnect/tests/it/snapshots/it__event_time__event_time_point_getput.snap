@@ -3,7 +3,15 @@ source: crates/fhirconnect/tests/it/event_time.rs
 expression: point
 ---
 {
+  "added": [
+    "ctx/setting = \"238\"",
+    "ctx/time = \"2026-09-13T08:00:00Z\""
+  ],
+  "changed": [
+    "ctx/composer_name: \"FerroBRIDGE\" became \"FHIRconnect\""
+  ],
   "first_leg": [],
+  "lost": [],
   "second_leg": [
     "the mapping status did not run: its unidirectional marker names the other direction",
     "the mapping code did not run: its unidirectional marker names the other direction",
@@ -12,13 +20,5 @@ expression: point
     "the engine filled /context/setting",
     "the engine filled /language",
     "the engine filled /territory"
-  ],
-  "lost": [],
-  "added": [
-    "ctx/setting = \"238\"",
-    "ctx/time = \"2026-09-13T08:00:00Z\""
-  ],
-  "changed": [
-    "ctx/composer_name: \"FerroBRIDGE\" became \"FHIRconnect\""
   ]
 }

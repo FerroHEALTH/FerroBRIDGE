@@ -173,7 +173,7 @@ fn putget_holds_on_the_kds_pseudonymised_patient() -> Result<(), Box<dyn Error>>
         &kds_pseudonymised_patient(),
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("kds_person_pseudo_putget", declared);
+    json_snapshot!("kds_person_pseudo_putget", declared);
     Ok(())
 }
 
@@ -206,7 +206,7 @@ const REPLACED: &[&str] = &[
 ///   code `Address.type`.
 #[test]
 fn the_kds_person_pseudo_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "kds_person_pseudo_chain_as_published",
         person_pseudo_chain_as_published()?
     );

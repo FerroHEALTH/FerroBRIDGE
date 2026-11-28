@@ -26,6 +26,8 @@ mod authored;
 mod batch;
 #[cfg(all(feature = "stu3", feature = "r4", feature = "r4b"))]
 mod date;
+#[cfg(all(feature = "stu3", feature = "r4", feature = "r4b"))]
+mod display_language;
 #[cfg(any(feature = "r4", feature = "r4b"))]
 mod end_to_end;
 #[cfg(all(feature = "smart", feature = "r4"))]

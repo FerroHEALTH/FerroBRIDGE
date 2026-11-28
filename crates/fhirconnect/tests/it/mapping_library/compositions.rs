@@ -243,6 +243,6 @@ fn the_defective_composition_models_refuse_as_pinned() -> Result<(), Box<dyn Err
         );
         refused.insert((*file).to_owned(), serde_json::json!(rows));
     }
-    insta::assert_json_snapshot!("library_composition_refusals", refused);
+    json_snapshot!("library_composition_refusals", refused);
     Ok(())
 }

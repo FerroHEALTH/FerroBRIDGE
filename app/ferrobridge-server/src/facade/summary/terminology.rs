@@ -100,11 +100,12 @@ impl TerminologyServer for Server {
     ) -> Result<Option<String>, TerminologyError> {
         let outcome = self
             .client
-            .lookup(system, code, None)
+            .lookup_in(system, code, None, language)
             .await
             .map_err(|error| refusal(Operation::Lookup, error))?;
         match outcome {
-            // NOTE: FHIR R4 `$lookup`: each `designation` names its language as a BCP 47 code.
+            // NOTE: FHIR R4 `$lookup`: `displayLanguage` asks for the language, and each
+            // `designation` names its language as a BCP 47 code.
             LookupOutcome::Found { designations, .. } => Ok(designations
                 .into_iter()
                 .find(|designation| {

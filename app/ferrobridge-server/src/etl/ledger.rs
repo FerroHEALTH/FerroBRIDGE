@@ -70,7 +70,8 @@ pub struct ElementLedger {
 pub struct ResourceLedger {
     /// The resource, as `Type/id`.
     pub resource: String,
-    /// Every element of the resource with a value, in document order.
+    /// Every element of the resource with a value, members in the order of
+    /// their names and array items in their own order.
     pub elements: Vec<ElementLedger>,
 }
 
@@ -119,7 +120,11 @@ pub fn of(resource: &Value, fate: Fate<'_>) -> ResourceLedger {
 fn collect(value: &Value, path: &str, leaves: &mut Vec<String>, root: bool) {
     match value {
         Value::Object(members) => {
-            for (key, member) in members {
+            // NOTE: no specification governs this order: our own design; the member
+            // names are sorted here, so the ledger never depends on how the map keeps them.
+            let mut sorted: Vec<(&String, &Value)> = members.iter().collect();
+            sorted.sort_unstable_by_key(|(key, _)| key.as_str());
+            for (key, member) in sorted {
                 if root && key == "resourceType" {
                     continue;
                 }

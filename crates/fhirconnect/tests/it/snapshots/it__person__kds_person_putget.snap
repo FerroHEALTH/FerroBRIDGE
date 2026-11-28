@@ -3,6 +3,11 @@ source: crates/fhirconnect/tests/it/person.rs
 expression: declared
 ---
 {
+  "added": [
+    "identifier[1].type.coding[0].code = \"KVZ10\"",
+    "identifier[1].type.coding[0].system = \"http://fhir.de/CodeSystem/identifier-type-de-basis\""
+  ],
+  "changed": [],
   "first_leg": [
     "the mapping typeOfName did not run: its unidirectional marker names the other direction",
     "the mapping typeOfName did not run: its unidirectional marker names the other direction",
@@ -13,14 +18,9 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [
     "active = true",
     "id = \"ferrobridge-kds-patient-1\""
   ],
-  "added": [
-    "identifier[1].type.coding[0].code = \"KVZ10\"",
-    "identifier[1].type.coding[0].system = \"http://fhir.de/CodeSystem/identifier-type-de-basis\""
-  ],
-  "changed": []
+  "second_leg": []
 }

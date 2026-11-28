@@ -207,7 +207,7 @@ fn a_composition_builds_validates_and_reads_back() {
         read.get("value").and_then(|v| v.as_str()),
         Some(MINIMAL_EVALUATION_NOTE)
     );
-    insta::assert_json_snapshot!("minimal_evaluation_composition", composition.value());
+    json_snapshot!("minimal_evaluation_composition", composition.value());
 }
 
 #[test]

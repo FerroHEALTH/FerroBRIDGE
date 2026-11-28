@@ -3,7 +3,13 @@ source: crates/fhirconnect/tests/it/person.rs
 expression: declared
 ---
 {
+  "added": [],
+  "changed": [
+    "ctx/composer_name: \"FerroBRIDGE synthetic composer\" became \"FHIRconnect\"",
+    "ctx/time: \"2026-09-12T10:00:00+02:00\" became \"2026-09-13T08:00:00Z\""
+  ],
   "first_leg": [],
+  "lost": [],
   "second_leg": [
     "the mapping typeOfName did not run: its unidirectional marker names the other direction",
     "the mapping typeOfName did not run: its unidirectional marker names the other direction",
@@ -13,11 +19,5 @@ expression: declared
     "the engine filled /context/setting",
     "the engine filled /language",
     "the engine filled /territory"
-  ],
-  "lost": [],
-  "added": [],
-  "changed": [
-    "ctx/composer_name: \"FerroBRIDGE synthetic composer\" became \"FHIRconnect\"",
-    "ctx/time: \"2026-09-12T10:00:00+02:00\" became \"2026-09-13T08:00:00Z\""
   ]
 }

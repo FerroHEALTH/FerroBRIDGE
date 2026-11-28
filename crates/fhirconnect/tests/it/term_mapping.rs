@@ -271,6 +271,6 @@ fn getput_declares_the_withheld_mapping() -> Result<(), Box<dyn Error>> {
         &annotated_composition(&index, '<')?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("term_mapping_getput", declared);
+    json_snapshot!("term_mapping_getput", declared);
     Ok(())
 }

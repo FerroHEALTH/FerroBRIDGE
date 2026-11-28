@@ -3,20 +3,6 @@ source: crates/fhirconnect/tests/it/todesursache.rs
 expression: declared
 ---
 {
-  "first_leg": [
-    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
-    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
-    "the mapping category did not run: its unidirectional marker names the other direction",
-    "the mapping metaURL did not run: its unidirectional marker names the other direction",
-    "the engine filled /composer",
-    "the engine filled /context/setting",
-    "the engine filled /language",
-    "the engine filled /territory"
-  ],
-  "second_leg": [],
-  "lost": [
-    "subject.reference = \"Patient/synthetic-1\""
-  ],
   "added": [
     "category[0].coding[0].code = \"79378-6\"",
     "category[0].coding[0].system = \"http://loinc.org\"",
@@ -29,5 +15,19 @@ expression: declared
   ],
   "changed": [
     "onsetDateTime: \"2026-09-11T22:30:00+02:00\" became \"2026-09-12T10:00:00+02:00\""
-  ]
+  ],
+  "first_leg": [
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
+    "the mapping category did not run: its unidirectional marker names the other direction",
+    "the mapping metaURL did not run: its unidirectional marker names the other direction",
+    "the engine filled /composer",
+    "the engine filled /context/setting",
+    "the engine filled /language",
+    "the engine filled /territory"
+  ],
+  "lost": [
+    "subject.reference = \"Patient/synthetic-1\""
+  ],
+  "second_leg": []
 }

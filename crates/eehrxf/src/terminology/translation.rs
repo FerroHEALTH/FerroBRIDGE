@@ -24,10 +24,10 @@
 //!
 //! A translator given [`Binding`]s ([`Translator::with_bindings`]) also asks,
 //! for each concept at a bound element that carries no coding in the
-//! binding's systems, for a translation into them, whether or not the
+//! binding's systems, for a translation into its targets, whether or not the
 //! concept is in a preferred system. A document bound for the MyHealth@EU
 //! Core profiles ([`MYHEALTH_EU_CORE`]) so carries the source's SNOMED CT
-//! coding and the ICD-10 or ATC coding the server maps it to, the original
+//! diagnosis and the ICD-10 coding the server maps it to, the original
 //! and the mapped coding draft `EEHRxF` Art 6(2) keeps side by side; a
 //! laboratory report bound for MyHealth@EU Laboratory
 //! ([`MYHEALTH_EU_LABORATORY`]) so carries the LOINC code of a result recorded
@@ -46,9 +46,11 @@ use fhir_types::codec::Json;
 use fhir_types::codec::Object;
 use fhir_types::codec::Path;
 use fhir_types::codec::Value;
+use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
 use fhir_types::r4::resource::Resource;
 
+use crate::terminology::Candidate;
 use crate::terminology::Terminology;
 use crate::terminology::TerminologyError;
 use crate::terminology::Translated;
@@ -90,40 +92,61 @@ pub enum TranslationError {
 /// The R4 extension that carries a translation of a string element.
 pub const TRANSLATION: &str = "http://hl7.org/fhir/StructureDefinition/translation";
 
-/// A required binding of a target profile that names the code systems its
-/// value set takes: the element, the value set and those systems.
+/// A required binding of a target profile: the element, the value set, the
+/// code systems the value set draws on and those a translation is asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Binding {
     /// The R4 element path the binding is on, such as `Condition.code`.
     pub element: &'static str,
     /// The canonical URL of the bound value set.
     pub value_set: &'static str,
-    /// The system URIs the value set's members are drawn from.
+    /// Every system URI the value set's members are drawn from: a concept
+    /// with a coding in one of them, outside the targets, is asked of
+    /// `ValueSet/$validate-code` whether it is a member.
     pub systems: &'static [&'static str],
+    /// The systems of [`Binding::systems`] a concept that is no member is
+    /// asked a translation into; a coding in one of them meets the binding.
+    pub targets: &'static [&'static str],
 }
 
-/// The MyHealth@EU Core 1.0.1 required bindings that take no SNOMED CT code.
+/// The International Classification of Diseases for Oncology, third
+/// edition, which MyHealth@EU `eHDSIOncologyDisease` draws on.
+const ICD_O_3: &str = "http://terminology.hl7.org/CodeSystem/icd-o-3";
+
+/// The IPS absent and unknown codes, which the MyHealth@EU `WithExceptions`
+/// problem and allergen value sets include.
+const ABSENT_UNKNOWN: &str = "http://hl7.org/fhir/uv/ips/CodeSystem/absent-unknown-uv-ips";
+
+/// The EMA SPOR substance identifiers, which MyHealth@EU `eHDSISubstance`
+/// draws on.
+const SPOR_SUBSTANCE: &str = "https://spor.ema.europa.eu/v2/SubstanceDefinition";
+
+/// The MyHealth@EU Core 1.0.1 required bindings a source's codes may not
+/// meet.
 ///
-/// Each names the system its members come from in the Master Value Sets
-/// Catalogue 9.1.0 Core depends on. The Hospital Discharge Report 9.2.0 and
+/// Each names every system its value set draws on, resolved through the
+/// Master Value Sets Catalogue 9.1.0 Core depends on, and asks a concept in
+/// none of them for its ICD-10 or ATC code. The Hospital Discharge Report 9.2.0 and
 /// Vaccination 10.0.0-preview guides add no binding beyond these on an element
 /// the shipped mappings write: the discharge report's `Condition.code` is the
 /// binding here and its `Condition.bodySite` takes SNOMED CT
 /// (`eHDSIBodySiteWithExceptions`); the vaccination's `Immunization.vaccineCode`
 /// takes SNOMED CT and ATC (`eHDSIVaccine`), and no shipped mapping writes its
 /// `Immunization.protocolApplied.targetDisease`.
-// NOTE: MyHealth@EU Core 1.0.1 binds Condition.code to eHDSIProblemWithExceptions (ICD-10
-// members) and AllergyIntolerance.code to eHDSIAllergenWithExceptions (ATC drug members).
+// NOTE: MyHealth@EU Core 1.0.1 eHDSIProblemWithExceptions draws on ICD-10, Orphacode and ICD-O-3,
+// and eHDSIAllergenWithExceptions on SNOMED CT, ATC and SPOR, both beside absent-unknown codes.
 pub const MYHEALTH_EU_CORE: [Binding; 2] = [
     Binding {
         element: "Condition.code",
         value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSIProblemWithExceptions",
-        systems: &[ehn::ICD_10],
+        systems: &[ehn::ICD_10, ehn::ORPHACODE, ICD_O_3, ABSENT_UNKNOWN],
+        targets: &[ehn::ICD_10],
     },
     Binding {
         element: "AllergyIntolerance.code",
         value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSIAllergenWithExceptions",
-        systems: &[ehn::ATC],
+        systems: &[ehn::SNOMED_CT, ehn::ATC, SPOR_SUBSTANCE, ABSENT_UNKNOWN],
+        targets: &[ehn::ATC],
     },
 ];
 
@@ -149,11 +172,13 @@ pub const MYHEALTH_EU_LABORATORY: [Binding; 2] = [
         element: "Observation.code",
         value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSILabCodeWithExceptions",
         systems: &[ehn::LOINC],
+        targets: &[ehn::LOINC],
     },
     Binding {
         element: "ServiceRequest.code",
         value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSILabCodeWithExceptions",
         systems: &[ehn::LOINC],
+        targets: &[ehn::LOINC],
     },
 ];
 
@@ -190,6 +215,7 @@ struct Pending<'t> {
     targets: Vec<&'t str>,
     preferred: bool,
     binding: Option<Binding>,
+    verify: bool,
 }
 
 /// The translator of the resources of one document: the configured
@@ -240,7 +266,7 @@ impl<'t> Translator<'t> {
 
     /// Returns the translator that also meets each of `bindings`: a concept
     /// at a bound element with no coding in the binding's systems is asked
-    /// for a translation into them, such as [`MYHEALTH_EU_CORE`] for a
+    /// for a translation into its targets, such as [`MYHEALTH_EU_CORE`] for a
     /// document bound for the MyHealth@EU Core profiles.
     #[must_use]
     pub const fn with_bindings(mut self, bindings: &'t [Binding]) -> Self {
@@ -324,10 +350,20 @@ impl<'t> Translator<'t> {
         }
         let mut changed = false;
         for concept in pending {
-            let added = self
-                .equivalents(&concept.originals, &concept.targets)
+            let binding = self
+                .unmet(concept.binding, concept.verify, &concept.originals)
                 .await?;
-            if let Some(binding) = concept.binding {
+            let mut asked = concept.targets.clone();
+            for system in binding.iter().flat_map(|binding| binding.targets) {
+                if !asked.contains(system) {
+                    asked.push(system);
+                }
+            }
+            if asked.is_empty() {
+                continue;
+            }
+            let added = self.equivalents(&concept.originals, &asked).await?;
+            if let Some(binding) = binding {
                 let met = added.iter().any(|(_, held)| {
                     identity(&held.coding)
                         .is_some_and(|(system, _)| binding.systems.contains(&system))
@@ -445,6 +481,38 @@ impl<'t> Translator<'t> {
         Ok(changed)
     }
 
+    /// Returns `binding` unless `originals` already meet it: when `verify`,
+    /// the concept carries a code in one of the binding's systems, and
+    /// `ValueSet/$validate-code` decides whether it is in the value set.
+    // NOTE: MyHealth@EU Core 1.0.1 eHDSIAllergenWithExceptions takes SNOMED CT only through the
+    // 470 enumerated eHDSIAllergenNoDrug concepts, so a code's system does not decide membership.
+    async fn unmet(
+        &self,
+        binding: Option<Binding>,
+        verify: bool,
+        originals: &[(String, String)],
+    ) -> Result<Option<Binding>, TerminologyError> {
+        let Some(binding) = binding.filter(|_| verify) else {
+            return Ok(binding);
+        };
+        let concept = CodeableConcept {
+            coding: originals
+                .iter()
+                .map(|(system, code)| Coding {
+                    system: Some(system.as_str().into()),
+                    code: Some(code.as_str().into()),
+                    ..Coding::default()
+                })
+                .collect(),
+            ..CodeableConcept::default()
+        };
+        let member = self
+            .terminology
+            .validate(binding.value_set, &Candidate::Concept(Box::new(concept)))
+            .await?;
+        Ok((!member).then_some(binding))
+    }
+
     /// Returns every accepted translation of `originals` into `targets`, in
     /// order, leaving out a coding the originals or an earlier translation
     /// already carry.
@@ -481,7 +549,7 @@ impl<'t> Translator<'t> {
 /// Returns every concept of `object` that carries at least one coding with a
 /// system and a code and either has no coding whose system `preferred`
 /// admits, asked of `targets`, or sits at an element one of `bindings` is on
-/// with no coding in its systems, asked of those systems.
+/// with no coding in its systems, asked of its targets.
 fn untranscoded<'t>(
     object: &Object,
     kind: &str,
@@ -518,20 +586,16 @@ fn untranscoded<'t>(
         let binding = bindings
             .iter()
             .find(|binding| binding.element == occurrence.element)
-            .filter(|binding| !carried(&|system| binding.systems.contains(&system)))
+            .filter(|binding| !carried(&|system| binding.targets.contains(&system)))
             .copied();
-        let mut asked: Vec<&'t str> = Vec::new();
-        if !is_preferred {
-            asked.extend(targets);
-        }
-        if let Some(binding) = binding {
-            for system in binding.systems {
-                if !asked.contains(system) {
-                    asked.push(system);
-                }
-            }
-        }
-        if asked.is_empty() {
+        let verify =
+            binding.is_some_and(|binding| carried(&|system| binding.systems.contains(&system)));
+        let asked: Vec<&'t str> = if is_preferred {
+            Vec::new()
+        } else {
+            targets.to_vec()
+        };
+        if asked.is_empty() && binding.is_none() {
             continue;
         }
         let originals: Vec<(String, String)> = codings
@@ -552,6 +616,7 @@ fn untranscoded<'t>(
             targets: asked,
             preferred: is_preferred,
             binding,
+            verify,
         });
     }
     Ok(pending)

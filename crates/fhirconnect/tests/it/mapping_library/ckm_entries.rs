@@ -169,7 +169,7 @@ fn refused_with(
 /// which `DV_CODED_TEXT.adoc` pairs with `CodeableConcept` and `Coding` only.
 #[test]
 fn the_adverse_reaction_models_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_adverse_reaction_refusals",
         refused(
             IPS_ENTRIES,
@@ -185,7 +185,7 @@ fn the_adverse_reaction_models_are_refused_as_pinned() -> Result<(), Box<dyn Err
 /// `Reference` onto the `PARTICIPATION` itself.
 #[test]
 fn the_problem_diagnosis_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_problem_diagnosis_refusals",
         refused(
             IPS_ENTRIES,
@@ -206,7 +206,7 @@ fn the_problem_diagnosis_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
 /// `:533` write `defining_code/terminology_id` as above.
 #[test]
 fn the_medication_action_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_medication_action_refusals",
         refused(
             MEDICATION_ACTION,
@@ -229,7 +229,7 @@ fn the_medication_action_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
 /// port of `timingToDaily` at `timing_daily.v1.yml:21` raises none.
 #[test]
 fn the_medication_statement_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_medication_statement_refusals",
         refused(
             MEDICATION_STATEMENT,
@@ -264,7 +264,7 @@ fn the_non_daily_timing_is_refused_on_its_offset() -> Result<(), Box<dyn Error>>
 /// none of their own.
 #[test]
 fn the_patient_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_patient_refusals",
         refused_with(
             PATIENT,
@@ -284,7 +284,7 @@ fn the_patient_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
 /// `String`, `Coding` and `CodeableConcept` only.
 #[test]
 fn the_case_entry_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_case_refusals",
         refused(CASE, "ferrobridge_library_case.context", CASE_FILES)?
     );
@@ -297,7 +297,7 @@ fn the_case_entry_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
 /// `anatomical_location.v1.yml` raises none slotted on `Condition.bodySite`.
 #[test]
 fn the_diagnosis_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_diagnosis_refusals",
         refused_with(
             DIAGNOSIS,
@@ -318,7 +318,7 @@ fn the_diagnosis_clusters_are_refused_as_pinned() -> Result<(), Box<dyn Error>> 
 /// laboratory report extension makes.
 #[test]
 fn the_laboratory_result_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_laboratory_result_refusals",
         refused_with(
             LABORATORY,
@@ -336,7 +336,7 @@ fn the_laboratory_result_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
 /// the template leaves it out and the method is ignored with a warning.
 #[test]
 fn the_service_request_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_service_request_refusals",
         refused(
             LABORATORY,
@@ -351,7 +351,7 @@ fn the_service_request_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
 /// `perfomer` at `:51`.
 #[test]
 fn the_vital_status_is_refused_as_pinned() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "ckm_vital_status_refusals",
         refused(
             LABORATORY,
@@ -377,6 +377,6 @@ fn the_informed_consent_is_refused_at_load() -> Result<(), Box<dyn Error>> {
     let Err(diagnostics) = load_set(paths, &Library) else {
         return Err("the informed consent set loads".into());
     };
-    insta::assert_json_snapshot!("ckm_informed_consent_refusals", rows(&diagnostics));
+    json_snapshot!("ckm_informed_consent_refusals", rows(&diagnostics));
     Ok(())
 }
