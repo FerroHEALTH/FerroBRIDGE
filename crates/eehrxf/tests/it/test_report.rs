@@ -25,7 +25,7 @@ use eehrxf::document::test_report::{
     ELECTROCARDIOGRAM, SPIROMETRY, TEST_REPORT_BUNDLE, TEST_REPORT_FORM, TEST_REPORT_SLOTS,
 };
 use eehrxf::draft::{Annex, AnnexCrosswalk, SHIPPED};
-use eehrxf::mapping::Mapping;
+use eehrxf::mapping::{Mapping, left_out};
 use eehrxf::mappings::TEST_REPORT;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::openehr::{COMMENT_LEAD, ReceivedComposition};
@@ -49,6 +49,7 @@ use openehr_adl::parse::Dialect;
 use openehr_mapping_core::index::WebTemplateIndex;
 use openehr_mapping_core::index::paths::AqlPath;
 use openehr_mapping_core::template::TemplateSource;
+use openehr_sdt::flat::example::{DetailLevel, apply_output_uid, example_composition};
 use serde_json::Value;
 
 use super::support::emit;
@@ -542,4 +543,42 @@ fn comment(canonical: &Value) -> Option<&Value> {
         .as_array()?
         .iter()
         .find(|item| item["archetype_node_id"] == "at0007")
+}
+
+/// A report of the template that records one occurrence of every node it
+/// holds, generated from its Web Template (`openehr-sdt`'s example at the
+/// `Medium` detail level), its comment among them.
+fn every_element() -> Result<String, Box<dyn Error>> {
+    let index = WebTemplateIndex::build(&template()?)?;
+    let mut example = example_composition(index.web_template(), DetailLevel::Medium)?;
+    apply_output_uid(&mut example, index.template_id());
+    Ok(serde_json::to_string(&example)?)
+}
+
+/// The openEHR paths a run of `context` over `composition` leaves unread.
+fn left_out_of(context: &str, composition: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let (_, warnings) = mapping(context)?.to_fhir_with_warnings(
+        composition,
+        &receive_settings(),
+        CallContext::new().with_patient(reference("Patient/synthetic-patient")),
+    )?;
+    Ok(left_out(&warnings))
+}
+
+// NOTE: no element of an R4 DiagnosticReport the project writes holds the report-result Comment
+// (at0007), so a sent report that holds one declares it, the losses #2398 writes there included.
+#[test]
+fn a_sent_report_declares_the_comment_no_mapping_carries() -> Result<(), Box<dyn Error>> {
+    let comment = TEST_REPORT
+        .note()
+        .ok_or("the project's comment")?
+        .value_path();
+    let named = left_out_of(SPIROMETRY_CONTEXT, &every_element()?)?;
+    assert!(named.contains(&comment), "{named:#?}");
+    let plain = left_out_of(SPIROMETRY_CONTEXT, &spirometry())?;
+    assert!(
+        !plain.contains(&comment),
+        "a report with no comment declares none: {plain:#?}"
+    );
+    Ok(())
 }

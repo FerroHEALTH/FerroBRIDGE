@@ -293,12 +293,7 @@ impl Stack {
             ),
         ))
         .await?;
-        let receiver = feed::routes(
-            running.cache.clone(),
-            format!("{origin}{}", feed::PATH),
-            &smart,
-            vec![String::from(FEED)],
-        );
+        let receiver = feed::routes(&running, &smart);
         let delivered = Delivered::default();
         let receiver = receiver.layer(axum::middleware::from_fn_with_state(
             delivered.clone(),
@@ -557,6 +552,25 @@ async fn the_pseudonym_cache_follows_ferropix_through_its_pmir_feed() -> Result<
     assert_eq!(
         StatusCode::FORBIDDEN,
         posted(&stack, Some(&unlisted)).await?
+    );
+
+    // PMIR 1.6.0 §2:3.93.5.1: each message received is recorded, one refused unread as a failure.
+    let feed_kind = ihe_iti::pmir::audit::feed_kind();
+    let received = stack.kept.count(&feed_kind);
+    assert!(
+        received >= 2,
+        "the merge and the revise were recorded as received"
+    );
+    let listed = token(&stack.provider, FEED).await?;
+    assert_eq!(
+        StatusCode::BAD_REQUEST,
+        posted(&stack, Some(&listed)).await?
+    );
+    assert_eq!(received + 1, stack.kept.count(&feed_kind));
+    assert_eq!(
+        Some(ihe_atna::balp::Outcome::MinorFailure),
+        stack.kept.last_outcome(&feed_kind),
+        "a message refused unread is recorded as a minor failure"
     );
 
     // Once the subscription is gone, the cache stops serving and the next lookup asks FerroPIX.

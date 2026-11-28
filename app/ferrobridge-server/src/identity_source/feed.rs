@@ -4,13 +4,15 @@
 //! The receiver of the identity source's PMIR feed (PMIR 1.6.0 ITI-93,
 //! §2:3.93), the channel endpoint of the deployment's subscription.
 //!
-//! Each message forgets, on every replica, the source identifiers whose
-//! pseudonym it may have changed (every pseudonym, for a merge or a
-//! delete), and only then is acknowledged, so the
-//! identity source sends again a message whose change did not reach every
-//! cache. The route admits only an access token whose `client_id` the
-//! deployment lists. No specification governs the route's path: our own
-//! design.
+//! Under `[audit]` each message's receipt is recorded first. Each message
+//! then forgets, on every replica, the source identifiers whose pseudonym it
+//! may have changed (every pseudonym, for a merge or a delete), and only
+//! then is acknowledged, so the identity source sends again a message whose
+//! receipt was not recorded or whose change did not reach every cache. The
+//! route admits only an access token whose `client_id` the deployment
+//! lists. No specification governs the route's path: our own design.
+
+use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Bytes;
@@ -20,6 +22,8 @@ use axum::routing::post;
 use ferrohealth_smart::guard::{AuthLayer, Requirement};
 use http::header::CONTENT_TYPE;
 use http::{HeaderMap, HeaderValue, StatusCode};
+use ihe_atna::balp::AuditRecorder;
+use ihe_iti::pmir::audit::received;
 use ihe_iti::pmir::feed::{Event, Feed, ResponseId, refusal};
 use secrecy::ExposeSecret as _;
 
@@ -35,25 +39,33 @@ const FHIR_JSON: &str = "application/fhir+json";
 /// The interaction the gate's audit line records.
 const INTERACTION: &str = "pmir-feed";
 
-/// Returns the receiver over `cache`, guarded by the gate of `smart`,
-/// admitting the access tokens of `clients`; `source` is the endpoint the
-/// acknowledgements name.
-pub fn routes(
-    cache: PseudonymCache,
-    source: String,
-    smart: &Smart,
-    clients: Vec<String>,
-) -> Router {
+/// Returns the receiver of `running`'s cache, guarded by the gate of
+/// `smart`, admitting the access tokens of its feed clients.
+pub fn routes(running: &super::Running, smart: &Smart) -> Router {
+    let settings = &running.settings;
     // NOTE: PMIR 1.6.0 §2:3.93.5 leaves the feed's authentication to the two parties;
     // the identity source sends its client-credentials token, so the route admits its client ids.
     let requirement = Requirement::Client {
-        client_ids: clients,
+        client_ids: settings.feed_clients.clone(),
         basic_users: Vec::new(),
     };
     let layer = AuthLayer::new(smart.gate().clone(), Routed::new(INTERACTION, requirement));
+    let audit = settings.recorder.as_ref().and_then(|recorder| {
+        url::Url::parse(&settings.feed_url)
+            .ok()
+            .map(|endpoint| Audit {
+                recorder: Arc::clone(recorder),
+                registry: settings.registry.clone(),
+                endpoint,
+            })
+    });
     Router::new()
         .route(PATH, post(receive))
-        .with_state(Receiver { cache, source })
+        .with_state(Receiver {
+            cache: running.cache.clone(),
+            source: settings.feed_url.clone(),
+            audit,
+        })
         .route_layer(layer)
 }
 
@@ -64,6 +76,50 @@ struct Receiver {
     cache: PseudonymCache,
     /// The endpoint the acknowledgements name.
     source: String,
+    /// What records each message, under `[audit]`.
+    audit: Option<Audit>,
+}
+
+/// The audit record of each received message (PMIR 1.6.0 §2:3.93.5.1).
+#[derive(Clone)]
+struct Audit {
+    /// The recorder.
+    recorder: Arc<dyn AuditRecorder>,
+    /// The Registry the messages come from.
+    registry: url::Url,
+    /// The channel endpoint they arrive at.
+    endpoint: url::Url,
+}
+
+impl std::fmt::Debug for Audit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Audit").finish_non_exhaustive()
+    }
+}
+
+impl Receiver {
+    /// Records the receipt of `feed`, `None` for a message refused unread.
+    ///
+    /// # Errors
+    /// Returns the recorder's error when the record cannot be kept.
+    async fn audited(&self, feed: Option<&Feed>) -> Result<(), ihe_atna::balp::AuditError> {
+        match &self.audit {
+            Some(audit) => {
+                audit
+                    .recorder
+                    .record(received(&audit.registry, &audit.endpoint, feed))
+                    .await
+            }
+            None => Ok(()),
+        }
+    }
+}
+
+/// The answer to a message whose receipt could not be recorded: refused, so
+/// the identity source sends it again (PMIR 1.6.0 §2:3.93.5.1).
+fn unaudited(error: &ihe_atna::balp::AuditError) -> Response {
+    tracing::warn!(error = %ferrohealth_server::run::chain(error), "a PMIR feed message is refused: its receipt could not be recorded");
+    StatusCode::SERVICE_UNAVAILABLE.into_response()
 }
 
 /// Takes one ITI-93 message.
@@ -74,12 +130,18 @@ async fn receive(State(receiver): State<Receiver>, headers: HeaderMap, body: Byt
     let feed = match Feed::read(media, &body) {
         Ok(feed) => feed,
         Err(error) => {
+            if let Err(unkept) = receiver.audited(None).await {
+                return unaudited(&unkept);
+            }
             return match refusal(&error) {
                 Ok(outcome) => fhir(StatusCode::BAD_REQUEST, outcome),
                 Err(_unwritable) => StatusCode::BAD_REQUEST.into_response(),
             };
         }
     };
+    if let Err(unkept) = receiver.audited(Some(&feed)).await {
+        return unaudited(&unkept);
+    }
     let forgotten = match changed(&feed) {
         Changed::Identifiers(changed) => {
             receiver

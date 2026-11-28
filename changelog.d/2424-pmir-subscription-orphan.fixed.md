@@ -1,0 +1,1 @@
+- A replica that loses the PMIR subscription's lease after creating a subscription and before recording it now deletes that subscription at the identity source, so the identity source does not keep feeding a subscription no replica can find (#2424).
