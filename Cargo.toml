@@ -150,7 +150,7 @@ backon = "1.6.0"
 # The server adds `axum` for its guard and `server-tls`, the family's reader
 # of every outbound `tls` table; ferrobridge-term's `smart` feature takes the
 # token client alone.
-ferrohealth-smart = { version = "0.38.0", default-features = false, features = ["fetch"] }
+ferrohealth-smart = { version = "0.38.2", default-features = false, features = ["fetch"] }
 # The family's one secret mask (FerroSYS): `Secret`, `SecretUrl` and the
 # `<key>_file` reader, so a secret renders as `***` and a URL's userinfo and
 # query masked. Pinned exactly, as a product pins every shared crate.
@@ -187,7 +187,7 @@ ihe-atna = { version = "=0.32.0", default-features = false }
 # The IHE ITI identity profiles (FerroPIX): the PIXm Consumer that asks the
 # identity source for a patient's pseudonym (ITI-83) and the Patient Identity
 # Source that feeds it (ITI-104). Pinned exactly.
-ihe-iti = { version = "=0.28.0", default-features = false }
+ihe-iti = { version = "=0.30.0", default-features = false }
 # The test-time signing of the inbound token cases (RFC 7515, RFC 7519) over
 # the aws-lc-rs provider reqwest and rustls already carry; the RustCrypto
 # backend stays off.
