@@ -42,6 +42,7 @@ pub(crate) mod shl;
 pub(crate) mod stub;
 mod sub_context;
 pub(crate) mod summary;
+mod summary_designation;
 mod terminology;
 pub(crate) mod tofhir;
 mod transaction;
