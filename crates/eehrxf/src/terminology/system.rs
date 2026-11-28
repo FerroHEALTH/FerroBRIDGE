@@ -192,7 +192,7 @@ pub(crate) fn rewrite_systems(resource: &mut Object, kind: &str) -> Result<bool,
         .collect();
     let mut changed = false;
     for (steps, concept) in found {
-        let Some(Value::Object(node)) = node_at(resource, &steps) else {
+        let Some(Value::Object(node)) = walk::value_at(resource, &steps) else {
             continue;
         };
         if concept {
@@ -233,21 +233,4 @@ fn rewrite_coding(coding: &mut Object) -> bool {
         }
     }
     true
-}
-
-/// The value `steps` reach from `object`.
-fn node_at<'o>(object: &'o mut Object, steps: &[Step]) -> Option<&'o mut Value> {
-    let (first, rest) = steps.split_first()?;
-    let Step::Key(key) = first else {
-        return None;
-    };
-    let mut node = object.get_mut(key)?;
-    for step in rest {
-        node = match (step, node) {
-            (Step::Key(key), Value::Object(inner)) => inner.get_mut(key)?,
-            (Step::Index(index), Value::Array(items)) => items.get_mut(*index)?,
-            _ => return None,
-        };
-    }
-    Some(node)
 }
