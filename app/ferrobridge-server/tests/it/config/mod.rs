@@ -26,6 +26,7 @@ mod oauth;
 mod omop_incremental;
 mod onward;
 mod operator;
+mod pseudonym_cache;
 mod refusals;
 mod secrets;
 mod shl;

@@ -441,6 +441,45 @@ pub struct Security {
     pub revoke: Option<String>,
 }
 
+/// How the gate reads a request on a router whose every route requires one
+/// thing: `requirement`, recorded as `interaction` under the matched route.
+#[derive(Debug, Clone)]
+pub struct Routed {
+    /// The interaction the audit line records.
+    interaction: &'static str,
+    /// What every route requires.
+    requirement: ferrohealth_smart::guard::Requirement,
+}
+
+impl Routed {
+    /// Returns the classifier recording `interaction` with `requirement`.
+    #[must_use]
+    pub const fn new(
+        interaction: &'static str,
+        requirement: ferrohealth_smart::guard::Requirement,
+    ) -> Self {
+        Self {
+            interaction,
+            requirement,
+        }
+    }
+}
+
+impl ferrohealth_smart::guard::Classify for Routed {
+    fn classify(
+        &self,
+        _method: &http::Method,
+        _uri: &http::Uri,
+        extensions: &http::Extensions,
+    ) -> Option<ferrohealth_smart::guard::Target> {
+        let template = extensions.get::<axum::extract::MatchedPath>()?.as_str();
+        Some(
+            ferrohealth_smart::guard::Target::new(self.interaction, self.requirement.clone())
+                .route(template),
+        )
+    }
+}
+
 /// Returns the routes of the discovery document.
 ///
 /// The document is served at `[base]/.well-known/smart-configuration`, the

@@ -335,6 +335,7 @@ fn listen(state: &crate::state::AppState, workers: Option<Arc<crate::store::list
         state.registers().map(|registers| registers.listened()),
         state.operator().and_then(crate::operator::watch::start),
         state.facade().and_then(|facade| facade.store().listened()),
+        state.pseudonyms().map(|running| running.cache.listened()),
         workers,
     ]
     .into_iter()
