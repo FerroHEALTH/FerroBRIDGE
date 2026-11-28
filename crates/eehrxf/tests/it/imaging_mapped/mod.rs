@@ -849,7 +849,9 @@ fn each_finding_element_the_report_has_no_place_for_is_declared() -> Result<(), 
     unread.sort();
     assert_eq!(
         unread,
-        ["at0007", "at0008", "at0014", "at0023", "at0056", "at0058", "at0059"],
+        [
+            "at0007", "at0008", "at0014", "at0023", "at0056", "at0058", "at0059"
+        ],
         "the findings and the composition's comment on what the received report lost: \
          {warnings:?}"
     );
