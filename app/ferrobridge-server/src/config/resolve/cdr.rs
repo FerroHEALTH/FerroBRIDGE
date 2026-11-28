@@ -24,6 +24,7 @@ fn settings(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Error> {
         &ferrohealth_smart::config::ServerTls,
         "cdr.endpoint.tls",
         &endpoint.tls,
+        std::slice::from_ref(&base_url),
     )
     .map_err(|source| Error::Client {
         upstream: "cdr",
@@ -36,7 +37,7 @@ fn settings(cdr: &Cdr) -> Result<crate::cdr::config::CdrConfig, Error> {
                 .connect_timeout
                 .map(ferrohealth_config::units::Duration::get),
         )
-        .with_tls(std::sync::Arc::clone(tls.config()))
+        .with_tls(tls)
         .with_demographic(cdr.demographic)
         .with_retry(openehr_its::rest::client::RetryPolicy {
             // NOTE: no specification governs this: our own design; a u32 fits a

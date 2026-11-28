@@ -130,9 +130,9 @@ fn client_tls(material: &Material, identity: bool) -> Result<rustls::ClientConfi
 /// Returns a client of the stub at `address` speaking `tls`.
 fn client(address: SocketAddr, tls: rustls::ClientConfig) -> Result<CdrClient, BoxError> {
     let base = format!("https://localhost:{}/v1", address.port()).parse()?;
-    Ok(CdrClient::new(
-        &CdrConfig::new(base).with_tls(Arc::new(tls)),
-    )?)
+    Ok(CdrClient::new(&CdrConfig::new(base).with_tls(
+        ferrohealth_smart::client::PresentedTls::new(Arc::new(tls), None),
+    ))?)
 }
 
 #[tokio::test]

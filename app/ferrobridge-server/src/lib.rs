@@ -166,13 +166,16 @@ async fn dispatch(cli: Cli) -> ExitCode {
         return Box::pin(job.run(settings)).await;
     }
     let service = Service::new("ferrobridge", build_info::VERSION);
-    let telemetry = match ferrohealth_server::telemetry::build(&settings.telemetry, service) {
-        Ok(telemetry) => telemetry,
-        Err(error) => {
-            eprintln!("ferrobridge: cannot start: {}", chain(&error));
-            return ExitCode::from(EXIT_CONFIG.get());
-        }
-    };
+    // The clearing keeps an `https` collector cleared for revocation, and
+    // stops when dropped, so it lives as long as the job runs.
+    let (telemetry, _clearing) =
+        match ferrohealth_server::telemetry::build(&settings.telemetry, service) {
+            Ok(built) => built,
+            Err(error) => {
+                eprintln!("ferrobridge: cannot start: {}", chain(&error));
+                return ExitCode::from(EXIT_CONFIG.get());
+            }
+        };
     if let Err(error) = telemetry.install(&settings.telemetry, &console) {
         eprintln!("ferrobridge: cannot start: {}", chain(&error));
         return ExitCode::from(EXIT_CONFIG.get());

@@ -152,6 +152,9 @@ pub struct CdrClient {
     /// The party the CDR authenticates the bridge's own credential as, when
     /// it presents one.
     principal: Option<Principal>,
+    /// The TLS the engine was built with, held so the clearing it carries
+    /// keeps the CDR cleared for revocation while the client lives.
+    tls: Option<ferrohealth_smart::client::PresentedTls>,
 }
 
 /// The party the CDR authenticates the bridge's own credential as, which a
@@ -187,8 +190,8 @@ impl CdrClient {
         if let Some(connect) = config.connect_timeout {
             builder = builder.connect_timeout(connect);
         }
-        if let Some(tls) = config.tls.as_deref() {
-            builder = builder.tls_backend_preconfigured(rustls::ClientConfig::clone(tls));
+        if let Some(tls) = &config.tls {
+            builder = builder.tls_backend_preconfigured(rustls::ClientConfig::clone(tls.config()));
         }
         let transport = ReqwestTransport::with_builder_timeout(builder, config.timeout)
             .map_err(|source| CdrError::Build { source })?;
@@ -224,6 +227,7 @@ impl CdrClient {
             onward: config.onward.clone(),
             on_behalf: None,
             principal,
+            tls: config.tls.clone(),
         })
     }
 
@@ -238,6 +242,7 @@ impl CdrClient {
             onward: self.onward.clone(),
             on_behalf: self.on_behalf.clone(),
             principal: self.principal.clone(),
+            tls: self.tls.clone(),
         }
     }
 
@@ -274,6 +279,7 @@ impl CdrClient {
             onward: None,
             on_behalf: Some(exchanged.subject),
             principal: self.principal.clone(),
+            tls: self.tls.clone(),
         })
     }
 
