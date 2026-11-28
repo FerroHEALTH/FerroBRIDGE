@@ -230,23 +230,25 @@ impl OperationContract {
         let (overlaid, added) = ecosystem::overlay(definition, r6);
         let mut contract = Self::lower(&overlaid, resource, module)?;
         for field in contract.inputs.iter_mut().chain(&mut contract.outputs) {
-            if let Some(entry) = added
-                .iter()
-                .find(|a| a.usage == field.usage && a.name == field.fhir_name)
-            {
-                field.source = entry.source;
-            }
-            for part in &mut field.parts {
-                let dotted = format!("{}.{}", field.fhir_name, part.fhir_name);
-                if let Some(entry) = added
-                    .iter()
-                    .find(|a| a.usage == field.usage && a.name == dotted)
-                {
-                    part.source = entry.source;
-                }
-            }
+            let name = field.fhir_name.clone();
+            attribute(field, &name, &added);
         }
         Ok(contract)
+    }
+}
+
+/// Marks `field`, named `dotted` from its top-level parameter, and each of
+/// its parts at any depth with the source the overlay recorded for it.
+fn attribute(field: &mut ContractField, dotted: &str, added: &[ecosystem::Added]) {
+    if let Some(entry) = added
+        .iter()
+        .find(|a| a.usage == field.usage && a.name == dotted)
+    {
+        field.source = entry.source;
+    }
+    for part in &mut field.parts {
+        let name = format!("{dotted}.{}", part.fhir_name);
+        attribute(part, &name, added);
     }
 }
 

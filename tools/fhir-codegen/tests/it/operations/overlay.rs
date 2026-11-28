@@ -330,3 +330,44 @@ fn the_ecosystem_defined_outputs_join_every_version_and_r6_pre_adopts_nothing() 
         }
     }
 }
+
+// NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Properties: a cluster member's
+// own `postcoordination` subproperties sit one level down, in its `value`.
+#[test]
+fn a_lookup_subproperty_nests_a_subproperty_with_its_own_parts_on_every_version() {
+    use fhir_codegen::ecosystem::ParameterSource;
+    for (package, module) in [(&*R4, "r4"), (&*R4B, "r4b"), (&*R5, "r5"), (&*R6, "r6")] {
+        let contracts = overlaid(package, module);
+        let lookup = find(&contracts, "CodeSystem", "lookup");
+        let subproperty = lookup
+            .outputs
+            .iter()
+            .find(|f| f.fhir_name == "property")
+            .and_then(|p| p.parts.iter().find(|f| f.fhir_name == "subproperty"))
+            .expect("property.subproperty");
+        let nested = subproperty
+            .parts
+            .iter()
+            .find(|f| f.fhir_name == "subproperty")
+            .expect("property.subproperty.subproperty");
+        assert_eq!(nested.source, ParameterSource::Ecosystem, "{module}");
+        assert_eq!(nested.min, 0, "{module}");
+        let names = |field: &fhir_codegen::operations::ContractField| -> Vec<String> {
+            field
+                .parts
+                .iter()
+                .filter(|f| f.fhir_name != "subproperty")
+                .map(|f| f.fhir_name.clone())
+                .collect()
+        };
+        assert_eq!(
+            names(nested),
+            names(subproperty),
+            "{module}: the parent's parts"
+        );
+        assert!(
+            nested.parts.iter().all(|f| f.fhir_name != "subproperty"),
+            "{module}: one level down only"
+        );
+    }
+}
