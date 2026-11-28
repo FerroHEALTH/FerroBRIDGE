@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The laboratory report in the HL7 Europe Laboratory Report 2.0.0 form
+//! The laboratory report in the HL7 Europe Laboratory Report 2.1.0 form
 //! (feature `laboratory`): a `Bundle-eu-lab` whose `Composition-eu-lab`
 //! and `DiagnosticReport-eu-lab` each name the other.
 
@@ -18,14 +18,13 @@ pub const LAB_BUNDLE: &str = "http://hl7.eu/fhir/laboratory/StructureDefinition/
 pub const LABORATORY_REPORT: &str = "11502-2";
 
 /// The sections of a laboratory report: one per study type of the
-/// `lab-studyType-eu-lab` value set, then the profile's `annotations` and
-/// `attachment` slices.
+/// `lab-studyType-eu-lab` value set, then the profile's `annotations` slice.
 ///
-/// `Composition-eu-lab` 2.0.0 slices only the two last; the results go in
+/// `Composition-eu-lab` 2.1.0 slices only `annotations`; the results go in
 /// sections coded by the study type they group (no specification governs
 /// which codes: our own design, the value set the profile binds the report's
 /// study type to).
-pub const LAB_SLOTS: [Slot; 9] = [
+pub const LAB_SLOTS: [Slot; 8] = [
     Slot::new("bloodBank", "18717-9", "Blood bank studies").with_ehdsi(EHDSI_RESULTS),
     Slot::new("chemistry", "18719-5", "Chemistry studies").with_ehdsi(EHDSI_RESULTS),
     Slot::new("fertility", "18722-9", "Fertility studies").with_ehdsi(EHDSI_RESULTS),
@@ -34,10 +33,9 @@ pub const LAB_SLOTS: [Slot; 9] = [
     Slot::new("toxicology", "18728-6", "Toxicology studies").with_ehdsi(EHDSI_RESULTS),
     Slot::new("laboratory", "26436-6", "Laboratory studies").with_ehdsi(EHDSI_RESULTS),
     Slot::new("annotations", "48767-8", "Annotation comment"),
-    Slot::new("attachment", "77599-9", "Additional documents"),
 ];
 
-/// The laboratory report in the HL7 Europe Laboratory Report 2.0.0 form.
+/// The laboratory report in the HL7 Europe Laboratory Report 2.1.0 form.
 pub const LABORATORY_REPORT_FORM: Form = Form {
     bundle: LAB_BUNDLE,
     composition: LAB_COMPOSITION,
@@ -56,7 +54,7 @@ pub const LABORATORY_REPORT_FORM: Form = Form {
     }),
     encounter: None,
     language: Language::OPTIONAL,
-    // NOTE: Composition-eu-lab 2.0.0 adds no section invariant; FHIR R4 cmp-1 holds by the narrative.
+    // NOTE: Composition-eu-lab 2.1.0 adds no section invariant; FHIR R4 cmp-1 holds by the narrative.
     rules: &[],
     entries: &[],
     legal_authentication: false,

@@ -154,7 +154,7 @@ name = "Medical test results, laboratory results and related reports"
 [[category.row]]
 target = "DiagnosticReport-eu-lab"
 profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
-package = "hl7.fhir.eu.laboratory 2.0.0"
+package = "hl7.fhir.eu.laboratory 2.1.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
 context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
@@ -163,7 +163,7 @@ test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_th
 [[category.row]]
 target = "Observation-resultslab-eu-lab"
 profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab"
-package = "hl7.fhir.eu.laboratory 2.0.0"
+package = "hl7.fhir.eu.laboratory 2.1.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
 context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
@@ -172,7 +172,7 @@ test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_th
 [[category.row]]
 target = "Specimen-eu-lab"
 profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab"
-package = "hl7.fhir.eu.laboratory 2.0.0"
+package = "hl7.fhir.eu.laboratory 2.1.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
 context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_laboratory.context.yml"
@@ -181,7 +181,7 @@ test = "crates/fhirconnect/tests/it/eu_laboratory.rs::the_profile_elements_of_th
 [[category.row]]
 target = "Composition-eu-lab"
 profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab"
-package = "hl7.fhir.eu.laboratory 2.0.0"
+package = "hl7.fhir.eu.laboratory 2.1.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
 context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_lab_composition.context.yml"
@@ -190,7 +190,7 @@ test = "crates/fhirconnect/tests/it/eu_lab_composition.rs::the_profile_elements_
 [[category.row]]
 target = "Bundle-eu-lab"
 profile = "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab"
-package = "hl7.fhir.eu.laboratory 2.0.0"
+package = "hl7.fhir.eu.laboratory 2.1.0"
 template = "KDS_Laborbericht"
 template_file = "tools/ferrobridge-testkit/fixtures/opt/kds-laborbericht/KDS_Laborbericht.opt"
 context = "crates/eehrxf/mappings/laboratory/ferrobridge_eu_lab_composition.context.yml"

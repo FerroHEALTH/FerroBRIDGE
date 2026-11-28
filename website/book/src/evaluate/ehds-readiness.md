@@ -75,11 +75,11 @@ The openEHR international CKM publishes no imaging report template; the template
 
 | Target profile | Package | Committed template | Transform proven |
 |---|---|---|---|
-| `DiagnosticReport-eu-lab` | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_report_survive_the_round_trip` |
-| `Observation-resultslab-eu-lab` | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_result_survive_the_round_trip` |
-| `Specimen-eu-lab` | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_specimen_survive_the_round_trip` |
-| `Composition-eu-lab` | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_profile_elements_of_the_document_composition_survive_the_round_trip` |
-| `Bundle-eu-lab` (produced, not claimed); assembled by the facade's Composition/$document, proven on a synthetic Composition context; the claimed document is the interoperability component's (`eehrxf`) laboratory document | hl7.fhir.eu.laboratory 2.0.0 | KDS_Laborbericht | `the_document_is_the_composition_and_every_resource_it_creates` |
+| `DiagnosticReport-eu-lab` | hl7.fhir.eu.laboratory 2.1.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_report_survive_the_round_trip` |
+| `Observation-resultslab-eu-lab` | hl7.fhir.eu.laboratory 2.1.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_result_survive_the_round_trip` |
+| `Specimen-eu-lab` | hl7.fhir.eu.laboratory 2.1.0 | KDS_Laborbericht | `the_profile_elements_of_the_laboratory_specimen_survive_the_round_trip` |
+| `Composition-eu-lab` | hl7.fhir.eu.laboratory 2.1.0 | KDS_Laborbericht | `the_profile_elements_of_the_document_composition_survive_the_round_trip` |
+| `Bundle-eu-lab` (produced, not claimed); assembled by the facade's Composition/$document, proven on a synthetic Composition context; the claimed document is the interoperability component's (`eehrxf`) laboratory document | hl7.fhir.eu.laboratory 2.1.0 | KDS_Laborbericht | `the_document_is_the_composition_and_every_resource_it_creates` |
 
 ### Article 14(1)(f): Discharge reports
 

@@ -3,7 +3,8 @@
 
 //! The elements of a received discharge report the composition does not
 //! carry, named in the composition's feeder system audit beside the original
-//! content that keeps them.
+//! content that keeps them, and in the composition's comment, where the
+//! record's reader sees them.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -12,12 +13,15 @@
 
 use std::error::Error;
 
+use eehrxf::mapping::{Mapping, MappingError};
+use eehrxf::mappings::HDR;
 use eehrxf::receive::ReceivedDocument;
-use eehrxf::receive::openehr::{DECLARATION, NOT_CARRIED, ReceivedComposition};
+use eehrxf::receive::openehr::{COMMENT_LEAD, DECLARATION, NOT_CARRIED, ReceivedComposition};
+use ferrobridge_testkit::fixtures::FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE;
 use openehr_mapping_core::index::WebTemplateIndex;
 use serde_json::Value;
 
-use super::{composition, diagnosis, mapping, sent, settings, template};
+use super::{composition, diagnosis, mapping, sent, settings, template, template_of};
 
 /// The composition the received report `text` maps into.
 fn received(text: &str) -> Result<ReceivedComposition, Box<dyn Error>> {
@@ -95,4 +99,103 @@ fn the_composition_naming_its_losses_validates_against_its_template() -> Result<
     let index = WebTemplateIndex::build(&template()?)?;
     index.accept(serde_json::from_str(composition.composition())?)?;
     Ok(())
+}
+
+// NOTE: RM Release 1.1.0, EHR IM, EVENT_CONTEXT.other_context holds the template's Comment, the
+// composition-level element its reader sees; it names each element by its FHIRPath alone.
+#[test]
+fn an_element_the_composition_does_not_carry_is_named_in_its_comment() -> Result<(), Box<dyn Error>>
+{
+    let composition = received(&noted()?)?;
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let tree = &canonical["context"]["other_context"];
+    assert_eq!(tree["archetype_node_id"], "at0001", "{tree}");
+    let comments: Vec<&Value> = tree["items"]
+        .as_array()
+        .ok_or("the context's items")?
+        .iter()
+        .filter(|item| item["archetype_node_id"] == "at0.1")
+        .collect();
+    let [comment] = comments.as_slice() else {
+        return Err(format!("one comment, not {}: {tree}", comments.len()).into());
+    };
+    assert_eq!(comment["name"]["value"], "Comment", "{comment}");
+    assert_eq!(
+        comment["value"]["value"],
+        format!("{COMMENT_LEAD}{}", composition.not_carried().join("; ")),
+        "{comment}"
+    );
+    assert!(
+        comment["value"]["value"]
+            .as_str()
+            .is_some_and(|text| text.contains("Condition.severity") && !text.contains("6736007")),
+        "{comment}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_report_that_loses_nothing_has_no_comment() -> Result<(), Box<dyn Error>> {
+    let document = ReceivedDocument::read(&noted()?)?;
+    let composition = mapping()?
+        .accounting(&[])
+        .to_openehr(&document, &settings())?;
+    assert!(
+        composition.not_carried().is_empty(),
+        "{:?}",
+        composition.not_carried()
+    );
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let comments = canonical["context"]["other_context"]["items"]
+        .as_array()
+        .map_or(0, |items| {
+            items
+                .iter()
+                .filter(|item| item["archetype_node_id"] == "at0.1")
+                .count()
+        });
+    assert_eq!(comments, 0, "{canonical}");
+    assert!(
+        canonical["feeder_audit"]["feeder_system_audit"]["other_details"].is_null(),
+        "{canonical}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_template_without_the_comment_is_refused() -> Result<(), Box<dyn Error>> {
+    let element = FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE
+        .find("        /context/other_context[at0001]/items matches {")
+        .ok_or("the comment's constraint")?;
+    let content = FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE
+        .find("        content matches {")
+        .ok_or("the content constraint")?;
+    let uncommented = format!(
+        "{}{}",
+        FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE
+            .get(..element)
+            .ok_or("the head")?,
+        FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE
+            .get(content..)
+            .ok_or("the tail")?
+    );
+    let refused = Mapping::compile_project(&template_of(&uncommented)?, &HDR);
+    assert!(
+        matches!(refused, Err(MappingError::NoNote { ref path, .. })
+            if path == "/context/other_context[at0001]/items[at0.1]/value"),
+        "{refused:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_comment_a_sent_report_leaves_out_is_named_in_the_hospital_course() {
+    assert_eq!(
+        HDR.slice_of("/context/other_context[at0001]/items[at0.1]/value"),
+        Some("sectionHospitalCourse")
+    );
+    assert_eq!(
+        HDR.slice_of("/context/other_context[at0001]/items[at0.10]/value"),
+        None
+    );
 }

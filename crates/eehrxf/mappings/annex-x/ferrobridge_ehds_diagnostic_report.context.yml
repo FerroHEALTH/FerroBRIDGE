@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's context for the laboratory result served by the facade as an
 # individual DiagnosticReport, the IHE QEDm 3.0.0 Diagnostic Reports option
-# (#2087), with the HL7 Europe Laboratory Report 2.0.0 DiagnosticReport-eu-lab
+# (#2087), with the HL7 Europe Laboratory Report 2.1.0 DiagnosticReport-eu-lab
 # profile over the published KDS_Laborbericht template. Each analyte becomes
 # an Observation-resultslab-eu-lab the report references, the draft EEHRxF
 # Annex X data group EHDSLaboratoryObservation.
@@ -17,7 +17,7 @@ spec:
 context:
   profile:
     url: "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
-    version: "2.0.0"
+    version: "2.1.0"
   template:
     id: "KDS_Laborbericht"
   archetypes:

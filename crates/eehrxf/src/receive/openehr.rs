@@ -21,8 +21,11 @@
 //! in the composition itself, by its FHIRPath and never by its value, in the
 //! `other_details` of its `FEEDER_AUDIT.feeder_system_audit`, the RM's place
 //! for "custom meta-data" of a system that handled the item (Common IM,
-//! `FEEDER_AUDIT_DETAILS`), beside the original content that keeps it, so a
-//! later reader of the record is told what the composition lacks.
+//! `FEEDER_AUDIT_DETAILS`), beside the original content that keeps it. Where
+//! the project's template has a composition-level comment
+//! ([`crate::mappings::Project::note`]), the same paths are written there as
+//! well, in the `other_context` a clinician reading the record sees (EHR IM,
+//! `EVENT_CONTEXT.other_context`).
 
 use std::fmt;
 
@@ -46,11 +49,14 @@ use openehr_rm::v1_2::composition::composition::Composition;
 use openehr_rm::v1_2::composition::content::content_item::ContentItem;
 use openehr_rm::v1_2::composition::content::entry::instruction_details::InstructionDetails;
 use openehr_rm::v1_2::data_structures::item_structure::item_structure::ItemStructure;
+use openehr_rm::v1_2::data_structures::item_structure::item_tree::ItemTree;
+use openehr_rm::v1_2::data_structures::representation::item::Item;
 use openehr_rm::v1_2::data_types::basic::dv_identifier::DvIdentifier;
 use openehr_rm::v1_2::data_types::encapsulated::dv_encapsulated::DvEncapsulated;
 use openehr_rm::v1_2::data_types::encapsulated::dv_parsable::DvParsable;
 
 use crate::mapping::Mapping;
+use crate::mappings::Note;
 use crate::receive::ReceivedDocument;
 use crate::receive::ReceivedResources;
 use crate::receive::accounted;
@@ -61,6 +67,12 @@ pub const FHIR_JSON: &str = "application/fhir+json";
 
 /// The name of the declaration of the elements a composition does not carry.
 pub const DECLARATION: &str = "Elements of the received document this composition does not carry";
+
+/// The opening of the composition-level comment that names, to the record's
+/// reader, the elements the composition does not carry; the FHIRPath of each
+/// follows it, separated by `"; "`.
+pub const COMMENT_LEAD: &str = "This composition does not carry these elements of the received \
+                                document, which FEEDER_AUDIT.original_content keeps: ";
 
 /// The value of each declared element.
 pub const NOT_CARRIED: &str = "The composition carries this element of the received document in no \
@@ -124,7 +136,8 @@ impl ReceivedComposition {
 
     /// Returns the FHIRPath of each element of the received resources the
     /// composition does not carry, in the order the run declared them, each
-    /// once; the composition's feeder audit names them to its reader.
+    /// once; the composition's feeder audit names them, and so does its
+    /// comment where the template has one.
     #[must_use]
     pub fn not_carried(&self) -> &[String] {
         &self.not_carried
@@ -147,8 +160,11 @@ impl Mapping {
     /// composition's [`ReceivedComposition::outcome`] beside the engine's own
     /// losses, and named by its FHIRPath in the other details of the
     /// composition's feeder system audit ([`DECLARATION`]), beside the
-    /// original content that keeps it, where a reader of the record finds it
-    /// ([`ReceivedComposition::not_carried`]).
+    /// original content that keeps it ([`ReceivedComposition::not_carried`]).
+    /// When the shipped project declares a composition-level comment
+    /// ([`crate::mappings::Project::note`]), one comment opening with
+    /// [`COMMENT_LEAD`] names the same paths in the composition's
+    /// `other_context`, where the record's reader sees it.
     ///
     /// # Errors
     ///
@@ -159,7 +175,10 @@ impl Mapping {
     /// when it names no template, [`ReceiveMappingError::OriginalTaken`] when
     /// the mapping already wrote an original content,
     /// [`ReceiveMappingError::DeclarationTaken`] when it already wrote the
-    /// feeder system audit's other details, and
+    /// feeder system audit's other details,
+    /// [`ReceiveMappingError::Uncontexted`] when a comment is due and the
+    /// composition has no context, [`ReceiveMappingError::CommentTaken`] when
+    /// the mapping already wrote the comment or another `other_context`, and
     /// [`ReceiveMappingError::Encode`] when it cannot be written out.
     pub fn to_openehr(
         &self,
@@ -278,6 +297,11 @@ impl Mapping {
             value: original.to_owned(),
             formalism: FHIR_JSON.to_owned(),
         })));
+        if let Some(note) = self.note()
+            && !lost.is_empty()
+        {
+            comment(&mut composition, &note, &lost)?;
+        }
         let canonical = serde_json::to_string(&composition)
             .map_err(|source| ReceiveMappingError::Encode { source })?;
         Ok(ReceivedComposition {
@@ -328,6 +352,52 @@ fn declaration(lost: &[String]) -> Result<ItemStructure, ReceiveMappingError> {
         "items": items,
     }))
     .map_err(|source| ReceiveMappingError::Encode { source })
+}
+
+/// Writes the comment `note` declares into `composition`'s
+/// `context/other_context`, naming each element of `lost` by its FHIRPath.
+fn comment(
+    composition: &mut Composition,
+    note: &Note,
+    lost: &[String],
+) -> Result<(), ReceiveMappingError> {
+    let element: Item = serde_json::from_value(serde_json::json!({
+        "_type": "ELEMENT",
+        "name": {"_type": "DV_TEXT", "value": note.element_name},
+        "archetype_node_id": note.element,
+        "value": {"_type": "DV_TEXT", "value": format!("{COMMENT_LEAD}{}", lost.join("; "))},
+    }))
+    .map_err(|source| ReceiveMappingError::Encode { source })?;
+    let context = composition
+        .context
+        .as_deref_mut()
+        .ok_or(ReceiveMappingError::Uncontexted)?;
+    match context.other_context.as_mut() {
+        None => {
+            let mut tree: ItemTree = serde_json::from_value(serde_json::json!({
+                "_type": "ITEM_TREE",
+                "name": {"_type": "DV_TEXT", "value": note.tree_name},
+                "archetype_node_id": note.tree,
+            }))
+            .map_err(|source| ReceiveMappingError::Encode { source })?;
+            tree.items = Some(vec![element]);
+            context.other_context = Some(ItemStructure::from(tree));
+            Ok(())
+        }
+        Some(ItemStructure::ItemTree(tree)) if tree.archetype_node_id == note.tree => {
+            let items = tree.items.get_or_insert_with(Vec::new);
+            let taken = items.iter().any(|item| match item {
+                Item::Element(held) => held.archetype_node_id == note.element,
+                Item::Cluster(held) => held.archetype_node_id == note.element,
+            });
+            if taken {
+                return Err(ReceiveMappingError::CommentTaken);
+            }
+            items.push(element);
+            Ok(())
+        }
+        Some(_) => Err(ReceiveMappingError::CommentTaken),
+    }
 }
 
 impl ReceivedComposition {
@@ -633,6 +703,15 @@ pub enum ReceiveMappingError {
     /// declared.
     #[error("the mapping already wrote the feeder system audit's other details")]
     DeclarationTaken,
+    /// The mapped composition has no context, whose `other_context` holds
+    /// the comment that names the elements it does not carry.
+    #[error("the mapped composition has no context for the comment on what it does not carry")]
+    Uncontexted,
+    /// The mapping already wrote the comment that names the elements the
+    /// composition does not carry, or wrote an `other_context` that is not the
+    /// tree the template declares for it.
+    #[error("the mapping already wrote the comment on what the composition does not carry")]
+    CommentTaken,
 }
 
 #[cfg(test)]

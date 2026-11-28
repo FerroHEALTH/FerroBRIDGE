@@ -42,6 +42,8 @@ use fhirconnect::engine::context::CallContext;
 use fhirconnect::operations::run::Settings;
 use openehr_adl::artefact::ArchetypeRepository;
 use openehr_adl::parse::Dialect;
+use openehr_mapping_core::index::WebTemplateIndex;
+use openehr_mapping_core::index::paths::AqlPath;
 use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
@@ -368,5 +370,21 @@ fn every_annex_viii_element_has_one_non_laboratory_row() -> Result<(), Box<dyn E
         .find(|row| row.element == "body.specimen")
         .ok_or("the specimen row")?;
     assert!(!specimen.applies, "a specimen is laboratory alone");
+    Ok(())
+}
+
+// NOTE: openEHR-EHR-COMPOSITION.report-result.v1 at0007 is the composition's Comment, a DV_TEXT in
+// other_context, where a received report names to its reader the elements it does not carry.
+#[test]
+fn the_project_names_its_losses_in_the_comment_the_template_inherits() -> Result<(), Box<dyn Error>>
+{
+    let note = TEST_REPORT.note().ok_or("the project's comment")?;
+    assert_eq!(
+        note.value_path(),
+        "/context/other_context[at0001]/items[at0007]/value"
+    );
+    let index = WebTemplateIndex::build(&template()?)?;
+    let value = index.node(&AqlPath::new(note.value_path()))?;
+    assert_eq!(value.rm_type(), "DV_TEXT");
     Ok(())
 }

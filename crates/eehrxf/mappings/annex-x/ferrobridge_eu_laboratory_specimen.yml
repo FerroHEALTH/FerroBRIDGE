@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's extension of CLUSTER.specimen.v1 for the Laboratory Report
-# 2.0.0 Specimen-eu-lab profile: its canonical.
+# 2.1.0 Specimen-eu-lab profile: its canonical.
 grammar: FHIRConnect/v1.0.0
 type: extension
 metadata:

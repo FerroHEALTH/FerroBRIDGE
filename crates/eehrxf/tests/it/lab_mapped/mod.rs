@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The laboratory report mapped between openEHR and the HL7 Europe
-//! Laboratory Report 2.0.0 document through the shipped laboratory project,
+//! Laboratory Report 2.1.0 document through the shipped laboratory project,
 //! over the published `KDS_Laborbericht` template.
 //!
 //! A synthetic `Bundle-eu-lab` is received, held to the vendored `Bundle`
@@ -447,7 +447,7 @@ fn the_report_mapped_back_out_is_a_document_the_profiles_constrain() -> Result<(
         result["meta"]["profile"][0], OBSERVATION_RESULTSLAB_EU_LAB,
         "{result}"
     );
-    // NOTE: HL7 Europe Laboratory Report 2.0.0 Observation-resultslab-eu-lab requires
+    // NOTE: HL7 Europe Laboratory Report 2.1.0 Observation-resultslab-eu-lab requires
     // effective[x]; an analyte takes the time of its laboratory test result's event.
     assert_eq!(
         result.pointer("/effectiveDateTime"),
