@@ -168,11 +168,11 @@ pub(super) fn group_observation() -> Group {
     }
 }
 
-/// HL7 Europe Laboratory Report 2.0.0.
+/// HL7 Europe Laboratory Report 2.1.0.
 pub(super) const LAB: &str = "http://hl7.eu/fhir/laboratory/StructureDefinition";
 
 /// Returns a laboratory report whose result and specimen it contains, in
-/// the shapes HL7 Europe Laboratory Report 2.0.0 constrains.
+/// the shapes HL7 Europe Laboratory Report 2.1.0 constrains.
 pub(super) fn laboratory_report() -> serde_json::Value {
     serde_json::json!({
         "resourceType": "DiagnosticReport",

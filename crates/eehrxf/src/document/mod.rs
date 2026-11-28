@@ -18,7 +18,7 @@
 //! is written to HL7 Europe Patient Summary 1.0.0-ballot
 //! ([`PATIENT_SUMMARY_FORM`]) or to HL7 International Patient Summary 2.0.1
 //! ([`form::IPS_PATIENT_SUMMARY_FORM`]), the laboratory report to HL7 Europe
-//! Laboratory Report 2.0.0 (`laboratory`), the discharge report to HL7
+//! Laboratory Report 2.1.0 (`laboratory`), the discharge report to HL7
 //! Europe Hospital Discharge Report 1.0.0 (`discharge`), the imaging report
 //! to HL7 Europe Imaging Report 1.0.0-ballot (`imaging`) and the vaccination
 //! history to MyHealth@EU Vaccination 10.0.0-preview (`vaccination`). What

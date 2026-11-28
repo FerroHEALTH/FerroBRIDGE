@@ -82,7 +82,7 @@ impl Category {
                 system: LOINC,
                 code: "60591-5",
             }),
-            // NOTE: HL7 Europe Laboratory Report 2.0.0, Composition-eu-lab binds Composition.type to
+            // NOTE: HL7 Europe Laboratory Report 2.1.0, Composition-eu-lab binds Composition.type to
             // lab-reportType-eu-lab, whose one concept is LOINC 11502-2.
             #[cfg(feature = "laboratory")]
             Self::Laboratory => Some(DocumentType {

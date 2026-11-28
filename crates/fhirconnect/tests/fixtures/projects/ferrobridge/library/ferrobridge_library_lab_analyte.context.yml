@@ -16,7 +16,7 @@ spec:
 context:
   profile:
     url: "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
-    version: "2.0.0"
+    version: "2.1.0"
   template:
     id: "KDS_Laborbericht"
   archetypes:

@@ -84,6 +84,11 @@ const TRANSFER_SUMMARY: &str = "openEHR-EHR-COMPOSITION.transfer_summary.v1";
 
 /// The ADL 2 operational template of the discharge report template.
 fn template() -> Result<TemplateSource, Box<dyn Error>> {
+    template_of(FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE)
+}
+
+/// The ADL 2 operational template of the discharge report template `source`.
+fn template_of(source: &str) -> Result<TemplateSource, Box<dyn Error>> {
     let mut repository = ArchetypeRepository::default();
     for (file, source) in CKM_DISCHARGE_ARCHETYPES
         .iter()
@@ -93,9 +98,8 @@ fn template() -> Result<TemplateSource, Box<dyn Error>> {
             .map_err(|errors| format!("{file}: {errors:?}"))?;
         repository.insert(archetype);
     }
-    let template =
-        openehr_adl::assemble::parse_artefact(FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE, Dialect::Adl2)
-            .map_err(|errors| format!("the template: {errors:?}"))?;
+    let template = openehr_adl::assemble::parse_artefact(source, Dialect::Adl2)
+        .map_err(|errors| format!("the template: {errors:?}"))?;
     let mut raw = openehr_adl::opt::create_opt(&template, &repository)
         .map_err(|errors| format!("the operational template: {errors:?}"))?;
     // NOTE: AM Release-2.3.0 AOM2 §3.6.6, an operational template is specialised; the root's
@@ -486,10 +490,10 @@ fn sent(mapping: &Mapping, composition: &str, identifier: &str) -> Result<String
         .iter()
         .find(|slot| slot.slice == "sectionHospitalCourse")
         .ok_or("the hospital course slot")?;
-    document.with_section(Section::new(
-        course,
-        vec![String::from("A synthetic hospital course.")],
-    ))?;
+    document.with_section(
+        Section::new(course, vec![String::from("A synthetic hospital course.")])
+            .with_left_out(left_out_in(&warnings, &HDR, course.slice)),
+    )?;
     for section in document.with_mapped_composition(run.bundle())? {
         let paragraph = format!("{}.", section.slot.title);
         let left_out = left_out_in(&warnings, &HDR, section.slot.slice);
@@ -549,10 +553,10 @@ async fn sent_myhealtheu(
         .iter()
         .find(|slot| slot.slice == "sectionHospitalCourse")
         .ok_or("the hospital course slot")?;
-    document.with_section(Section::new(
-        course,
-        vec![String::from("A synthetic hospital course.")],
-    ))?;
+    document.with_section(
+        Section::new(course, vec![String::from("A synthetic hospital course.")])
+            .with_left_out(left_out_in(&warnings, &HDR, course.slice)),
+    )?;
     for section in document.with_mapped_composition(run.bundle())? {
         let paragraph = format!("{}.", section.slot.title);
         let left_out = left_out_in(&warnings, &HDR, section.slot.slice);

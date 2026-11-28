@@ -140,7 +140,7 @@ and its presented form in the attachments section.
 Test results (Art 14(1)(e), feature `laboratory`) are crosswalked the same
 way: the eHealth Network *Guideline on Laboratory Results* (Release 1.1, §4),
 the Xt-EHR `EHDSLaboratoryReport` logical model and the HL7 Europe
-Laboratory Report profiles (`hl7.fhir.eu.laboratory` 2.0.0). A laboratory
+Laboratory Report profiles (`hl7.fhir.eu.laboratory` 2.1.0). A laboratory
 report keeps its header in the composition and its body in the
 `DiagnosticReport` the composition names, so the crosswalk names elements of
 both and `Crosswalk::check_with` checks it against both: the orders and their

@@ -4,7 +4,7 @@
 # Laboratory reports from openEHR
 
 The `openehr` and `laboratory` features map an openEHR laboratory report to
-the HL7 Europe Laboratory Report 2.0.0 document, and map a received
+the HL7 Europe Laboratory Report 2.1.0 document, and map a received
 laboratory report document into openEHR. Regulation (EU) 2025/327 names
 medical test results, laboratory results included, as a priority category
 in Art 14(1)(e).

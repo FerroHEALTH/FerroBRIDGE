@@ -6,7 +6,7 @@
 //! The rows key on the Xt-EHR `EHDSLaboratoryReport` 1.0.0 element paths,
 //! name the eHealth Network ids of the *Guideline on Laboratory Results*
 //! Release 1.1, §4.1 and §4.2, and the elements of the HL7 Europe Laboratory
-//! Report 2.0.0 profiles that carry them. A laboratory report is a document
+//! Report 2.1.0 profiles that carry them. A laboratory report is a document
 //! whose `Composition-eu-lab` names the header and the `DiagnosticReport-eu-lab`
 //! carries the body: the orders it answers in `basedOn`, the specimens in
 //! `specimen` and the results in `result`. The rows of the order information
@@ -388,11 +388,13 @@ const ROWS: &[Row] = &[
         "DiagnosticReport.result",
         &[RESULT],
     ),
+    // NOTE: HL7 Europe Laboratory Report 2.1.0 map-ehdslaboratoryreport: each attachment is a
+    // DocumentReference referenced through the alternate-reference extension on media.link.
     row(
         "EHDSLaboratoryReport.attachments",
         NONE,
         SHOULD,
-        "Composition.section:attachment.entry",
+        "DiagnosticReport.media.link.extension:link",
         ASSEMBLED,
     ),
 ];
