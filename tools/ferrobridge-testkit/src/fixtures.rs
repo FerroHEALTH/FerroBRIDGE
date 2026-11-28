@@ -367,7 +367,7 @@ pub const FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE: &str =
 
 /// The template identifier [`FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE`] declares.
 pub const FERROBRIDGE_DISCHARGE_REPORT_TEMPLATE_ID: &str =
-    "openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.0.0";
+    "openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.1.0";
 
 /// One vendored CKM discharge archetype as `(file name, source)`.
 macro_rules! ckm_discharge {
