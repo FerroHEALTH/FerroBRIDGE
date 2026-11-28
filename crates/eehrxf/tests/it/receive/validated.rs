@@ -30,7 +30,8 @@ use flate2::read::GzDecoder;
 use crate::support::profile_set;
 
 /// Returns every document `Bundle` example of the vendored guide `tarball`
-/// under `package/example/`, by member path, with its text.
+/// under `package/example/` or `package/examples/`, the directory the guide's
+/// publisher names, by member path, with its text.
 fn examples(tarball: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/specs")
@@ -40,7 +41,9 @@ fn examples(tarball: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
     for entry in archive.entries()? {
         let mut entry = entry?;
         let member = entry.path()?.to_string_lossy().into_owned();
-        if member.starts_with("package/example/Bundle-") {
+        if member.starts_with("package/example/Bundle-")
+            || member.starts_with("package/examples/Bundle-")
+        {
             let mut text = String::new();
             entry.read_to_string(&mut text)?;
             let tree: serde_json::Value = serde_json::from_str(&text)?;
@@ -232,22 +235,76 @@ mod laboratory {
 
     use super::{every_example_passes, planted, profile_set, refusals, reported, validated};
 
-    /// The vendored HL7 Europe Laboratory Report 2.0.0 package.
-    const LAB: &str = "eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.0.0.tgz";
+    /// The vendored HL7 Europe Laboratory Report 2.1.0 package.
+    const LAB: &str = "eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.1.0.tgz";
 
     /// The example that breaks R4, held by its own test.
-    const BROKEN: &str = "package/example/Bundle-BundleLabResultReportPOC.json";
+    const BROKEN: &str = "package/examples/Bundle-BundleLabResultReportPOC.json";
 
     /// The example the planted violation is made in.
-    const PLANTED: &str = "package/example/Bundle-BundleHepatitisPanel.json";
+    const PLANTED: &str = "package/examples/Bundle-BundleHepatitisPanel.json";
+
+    /// The examples whose `Composition` does not reference their
+    /// `DiagnosticReport` (#2392), each with the entries of the report and of
+    /// what only the report references, held by their own test.
+    const UNREFERENCED: [(&str, &[(usize, &str)]); 4] = [
+        (PLANTED, &[(2, "DiagnosticReport")]),
+        (
+            "package/examples/Bundle-BundleLabResultMicroCultureSusc.json",
+            &[(2, "DiagnosticReport"), (3, "Specimen")],
+        ),
+        (
+            "package/examples/Bundle-IT-CDA2FHIR-17e2cad1-c3e3-4901-adb1-c35a0b82b883.json",
+            &[(2, "DiagnosticReport")],
+        ),
+        (
+            "package/examples/Bundle-SimpleChemistryResultReport.json",
+            &[(15, "ServiceRequest"), (20, "DiagnosticReport")],
+        ),
+    ];
 
     #[tokio::test]
     async fn every_conformant_laboratory_report_example_validates() -> Result<(), Box<dyn Error>> {
         let Some(set) = profile_set()? else {
             return Ok(());
         };
-        let passed = every_example_passes(set, Category::Laboratory, LAB, &[BROKEN]).await?;
-        assert_eq!(passed, 4, "the guide's conformant document examples");
+        let mut refused = vec![BROKEN];
+        refused.extend(UNREFERENCED.iter().map(|(member, _)| *member));
+        let passed = every_example_passes(set, Category::Laboratory, LAB, &refused).await?;
+        assert_eq!(
+            passed, 0,
+            "every document example of the guide is refused by its own test"
+        );
+        Ok(())
+    }
+
+    // NOTE: FHIR R4 documents.html §3.3.1 admits what the Composition references; the report's R5
+    // composition extension references the Composition, so it does not bring the report in.
+    #[tokio::test]
+    async fn a_laboratory_report_example_whose_composition_names_no_report_is_refused()
+    -> Result<(), Box<dyn Error>> {
+        let Some(set) = profile_set()? else {
+            return Ok(());
+        };
+        let examples = super::examples(LAB)?;
+        for (member, entries) in UNREFERENCED {
+            let (_, text) = examples
+                .iter()
+                .find(|(found, _)| found == member)
+                .ok_or(member)?;
+            let findings = refusals(validated(set, Category::Laboratory, text).await?)?;
+            for (entry, kind) in entries {
+                assert!(
+                    reported(
+                        &findings,
+                        &format!("Bundle.entry[{entry}]"),
+                        &format!("holds a {kind} the Composition does not reference")
+                    ),
+                    "{member} entry {entry}: {findings:?}"
+                );
+            }
+            assert_eq!(findings.len(), entries.len(), "{member}: {findings:?}");
+        }
         Ok(())
     }
 

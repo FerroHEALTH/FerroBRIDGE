@@ -125,8 +125,8 @@ pub(super) const GROUPS: &[Group] = &[
         "body.recommendation",
         Some("recommendation"),
     ),
-    // NOTE: HL7 Europe Laboratory Report 2.0.0 Composition-eu-lab slices only its annotations and
-    // attachments; the order and its supporting information are DiagnosticReport.basedOn.
+    // NOTE: HL7 Europe Laboratory Report 2.1.0 Composition-eu-lab slices only its annotations;
+    // the order and its supporting information are DiagnosticReport.basedOn.
     group(Annex::Viii, LR, "body.orderInformation", None),
     group(Annex::Viii, LR, "body.supportingInformation", None),
     group(Annex::Viii, LR, "body.resultData", None),

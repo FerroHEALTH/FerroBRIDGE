@@ -211,7 +211,7 @@ readonly PROJECT_BADGES=(
   '[![Docs](https://img.shields.io/badge/docs-ferrobridge.eu-blue?logo=mdbook)](https://ferrobridge.eu/docs/)'
   '[![GHCR](https://img.shields.io/badge/ghcr.io-ferrobridge-2496ED?logo=docker&logoColor=white)](https://github.com/FerroHEALTH/FerroBRIDGE/pkgs/container/ferrobridge)'
 )
-# The compliance markers, on their own line under the conformance badges; the
+# The security and compliance badges, the last group of the README block; the
 # post-quantum badge is scripts/checks/post-quantum.sh's.
 readonly COMPLIANCE_BADGES=(
   '[![CRA](https://img.shields.io/badge/CRA-user%20information-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferrobridge.eu/docs/evaluate/cra-user-information.html)'
@@ -236,30 +236,30 @@ label_of() {
     omocl) echo "OMOCL mapping library" ;;
     roundtrip) echo "FHIR round-trip laws" ;;
     rest-api) echo "FHIRconnect REST API" ;;
-    hl7v2) echo "HL7 v2 message corpora" ;;
-    hl7v2-smoke) echo "HL7 v2 smoke (NIST, AIRA)" ;;
-    fhir-stu3) echo "FHIR STU3" ;;
-    fhir-r4) echo "FHIR R4" ;;
-    fhir-r4b) echo "FHIR R4B" ;;
-    fhir-r5) echo "FHIR R5" ;;
-    fhir-r6) echo "FHIR R6" ;;
-    fhir-r4-facade) echo "FHIR R4 facade" ;;
-    fhirpath-r4) echo "FHIRPath R4 suite, N1" ;;
-    fhirpath-r4-stu3) echo "FHIRPath R4 suite, 3.0.0 STU" ;;
+    hl7v2) echo "message corpora" ;;
+    hl7v2-smoke) echo "smoke (NIST, AIRA)" ;;
+    fhir-stu3) echo "STU3" ;;
+    fhir-r4) echo "R4" ;;
+    fhir-r4b) echo "R4B" ;;
+    fhir-r5) echo "R5" ;;
+    fhir-r6) echo "R6" ;;
+    fhir-r4-facade) echo "R4 facade" ;;
+    fhirpath-r4) echo "FHIRPath R4 N1" ;;
+    fhirpath-r4-stu3) echo "FHIRPath R4 3.0.0 STU" ;;
     validator-agreement) echo "R4 profile validator agreement" ;;
     xtehr-crosswalk) echo "Xt-EHR 1.0.0 crosswalk" ;;
-    eehrxf-draft-patient-summary) echo "EEHRxF Patient Summary" ;;
-    eehrxf-draft-eprescription) echo "EEHRxF ePrescription" ;;
-    eehrxf-draft-edispensation) echo "EEHRxF eDispensation" ;;
-    eehrxf-draft-medical-test-report) echo "EEHRxF Medical test report" ;;
-    eehrxf-draft-imaging) echo "EEHRxF Imaging report" ;;
-    eehrxf-draft-discharge) echo "EEHRxF Discharge report" ;;
+    eehrxf-draft-patient-summary) echo "Patient Summary" ;;
+    eehrxf-draft-eprescription) echo "ePrescription" ;;
+    eehrxf-draft-edispensation) echo "eDispensation" ;;
+    eehrxf-draft-medical-test-report) echo "Medical test report" ;;
+    eehrxf-draft-imaging) echo "Imaging report" ;;
+    eehrxf-draft-discharge) echo "Discharge report" ;;
     myhealth-eu-core) echo "Core $(ci_build_version myhealth.eu.fhir.core)" ;;
     myhealth-eu-laboratory) echo "Laboratory $(ci_build_version myhealth.eu.fhir.laboratory)" ;;
     myhealth-eu-hdr) echo "HDR $(ci_build_version myhealth.eu.fhir.hdr)" ;;
     myhealth-eu-mvc) echo "MVC $(ci_build_version myhealth.eu.fhir.mvc-package)" ;;
     myhealth-eu-euvac) echo "EuVAC $(pinned_version myhealth.eu.fhir.euvac)" ;;
-    eehrxf-annex-x) echo "EEHRxF Annex X groups served" ;;
+    eehrxf-annex-x) echo "Annex X groups served" ;;
     *) return 1 ;;
   esac
 }
@@ -442,10 +442,31 @@ page_row() {
     "$passed" "$total" "$(measure_of "$corpus")" "$held" "${also:--}" "$(edition_of "$corpus")" "$corpus"
 }
 
-# The corpus badges of the README, in its order, by group.
-readonly CONFORMANCE_BADGES=(fhirconnect-mapping-lib rest-api omocl fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6
-  roundtrip fhir-r4-facade eehrxf-annex-x fhirpath-r4 fhirpath-r4-stu3 validator-agreement hl7v2 hl7v2-smoke)
-readonly MYHEALTH_EU_BADGES=(myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac)
+# The corpus badge groups of the README, standards first, each a heading
+# and its corpora in order; a label leaves out what its heading says.
+readonly BADGE_GROUPS=(mapping fhir hl7v2 ehds myhealth-eu)
+
+# The heading of badge group $1.
+group_heading() {
+  case "$1" in
+    mapping) echo "Mapping languages" ;;
+    fhir) echo "FHIR" ;;
+    hl7v2) echo "HL7 v2" ;;
+    ehds) echo "EHDS, $(draft_label)" ;;
+    myhealth-eu) echo "MyHealth@EU" ;;
+  esac
+}
+
+# The corpora of badge group $1, one per line.
+group_corpora() {
+  case "$1" in
+    mapping) printf '%s\n' fhirconnect-mapping-lib rest-api omocl roundtrip ;;
+    fhir) printf '%s\n' fhir-stu3 fhir-r4 fhir-r4b fhir-r5 fhir-r6 fhir-r4-facade fhirpath-r4 fhirpath-r4-stu3 validator-agreement ;;
+    hl7v2) printf '%s\n' hl7v2 hl7v2-smoke ;;
+    ehds) printf '%s\n' "${DRAFT_CORPORA[@]}" eehrxf-annex-x xtehr-crosswalk ;;
+    myhealth-eu) printf '%s\n' myhealth-eu-core myhealth-eu-laboratory myhealth-eu-hdr myhealth-eu-mvc myhealth-eu-euvac ;;
+  esac
+}
 
 # conformance/README.md: every corpus badge's count broken down.
 render_page() {
@@ -471,10 +492,16 @@ render_page() {
   echo '  terminologies 4.1.5.3), counted as passing; and annex elements whose'
   echo '  Xt-EHR element differs, passing when a decision records where each goes.'
   echo
-  echo '| Badge | Count | Held upstream | Also counted | Edition | Pass list |'
-  echo '|---|---|---|---|---|---|'
-  for name in "${CONFORMANCE_BADGES[@]}" "${DRAFT_CORPORA[@]}" xtehr-crosswalk "${MYHEALTH_EU_BADGES[@]}"; do
-    page_row "$name" || return 2
+  local group
+  for group in "${BADGE_GROUPS[@]}"; do
+    [[ "$group" = mapping ]] || echo
+    echo "## $(group_heading "$group")"
+    echo
+    echo '| Badge | Count | Held upstream | Also counted | Edition | Pass list |'
+    echo '|---|---|---|---|---|---|'
+    while IFS= read -r name; do
+      page_row "$name" || return 2
+    done < <(group_corpora "$group")
   done
 }
 
@@ -920,7 +947,7 @@ badge_link() {
 # rows, then the conformance rows linked to conformance/README.md, closing on
 # the HL7 v2 family and version badges.
 render_block() {
-  local name
+  local name group
   echo '<!-- badges:begin -->'
   echo '**Project**<br>'
   printf '%s\n' "${PROJECT_BADGES[@]}"
@@ -928,40 +955,34 @@ render_block() {
   echo '**Quality and security**<br>'
   printf '%s\n' "${QUALITY_BADGES[@]}"
   echo
-  echo '**Conformance and compliance**<br>'
   echo "$badge_caption<br>"
-  for name in "${CONFORMANCE_BADGES[@]}"; do
-    badge_link "$(label_of "$name")" "$name" "$PAGE"
+  for group in "${BADGE_GROUPS[@]}"; do
+    [[ "$group" = mapping ]] || echo
+    echo "**$(group_heading "$group")**<br>"
+    while IFS= read -r name; do
+      badge_link "$(label_of "$name")" "$name" "$PAGE"
+    done < <(group_corpora "$group")
+    # The per-family and per-version badges fold under the HL7 v2 group, so
+    # the per-corpus badges stay in view; GitHub renders Markdown inside
+    # <details> only after a blank line.
+    if [[ "$group" = hl7v2 ]] && [[ ${#families[@]} -gt 0 || ${#versions[@]} -gt 0 ]]; then
+      echo
+      echo '<details>'
+      echo '<summary>By message family and by version, across both corpora</summary>'
+      echo
+      for name in ${families[@]+"${families[@]}"}; do
+        badge_link "HL7 v2 $(tr '[:lower:]' '[:upper:]' <<<"${name#hl7v2-family-}")" "$name" conformance/hl7v2/pass-list.txt
+      done
+      for name in ${versions[@]+"${versions[@]}"}; do
+        badge_link "HL7 v${name#hl7v2-version-}" "$name" conformance/hl7v2/pass-list.txt
+      done
+      echo
+      echo '</details>'
+    fi
   done
-  echo '<br>'
+  echo
+  echo '**Security and compliance**<br>'
   printf '%s\n' "${COMPLIANCE_BADGES[@]}"
-  echo
-  echo "**EHDS and $(draft_label)**<br>"
-  for name in "${DRAFT_CORPORA[@]}" xtehr-crosswalk; do
-    badge_link "$(label_of "$name")" "$name" "$PAGE"
-  done
-  echo
-  echo '**MyHealth@EU**<br>'
-  for name in "${MYHEALTH_EU_BADGES[@]}"; do
-    badge_link "$(label_of "$name")" "$name" "$PAGE"
-  done
-  # The per-family and per-version badges fold into a collapsed block, so the
-  # per-corpus badges stay in view; GitHub renders Markdown inside <details>
-  # only after a blank line.
-  if [[ ${#families[@]} -gt 0 || ${#versions[@]} -gt 0 ]]; then
-    echo
-    echo '<details>'
-    echo '<summary>HL7 v2 by message family and by version, across both corpora</summary>'
-    echo
-    for name in ${families[@]+"${families[@]}"}; do
-      badge_link "HL7 v2 $(tr '[:lower:]' '[:upper:]' <<<"${name#hl7v2-family-}")" "$name" conformance/hl7v2/pass-list.txt
-    done
-    for name in ${versions[@]+"${versions[@]}"}; do
-      badge_link "HL7 v${name#hl7v2-version-}" "$name" conformance/hl7v2/pass-list.txt
-    done
-    echo
-    echo '</details>'
-  fi
   echo '<!-- badges:end -->'
 }
 
@@ -1006,6 +1027,8 @@ fi
 # A long badge fails every mode: its breakdown belongs on the page.
 badge_length_check "$BADGES"/*.json || failed=1
 badge_length_readme README.md || failed=1
+badge_block_check README.md || failed=1
+badge_render_check README.md || failed=1
 
 mapfile -t plain_badges < <(without_upstream "$BADGES"/*.json)
 if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md || ! badge_caption_check README.md ||

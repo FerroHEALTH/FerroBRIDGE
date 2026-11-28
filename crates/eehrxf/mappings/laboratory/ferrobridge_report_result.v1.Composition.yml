@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's composition model mapping of the CKM
 # COMPOSITION.report-result.v1 to a FHIR R4 Composition, the start of the
-# Laboratory Report 2.0.0 document context (a context whose start is a
+# Laboratory Report 2.1.0 document context (a context whose start is a
 # composition model slots no composition: composition-element.adoc). The
 # report's status, kept in KDS_Laborbericht's other_context (at0005) bound
 # to the R4 diagnostic-report-status value set, travels through the codes

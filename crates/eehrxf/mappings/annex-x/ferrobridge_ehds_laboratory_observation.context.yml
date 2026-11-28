@@ -4,7 +4,7 @@
 # EHDSLaboratoryObservation (Table 19), served by the facade as an individual
 # resource (draft act Art 7(2), #2087): each analyte of a laboratory result
 # in the published KDS_Laborbericht template becomes one Observation with the
-# HL7 Europe Laboratory Report 2.0.0 Observation-resultslab-eu-lab profile.
+# HL7 Europe Laboratory Report 2.1.0 Observation-resultslab-eu-lab profile.
 grammar: FHIRConnect/v1.0.0
 type: context
 metadata:
@@ -16,7 +16,7 @@ spec:
 context:
   profile:
     url: "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab"
-    version: "2.0.0"
+    version: "2.1.0"
   template:
     id: "KDS_Laborbericht"
   archetypes:

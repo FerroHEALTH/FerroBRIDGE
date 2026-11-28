@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The laboratory report document: the section slots held to the vendored
-//! HL7 Europe Laboratory Report 2.0.0 profiles, and a document assembled
+//! HL7 Europe Laboratory Report 2.1.0 profiles, and a document assembled
 //! from synthetic resources, written as the `Bundle-eu-lab` the profiles
 //! constrain, its report and its composition held to one another.
 

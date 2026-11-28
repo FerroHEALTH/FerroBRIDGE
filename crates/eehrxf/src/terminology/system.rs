@@ -102,7 +102,7 @@ pub fn fhir_system(name: &str, archetype: Option<&ArchetypeId>) -> Result<Option
 /// Core 2.2.0 includes SNOMED CT in its value sets at the version
 /// `http://snomed.info/sct/900000000000207008/version/20260201`
 /// (`ValueSet.compose.include.version`), and HL7 Europe Laboratory Report
-/// 2.0.0 expands its value sets at `http://snomed.info/sct/900000000000207008`
+/// 2.1.0 expands its value sets at `http://snomed.info/sct/900000000000207008`
 /// (`Parameters` `exp-params`, `system-version`).
 pub const SNOMED_CT_VERSION: &str = "http://snomed.info/sct/";
 

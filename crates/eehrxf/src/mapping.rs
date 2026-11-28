@@ -44,9 +44,11 @@ use openehr_mapping_core::diagnostic::Diagnostic;
 use openehr_mapping_core::header::metadata::MappingName;
 use openehr_mapping_core::header::metadata::MappingNameError;
 use openehr_mapping_core::index::WebTemplateIndex;
+use openehr_mapping_core::index::paths::AqlPath;
 use openehr_mapping_core::template::PathError;
 use openehr_mapping_core::template::TemplateSource;
 
+use crate::mappings::Note;
 use crate::mappings::Project;
 use crate::transformation::Pin;
 
@@ -57,6 +59,7 @@ pub struct Mapping {
     files: Vec<String>,
     accounted: &'static [&'static str],
     followed: &'static [&'static str],
+    note: Option<Note>,
 }
 
 impl Mapping {
@@ -73,8 +76,11 @@ impl Mapping {
     /// Returns [`MappingError::Template`] when `opt` is not an OPT 1.4
     /// template, [`MappingError::ContextName`] when a context name is not a
     /// mapping name, [`MappingError::Refused`] with every diagnostic when a
-    /// file does not load or a context does not compile, and
-    /// [`MappingError::Program`] when a context maps another template.
+    /// file does not load or a context does not compile,
+    /// [`MappingError::Program`] when a context maps another template, and
+    /// [`MappingError::NoNote`] or [`MappingError::NoteNotText`] when the
+    /// template lacks the free-text comment the shipped project of the
+    /// contexts declares ([`Project::note`]).
     pub fn compile<P: AsRef<Path>>(
         opt: &str,
         files: &[P],
@@ -165,6 +171,11 @@ impl Mapping {
                     .map_err(|diagnostics| MappingError::Refused { diagnostics })?,
             );
         }
+        let shipped = crate::mappings::shipped_for(contexts);
+        let note = shipped.and_then(Project::note);
+        if let Some(declared) = note {
+            noted(&index, &declared)?;
+        }
         let mut programs = ProgramSet::new();
         programs.insert_template(index);
         for program in compiled {
@@ -172,12 +183,12 @@ impl Mapping {
                 .insert_program(program)
                 .map_err(|source| MappingError::Program { source })?;
         }
-        let shipped = crate::mappings::shipped_for(contexts);
         Ok(Self {
             programs,
             files,
             accounted: shipped.map_or(&[], Project::accounted),
             followed: shipped.map_or(&[], Project::followed),
+            note,
         })
     }
 
@@ -195,6 +206,14 @@ impl Mapping {
     pub const fn accounting(mut self, accounted: &'static [&'static str]) -> Self {
         self.accounted = accounted;
         self
+    }
+
+    /// Returns the composition-level comment where a received document's
+    /// composition names the elements it does not carry
+    /// ([`Project::note`]), checked against the template when the mapping
+    /// was compiled.
+    pub(crate) const fn note(&self) -> Option<Note> {
+        self.note
     }
 
     /// Returns the received elements the mapping accounts for.
@@ -637,6 +656,44 @@ pub enum MappingError {
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
+    /// The template has no node at the path the shipped project declares for
+    /// the comment naming a received document's losses ([`Project::note`]).
+    #[error("the template has no comment at {path}")]
+    NoNote {
+        /// The path the project declares.
+        path: String,
+        /// The lookup failure.
+        #[source]
+        source: Box<PathError>,
+    },
+    /// The node at the path the shipped project declares for the comment
+    /// naming a received document's losses is not free text.
+    #[error("the comment at {path} is a {rm_type}, not a DV_TEXT")]
+    NoteNotText {
+        /// The path the project declares.
+        path: String,
+        /// The RM type the template constrains the node to.
+        rm_type: String,
+    },
+}
+
+/// Checks that `index` has the free-text comment `note` declares.
+fn noted(index: &WebTemplateIndex, note: &Note) -> Result<(), MappingError> {
+    let path = note.value_path();
+    let rm_type = match index.node(&AqlPath::new(path.as_str())) {
+        Ok(found) => found.rm_type().to_owned(),
+        Err(source) => {
+            return Err(MappingError::NoNote {
+                path,
+                source: Box::new(source),
+            });
+        }
+    };
+    if rm_type == "DV_TEXT" {
+        Ok(())
+    } else {
+        Err(MappingError::NoteNotText { path, rm_type })
+    }
 }
 
 /// Renders a diagnostic list on one line.

@@ -169,12 +169,12 @@ pub(crate) fn imaging(url: &str) -> Result<ResourceProfile, Box<dyn Error>> {
     )?)
 }
 
-/// The vendored `hl7.fhir.eu.laboratory` 2.0.0 package, the version the
+/// The vendored `hl7.fhir.eu.laboratory` 2.1.0 package, the version the
 /// component reads.
 #[cfg(feature = "laboratory")]
 pub(crate) fn lab_package() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/specs/eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.0.0.tgz")
+        .join("../../docs/specs/eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.1.0.tgz")
 }
 
 /// Reads the profile at `url` from the vendored Laboratory Report package.

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's extension of CLUSTER.laboratory_test_analyte.v1 for the
-# Laboratory Report 2.0.0 Observation-resultslab-eu-lab profile: the
+# Laboratory Report 2.1.0 Observation-resultslab-eu-lab profile: the
 # canonical, the `laboratory` category slice the profile fixes by pattern
 # (min 1, max 1), written out of openEHR, where a laboratory analyte is a
 # laboratory result by its archetype, and the effective time and performer

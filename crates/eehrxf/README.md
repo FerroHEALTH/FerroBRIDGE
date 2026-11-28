@@ -35,7 +35,7 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   `laboratory`) and the discharge report (`crosswalk::discharge`, feature
   `discharge`) carry one, the two medication ones against the HL7 Europe MPD
   1.0.0 `MedicationRequest-eu-mpd` and `MedicationDispense-eu-mpd` profiles,
-  the laboratory report against the HL7 Europe Laboratory Report 2.0.0
+  the laboratory report against the HL7 Europe Laboratory Report 2.1.0
   `Composition-eu-lab` with its `DiagnosticReport-eu-lab` companion
   (`Crosswalk::check_with`), and the discharge report against the HL7
   Europe Hospital Discharge Report 1.0.0 `composition-eu-hdr` profile.
@@ -62,7 +62,7 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   under `mappings/` in its package, each embedded as text with the context
   mappings it compiles: `MPD` (features `prescription` or `dispensation`),
   the HL7 Europe MPD 1.0.0 request and dispense, and `LABORATORY` (feature
-  `laboratory`), the HL7 Europe Laboratory Report 2.0.0 report with its
+  `laboratory`), the HL7 Europe Laboratory Report 2.1.0 report with its
   results and specimens over the published `KDS_Laborbericht` template, and
   `HDR` (feature `discharge`), the HL7 Europe Hospital Discharge Report
   1.0.0 composition, encounter, diagnostic summary, significant procedures
@@ -112,8 +112,12 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   that the run carries into no structured element is a `warning` issue in
   `ReceivedComposition::outcome`, and is named by its FHIRPath in the
   composition's `FEEDER_AUDIT.feeder_system_audit.other_details`, beside the
-  original content, for a later reader of the record
-  (`ReceivedComposition::not_carried`).
+  original content (`ReceivedComposition::not_carried`). Where the shipped
+  project declares its template's composition-level comment
+  (`Project::note`: the discharge, imaging and medical test reports), the
+  same paths are written into that `Comment` in the composition's
+  `other_context`, where the record's reader sees them; compiling such a
+  project against a template without the comment is refused.
 - `terminology` (feature `fhir-r4`): the terminology rules. With `openehr`,
   `transcode` turns an openEHR text item into FHIR codings and narrative: a
   code in a preferred system as recorded, a `TERM_MAPPING` of match `=` as a
@@ -147,10 +151,10 @@ uses it:
 
 ```toml
 [dependencies]
-eehrxf = "0.49"
+eehrxf = "0.50"
 ```
 
-Name a patch (`"0.49.N"`) when you need the first release that carries what
+Name a patch (`"0.50.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## Licence
