@@ -42,19 +42,20 @@ const INTERACTION: &str = "pmir-feed";
 /// Returns the receiver of `running`'s cache, guarded by the gate of
 /// `smart`, admitting the access tokens of its feed clients.
 pub fn routes(running: &super::Running, smart: &Smart) -> Router {
+    let settings = &running.settings;
     // NOTE: PMIR 1.6.0 §2:3.93.5 leaves the feed's authentication to the two parties;
     // the identity source sends its client-credentials token, so the route admits its client ids.
     let requirement = Requirement::Client {
-        client_ids: running.feed_clients.clone(),
+        client_ids: settings.feed_clients.clone(),
         basic_users: Vec::new(),
     };
     let layer = AuthLayer::new(smart.gate().clone(), Routed::new(INTERACTION, requirement));
-    let audit = running.recorder.as_ref().and_then(|recorder| {
-        url::Url::parse(&running.feed_url)
+    let audit = settings.recorder.as_ref().and_then(|recorder| {
+        url::Url::parse(&settings.feed_url)
             .ok()
             .map(|endpoint| Audit {
                 recorder: Arc::clone(recorder),
-                registry: running.registry.clone(),
+                registry: settings.registry.clone(),
                 endpoint,
             })
     });
@@ -62,7 +63,7 @@ pub fn routes(running: &super::Running, smart: &Smart) -> Router {
         .route(PATH, post(receive))
         .with_state(Receiver {
             cache: running.cache.clone(),
-            source: running.feed_url.clone(),
+            source: settings.feed_url.clone(),
             audit,
         })
         .route_layer(layer)

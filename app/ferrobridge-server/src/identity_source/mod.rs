@@ -71,32 +71,14 @@ pub struct CacheSettings {
 }
 
 /// The started cache: what the lanes run and the router mounts.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Running {
     /// The cache every replica's lookups read.
     pub cache: PseudonymCache,
     /// The subscription's holder, run under its lane lease.
     pub holder: subscription::Holder,
-    /// The endpoint the acknowledgements name.
-    pub feed_url: String,
-    /// The client ids of the access tokens the receiver admits.
-    pub feed_clients: Vec<String>,
-    /// The identity source's base, the Registry each ITI-93 message comes
-    /// from.
-    pub registry: url::Url,
-    /// What records each received ITI-93 message under `[audit]`.
-    pub recorder: Option<std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>>,
-}
-
-impl std::fmt::Debug for Running {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Running")
-            .field("cache", &self.cache)
-            .field("holder", &self.holder)
-            .field("feed_clients", &self.feed_clients)
-            .field("audited", &self.recorder.is_some())
-            .finish_non_exhaustive()
-    }
+    /// What the cache was started from, which the receiver reads.
+    pub settings: CacheSettings,
 }
 
 impl Running {
@@ -117,10 +99,7 @@ impl Running {
         Ok(Self {
             cache,
             holder,
-            feed_url: settings.feed_url.clone(),
-            feed_clients: settings.feed_clients.clone(),
-            registry: settings.registry.clone(),
-            recorder: settings.recorder.clone(),
+            settings: settings.clone(),
         })
     }
 }
