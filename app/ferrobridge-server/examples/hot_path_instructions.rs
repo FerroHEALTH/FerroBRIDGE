@@ -73,6 +73,7 @@ fn on_fresh_heap<R: Send>(path: impl FnOnce() -> R + Send) -> R {
 /// source no path reaches.
 fn settings() -> Result<Settings, Box<dyn Error>> {
     let section = ferrobridge_server::config::section::identity_source::IdentitySource {
+        cache: None,
         endpoint: ferrohealth_smart::config::endpoint::EndpointSection {
             url: ferrohealth_secret::secret_url::SecretUrl::new("http://127.0.0.1:9/fhir"),
             ..ferrohealth_smart::config::endpoint::EndpointSection::default()

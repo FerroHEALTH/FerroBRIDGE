@@ -10,7 +10,13 @@
 //! <https://profiles.ihe.net/ITI/PIXm/3.1.0/ITI-83.html>), and every EHR's
 //! `EHR_STATUS.subject.external_ref` names that pseudonym. The inbound engine
 //! also feeds it as a Patient Identity Source over ITI-104 (`PIXm` 3.1.0
-//! §2:3.104).
+//! §2:3.104). The answers may be cached ([`cache`]) while the identity
+//! source's PMIR feed ([`feed`]) reaches the deployment through its
+//! subscription ([`subscription`]).
+
+pub mod cache;
+pub mod feed;
+pub mod subscription;
 
 use std::time::Duration;
 
@@ -24,6 +30,7 @@ use ihe_iti::pixm::source::error::SourceError as FeedError;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::identity::PersonId;
+use cache::PseudonymCache;
 
 /// The identity source, resolved from `[identity_source]`.
 #[derive(Clone)]
@@ -39,6 +46,88 @@ pub struct IdentitySource {
     source_domains: Vec<String>,
     /// How long one exchange may take.
     timeout: Duration,
+    /// The cache of the answers, once the lanes start it.
+    cache: Option<PseudonymCache>,
+    /// What `[identity_source.cache]` configures, when it is present.
+    cache_settings: Option<CacheSettings>,
+}
+
+/// What `[identity_source.cache]` resolves to.
+#[derive(Clone)]
+pub struct CacheSettings {
+    /// What the cache holds.
+    pub bounds: cache::Bounds,
+    /// The deployment's subscription to the identity source's feed.
+    pub subscription: subscription::Subscription,
+    /// The endpoint the acknowledgements name: the channel endpoint.
+    pub feed_url: String,
+    /// The client ids of the access tokens the receiver admits.
+    pub feed_clients: Vec<String>,
+    /// The identity source's base, the Registry each ITI-93 message comes
+    /// from.
+    pub registry: url::Url,
+    /// What records each received ITI-93 message under `[audit]`.
+    pub recorder: Option<std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>>,
+}
+
+/// The started cache: what the lanes run and the router mounts.
+#[derive(Debug, Clone)]
+pub struct Running {
+    /// The cache every replica's lookups read.
+    pub cache: PseudonymCache,
+    /// The subscription's holder, run under its lane lease.
+    pub holder: subscription::Holder,
+    /// What the cache was started from, which the receiver reads.
+    pub settings: CacheSettings,
+}
+
+impl Running {
+    /// Starts the cache `settings` configures over `store`, whose sealing
+    /// keys digest every source identifier.
+    ///
+    /// # Errors
+    /// Returns [`StartError::Unsealed`] when the store has no `[state.seal]`,
+    /// and [`StartError::Lease`] when the lane's lease cannot be named.
+    pub fn start(
+        settings: &CacheSettings,
+        store: &crate::store::Store,
+    ) -> Result<Self, StartError> {
+        let lookup = store.seal().ok_or(StartError::Unsealed)?.lookup().clone();
+        let cache = PseudonymCache::new(settings.bounds, lookup, store.pool().clone());
+        let holder =
+            subscription::Holder::new(settings.subscription.clone(), cache.clone(), store)?;
+        Ok(Self {
+            cache,
+            holder,
+            settings: settings.clone(),
+        })
+    }
+}
+
+/// Why the cache could not start.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum StartError {
+    /// The state store has no `[state.seal]`, so no source identifier can be
+    /// digested.
+    #[error(
+        "[identity_source.cache] needs [state.seal]: every source identifier is held as its digest"
+    )]
+    Unsealed,
+    /// The lane's lease cannot be named.
+    #[error("the PMIR subscription's lane lease cannot be named")]
+    Lease(#[from] crate::store::lease::LeaseError),
+}
+
+impl std::fmt::Debug for CacheSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CacheSettings")
+            .field("bounds", &self.bounds)
+            .field("subscription", &self.subscription)
+            .field("feed_clients", &self.feed_clients)
+            .field("audited", &self.recorder.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl std::fmt::Debug for IdentitySource {
@@ -49,6 +138,8 @@ impl std::fmt::Debug for IdentitySource {
             .field("pseudonym_domain", &self.pseudonym_domain.as_str())
             .field("source_domains", &self.source_domains)
             .field("timeout", &self.timeout)
+            .field("cache", &self.cache.is_some())
+            .field("cache_settings", &self.cache_settings)
             .finish()
     }
 }
@@ -150,18 +241,60 @@ impl IdentitySource {
             pseudonym_domain,
             source_domains,
             timeout,
+            cache: None,
+            cache_settings: None,
+        }
+    }
+
+    /// Returns this identity source configured to cache its answers as
+    /// `settings` says, `None` caching none.
+    #[must_use]
+    pub fn with_cache_settings(self, settings: Option<CacheSettings>) -> Self {
+        Self {
+            cache_settings: settings,
+            ..self
+        }
+    }
+
+    /// Returns what `[identity_source.cache]` configures, when it is present.
+    #[must_use]
+    pub const fn cache_settings(&self) -> Option<&CacheSettings> {
+        self.cache_settings.as_ref()
+    }
+
+    /// Returns this identity source answering through `cache`.
+    #[must_use]
+    pub fn with_cache(self, cache: PseudonymCache) -> Self {
+        Self {
+            cache: Some(cache),
+            ..self
         }
     }
 
     /// Returns this identity source recording every ITI-83 exchange through
-    /// `recorder` as the `PIXm` Query Consumer audit profile fixes it, and
-    /// every ITI-104 exchange as the Feed Source profile does (`PIXm` 3.1.0
-    /// §2:3.83.5.1.1, §2:3.104.5.1.1).
+    /// `recorder` as the `PIXm` Query Consumer audit profile fixes it, every
+    /// ITI-104 exchange as the Feed Source profile does (`PIXm` 3.1.0
+    /// §2:3.83.5.1.1, §2:3.104.5.1.1), every ITI-94 exchange of the
+    /// cache's subscription as the Subscriber's profiles do (PMIR 1.6.0
+    /// §2:3.94.5.1), and every ITI-93 message the cache's receiver takes as
+    /// the Consumer's feed profile does (§2:3.93.5.1).
     #[must_use]
     pub fn audited(self, recorder: std::sync::Arc<dyn ihe_atna::balp::AuditRecorder>) -> Self {
+        let cache_settings = self.cache_settings.map(|settings| CacheSettings {
+            subscription: subscription::Subscription {
+                subscriber: settings
+                    .subscription
+                    .subscriber
+                    .audited(std::sync::Arc::clone(&recorder)),
+                ..settings.subscription
+            },
+            recorder: Some(std::sync::Arc::clone(&recorder)),
+            ..settings
+        });
         Self {
             pixm: self.pixm.audited(std::sync::Arc::clone(&recorder)),
             feed: self.feed.audited(recorder),
+            cache_settings,
             ..self
         }
     }
@@ -201,8 +334,17 @@ impl IdentitySource {
                 &OnBehalfOf::System,
                 self.timeout,
             )
-            .await
-            .map(drop)
+            .await?;
+        if let Some(cache) = &self.cache {
+            let named = [subsumed, survivor]
+                .map(|source| (source.system(), source.value().expose_secret()));
+            // NOTE: no specification governs this: our own design; the identity source's own
+            // ITI-93 announcement of the merge forgets them on every replica as well.
+            if let Err(error) = cache.forget(named).await {
+                tracing::warn!(error = %ferrohealth_server::run::chain(&error), "a merge was forgotten on this replica and could not be announced to the others");
+            }
+        }
+        Ok(())
     }
 
     /// Returns the domain every EHR subject is a pseudonym in.
@@ -285,6 +427,23 @@ impl IdentitySource {
     /// pseudonym, [`PseudonymError::Upstream`] when the exchange failed, and
     /// [`PseudonymError::Subject`] when the pseudonym cannot be a subject.
     pub async fn pseudonym(
+        &self,
+        source: &SourceIdentifier,
+        on_behalf: &OnBehalfOf,
+    ) -> Result<PersonId, PseudonymError> {
+        if let Some(found) = self.cache.as_ref().and_then(|cache| cache.get(source)) {
+            return Ok(found);
+        }
+        let changes = self.cache.as_ref().map(PseudonymCache::changes);
+        let person = self.asked(source, on_behalf).await?;
+        if let (Some(cache), Some(changes)) = (&self.cache, changes) {
+            cache.put(changes, source, &person);
+        }
+        Ok(person)
+    }
+
+    /// Asks the identity source for the pseudonym of `source` over ITI-83.
+    async fn asked(
         &self,
         source: &SourceIdentifier,
         on_behalf: &OnBehalfOf,

@@ -28,8 +28,10 @@
 //! concept is in a preferred system. A document bound for the MyHealth@EU
 //! Core profiles ([`MYHEALTH_EU_CORE`]) so carries the source's SNOMED CT
 //! coding and the ICD-10 or ATC coding the server maps it to, the original
-//! and the mapped coding draft `EEHRxF` Art 6(2) keeps side by side. A bound
-//! concept no translation reaches is an [`Unbound`] outcome.
+//! and the mapped coding draft `EEHRxF` Art 6(2) keeps side by side; a
+//! laboratory report bound for MyHealth@EU Laboratory
+//! ([`MYHEALTH_EU_LABORATORY`]) so carries the LOINC code of a result recorded
+//! in NPU. A bound concept no translation reaches is an [`Unbound`] outcome.
 //!
 //! A translator given a language ([`Translator::with_designations`]) gives
 //! each coding a translation adds the server's designation in that language,
@@ -103,7 +105,13 @@ pub struct Binding {
 /// The MyHealth@EU Core 1.0.1 required bindings that take no SNOMED CT code.
 ///
 /// Each names the system its members come from in the Master Value Sets
-/// Catalogue 9.1.0 Core depends on.
+/// Catalogue 9.1.0 Core depends on. The Hospital Discharge Report 9.2.0 and
+/// Vaccination 10.0.0-preview guides add no binding beyond these on an element
+/// the shipped mappings write: the discharge report's `Condition.code` is the
+/// binding here and its `Condition.bodySite` takes SNOMED CT
+/// (`eHDSIBodySiteWithExceptions`); the vaccination's `Immunization.vaccineCode`
+/// takes SNOMED CT and ATC (`eHDSIVaccine`), and no shipped mapping writes its
+/// `Immunization.protocolApplied.targetDisease`.
 // NOTE: MyHealth@EU Core 1.0.1 binds Condition.code to eHDSIProblemWithExceptions (ICD-10
 // members) and AllergyIntolerance.code to eHDSIAllergenWithExceptions (ATC drug members).
 pub const MYHEALTH_EU_CORE: [Binding; 2] = [
@@ -119,6 +127,36 @@ pub const MYHEALTH_EU_CORE: [Binding; 2] = [
     },
 ];
 
+/// The MyHealth@EU Laboratory 9.2.0 required bindings, on elements the shipped
+/// mappings write, whose value set takes no system a source records beside it.
+///
+/// `Observation-resultslab-lab-myhealtheu` binds `Observation.code`, and
+/// `ServiceRequest-lab-myhealtheu` binds `ServiceRequest.code`, to
+/// `eHDSILabCodeWithExceptions`, whose members are LOINC codes (MyHealth@EU
+/// Core 1.0.1 over the Master Value Sets Catalogue 9.1.0 the guide depends
+/// on), so a result recorded in NPU is asked for its LOINC code. The guide's
+/// other required bindings on written elements take SNOMED CT, the system the
+/// source records them in, and need no translation: `Observation.value[x]`
+/// (`eHDSIResultsCodedValueLaboratory`), `Observation.method`
+/// (`eHDSILabTechniqueWithExceptions`), `Specimen.type`
+/// (`eHDSILabSpecimenTypeWithExceptions`), `Specimen.collection.bodySite`
+/// (`eHDSIBodySiteWithExceptions`) and `ServiceRequest.reasonCode`
+/// (`eHDSIOrderReasonWithExceptions`, ICD-10, SNOMED CT and Orphacode). The
+/// report's `DiagnosticReport.code` and the composition's type and category
+/// are LOINC codes the document assembly writes.
+pub const MYHEALTH_EU_LABORATORY: [Binding; 2] = [
+    Binding {
+        element: "Observation.code",
+        value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSILabCodeWithExceptions",
+        systems: &[ehn::LOINC],
+    },
+    Binding {
+        element: "ServiceRequest.code",
+        value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSILabCodeWithExceptions",
+        systems: &[ehn::LOINC],
+    },
+];
+
 /// A concept at a bound element that carries no coding in the binding's
 /// systems after translation: the typed outcome of a mapping the server
 /// does not make.
@@ -128,6 +166,17 @@ pub struct Unbound {
     pub location: String,
     /// The binding the concept does not meet.
     pub binding: Binding,
+    /// The concept's codings, as system and code.
+    pub originals: Vec<(String, String)>,
+}
+
+/// A concept in no preferred system that no translation covered: where it
+/// is and its codings, the mapping gap a run report counts and a consumer
+/// finds again in the resource by its location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Untranslated {
+    /// Where the concept is, as an element path with indexes.
+    pub location: String,
     /// The concept's codings, as system and code.
     pub originals: Vec<(String, String)>,
 }
@@ -155,7 +204,7 @@ pub struct Translator<'t> {
     english: bool,
     designations: Option<&'t str>,
     mapped: Vec<Mapping>,
-    unmapped: Vec<(String, String)>,
+    unmapped: Vec<Untranslated>,
     unbound: Vec<Unbound>,
 }
 
@@ -231,10 +280,10 @@ impl<'t> Translator<'t> {
         &self.mapped
     }
 
-    /// Returns each original coding, as system and code, of a concept no
-    /// translation covered: the mapping gaps the run report counts.
+    /// Returns each concept in no preferred system that no translation
+    /// covered, with its location and its original codings.
     #[must_use]
-    pub fn unmapped(&self) -> &[(String, String)] {
+    pub fn unmapped(&self) -> &[Untranslated] {
         &self.unmapped
     }
 
@@ -298,7 +347,10 @@ impl<'t> Translator<'t> {
             })?;
             if added.is_empty() {
                 if !concept.preferred {
-                    self.unmapped.extend(concept.originals.iter().cloned());
+                    self.unmapped.push(Untranslated {
+                        location: concept.location.clone(),
+                        originals: concept.originals.clone(),
+                    });
                     if self.english {
                         changed |= self.designate(codings, "en").await?;
                     }
@@ -507,19 +559,7 @@ fn untranscoded<'t>(
 
 /// Returns the `coding` array of the concept `steps` reach from `object`.
 fn codings_at<'o>(object: &'o mut Object, steps: &[Step]) -> Option<&'o mut Vec<Value>> {
-    let (first, rest) = steps.split_first()?;
-    let Step::Key(key) = first else {
-        return None;
-    };
-    let mut node = object.get_mut(key)?;
-    for step in rest {
-        node = match (step, node) {
-            (Step::Key(key), Value::Object(inner)) => inner.get_mut(key)?,
-            (Step::Index(index), Value::Array(items)) => items.get_mut(*index)?,
-            _ => return None,
-        };
-    }
-    let Value::Object(concept) = node else {
+    let Value::Object(concept) = walk::value_at(object, steps)? else {
         return None;
     };
     match concept.get_mut("coding")? {

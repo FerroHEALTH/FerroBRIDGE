@@ -32,6 +32,10 @@ pub struct Hl7v2 {
     pub frame_timeout: Duration,
     /// The largest message one frame may carry, in bytes.
     pub frame_limit: ByteSize,
+    /// How long the answer to a PID-3 assigning authority's identifier
+    /// `NamingSystem` search is held across messages before the next message
+    /// naming it searches again; `0` searches on every message.
+    pub authority_max_age: Duration,
     /// The TLS the MLLP listener serves, with the client certificates it
     /// requires; unset, no TLS listener runs.
     pub tls: Hl7v2Tls,
@@ -74,6 +78,7 @@ impl Default for Hl7v2 {
             idle_timeout: Duration::from_secs(300),
             frame_timeout: Duration::from_secs(30),
             frame_limit: ByteSize::from_mib(1),
+            authority_max_age: Duration::from_secs(600),
             tls: Hl7v2Tls::default(),
             plain: None,
         }

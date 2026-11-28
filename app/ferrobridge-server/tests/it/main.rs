@@ -46,6 +46,7 @@ mod omop;
 mod operations;
 mod operator;
 mod post_quantum;
+mod pseudonym_cache;
 mod quality;
 mod readiness;
 mod run;

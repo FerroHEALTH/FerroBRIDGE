@@ -50,6 +50,14 @@ pub struct CodeSystemLookupRequest {
     /// provide additional designations that may be indicated by, for example,
     /// the displayLanguage parameter
     pub use_supplement: Vec<super::super::primitives::Canonical>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. Whether each \`postcoordination\` property lists
+    /// every axis the code declares, valued or not, with \`required\`,
+    /// \`allowMultipleValues\` and \`valueSet\`; by default only \`axis\` and
+    /// \`value\` of the valued axes (ICD-11 and ICF, \`icd-11.html\`,
+    /// Properties).
+    pub post_coordination_metadata: Option<super::super::primitives::Boolean>,
 }
 
 /// The `out` parameters of `CodeSystem/$lookup`.
@@ -170,6 +178,7 @@ impl CodeSystemLookupRequest {
         let mut field_display_language: Option<super::super::primitives::Code> = None;
         let mut field_property: Vec<super::super::primitives::Code> = Vec::new();
         let mut field_use_supplement: Vec<super::super::primitives::Canonical> = Vec::new();
+        let mut field_post_coordination_metadata: Option<super::super::primitives::Boolean> = None;
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -482,6 +491,36 @@ impl CodeSystemLookupRequest {
                         }
                     });
                 }
+                "post-coordination-metadata" => {
+                    if field_post_coordination_metadata.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "post-coordination-metadata",
+                        });
+                    }
+                    field_post_coordination_metadata = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::Boolean(
+                            value,
+                        )) => value.clone(),
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "post-coordination-metadata",
+                                    expected: "Boolean",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "post-coordination-metadata",
+                                },
+                            );
+                        }
+                    });
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -501,12 +540,13 @@ impl CodeSystemLookupRequest {
             display_language: field_display_language,
             property: field_property,
             use_supplement: field_use_supplement,
+            post_coordination_metadata: field_post_coordination_metadata,
         })
     }
     /// Writes the fields as a parameter list, by move.
     #[must_use]
     pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
-        let mut out = Vec::with_capacity(8);
+        let mut out = Vec::with_capacity(9);
         if let Some(value) = self.code {
             out.push(super::super::parameters::ParametersParameter {
                 name: "code".into(),
@@ -572,6 +612,15 @@ impl CodeSystemLookupRequest {
             out.push(super::super::parameters::ParametersParameter {
                 name: "useSupplement".into(),
                 value: Some(super::super::parameters::ParametersParameterValue::Canonical(value)),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.post_coordination_metadata {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "post-coordination-metadata".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::Boolean(
+                    value,
+                )),
                 ..Default::default()
             });
         }
@@ -1752,6 +1801,18 @@ pub const CODE_SYSTEM_LOOKUP: super::super::super::operation::Operation =
                 type_code: Some("canonical"),
                 scope: &[],
                 source: super::super::super::operation::ParameterSource::PreAdopted,
+                parts: &[],
+            },
+            super::super::super::operation::Parameter {
+                name: "post-coordination-metadata",
+                usage: super::super::super::operation::ParameterUse::In,
+                cardinality: super::super::super::operation::Cardinality {
+                    min: 0,
+                    max: Some(1),
+                },
+                type_code: Some("boolean"),
+                scope: &[],
+                source: super::super::super::operation::ParameterSource::Ecosystem,
                 parts: &[],
             },
             super::super::super::operation::Parameter {

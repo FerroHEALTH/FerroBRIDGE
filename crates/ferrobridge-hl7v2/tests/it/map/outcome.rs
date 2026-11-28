@@ -69,7 +69,9 @@ async fn refusing(
     map(
         &support::parsed(&fixtures::adt_a01()),
         support::corpus(),
-        Some(&client),
+        Some(&ferrobridge_hl7v2::map::terminology::Terminology::new(
+            client,
+        )),
     )
     .await
 }
@@ -163,7 +165,9 @@ async fn a_refused_translation_fails_the_run_with_the_upstream_status() {
                 initial_backoff: std::time::Duration::from_millis(1),
                 max_backoff: std::time::Duration::from_millis(1),
             });
-    let client = ferrobridge_term::client::Client::new(config).expect("a client");
+    let client = ferrobridge_hl7v2::map::terminology::Terminology::new(
+        ferrobridge_term::client::Client::new(config).expect("a client"),
+    );
     let refused = map(&parsed, corpus, Some(&client)).await;
     assert!(
         matches!(
@@ -199,7 +203,9 @@ async fn an_stu3_terminology_client_is_refused_before_any_translation_is_sent() 
         .expect("a base url");
     let config =
         ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::Stu3);
-    let client = ferrobridge_term::client::Client::new(config).expect("a client");
+    let client = ferrobridge_hl7v2::map::terminology::Terminology::new(
+        ferrobridge_term::client::Client::new(config).expect("a client"),
+    );
     let refused = map(&parsed, corpus, Some(&client)).await;
     let Err(ferrobridge_hl7v2::map::MapError::Terminology { source, .. }) = refused else {
         panic!("an STU3 client fails the run: {refused:?}");

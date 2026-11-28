@@ -517,6 +517,9 @@ pub fn router(state: Arc<AppState>, server: &ServerSection) -> Router {
         if let Some(links) = state.links() {
             routes = routes.merge(shl::routes(Arc::clone(links), smart));
         }
+        if let Some(running) = state.pseudonyms() {
+            routes = routes.merge(identity_source::feed::routes(running, smart));
+        }
         if let Some(operator) = state.operator() {
             routes = routes.merge(operator::routes(
                 Arc::clone(operator),

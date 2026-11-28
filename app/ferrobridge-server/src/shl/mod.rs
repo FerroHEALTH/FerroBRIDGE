@@ -39,7 +39,7 @@ use ihe_atna::balp::Reserved;
 
 use crate::audit::AccessLog;
 use crate::facade::Facade;
-use crate::store::lease::{Lane, Leader, Lease};
+use crate::store::lease::{Kept, Lane, Lease};
 
 /// The path the person's routes sit under.
 pub const BASE: &str = "/shl";
@@ -150,48 +150,34 @@ impl Links {
         stop: &tokio::sync::watch::Receiver<bool>,
     ) -> tokio::task::JoinHandle<()> {
         let links = Arc::clone(self);
-        let mut stop = stop.clone();
-        tokio::spawn(async move {
-            let mut leader = Leader::new(Arc::new(links.sweep_lease.clone()));
-            let mut ticks = tokio::time::interval(SWEEP);
-            loop {
-                tokio::select! {
-                    biased;
-                    () = async {
-                        let _settled = stop.wait_for(|stopped| *stopped).await.is_ok();
-                    } => break,
-                    _tick = ticks.tick() => links.sweep(&mut leader).await,
-                }
-            }
-            if let Err(error) = leader.release().await {
-                tracing::warn!(reason = %crate::indicators::reason(&error), "the sweep lease could not be released; it runs out on its own");
-            }
-        })
+        crate::store::lease::spawn_led(
+            links.sweep_lease.clone(),
+            SWEEP,
+            "the link sweep",
+            stop,
+            move |term| {
+                let links = Arc::clone(&links);
+                async move { links.sweep(&term).await }
+            },
+        )
     }
 
     /// Removes every expired link and lapsed location now while this
     /// replica leads the sweep, recording each link that ends.
-    async fn sweep(&self, leader: &mut Leader) {
-        let term = match leader.lead().await {
-            Ok(Some(term)) => term,
-            Ok(None) => return,
-            Err(error) => {
-                tracing::warn!(reason = %crate::indicators::reason(&error), "the sweep lease could not be claimed");
-                return;
-            }
-        };
+    async fn sweep(&self, term: &crate::store::lease::Term) -> Kept {
         let now = jiff::Timestamp::now().as_second();
-        match self.store.sweep(&term, now).await {
+        match self.store.sweep(term, now).await {
             Ok(ended) => {
                 for gone in ended {
                     self.ended(&gone).await;
                 }
             }
-            Err(store::StoreError::Fenced(_)) => leader.lost(),
+            Err(store::StoreError::Fenced(_)) => return Kept::Lost,
             Err(error) => {
                 tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the link store could not be swept");
             }
         }
+        Kept::Held
     }
 
     /// Records that `gone` left the store, logging a record that cannot be

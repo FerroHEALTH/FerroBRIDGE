@@ -9,6 +9,7 @@ use ferrobridge_server::cdr::config::CdrCredentials;
 use ferrobridge_server::config::Config;
 use ferrobridge_server::config::Process;
 use ferrobridge_server::config::error::Error;
+use ferrohealth_smart::client::dpop::Role;
 use ferrohealth_smart::client::{ClientAuth, ClientCredentials, Endpoint};
 use ferrohealth_smart::config::ConfigError;
 use ferrohealth_smart::jws::algorithm::Algorithm;
@@ -293,6 +294,47 @@ fn an_ml_dsa_key_signs_a_client_assertion_its_published_key_verifies()
     let claims = decoded.verify_claims(&jwk)?;
     assert_eq!(Some("ferrobridge"), claims["iss"].as_str());
     assert_eq!(Some("https://as.example.org/token"), claims["aud"].as_str());
+    Ok(())
+}
+
+// NOTE: RFC 9449 §4.2 signs a proof with an asymmetric algorithm and carries its public key in
+// the `jwk` header, which RFC 9964 §3 writes as an `AKP` key for ML-DSA.
+#[test]
+fn an_ml_dsa_dpop_key_signs_a_proof_its_own_key_verifies() -> Result<(), Box<dyn std::error::Error>>
+{
+    let mut file = tempfile::NamedTempFile::new()?;
+    file.write_all(ml_dsa_pem()?.as_bytes())?;
+    let grant = grant(&text(
+        "",
+        &format!(
+            concat!(
+                "token_endpoint = \"https://as.example.org/token\"\n",
+                "client_id = \"ferrobridge\"\n",
+                "client_secret = \"synthetic-secret\"\n",
+                "dpop_key_file = {:?}\n",
+            ),
+            file.path()
+        ),
+    ))?;
+    let key = grant
+        .dpop_key()
+        .ok_or("the grant's tokens are bound to its key")?;
+    assert_eq!(Algorithm::MlDsa65, key.algorithm());
+    let url = url::Url::parse("https://cdr.example.org/ehr?x=1")?;
+    let proof = key.proof(&reqwest::Method::GET, &url, Role::Resource, Some("token"))?;
+    let decoded = compact::decode(&proof)?;
+    assert_eq!(Algorithm::MlDsa65, decoded.header().alg);
+    let carried = decoded
+        .header()
+        .jwk
+        .clone()
+        .ok_or("the proof carries its key")?;
+    assert_eq!(&carried, key.public_jwk());
+    let published = serde_json::to_value(&carried)?;
+    assert_eq!(Some("AKP"), published["kty"].as_str(), "{published}");
+    let claims = decoded.verify_claims(&carried)?;
+    assert_eq!(Some("GET"), claims["htm"].as_str());
+    assert_eq!(Some("https://cdr.example.org/ehr"), claims["htu"].as_str());
     Ok(())
 }
 

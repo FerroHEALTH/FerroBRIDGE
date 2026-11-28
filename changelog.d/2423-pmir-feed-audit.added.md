@@ -1,0 +1,1 @@
+- Under `[audit]`, the bridge records each ITI-93 message its PMIR feed receiver takes, as the Patient Identity Consumer's feed audit profile fixes it (PMIR 1.6.0 §2:3.93.5.1), and refuses with `503` a message whose receipt it cannot record, so the identity source sends it again (#2423).

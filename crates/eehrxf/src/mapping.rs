@@ -20,9 +20,11 @@ use std::path::Path;
 
 use fhir_types::codec::{Json, Object, Value};
 use fhir_types::r4::bundle::{Bundle, BundleEntry};
+use fhir_types::r4::operation_outcome::OperationOutcome;
 use fhir_types::r4::resource::Resource;
 use fhir_types::r4::schema::SCHEMAS;
 use fhirconnect::engine::context::CallContext;
+use fhirconnect::engine::outcome::Location;
 use fhirconnect::engine::outcome::Loss;
 use fhirconnect::engine::outcome::Warning;
 use fhirconnect::engine::seam::Seams;
@@ -34,6 +36,7 @@ use fhirconnect::operations::contract::CompositionPayload;
 use fhirconnect::operations::contract::ToFhirRequest;
 use fhirconnect::operations::contract::ToFhirResponse;
 use fhirconnect::operations::error::OperationError;
+use fhirconnect::operations::issues;
 use fhirconnect::operations::programs::ProgramSet;
 use fhirconnect::operations::programs::ProgramSetError;
 use fhirconnect::operations::run;
@@ -50,6 +53,7 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::mappings::Note;
 use crate::mappings::Project;
+use crate::terminology::system::rewrite_systems;
 use crate::transformation::Pin;
 
 /// FHIRconnect context mappings compiled against one operational template.
@@ -309,7 +313,8 @@ impl Mapping {
     /// object without `_type` (a flat composition), and
     /// [`MappingError::Run`] when it does not parse, names a template the
     /// mapping was not compiled against, or carries an element the mapping
-    /// cannot carry.
+    /// cannot carry, and [`MappingError::System`] when a mapped resource
+    /// holds an element the R4 element table does not describe.
     pub fn to_fhir(
         &self,
         composition: &str,
@@ -343,6 +348,8 @@ impl Mapping {
     /// Runs the mapping as [`Mapping::to_fhir_with`] does, and answers beside
     /// the Bundle the losses the run declared, typed, in the order the engine
     /// raised them: the same losses the Bundle's `OperationOutcome` renders.
+    /// A composition-level comment the shipped project declares
+    /// ([`Project::note`]) that no mapping carries is declared unread last.
     ///
     /// # Errors
     ///
@@ -371,6 +378,10 @@ impl Mapping {
             return Err(MappingError::NotCanonical);
         }
         let template = payload.template_id();
+        let commented = match (&payload, self.note) {
+            (CompositionPayload::Canonical(object), Some(note)) => holds_note(object, &note),
+            _ => false,
+        };
         let request = ToFhirRequest::new(payload);
         let request = match context {
             Some(context) => request.with_context(context),
@@ -388,16 +399,89 @@ impl Mapping {
         )
         .map_err(refused)?
         .into_parts();
+        let mut warnings = warnings;
+        let mut bundle = response.into_bundle();
+        if let Some(note) = self.note.filter(|_| commented) {
+            declare_note(&note, &mut warnings, &mut bundle);
+        }
         let template = template.ok_or_else(|| refused(OperationError::CanonicalTemplate))?;
         let program = select_by_template(self.programs.programs(), &template)
             .map_err(|source| refused(OperationError::Select { source }))?;
-        let mut bundle = response.into_bundle();
         claim(
             &mut bundle,
             program.resource().as_str(),
             program.profile().url().as_str(),
         )?;
+        systems(&mut bundle)?;
         Ok((ToFhirResponse::new(bundle), warnings))
+    }
+}
+
+/// Whether the canonical composition `object` holds the comment `note`
+/// declares.
+fn holds_note(object: &serde_json::Map<String, serde_json::Value>, note: &Note) -> bool {
+    let Some(tree) = object
+        .get("context")
+        .and_then(|context| context.get("other_context"))
+        .filter(|tree| {
+            tree.get("archetype_node_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(note.tree)
+        })
+    else {
+        return false;
+    };
+    tree.get("items")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|items| {
+            items.iter().any(|item| {
+                item.get("archetype_node_id")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(note.element)
+            })
+        })
+}
+
+// NOTE: no specification governs this: our own design; a run declares unread only what lies under
+// a node its mappings read, so the comment the bridge writes on receive is declared here.
+/// Declares the comment `note` names left unread, in `warnings` and in the
+/// `OperationOutcome` of `bundle`, unless the run already named it.
+fn declare_note(note: &Note, warnings: &mut Vec<Warning>, bundle: &mut Bundle) {
+    let element = note.element_path();
+    let named = warnings.iter().any(|warning| {
+        matches!(*warning.loss(), Loss::Unread { .. })
+            && warning.location().openehr().is_some_and(|path| {
+                path.strip_prefix(&element)
+                    .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+            })
+    });
+    if named {
+        return;
+    }
+    let warning = Warning::new(
+        Loss::Unread {
+            node: note.element.to_owned(),
+        },
+        Location::default().with_openehr(note.value_path()),
+    );
+    let issue = issues::of_warning(&warning);
+    warnings.push(warning);
+    let outcome = bundle
+        .entry
+        .iter_mut()
+        .find_map(|entry| match entry.resource {
+            Some(Resource::OperationOutcome(ref mut outcome)) => Some(outcome),
+            _ => None,
+        });
+    match outcome {
+        Some(outcome) => outcome.issue.push(issue),
+        None => bundle.entry.push(BundleEntry {
+            resource: Some(Resource::OperationOutcome(Box::new(OperationOutcome {
+                issue: vec![issue],
+                ..OperationOutcome::default()
+            }))),
+            ..BundleEntry::default()
+        }),
     }
 }
 
@@ -448,6 +532,35 @@ fn claim(bundle: &mut Bundle, resource_type: &str, profile: &str) -> Result<(), 
         Err(claim_error(Unclaimable(
             "the run wrote no resource of the mapped type",
         )))
+    }
+}
+
+/// Writes, in every mapped resource of `bundle`, the FHIR system URI of each
+/// coding whose `system` is the openEHR terminology id the run read.
+// NOTE: FHIR R4 terminologies-systems.html names the URI of each code system, and a
+// Coding.system is that URI; the run writes the CODE_PHRASE.terminology_id name as recorded.
+fn systems(bundle: &mut Bundle) -> Result<(), MappingError> {
+    for resource in bundle
+        .entry
+        .iter_mut()
+        .filter_map(|entry| entry.resource.as_mut())
+    {
+        let mut object = Json::to_json(&*resource).map_err(system_error)?;
+        let kind = text(&object, "resourceType")
+            .unwrap_or("Resource")
+            .to_owned();
+        if rewrite_systems(&mut object, &kind).map_err(system_error)? {
+            *resource = Resource::from_json(&object, &mut fhir_types::codec::Path::root(&kind))
+                .map_err(system_error)?;
+        }
+    }
+    Ok(())
+}
+
+/// The system failure `source`.
+fn system_error(source: impl std::error::Error + Send + Sync + 'static) -> MappingError {
+    MappingError::System {
+        source: Box::new(source),
     }
 }
 
@@ -674,6 +787,14 @@ pub enum MappingError {
         path: String,
         /// The RM type the template constrains the node to.
         rm_type: String,
+    },
+    /// The coding systems of a mapped resource could not be written as FHIR
+    /// system URIs.
+    #[error("a mapped resource's coding systems cannot be written as FHIR system URIs")]
+    System {
+        /// The encoding or walk failure.
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
 }
 

@@ -194,9 +194,16 @@ can run it, and the plain listener when you cannot.
    answered `AR` here and is never mapped.
 3. The guide's message, segment and data type maps, with FerroBRIDGE's
    corrections over them, write an R4 message Bundle, and each table value is
-   translated by `ConceptMap/$translate` on the terminology server. Every row
-   the run cannot carry is a counted outcome, and every correction the run
-   used is counted once as `supplemented`.
+   translated by `ConceptMap/$translate` on the terminology server. A PID-3
+   assigning authority with no ISO or UUID universal id takes its identifier
+   system from the terminology server's identifier registry,
+   `NamingSystem?kind=identifier&value=<authority>`. The answer (one system,
+   none, or more than one) is held for `authority_max_age`, 10 minutes by
+   default, so a steady feed searches once per authority in that period, and
+   a registration changed on the server is in force within it. A refused or
+   unreachable search is never held. Every row the run cannot carry is a
+   counted outcome, and every correction the run used is counted once as
+   `supplemented`.
 4. Every entry whose resource type the source lists under `profiles` and that claims
    no profile gets that profile in `meta.profile`, and every entry with a
    `subject` or `patient` reference and none set references the message's one

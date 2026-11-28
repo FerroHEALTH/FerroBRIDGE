@@ -248,11 +248,13 @@ fn the_inverse_and_the_single_map_run_on_a_multi_threaded_runtime() {
     fn spawnable<F: Future + Send>(_: &F) {}
     let corpus = support::shipped();
     // The futures are only built, never polled, so the client reaches no server.
-    let terminology = ferrobridge_term::client::Client::new(ferrobridge_term::config::Config::new(
-        "http://127.0.0.1:9/r4".parse().expect("a base url"),
-        ferrobridge_term::config::WireVersion::R4,
-    ))
-    .expect("a client");
+    let terminology = ferrobridge_hl7v2::map::terminology::Terminology::new(
+        ferrobridge_term::client::Client::new(ferrobridge_term::config::Config::new(
+            "http://127.0.0.1:9/r4".parse().expect("a base url"),
+            ferrobridge_term::config::WireVersion::R4,
+        ))
+        .expect("a client"),
+    );
     let patient = json(r#"{"resourceType": "Patient"}"#);
     spawnable(&segment(&patient, pid_2_5(), corpus, Some(&terminology)));
     let parsed = support::parsed(&fixtures::message(&[

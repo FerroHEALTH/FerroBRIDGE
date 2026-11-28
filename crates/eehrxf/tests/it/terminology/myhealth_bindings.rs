@@ -1,0 +1,192 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
+//! The MyHealth@EU Laboratory 9.2.0 binding set held against the guide and
+//! the value sets it binds, read from the packages
+//! `scripts/vendor/profile-packages.sh` fetches: each binding the set carries
+//! is a `required` binding of the guide whose value set draws on exactly the
+//! systems the binding names, and each one left out draws on SNOMED CT, the
+//! system the source records it in. The value sets resolve through MyHealth@EU
+//! Core 1.0.1 and the Master Value Sets Catalogue 9.1.0 the guide depends on.
+
+#![expect(
+    clippy::panic_in_result_fn,
+    reason = "a test asserts, and returns its setup errors"
+)]
+
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::error::Error;
+use std::path::PathBuf;
+
+use eehrxf::terminology::ehn;
+use eehrxf::terminology::translation::MYHEALTH_EU_LABORATORY;
+use serde_json::Value;
+
+use crate::support::profile_set;
+
+/// The guide.
+const LABORATORY: &str = "myhealth.eu.fhir.laboratory#9.2.0";
+
+/// The packages the guide's value sets resolve in.
+const VALUE_SETS: [&str; 2] = [
+    "myhealth.eu.fhir.core#1.0.1",
+    "myhealth.eu.fhir.mvc-package#9.1.0",
+];
+
+/// The code system of the exceptional values every `WithExceptions` value set
+/// adds, in which no source records a concept.
+const NULL_FLAVOR: &str = "http://terminology.hl7.org/CodeSystem/v3-NullFlavor";
+
+/// The guide's required bindings on elements the shipped mappings write that
+/// the set leaves out, each element with its value set.
+const LEFT_OUT: [(&str, &str); 5] = [
+    ("Observation.value[x]", "eHDSIResultsCodedValueLaboratory"),
+    ("Observation.method", "eHDSILabTechniqueWithExceptions"),
+    ("Specimen.type", "eHDSILabSpecimenTypeWithExceptions"),
+    (
+        "Specimen.collection.bodySite",
+        "eHDSIBodySiteWithExceptions",
+    ),
+    (
+        "ServiceRequest.reasonCode",
+        "eHDSIOrderReasonWithExceptions",
+    ),
+];
+
+/// The root the packages are fetched under.
+fn packages() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/specs/fhir-packages")
+}
+
+/// Every JSON resource of `kind` in `package`.
+fn resources(package: &str, kind: &str) -> Result<Vec<Value>, Box<dyn Error>> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(packages().join(package).join("package"))? {
+        let path = entry?.path();
+        let named = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(&format!("{kind}-")))
+            && path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"));
+        if named {
+            found.push(serde_json::from_str(&std::fs::read_to_string(&path)?)?);
+        }
+    }
+    Ok(found)
+}
+
+/// The guide's `required` bindings, by element path, each with its value set.
+fn required_bindings() -> Result<BTreeSet<(String, String)>, Box<dyn Error>> {
+    let mut found = BTreeSet::new();
+    for profile in resources(LABORATORY, "StructureDefinition")? {
+        let elements = profile["differential"]["element"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for element in elements {
+            if element["binding"]["strength"] == "required"
+                && let (Some(path), Some(value_set)) = (
+                    element["path"].as_str(),
+                    element["binding"]["valueSet"].as_str(),
+                )
+            {
+                found.insert((path.to_owned(), value_set.to_owned()));
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// The value sets of [`VALUE_SETS`], by canonical URL.
+fn value_sets() -> Result<BTreeMap<String, Value>, Box<dyn Error>> {
+    let mut found = BTreeMap::new();
+    for package in VALUE_SETS {
+        for value_set in resources(package, "ValueSet")? {
+            if let Some(url) = value_set["url"].as_str() {
+                found.entry(url.to_owned()).or_insert(value_set);
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// The code systems the value set `url` draws on, through the value sets it
+/// includes, without the exceptional values.
+fn systems(sets: &BTreeMap<String, Value>, url: &str) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    let value_set = sets
+        .get(url.split('|').next().unwrap_or(url))
+        .ok_or_else(|| format!("no package holds the value set {url}"))?;
+    let mut found = BTreeSet::new();
+    let includes = value_set["compose"]["include"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    for include in includes {
+        if let Some(system) = include["system"].as_str()
+            && system != NULL_FLAVOR
+        {
+            found.insert(system.to_owned());
+        }
+        for nested in include["valueSet"].as_array().cloned().unwrap_or_default() {
+            let nested = nested.as_str().ok_or("a value set canonical")?;
+            found.extend(systems(sets, nested)?);
+        }
+    }
+    Ok(found)
+}
+
+#[test]
+fn each_laboratory_binding_is_a_required_binding_of_the_guide_on_its_systems()
+-> Result<(), Box<dyn Error>> {
+    if profile_set()?.is_none() {
+        return Ok(());
+    }
+    let required = required_bindings()?;
+    let sets = value_sets()?;
+    for binding in &MYHEALTH_EU_LABORATORY {
+        assert!(
+            required.contains(&(binding.element.to_owned(), binding.value_set.to_owned())),
+            "{} is not bound required to {}",
+            binding.element,
+            binding.value_set
+        );
+        let expected: BTreeSet<String> = binding.systems.iter().map(|s| (*s).to_owned()).collect();
+        assert_eq!(
+            systems(&sets, binding.value_set)?,
+            expected,
+            "{}",
+            binding.element
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn each_laboratory_binding_left_out_draws_on_snomed_ct() -> Result<(), Box<dyn Error>> {
+    if profile_set()?.is_none() {
+        return Ok(());
+    }
+    let required = required_bindings()?;
+    let sets = value_sets()?;
+    for (element, name) in LEFT_OUT {
+        let url = format!("http://fhir.ehdsi.eu/core/ValueSet/{name}");
+        assert!(
+            required.contains(&(element.to_owned(), url.clone())),
+            "{element} is not bound required to {name}"
+        );
+        assert!(
+            systems(&sets, &url)?.contains(ehn::SNOMED_CT),
+            "{element}: {name} takes no SNOMED CT code"
+        );
+        assert!(
+            MYHEALTH_EU_LABORATORY
+                .iter()
+                .all(|binding| binding.element != element),
+            "{element} is left out"
+        );
+    }
+    Ok(())
+}

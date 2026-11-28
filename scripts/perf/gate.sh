@@ -87,10 +87,19 @@ readonly PIX=http://127.0.0.1:18110
 # The client FerroPIX trusts as the Source of the subjects' domains, which
 # seeds the plan's subjects over ITI-104.
 readonly PIX_SOURCE=ferrobridge-perf-source
+# The client FerroPIX sends the head arm's PMIR feed as, which the arm's
+# [identity_source.cache] feed_clients admits.
+readonly FEED_CLIENT=ferropix-perf
+# The client the request set and the seeds call each facade as.
+readonly LOAD_CLIENT=ferrobridge-perf-load
 # The domain of the ORU^R01's PID-3, whose assigning authority is an ISO OID.
 readonly V2_SUBJECTS=urn:oid:2.999.1.7
 # The pseudonym domain the head arm's EHRs are keyed in.
 readonly PSEUDONYMS=urn:oid:2.999.9
+# The most ITI-83 queries the run may send FerroPIX while every cached arm's
+# pseudonym cache serves: the plan names three subjects, each asked again
+# after a feed message or the cache's max_age (#2425).
+readonly ITI83_CEILING=100
 # FerroPIX's configuration and its two throwaway secrets, outside $WORK so
 # the server's non-root user reads them.
 readonly PIX_FILES=target/perf-pix
@@ -612,7 +621,7 @@ identity() {
   # shellcheck disable=SC2016 # ${clientId} and ${scope} are the issuer's own template
   "$engine" run --quiet --detach --name "$ISSUER_NAME" --publish 127.0.0.1:18180:8080 \
     --env SERVER_PORT=8080 \
-    --env 'JSON_CONFIG={"tokenCallbacks":[{"issuerId":"perf","requestMappings":[{"requestParam":"grant_type","match":"client_credentials","typeHeader":"at+jwt","claims":{"sub":"${clientId}","client_id":"${clientId}","aud":["'"$PIX"'/fhir"],"scope":"${scope}"}}]}]}' \
+    --env 'JSON_CONFIG={"tokenCallbacks":[{"issuerId":"perf","requestMappings":[{"requestParam":"grant_type","match":"client_credentials","typeHeader":"at+jwt","claims":{"sub":"${clientId}","client_id":"${clientId}","aud":["'"$PIX"'/fhir","'"$(facade head)"'/fhir","'"$(facade base)"'/fhir"],"scope":"${scope}"}}]}]}' \
     "$issuer_image" > /dev/null
   "$engine" run --quiet --detach --name "$PIX_DB_NAME" --publish "127.0.0.1:$PIX_DB_PORT:5432" \
     --env POSTGRES_PASSWORD=postgres "$state_image" > /dev/null
@@ -628,9 +637,26 @@ identity() {
   mkdir -p "$files"
   printf 'postgresql://ferropix:ferropix@127.0.0.1:%s/ferropix?sslmode=disable' "$PIX_DB_PORT" > "$files/db-url"
   openssl rand -base64 32 | tr -d '\n' > "$files/data-key"
+  printf perf > "$files/feed-secret"
+  # The development profile admits the plain http loopback channel of the
+  # head arm's PMIR feed receiver.
   cat > "$files/ferropix.toml" <<TOML
-profile = "production"
+profile = "development"
 public_base_url = "$PIX"
+
+[dev]
+
+[pmir]
+enabled = true
+
+[[pmir.feed.consumers]]
+url = "$(facade head)/pmir/feed"
+
+[pmir.feed.consumers.credentials.oauth]
+issuer = "$ISSUER"
+client_id = "$FEED_CLIENT"
+client_secret_file = "/run/ferropix/feed-secret"
+scope = "system/Patient.rs"
 
 [db]
 url_file = "/run/ferropix/db-url"
@@ -698,6 +724,19 @@ TOML
 # perf/ferrobridge.toml naming [identity_source].
 pseudonymous() {
   grep -q '^\[identity_source\]' "$1/$CONFIG"
+}
+
+# cached TREE: whether TREE's bridge caches its identity source's answers,
+# its perf/ferrobridge.toml naming [identity_source.cache].
+cached() {
+  grep -q '^\[identity_source\.cache\]' "$1/$CONFIG"
+}
+
+# iti83_asked: how many ITI-83 queries the arms' client sent, read from
+# FerroPIX's request log on stdin.
+iti83_asked() {
+  # shellcheck disable=SC2016 # $ihe-pix is the route's own text
+  { grep -F '"route":"/fhir/Patient/$ihe-pix"' || true; } | { grep -c -F '"caller":"ferrobridge-perf"' || true; }
 }
 
 # pseudonym VALUE: the head arm's pseudonym of the subject VALUE of the
@@ -795,6 +834,7 @@ seed() {
   local arm="$1" status
   status="$(condition synthetic-subject-perf-read | curl --silent --output "$WORK/$arm/seed.json" \
     --write-out '%{http_code}' --header 'content-type: application/fhir+json' \
+    --header "authorization: Bearer $load_token" \
     --data-binary @- "$(facade "$arm")/fhir/Condition")"
   [[ "$status" = 201 ]] ||
     die "the $arm facade answered $status to the seed: $(head -c 400 "$WORK/$arm/seed.json")"
@@ -846,7 +886,10 @@ run() {
   command -v ferrohealth-perf > /dev/null || die "ferrohealth-perf is not on PATH"
   trap cleanup EXIT
   start
-  local head_id base_id body search head_search base_search code=0 arm
+  local head_id base_id body search head_search base_search code=0 arm load_token
+  # An arm without [auth] ignores the token.
+  load_token="$(token "$LOAD_CLIENT" "system/Condition.cruds system/Observation.cruds")" ||
+    die "the stub issuer signed no load token"
   head_id="$(seed head)" || exit 2
   base_id="$(seed base)" || exit 2
   body="$(condition synthetic-subject-perf-write)"
@@ -865,14 +908,26 @@ run() {
       printf 'The head arm asks a FerroPIX identity source over ITI-83 for every subject it resolves; this base, from before the facade needed one, does not, so a head-over-base rise in the facade groups includes that round trip.\n\n' >> "$GITHUB_STEP_SUMMARY"
     echo "perf-gate: the head arm asks FerroPIX over ITI-83 for every subject it resolves; a rise over this base, which has no identity source, includes that round trip"
   fi
+  local asked
+  asked="$("$engine" logs "$PIX_NAME" 2>&1 | iti83_asked)"
   ferrohealth-perf ab --plan "$PLAN" \
     --base-url "$(facade base)" --base-pid "$base_pid" \
     --base-mllp-address "127.0.0.1:$(port base mllp)" --base-database-url "$(admin_url base)" \
     --base-var "READ_ID=$base_id" --base-var "CREATE_BODY=$body" --base-var "SEARCH=$base_search" \
+    --base-var "TOKEN=$load_token" \
     --head-url "$(facade head)" --head-pid "$head_pid" \
     --head-mllp-address "127.0.0.1:$(port head mllp)" --head-database-url "$(admin_url head)" \
     --head-var "READ_ID=$head_id" --head-var "CREATE_BODY=$body" --head-var "SEARCH=$head_search" \
+    --head-var "TOKEN=$load_token" \
     --out-dir target/perf || code=$?
+  asked=$(($("$engine" logs "$PIX_NAME" 2>&1 | iti83_asked) - asked))
+  echo "perf-gate: the arms sent FerroPIX $asked ITI-83 queries while measured"
+  [[ -z "${GITHUB_STEP_SUMMARY:-}" ]] ||
+    printf 'The arms sent FerroPIX %s ITI-83 queries while measured.\n\n' "$asked" >> "$GITHUB_STEP_SUMMARY"
+  if { ! pseudonymous "$root/$BASE_TREE/src" || cached "$root/$BASE_TREE/src"; } && [[ "$asked" -gt "$ITI83_CEILING" ]]; then
+    echo "perf-gate: more than $ITI83_CEILING ITI-83 queries: the head arm's pseudonym cache did not serve" >&2
+    [[ "$code" -ne 0 ]] || code=1
+  fi
   busy_loop || { [[ "$code" -ne 0 ]] || code=1; }
   if [[ "$code" -ne 0 ]]; then
     for arm in head base; do
@@ -906,8 +961,8 @@ self_test() {
   done
   printf "path = \"/x/@READ_ID@/@A_1@\"\nbody = 'a@b.org @lower@ @READ_ID@'\n" > "$work/plan.toml"
   check "the placeholders are read once each" "$(printf 'A_1\nREAD_ID')" "$(placeholders "$work/plan.toml")"
-  check "the committed plan holds the three placeholders the gate gives each arm" \
-    "$(printf 'CREATE_BODY\nREAD_ID\nSEARCH')" "$(placeholders "$root/$PLAN")"
+  check "the committed plan holds the four placeholders the gate gives each arm" \
+    "$(printf 'CREATE_BODY\nREAD_ID\nSEARCH\nTOKEN')" "$(placeholders "$root/$PLAN")"
   check "the seeded Condition names its subject and the profile" \
     "$PROFILE s-1" "$(condition s-1 | jq --raw-output '"\(.meta.profile[0]) \(.subject.identifier.value)"')"
   check "the seeded Condition carries no id" null "$(condition s-1 | jq --raw-output '.id')"
@@ -917,6 +972,17 @@ self_test() {
   check "a tree naming an identity source is pseudonymous" 1 "$(pseudonymous "$work/pseudonymous" && echo 1 || echo 0)"
   check "a tree naming none is not" 0 "$(pseudonymous "$work/plain" && echo 1 || echo 0)"
   check "this tree names one" 1 "$(pseudonymous "$root" && echo 1 || echo 0)"
+  printf '[identity_source.cache]\nfeed_url = "x"\n' >> "$work/pseudonymous/$CONFIG"
+  check "a tree naming a cache caches" 1 "$(cached "$work/pseudonymous" && echo 1 || echo 0)"
+  check "a tree naming none does not" 0 "$(cached "$work/plain" && echo 1 || echo 0)"
+  check "this tree caches" 1 "$(cached "$root" && echo 1 || echo 0)"
+  # shellcheck disable=SC2016 # $ihe-pix is the route's own text
+  check "only the arms' ITI-83 queries are counted" 2 "$(printf '%s\n' \
+    '{"route":"/fhir/Patient/$ihe-pix","caller":"ferrobridge-perf"}' \
+    '{"route":"/fhir/Patient/$ihe-pix","caller":"ferrobridge-perf-source"}' \
+    '{"route":"/fhir/Patient","caller":"ferrobridge-perf"}' \
+    '{"route":"/fhir/Patient/$ihe-pix","status":200,"caller":"ferrobridge-perf"}' | iti83_asked)"
+  check "an empty log counts none" 0 "$(iti83_asked < /dev/null)"
   check "the arms listen apart" "18080 18081 12575 12576" \
     "$(port head facade) $(port base facade) $(port head mllp) $(port base mllp)"
   local file

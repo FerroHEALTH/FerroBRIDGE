@@ -837,6 +837,44 @@ pseudonym_domain = "https://example.org/fhir/sid/pseudonym"
 source_domains = ["http://fhir.nl/fhir/NamingSystem/bsn", "https://example.org/fhir/sid/mrn"]
 ```
 
+### `[identity_source.cache]`
+
+Each replica can keep the pseudonyms the identity source answered, so a
+repeated subject costs no ITI-83 round trip. An answer changes when the
+identity source merges, unmerges, links or deletes a patient, so the cache
+serves only while the identity source's PMIR feed reaches the bridge:
+
+- One replica holds the deployment's ITI-94 subscription, which asks for
+  every Patient change to be sent to `feed_url`. It reads the subscription's
+  status every `status_every`.
+- The bridge receives each ITI-93 message at `POST /pmir/feed`. It forgets
+  the identifiers of every updated patient on every replica before it
+  acknowledges the message. A merge or a delete may name the person without
+  the identifiers that resolved to it, so it forgets every pseudonym.
+- While the subscription is not `active`, its status is older than two
+  periods, or a replica's `LISTEN` session is down, every lookup asks the
+  identity source, and the replica drops what it held, since a message may
+  have been missed meanwhile. An entry also lives at most `max_age`.
+
+The receiver admits only an access token whose `client_id` is in
+`feed_clients`, so the table needs `[auth]`. It also needs `[state]` with
+`[state.seal]`: the subscription is held there, and a source identifier is
+kept as its HMAC under the lookup key.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `entries` | `10000` | The most pseudonyms one replica keeps, at least 1 |
+| `max_age` | `5m` | The longest one pseudonym is kept, whatever the feed says |
+| `feed_url` | none, required | This bridge's `/pmir/feed` route as the identity source reaches it: the subscription's channel endpoint |
+| `feed_clients` | none, required | The client ids of the identity source's access tokens the receiver admits |
+| `status_every` | `30s` | How often the subscription's holder reads its status |
+
+```toml
+[identity_source.cache]
+feed_url = "https://bridge.example.org/pmir/feed"
+feed_clients = ["ferropix"]
+```
+
 ### `[facade]`
 
 The FHIR R4 facade. It is off until `enabled` is true, and a disabled facade
@@ -1484,6 +1522,7 @@ it answers.
 | `idle_timeout` | `"5min"` | How long a connection may sit between messages; `"0s"` keeps it open |
 | `frame_timeout` | `"30s"` | How long one frame may take to arrive whole; `"0s"` waits |
 | `frame_limit` | `"1MiB"` | The largest message one frame may carry |
+| `authority_max_age` | `"10min"` | How long the answer to a PID-3 assigning authority's identifier `NamingSystem` search is held across messages before the next message naming it searches again; `"0s"` searches on every message |
 | `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none | The PEM chain and key the TLS listener serves, and the authorities a sender's client certificate must chain to; the TLS listener runs when they are set. The authorities file is read again when its modification time changes, so a rotated file is in force for the next handshake without a restart |
 | `plain.bind` | none | The socket address of a second listener with no TLS, for the devices that cannot speak it; never the TLS listener's port |
 

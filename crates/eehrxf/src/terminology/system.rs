@@ -28,12 +28,18 @@
 //! `Coding.version`), only in the form the code system's versions take.
 //! [`fhir_version`] is that rule.
 
+use fhir_types::codec::Object;
+use fhir_types::codec::Value;
 use openehr_base::v1_3::base_types::definitions::definitions_impl::LOCAL_TERMINOLOGY_ID;
 use openehr_base::v1_3::base_types::identification::archetype_id::ArchetypeId;
 use openehr_base::v1_3::base_types::identification::lexical::IdError;
 use url::Url;
 
 use crate::terminology::ehn;
+use crate::terminology::walk;
+use crate::terminology::walk::Coded;
+use crate::terminology::walk::Step;
+use crate::terminology::walk::Unwalkable;
 
 /// The base of the system URI of each archetype's local terminology, which
 /// the archetype id completes.
@@ -160,4 +166,71 @@ fn is_dotted(version: &str) -> bool {
 /// Returns whether `text` is one or more ASCII digits.
 fn is_digits(text: &str) -> bool {
     !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+/// Rewrites every `Coding` of `resource`, a resource of type `kind` in FHIR
+/// JSON, whose `system` is an identifier of [`OPENEHR_NAMES`], to the system
+/// URI it names, its `version` kept only in the form [`fhir_version`] admits;
+/// answers whether any coding changed.
+///
+/// A FHIRconnect run writes a `CODE_PHRASE.terminology_id` name as the
+/// `Coding.system` it reads, so a code recorded under `SNOMED-CT` arrives
+/// here as `system` `SNOMED-CT`. The codings of the resources `resource`
+/// contains are rewritten too.
+///
+/// # Errors
+///
+/// [`Unwalkable`] for an element the R4 element table does not describe.
+pub(crate) fn rewrite_systems(resource: &mut Object, kind: &str) -> Result<bool, Unwalkable> {
+    let found: Vec<(Vec<Step>, bool)> = walk::coded(resource, kind, true)?
+        .into_iter()
+        .filter_map(|occurrence| match occurrence.value {
+            Coded::Coding(_) => Some((occurrence.steps, false)),
+            Coded::Concept(_) => Some((occurrence.steps, true)),
+            Coded::Code(_) => None,
+        })
+        .collect();
+    let mut changed = false;
+    for (steps, concept) in found {
+        let Some(Value::Object(node)) = walk::value_at(resource, &steps) else {
+            continue;
+        };
+        if concept {
+            if let Some(Value::Array(codings)) = node.get_mut("coding") {
+                for coding in codings {
+                    if let Value::Object(coding) = coding {
+                        changed |= rewrite_coding(coding);
+                    }
+                }
+            }
+        } else {
+            changed |= rewrite_coding(node);
+        }
+    }
+    Ok(changed)
+}
+
+/// Rewrites the `system` of `coding` when it is an identifier of
+/// [`OPENEHR_NAMES`], answering whether it did.
+fn rewrite_coding(coding: &mut Object) -> bool {
+    let Some(Value::String(name)) = coding.get("system") else {
+        return false;
+    };
+    let Some((_, uri)) = OPENEHR_NAMES.iter().find(|(known, _)| known == name) else {
+        return false;
+    };
+    let version = match coding.get("version") {
+        Some(Value::String(version)) => fhir_version(uri, version).map(str::to_owned),
+        _ => None,
+    };
+    coding.insert(String::from("system"), Value::String((*uri).to_owned()));
+    match version {
+        Some(version) => {
+            coding.insert(String::from("version"), Value::String(version));
+        }
+        None => {
+            coding.remove("version");
+        }
+    }
+    true
 }

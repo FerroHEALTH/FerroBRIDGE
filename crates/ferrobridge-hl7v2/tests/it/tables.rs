@@ -11,6 +11,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
+use ferrobridge_hl7v2::map::terminology::Terminology;
 use ferrobridge_term::client::Client;
 use ferrobridge_term::config::{Config, RetryPolicy, WireVersion};
 use ferrobridge_testkit::stubs::terminology;
@@ -95,7 +96,7 @@ impl PackageTables {
     }
 
     /// Mounts the stub on a new server and returns a client of it.
-    pub(crate) async fn serve(&self) -> Result<(MockServer, Client), Box<dyn Error>> {
+    pub(crate) async fn serve(&self) -> Result<(MockServer, Terminology), Box<dyn Error>> {
         let server = MockServer::builder()
             .disable_request_recording()
             .start()
@@ -108,7 +109,7 @@ impl PackageTables {
                 initial_backoff: Duration::from_millis(1),
                 max_backoff: Duration::from_millis(1),
             });
-        Ok((server, Client::new(config)?))
+        Ok((server, Terminology::new(Client::new(config)?)))
     }
 }
 

@@ -16,9 +16,9 @@
 use fhir_types::codec::Value;
 
 use crate::map::maps::Maps;
+use crate::map::terminology::Terminology;
 use crate::map::{MapError, Outcome, run};
 use crate::parse::Parsed;
-use ferrobridge_term::client::Client;
 
 /// A refusal to map one segment.
 #[derive(Debug, thiserror::Error)]
@@ -105,8 +105,9 @@ impl Segmented {
 /// [`SegmentError::NoSegmentMap`] when the corpus holds none or several
 /// segment maps from the segment to `resource_type`, and
 /// [`SegmentError::Map`] with [`MapError::Stopped`] when a `NOT VALUED ERROR`
-/// condition holds or [`MapError::Terminology`] when the terminology server
-/// refuses a translation or cannot be reached.
+/// condition holds, [`MapError::Terminology`] when the terminology server
+/// refuses a translation or cannot be reached, or [`MapError::Registry`]
+/// when it refuses an identifier registry search or cannot be reached.
 ///
 /// [`map`]: crate::map::map
 pub async fn segment(
@@ -114,11 +115,11 @@ pub async fn segment(
     index: usize,
     resource_type: &str,
     corpus: &Maps,
-    translator: Option<&Client>,
+    translator: Option<&Terminology>,
 ) -> Result<Segmented, SegmentError> {
     let mut run = run::Run::new(corpus, parsed);
     let root = run.single(index, resource_type)?;
-    let translations = run.translate(translator).await?;
+    let translations = run.translate(translator.map(Terminology::client)).await?;
     run.register(translator).await?;
     let (entries, outcomes) = run.resources();
     let mut resource = None;
