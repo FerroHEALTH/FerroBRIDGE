@@ -81,7 +81,7 @@ ehds-logging = { workspace = true, features = ["balp"] }
 ihe-atna = { workspace = true, features = ["balp", "feed"] }
 # The PIXm Consumer (ITI-83) and Patient Identity Source (ITI-104) of the
 # identity source.
-ihe-iti = { workspace = true, features = ["pixm", "pixm-source", "balp"] }
+ihe-iti = { workspace = true, features = ["pixm", "pixm-source", "pmir", "balp"] }
 # The AMQP publisher of the events lane.
 lapin.workspace = true
 # The AOM2 operational template the adl2 route serves, and the HRID parser an

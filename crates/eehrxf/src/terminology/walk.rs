@@ -75,6 +75,24 @@ pub(crate) fn coded<'d>(
     Ok(walk.found)
 }
 
+/// Returns the value `steps` reach from `object`, the steps an
+/// [`Occurrence`] names.
+pub(crate) fn value_at<'o>(object: &'o mut Object, steps: &[Step]) -> Option<&'o mut Value> {
+    let (first, rest) = steps.split_first()?;
+    let Step::Key(key) = first else {
+        return None;
+    };
+    let mut node = object.get_mut(key)?;
+    for step in rest {
+        node = match (step, node) {
+            (Step::Key(key), Value::Object(inner)) => inner.get_mut(key)?,
+            (Step::Index(index), Value::Array(items)) => items.get_mut(*index)?,
+            _ => return None,
+        };
+    }
+    Some(node)
+}
+
 /// One walk and what it found.
 struct Walk<'d> {
     nested: bool,

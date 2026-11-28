@@ -486,6 +486,60 @@ async fn renew(leadership: Arc<dyn Leadership>, term: Term, lost: Arc<AtomicBool
     }
 }
 
+/// Whether a led period kept its term.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kept {
+    /// The term still holds.
+    Held,
+    /// A fenced write was refused: another replica took the lane.
+    Lost,
+}
+
+/// Runs `period` under this replica's term every `every` while it leads `lease`.
+///
+/// It runs on its own task until `stop` reads `true`, then gives the lease
+/// up; a period under way finishes first, and `what` names the lane in the
+/// logs.
+pub fn spawn_led<F, Fut>(
+    lease: Lease,
+    every: Duration,
+    what: &'static str,
+    stop: &tokio::sync::watch::Receiver<bool>,
+    mut period: F,
+) -> tokio::task::JoinHandle<()>
+where
+    F: FnMut(Term) -> Fut + Send + 'static,
+    Fut: Future<Output = Kept> + Send,
+{
+    let mut stop = stop.clone();
+    tokio::spawn(async move {
+        let mut leader = Leader::new(Arc::new(lease));
+        let mut ticks = tokio::time::interval(every);
+        loop {
+            tokio::select! {
+                biased;
+                () = async {
+                    let _settled = stop.wait_for(|stopped| *stopped).await.is_ok();
+                } => break,
+                _tick = ticks.tick() => match leader.lead().await {
+                    Ok(Some(term)) => {
+                        if period(term).await == Kept::Lost {
+                            leader.lost();
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        tracing::warn!(lane = what, reason = %crate::indicators::reason(&error), "a lane lease could not be claimed");
+                    }
+                },
+            }
+        }
+        if let Err(error) = leader.release().await {
+            tracing::warn!(lane = what, reason = %crate::indicators::reason(&error), "a lane lease could not be released; it runs out on its own");
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;

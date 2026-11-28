@@ -69,6 +69,7 @@ pub(crate) fn identity_source_accepting(
     accepted: &[&str],
 ) -> Arc<ferrobridge_server::identity_source::IdentitySource> {
     let section = ferrobridge_server::config::section::identity_source::IdentitySource {
+        cache: None,
         endpoint: ferrohealth_smart::config::endpoint::EndpointSection {
             url: ferrohealth_secret::secret_url::SecretUrl::new(base),
             ..ferrohealth_smart::config::endpoint::EndpointSection::default()

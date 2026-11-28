@@ -545,19 +545,7 @@ fn untranscoded<'t>(
 
 /// Returns the `coding` array of the concept `steps` reach from `object`.
 fn codings_at<'o>(object: &'o mut Object, steps: &[Step]) -> Option<&'o mut Vec<Value>> {
-    let (first, rest) = steps.split_first()?;
-    let Step::Key(key) = first else {
-        return None;
-    };
-    let mut node = object.get_mut(key)?;
-    for step in rest {
-        node = match (step, node) {
-            (Step::Key(key), Value::Object(inner)) => inner.get_mut(key)?,
-            (Step::Index(index), Value::Array(items)) => items.get_mut(*index)?,
-            _ => return None,
-        };
-    }
-    let Value::Object(concept) = node else {
+    let Value::Object(concept) = walk::value_at(object, steps)? else {
         return None;
     };
     match concept.get_mut("coding")? {

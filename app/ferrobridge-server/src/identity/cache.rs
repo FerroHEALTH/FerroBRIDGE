@@ -76,11 +76,18 @@ impl<K: Ord + Clone, V: Clone> Bounded<K, V> {
     /// Puts `value` under `key` when the map does not hold `key`, dropping
     /// the oldest entry when the map is full.
     pub fn put(&self, key: K, value: V) {
+        self.put_if(key, value, || true);
+    }
+
+    /// Puts `value` under `key` as [`Self::put`] does, when `holds` answers
+    /// `true` while the map is locked, so no change the caller counts can
+    /// land between the check and the entry.
+    pub fn put_if(&self, key: K, value: V, holds: impl FnOnce() -> bool) {
         if self.capacity == 0 {
             return;
         }
         let mut entries = self.entries();
-        if entries.values.contains_key(&key) {
+        if !holds() || entries.values.contains_key(&key) {
             return;
         }
         while entries.values.len() >= self.capacity {
@@ -93,6 +100,14 @@ impl<K: Ord + Clone, V: Clone> Bounded<K, V> {
         entries.next = sequence.wrapping_add(1);
         entries.order.insert(sequence, key.clone());
         entries.values.insert(key, (sequence, value));
+    }
+
+    /// Drops the entry of `key`, when the map holds one.
+    pub fn remove(&self, key: &K) {
+        let mut entries = self.entries();
+        if let Some((sequence, _)) = entries.values.remove(key) {
+            entries.order.remove(&sequence);
+        }
     }
 
     /// Returns how many entries the map holds.

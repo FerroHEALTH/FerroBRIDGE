@@ -399,6 +399,26 @@ pub(crate) fn section_entries<'a>(
     Ok(found)
 }
 
+// NOTE: FHIR R4 terminologies-systems.html: SNOMED CT is http://snomed.info/sct, which openEHR
+// names SNOMED-CT.
+#[test]
+fn a_medicine_recorded_under_an_openehr_terminology_id_is_written_with_its_fhir_system_uri()
+-> Result<(), Box<dyn Error>> {
+    let recorded = order(MEDICINE).replace(&format!("\"{ATC}\""), "\"SNOMED-CT\"");
+    assert!(recorded.contains("\"SNOMED-CT\""));
+    let resources = run(
+        &summary()?,
+        &composition(&[section(MEDICATION_SUMMARY, &[recorded])]),
+        call("Patient/synthetic-subject", "Device/gateway"),
+    )?;
+    let statements = section_entries(&resources, MEDICATIONS)?;
+    let statement = serde_json::to_value(*statements.first().ok_or("the statement")?)?;
+    let coding = &statement["medicationCodeableConcept"]["coding"][0];
+    assert_eq!(coding["system"], SNOMED);
+    assert_eq!(coding["code"], MEDICINE);
+    Ok(())
+}
+
 #[test]
 fn a_medication_order_maps_to_the_medication_summary_entry() -> Result<(), Box<dyn Error>> {
     let composition = composition(&[section(MEDICATION_SUMMARY, &[order(MEDICINE)])]);

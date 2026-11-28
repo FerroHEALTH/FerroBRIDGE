@@ -23,17 +23,12 @@ use axum::response::Response;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ferrohealth_smart::guard::AuthLayer;
-use ferrohealth_smart::guard::Classify;
 use ferrohealth_smart::guard::Requirement;
-use ferrohealth_smart::guard::Target;
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
-use http::Extensions;
 use http::HeaderMap;
 use http::HeaderValue;
-use http::Method;
 use http::StatusCode;
-use http::Uri;
 use http::header;
 use secrecy::ExposeSecret as _;
 use secrecy::SecretString;
@@ -77,33 +72,21 @@ const INACTIVE: &str = "no active link answers here";
 const NO_PERSON: &str =
     "a link is shared by a person, with a token that names their patient record";
 
-/// How the gate reads a request on the person's routes: a read permission on
-/// `Patient`, the patient summary's subject.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct Classifier;
-
-impl Classify for Classifier {
-    fn classify(&self, _method: &Method, _uri: &Uri, extensions: &Extensions) -> Option<Target> {
-        let template = extensions.get::<axum::extract::MatchedPath>()?.as_str();
-        Some(
-            Target::new(
-                "shl",
-                Requirement::Fhir {
-                    permission: Permission::Read,
-                    resource_type: String::from("Patient"),
-                },
-            )
-            .route(template),
-        )
-    }
-}
-
 /// Returns the gate of the person's routes, refusing with an
 /// `OperationOutcome`.
-pub(super) fn guard(smart: &crate::smart::Smart) -> AuthLayer<Classifier> {
+// NOTE: no specification governs this: our own design; the person's routes need a read
+// permission on `Patient`, the patient summary's subject.
+pub(super) fn guard(smart: &crate::smart::Smart) -> AuthLayer<crate::smart::Routed> {
     let gate = smart.gate().clone();
     let render = crate::facade::guard::Outcome::new(gate.realm().map(str::to_owned));
-    AuthLayer::new(gate, Classifier).with_render(render)
+    let classifier = crate::smart::Routed::new(
+        "shl",
+        Requirement::Fhir {
+            permission: Permission::Read,
+            resource_type: String::from("Patient"),
+        },
+    );
+    AuthLayer::new(gate, classifier).with_render(render)
 }
 
 /// A create request.

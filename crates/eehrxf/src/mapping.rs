@@ -53,6 +53,7 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::mappings::Note;
 use crate::mappings::Project;
+use crate::terminology::system::rewrite_systems;
 use crate::transformation::Pin;
 
 /// FHIRconnect context mappings compiled against one operational template.
@@ -312,7 +313,8 @@ impl Mapping {
     /// object without `_type` (a flat composition), and
     /// [`MappingError::Run`] when it does not parse, names a template the
     /// mapping was not compiled against, or carries an element the mapping
-    /// cannot carry.
+    /// cannot carry, and [`MappingError::System`] when a mapped resource
+    /// holds an element the R4 element table does not describe.
     pub fn to_fhir(
         &self,
         composition: &str,
@@ -410,6 +412,7 @@ impl Mapping {
             program.resource().as_str(),
             program.profile().url().as_str(),
         )?;
+        systems(&mut bundle)?;
         Ok((ToFhirResponse::new(bundle), warnings))
     }
 }
@@ -529,6 +532,35 @@ fn claim(bundle: &mut Bundle, resource_type: &str, profile: &str) -> Result<(), 
         Err(claim_error(Unclaimable(
             "the run wrote no resource of the mapped type",
         )))
+    }
+}
+
+/// Writes, in every mapped resource of `bundle`, the FHIR system URI of each
+/// coding whose `system` is the openEHR terminology id the run read.
+// NOTE: FHIR R4 terminologies-systems.html names the URI of each code system, and a
+// Coding.system is that URI; the run writes the CODE_PHRASE.terminology_id name as recorded.
+fn systems(bundle: &mut Bundle) -> Result<(), MappingError> {
+    for resource in bundle
+        .entry
+        .iter_mut()
+        .filter_map(|entry| entry.resource.as_mut())
+    {
+        let mut object = Json::to_json(&*resource).map_err(system_error)?;
+        let kind = text(&object, "resourceType")
+            .unwrap_or("Resource")
+            .to_owned();
+        if rewrite_systems(&mut object, &kind).map_err(system_error)? {
+            *resource = Resource::from_json(&object, &mut fhir_types::codec::Path::root(&kind))
+                .map_err(system_error)?;
+        }
+    }
+    Ok(())
+}
+
+/// The system failure `source`.
+fn system_error(source: impl std::error::Error + Send + Sync + 'static) -> MappingError {
+    MappingError::System {
+        source: Box::new(source),
     }
 }
 
@@ -755,6 +787,14 @@ pub enum MappingError {
         path: String,
         /// The RM type the template constrains the node to.
         rm_type: String,
+    },
+    /// The coding systems of a mapped resource could not be written as FHIR
+    /// system URIs.
+    #[error("a mapped resource's coding systems cannot be written as FHIR system URIs")]
+    System {
+        /// The encoding or walk failure.
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
 }
 

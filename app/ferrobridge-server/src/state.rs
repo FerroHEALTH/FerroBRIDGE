@@ -103,6 +103,8 @@ pub struct AppState {
     sources: Option<Arc<crate::sources::Sources>>,
     /// The inbound intake, when `[inbound]` is on.
     intake: Option<Arc<crate::inbound::intake::Intake>>,
+    /// The identity source's pseudonym cache, when it runs.
+    pseudonyms: Option<Arc<crate::identity_source::Running>>,
 }
 
 impl AppState {
@@ -210,6 +212,7 @@ impl AppState {
             change_feed: None,
             access_log: None,
             links: None,
+            pseudonyms: None,
             registers: store
                 .as_ref()
                 .map(|store| Arc::new(crate::settings::Registers::new(store))),
@@ -242,6 +245,7 @@ impl AppState {
             change_feed: None,
             access_log: None,
             links: None,
+            pseudonyms: None,
             store: None,
             registers: None,
             sources: None,
@@ -255,6 +259,19 @@ impl AppState {
     pub fn with_links(mut self, links: Arc<crate::shl::Links>) -> Self {
         self.links = Some(links);
         self
+    }
+
+    /// Returns this state running the identity source's pseudonym cache.
+    #[must_use]
+    pub fn with_pseudonyms(mut self, running: Arc<crate::identity_source::Running>) -> Self {
+        self.pseudonyms = Some(running);
+        self
+    }
+
+    /// Returns the identity source's pseudonym cache, when it runs.
+    #[must_use]
+    pub fn pseudonyms(&self) -> Option<&Arc<crate::identity_source::Running>> {
+        self.pseudonyms.as_ref()
     }
 
     /// Returns the state store, when `[state]` is configured.

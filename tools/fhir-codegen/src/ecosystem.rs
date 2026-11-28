@@ -295,6 +295,17 @@ fn validation_outputs() -> Vec<OperationParameter> {
             "The status of the validated concept when its code system states one (`retired`, `deprecated`, …).",
         )
     };
+    // NOTE: tx-ecosystem IG icd-11.md at 9c2bbce: `$validate-code` returns a
+    // `classificationCode` output when the code was given with entity ids.
+    let classification_code = || {
+        ecosystem_parameter(
+            "classificationCode",
+            ParameterUse::Out,
+            "1",
+            "code",
+            "The short classification code of the normal form, when the code was given with entity ids, so for an expression written out of order it matches `normalized-code`; a code given with classification codes gets none (ICD-11 and ICF, `icd-11.html`).",
+        )
+    };
     vec![
         ecosystem_parameter(
             "normalized-code",
@@ -307,6 +318,7 @@ fn validation_outputs() -> Vec<OperationParameter> {
         unknown_system_of_concept(),
         inactive(),
         status(),
+        classification_code(),
     ]
 }
 
@@ -394,6 +406,15 @@ fn ecosystem_parameters(url: &str, own: &OperationDefinition) -> Vec<OperationPa
                 "*",
                 "canonical",
                 "A code system supplement the lookup drew on, one parameter per supplement; a global language pack that contributes a display or a designation is reported here (requirements, CodeSystem supplements).",
+            ),
+            // NOTE: tx-ecosystem IG icd-11.md at 9c2bbce, Properties: with
+            // `post-coordination-metadata=true` every axis a code declares is listed.
+            ecosystem_parameter(
+                "post-coordination-metadata",
+                ParameterUse::In,
+                "1",
+                "boolean",
+                "Whether each `postcoordination` property lists every axis the code declares, valued or not, with `required`, `allowMultipleValues` and `valueSet`; by default only `axis` and `value` of the valued axes (ICD-11 and ICF, `icd-11.html`, Properties).",
             ),
         ],
         _ => Vec::new(),
