@@ -194,6 +194,36 @@ struct Stack {
     holder: tokio::task::JoinHandle<()>,
     /// The receiver's task.
     served: tokio::task::JoinHandle<std::io::Result<()>>,
+    /// Every message the receiver was sent, with its answer.
+    delivered: Delivered,
+}
+
+/// Each message the receiver was sent, its answer's status and its body,
+/// all synthetic.
+type Delivered = Arc<std::sync::Mutex<Vec<(u16, String)>>>;
+
+/// Records each request the receiver answers in `delivered`.
+async fn witnessed(
+    axum::extract::State(delivered): axum::extract::State<Delivered>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let (parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX)
+        .await
+        .unwrap_or_default();
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    let answer = next
+        .run(axum::extract::Request::from_parts(
+            parts,
+            axum::body::Body::from(bytes),
+        ))
+        .await;
+    delivered
+        .lock()
+        .unwrap()
+        .push((answer.status().as_u16(), text));
+    answer
 }
 
 impl Stack {
@@ -269,6 +299,11 @@ impl Stack {
             &smart,
             vec![String::from(FEED)],
         );
+        let delivered = Delivered::default();
+        let receiver = receiver.layer(axum::middleware::from_fn_with_state(
+            delivered.clone(),
+            witnessed,
+        ));
         let served = tokio::spawn(async move { axum::serve(listener, receiver).await });
         let source = identity_of(&bridge_config(
             &pix.fhir_base(),
@@ -290,6 +325,7 @@ impl Stack {
             stop,
             holder,
             served,
+            delivered,
         })
     }
 
@@ -384,11 +420,23 @@ impl Stack {
         self.settled().await?;
         let asked = self.asked();
         let pseudonym = self.pseudonym(source).await?;
-        assert_eq!(
-            asked + 1,
-            self.asked(),
-            "after {what}, FerroPIX is asked again"
-        );
+        if self.asked() != asked + 1 {
+            let delivered: Vec<String> = self
+                .delivered
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(status, body)| format!("{status}: {body}"))
+                .collect();
+            let log = self.pix.log().await;
+            let tail: Vec<&str> = log.lines().rev().take(30).collect();
+            return Err(format!(
+                "after {what}, FerroPIX was not asked again\nthe receiver was sent:\n{}\nFerroPIX log, newest first:\n{}",
+                delivered.join("\n"),
+                tail.join("\n")
+            )
+            .into());
+        }
         Ok(pseudonym)
     }
 
