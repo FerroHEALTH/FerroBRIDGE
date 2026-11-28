@@ -54,7 +54,8 @@ pub(crate) enum Script {
     Translate(Vec<(&'static str, &'static str, &'static str)>),
     /// `$translate` answers each entry whose source system, source code and
     /// target system are asked as an `equivalent` match to its code, and no
-    /// match to anything else.
+    /// match to anything else; `$validate-code` answers that no concept is a
+    /// member.
     #[cfg_attr(
         not(all(feature = "openehr", feature = "patient-summary")),
         expect(dead_code, reason = "only the EPS sections suite scripts a map")
@@ -180,10 +181,11 @@ impl TerminologyServer for Scripted {
         _value_set: &str,
         _concept: &Candidate,
     ) -> Result<bool, TerminologyError> {
-        let Script::Valid(result) = self.0 else {
-            return Err(self.refusal(Operation::ValidateCode));
-        };
-        Ok(result)
+        match &self.0 {
+            Script::Valid(result) => Ok(*result),
+            Script::Map(_) => Ok(false),
+            _ => Err(self.refusal(Operation::ValidateCode)),
+        }
     }
 }
 

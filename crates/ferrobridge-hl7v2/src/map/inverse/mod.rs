@@ -51,8 +51,8 @@ use crate::map::inverse::grid::Grid;
 use crate::map::inverse::line::{Line, deprecated, lines, order, primitives};
 use crate::map::inverse::walk::Inverse;
 use crate::map::maps::Maps;
+use crate::map::terminology::Terminology;
 use crate::write::value::{Field, Segment};
-use ferrobridge_term::client::Client;
 
 /// Something the inverse did not write back, typed and counted.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,7 +192,7 @@ pub async fn segment(
     resource: &Value,
     definition: &'static hl7v2_types::model::Segment,
     corpus: &Maps,
-    translator: Option<&Client>,
+    translator: Option<&Terminology>,
 ) -> Result<Inverted, InverseError> {
     let resource_type = resource
         .get("resourceType")
@@ -207,7 +207,7 @@ pub async fn segment(
         })?;
     let mut inverse = Inverse {
         corpus,
-        translator,
+        translator: translator.map(Terminology::client),
         outcomes: Vec::new(),
         translations: 0,
         consumed: BTreeSet::new(),

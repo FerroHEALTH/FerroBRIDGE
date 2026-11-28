@@ -43,16 +43,17 @@ pub mod maps;
 pub mod notation;
 mod run;
 pub mod single;
+pub mod terminology;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ferrobridge_term::client::Client;
 use fhir_types::codec::{DecodeError, DecodeErrorKind, Value};
 use fhirconnect::tree::error::{ParseError, ResolveError, WriteError};
 
 use crate::map::convert::ConvertError;
 use crate::map::maps::Maps;
 use crate::map::notation::NotationError;
+use crate::map::terminology::Terminology;
 use crate::parse::{Location, Parsed, Unplaced};
 
 /// The row an outcome is about.
@@ -763,23 +764,28 @@ impl Mapped {
 /// answer from another map. With no terminology server, a table value is
 /// counted as [`Outcome::NoTerminology`].
 ///
+/// A PID-3 assigning authority `terminology` resolved within its max age
+/// ([`Terminology::max_age`]) takes the held answer, and any other is
+/// searched on the server's identifier registry.
+///
 /// # Errors
 ///
 /// Returns [`MapError::NoMessageMap`] when the corpus has no message map for
 /// the structure, [`MapError::Stopped`] when a `NOT VALUED ERROR` condition
 /// holds, [`MapError::Terminology`] when the terminology server refuses a
 /// translation or cannot be reached, or the client speaks STU3 (the
-/// client's `UnsupportedParameter`, sent before any request), and
-/// [`MapError::NoMessageHeader`] when the message Bundle would carry no
+/// client's `UnsupportedParameter`, sent before any request),
+/// [`MapError::Registry`] when the server refuses an identifier registry
+/// search or cannot be reached, and [`MapError::NoMessageHeader`] when the message Bundle would carry no
 /// `MessageHeader`.
 pub async fn map(
     parsed: &Parsed,
     maps: &Maps,
-    terminology: Option<&Client>,
+    terminology: Option<&Terminology>,
 ) -> Result<Mapped, MapError> {
     let mut run = run::Run::new(maps, parsed);
     run.message()?;
-    let translations = run.translate(terminology).await?;
+    let translations = run.translate(terminology.map(Terminology::client)).await?;
     run.register(terminology).await?;
     let applied = run.take_applied();
     let (bundle, outcomes) = run.finish()?;

@@ -1522,6 +1522,7 @@ it answers.
 | `idle_timeout` | `"5min"` | How long a connection may sit between messages; `"0s"` keeps it open |
 | `frame_timeout` | `"30s"` | How long one frame may take to arrive whole; `"0s"` waits |
 | `frame_limit` | `"1MiB"` | The largest message one frame may carry |
+| `authority_max_age` | `"10min"` | How long the answer to a PID-3 assigning authority's identifier `NamingSystem` search is held across messages before the next message naming it searches again; `"0s"` searches on every message |
 | `tls.certificate_file`, `tls.key_file`, `tls.client_ca_file` | none | The PEM chain and key the TLS listener serves, and the authorities a sender's client certificate must chain to; the TLS listener runs when they are set. The authorities file is read again when its modification time changes, so a rotated file is in force for the next handshake without a restart |
 | `plain.bind` | none | The socket address of a second listener with no TLS, for the devices that cannot speak it; never the TLS listener's port |
 

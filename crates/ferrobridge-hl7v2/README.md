@@ -20,10 +20,10 @@ uses it:
 
 ```toml
 [dependencies]
-ferrobridge-hl7v2 = "0.39"
+ferrobridge-hl7v2 = "0.40"
 ```
 
-Name a patch (`"0.39.N"`) when you need the first release that carries what
+Name a patch (`"0.40.N"`) when you need the first release that carries what
 you use; the range is the same caret range.
 
 ## What it does
@@ -72,7 +72,11 @@ you use; the range is the same caret range.
   `ConceptMap/$translate` on a terminology server through `ferrobridge-term`'s
   client, every translation of a message asked in one `batch`: load the guide's package and FerroBRIDGE's value package
   (packed from `terminology/hl7v2-values/` in the repository by
-  `scripts/terminology/pack-hl7v2-values.sh`) into it. `map::single` maps
+  `scripts/terminology/pack-hl7v2-values.sh`) into it. The client goes in as
+  a `map::terminology::Terminology`, which holds the answer to each PID-3
+  assigning authority's identifier `NamingSystem` search across messages for
+  a max age (10 minutes by default, `Terminology::with_max_age`), so a steady
+  feed searches once per authority in that period. `map::single` maps
   one segment to one resource, a PID to a `Patient`. `map::inverse` writes a
   resource back as a segment through the same maps, a `Patient` as a PID,
   with every element it does not write back counted. The FHIR side is written
@@ -90,7 +94,7 @@ With `map` off the crate is the listener, the decoder, the parser, the writer
 and the acknowledgment:
 
 ```toml
-ferrobridge-hl7v2 = { version = "0.39", default-features = false }
+ferrobridge-hl7v2 = { version = "0.40", default-features = false }
 ```
 
 ## Example

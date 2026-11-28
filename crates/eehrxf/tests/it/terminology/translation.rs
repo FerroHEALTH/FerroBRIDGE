@@ -504,3 +504,62 @@ async fn a_laboratory_result_no_loinc_translation_reaches_is_unbound() -> TestRe
     assert_eq!(unbound.binding.systems, [ehn::LOINC]);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_snomed_ct_allergen_the_value_set_holds_is_not_asked_a_translation() -> TestResult {
+    // NOTE: MyHealth@EU Core 1.0.1 eHDSIAllergenWithExceptions takes SNOMED CT through the
+    // enumerated eHDSIAllergenNoDrug, so $validate-code decides membership; $translate refuses here.
+    let terminology = scripted(Script::Valid(true));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let recorded = allergy(vec![coding(ehn::SNOMED_CT, "256349002")]);
+    let translated = translator
+        .translate(&recorded, |system| system == ehn::SNOMED_CT)
+        .await?;
+    assert_eq!(translated, recorded);
+    assert_eq!(translator.unbound().len(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_snomed_ct_allergen_the_value_set_does_not_hold_is_asked_for_its_atc_code() {
+    let terminology = scripted(Script::Valid(false));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let asked = translator
+        .translate(
+            &allergy(vec![coding(ehn::SNOMED_CT, "764146007")]),
+            |system| system == ehn::SNOMED_CT,
+        )
+        .await;
+    assert!(
+        matches!(
+            asked,
+            Err(TranslationError::Terminology(TerminologyError::Status {
+                operation: Operation::Translate,
+                ..
+            }))
+        ),
+        "a drug allergen is no member, so $translate is asked: {asked:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_refused_membership_check_fails_the_translation() {
+    let terminology = scripted(Script::Refuse(StatusCode::SERVICE_UNAVAILABLE));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let refused = translator
+        .translate(
+            &allergy(vec![coding(ehn::SNOMED_CT, "256349002")]),
+            |system| system == ehn::SNOMED_CT,
+        )
+        .await;
+    assert!(
+        matches!(
+            refused,
+            Err(TranslationError::Terminology(TerminologyError::Status {
+                operation: Operation::ValidateCode,
+                status: StatusCode::SERVICE_UNAVAILABLE,
+            }))
+        ),
+        "{refused:?}"
+    );
+}

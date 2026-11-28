@@ -30,6 +30,20 @@ impl Kept {
             .filter(|exchange| exchange.kind.profile == kind.profile)
             .count()
     }
+
+    /// The outcome of the last exchange of the audit profile `kind` kept.
+    pub(super) fn last_outcome(
+        &self,
+        kind: &ihe_atna::balp::EventKind,
+    ) -> Option<ihe_atna::balp::Outcome> {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find(|exchange| exchange.kind.profile == kind.profile)
+            .map(|exchange| exchange.outcome)
+    }
 }
 
 #[async_trait::async_trait]

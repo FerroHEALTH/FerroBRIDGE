@@ -134,6 +134,7 @@ pub(in crate::config) fn resolve(config: &Config) -> Result<Option<Hl7v2Settings
             frame: timeout_of(hl7v2.frame_timeout),
         },
         frame_limit,
+        authority_max_age: hl7v2.authority_max_age.get(),
         tls,
         plain,
     }))

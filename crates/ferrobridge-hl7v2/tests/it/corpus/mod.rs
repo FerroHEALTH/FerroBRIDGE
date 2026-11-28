@@ -33,11 +33,11 @@ use ferrobridge_hl7v2::batch;
 use ferrobridge_hl7v2::decode::Charset;
 use ferrobridge_hl7v2::inbound::{self, Received};
 
+use ferrobridge_hl7v2::map::terminology::Terminology;
 use ferrobridge_hl7v2::map::{Mapped, Outcome, map};
 use ferrobridge_hl7v2::mllp::Codec;
 use ferrobridge_hl7v2::parse;
 use ferrobridge_hl7v2::parse::structure::structure_for;
-use ferrobridge_term::client::Client;
 use ferrobridge_testkit::conformance::{Case, Corpus, record};
 use fhir_types::codec::{Json, Value};
 use tokio_util::codec::{Decoder, Encoder};
@@ -216,7 +216,7 @@ async fn run(
     message: &Message,
     guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
-    client: &Client,
+    client: &Terminology,
     expected: Option<&Expected>,
 ) -> Case {
     let normal = normalised(&message.bytes);
@@ -276,7 +276,7 @@ async fn verdict(
     normal: &[u8],
     guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
-    client: &Client,
+    client: &Terminology,
 ) -> Case {
     let bytes = match framed(normal) {
         Ok(bytes) => bytes,
@@ -304,7 +304,7 @@ async fn batch_verdict(
     bytes: &[u8],
     guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
-    client: &Client,
+    client: &Terminology,
 ) -> Case {
     let file = match batch::split(bytes) {
         Ok(file) => file,
@@ -342,7 +342,7 @@ async fn one(
     expected: Option<&Path>,
     guide: &ferrobridge_hl7v2::map::maps::Maps,
     targets: &Targets,
-    client: &Client,
+    client: &Terminology,
 ) -> Case {
     let inbound = match inbound::receive(bytes, Charset::Ascii, structure_for, support::STAMP) {
         Received::Parsed(inbound) => inbound,

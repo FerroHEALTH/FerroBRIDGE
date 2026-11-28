@@ -22,7 +22,7 @@ context:
     url: "http://hl7.eu/fhir/hdr/StructureDefinition/composition-eu-hdr"
     version: "1.0.0"
   template:
-    id: "openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.0.0"
+    id: "openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.1.0"
   archetypes:
     - "COMPOSITION.transfer_summary.v1.Composition"
     - "EVALUATION.problem_diagnosis.v1"

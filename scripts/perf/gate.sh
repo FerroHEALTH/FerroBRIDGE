@@ -96,6 +96,10 @@ readonly LOAD_CLIENT=ferrobridge-perf-load
 readonly V2_SUBJECTS=urn:oid:2.999.1.7
 # The pseudonym domain the head arm's EHRs are keyed in.
 readonly PSEUDONYMS=urn:oid:2.999.9
+# The most ITI-83 queries the run may send FerroPIX while every cached arm's
+# pseudonym cache serves: the plan names three subjects, each asked again
+# after a feed message or the cache's max_age (#2425).
+readonly ITI83_CEILING=100
 # FerroPIX's configuration and its two throwaway secrets, outside $WORK so
 # the server's non-root user reads them.
 readonly PIX_FILES=target/perf-pix
@@ -722,6 +726,19 @@ pseudonymous() {
   grep -q '^\[identity_source\]' "$1/$CONFIG"
 }
 
+# cached TREE: whether TREE's bridge caches its identity source's answers,
+# its perf/ferrobridge.toml naming [identity_source.cache].
+cached() {
+  grep -q '^\[identity_source\.cache\]' "$1/$CONFIG"
+}
+
+# iti83_asked: how many ITI-83 queries the arms' client sent, read from
+# FerroPIX's request log on stdin.
+iti83_asked() {
+  # shellcheck disable=SC2016 # $ihe-pix is the route's own text
+  { grep -F '"route":"/fhir/Patient/$ihe-pix"' || true; } | { grep -c -F '"caller":"ferrobridge-perf"' || true; }
+}
+
 # pseudonym VALUE: the head arm's pseudonym of the subject VALUE of the
 # subjects' domain, asked over ITI-83 as the head's facade asks it (PIXm
 # 3.1.0 §2:3.83.4.1.2), which the head's search names its subject by.
@@ -891,6 +908,8 @@ run() {
       printf 'The head arm asks a FerroPIX identity source over ITI-83 for every subject it resolves; this base, from before the facade needed one, does not, so a head-over-base rise in the facade groups includes that round trip.\n\n' >> "$GITHUB_STEP_SUMMARY"
     echo "perf-gate: the head arm asks FerroPIX over ITI-83 for every subject it resolves; a rise over this base, which has no identity source, includes that round trip"
   fi
+  local asked
+  asked="$("$engine" logs "$PIX_NAME" 2>&1 | iti83_asked)"
   ferrohealth-perf ab --plan "$PLAN" \
     --base-url "$(facade base)" --base-pid "$base_pid" \
     --base-mllp-address "127.0.0.1:$(port base mllp)" --base-database-url "$(admin_url base)" \
@@ -901,6 +920,14 @@ run() {
     --head-var "READ_ID=$head_id" --head-var "CREATE_BODY=$body" --head-var "SEARCH=$head_search" \
     --head-var "TOKEN=$load_token" \
     --out-dir target/perf || code=$?
+  asked=$(($("$engine" logs "$PIX_NAME" 2>&1 | iti83_asked) - asked))
+  echo "perf-gate: the arms sent FerroPIX $asked ITI-83 queries while measured"
+  [[ -z "${GITHUB_STEP_SUMMARY:-}" ]] ||
+    printf 'The arms sent FerroPIX %s ITI-83 queries while measured.\n\n' "$asked" >> "$GITHUB_STEP_SUMMARY"
+  if { ! pseudonymous "$root/$BASE_TREE/src" || cached "$root/$BASE_TREE/src"; } && [[ "$asked" -gt "$ITI83_CEILING" ]]; then
+    echo "perf-gate: more than $ITI83_CEILING ITI-83 queries: the head arm's pseudonym cache did not serve" >&2
+    [[ "$code" -ne 0 ]] || code=1
+  fi
   busy_loop || { [[ "$code" -ne 0 ]] || code=1; }
   if [[ "$code" -ne 0 ]]; then
     for arm in head base; do
@@ -945,6 +972,17 @@ self_test() {
   check "a tree naming an identity source is pseudonymous" 1 "$(pseudonymous "$work/pseudonymous" && echo 1 || echo 0)"
   check "a tree naming none is not" 0 "$(pseudonymous "$work/plain" && echo 1 || echo 0)"
   check "this tree names one" 1 "$(pseudonymous "$root" && echo 1 || echo 0)"
+  printf '[identity_source.cache]\nfeed_url = "x"\n' >> "$work/pseudonymous/$CONFIG"
+  check "a tree naming a cache caches" 1 "$(cached "$work/pseudonymous" && echo 1 || echo 0)"
+  check "a tree naming none does not" 0 "$(cached "$work/plain" && echo 1 || echo 0)"
+  check "this tree caches" 1 "$(cached "$root" && echo 1 || echo 0)"
+  # shellcheck disable=SC2016 # $ihe-pix is the route's own text
+  check "only the arms' ITI-83 queries are counted" 2 "$(printf '%s\n' \
+    '{"route":"/fhir/Patient/$ihe-pix","caller":"ferrobridge-perf"}' \
+    '{"route":"/fhir/Patient/$ihe-pix","caller":"ferrobridge-perf-source"}' \
+    '{"route":"/fhir/Patient","caller":"ferrobridge-perf"}' \
+    '{"route":"/fhir/Patient/$ihe-pix","status":200,"caller":"ferrobridge-perf"}' | iti83_asked)"
+  check "an empty log counts none" 0 "$(iti83_asked < /dev/null)"
   check "the arms listen apart" "18080 18081 12575 12576" \
     "$(port head facade) $(port base facade) $(port head mllp) $(port base mllp)"
   local file

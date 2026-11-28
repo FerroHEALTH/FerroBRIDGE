@@ -61,6 +61,15 @@ enum Unread {
     Store(#[from] sqlx::Error),
 }
 
+/// The subscription a holder knows of between its periods.
+#[derive(Debug, Default)]
+struct Known {
+    /// Where it is, once adopted or created.
+    subscribed: Option<Subscribed>,
+    /// Whether the `pmir_subscription` row records its location.
+    recorded: bool,
+}
+
 /// The holder of the subscription, run by whichever replica holds its lease.
 #[derive(Clone)]
 pub struct Holder {
@@ -139,7 +148,7 @@ impl Holder {
     /// `true`, then gives the lease up.
     #[must_use]
     pub fn spawn(self, stop: &tokio::sync::watch::Receiver<bool>) -> tokio::task::JoinHandle<()> {
-        let known = Arc::new(tokio::sync::Mutex::new(None));
+        let known = Arc::new(tokio::sync::Mutex::new(Known::default()));
         let lease = self.lease.clone();
         let every = self.every;
         spawn_led(lease, every, LANE, stop, move |term| {
@@ -153,7 +162,7 @@ impl Holder {
     }
 
     /// Reads, records and announces the subscription's status under `term`.
-    async fn period(&self, term: &Term, known: &mut Option<Subscribed>) -> Kept {
+    async fn period(&self, term: &Term, known: &mut Known) -> Kept {
         let status = match self.status(known).await {
             Ok(status) => status,
             Err(error) => {
@@ -161,30 +170,51 @@ impl Holder {
                 UNREACHABLE
             }
         };
-        let kept = match self.record(term, known.as_ref(), status).await {
-            Ok(()) => Kept::Held,
-            Err(LeaseError::Stale { .. }) => Kept::Lost,
+        match self.record(term, known.subscribed.as_ref(), status).await {
+            Ok(()) => known.recorded = true,
+            // NOTE: PMIR 1.6.0 §2:3.94 defines no search, so a subscription no replica records
+            // is never found again; it is deleted (§2:3.94.4.4) and the lane's holder announces.
+            Err(LeaseError::Stale { .. }) => {
+                self.withdraw(known).await;
+                return Kept::Lost;
+            }
             Err(error) => {
                 tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the PMIR subscription's status could not be recorded");
-                Kept::Held
             }
-        };
+        }
         if let Err(error) = self.cache.announce(status).await {
             tracing::warn!(error = %ferrohealth_server::run::chain(&error), "the PMIR subscription's status could not be announced");
         }
-        kept
+        Kept::Held
+    }
+
+    /// Deletes the subscription `known` locates when its location was never
+    /// recorded, and forgets it either way.
+    async fn withdraw(&self, known: &mut Known) {
+        let Known {
+            subscribed,
+            recorded,
+        } = std::mem::take(known);
+        if let (Some(subscribed), false) = (subscribed, recorded)
+            && let Err(error) = self.subscriber.unsubscribe(&subscribed, self.timeout).await
+        {
+            tracing::warn!(error = %ferrohealth_server::run::chain(&error), "a PMIR subscription no replica records could not be deleted; the identity source keeps feeding it");
+        }
     }
 
     /// Returns the status of the subscription `known` locates, adopting or
     /// creating one first when none is known.
-    async fn status(&self, known: &mut Option<Subscribed>) -> Result<&'static str, Unread> {
-        let subscribed = match known.take() {
-            Some(subscribed) => subscribed,
-            None => self.adopt_or_create().await?,
+    async fn status(&self, known: &mut Known) -> Result<&'static str, Unread> {
+        let subscribed = if let Some(subscribed) = known.subscribed.take() {
+            subscribed
+        } else {
+            let (subscribed, recorded) = self.adopt_or_create().await?;
+            known.recorded = recorded;
+            subscribed
         };
         match self.subscriber.status(&subscribed, self.timeout).await {
             Ok(status) => {
-                *known = Some(subscribed);
+                known.subscribed = Some(subscribed);
                 Ok(status.as_str())
             }
             // NOTE: PMIR 1.6.0 §2:3.94.4.3 and FHIR R4 http.html read: a 404 or 410 is a
@@ -192,18 +222,19 @@ impl Holder {
             Err(SubscribeError::Rejected { status, .. })
                 if status == StatusCode::NOT_FOUND || status == StatusCode::GONE =>
             {
+                known.recorded = false;
                 Ok(UNREACHABLE)
             }
             Err(error) => {
-                *known = Some(subscribed);
+                known.subscribed = Some(subscribed);
                 Err(error.into())
             }
         }
     }
 
     /// Returns the subscription whose location the row records, or a new
-    /// one.
-    async fn adopt_or_create(&self) -> Result<Subscribed, Unread> {
+    /// one, with whether its location is recorded.
+    async fn adopt_or_create(&self) -> Result<(Subscribed, bool), Unread> {
         // NOTE: PMIR 1.6.0 §2:3.94 defines no search, so the subscriber keeps the location
         // of what it created; a location not under the identity source's base is created anew.
         let recorded: Option<String> =
@@ -213,12 +244,13 @@ impl Holder {
         if let Some(subscribed) =
             recorded.and_then(|location| Subscribed::at(self.subscriber.endpoint(), &location).ok())
         {
-            return Ok(subscribed);
+            return Ok((subscribed, true));
         }
-        Ok(self
+        let created = self
             .subscriber
             .subscribe(&self.request, self.timeout)
-            .await?)
+            .await?;
+        Ok((created, false))
     }
 
     /// Records `status` of the subscription at `location` under `term`.
@@ -243,5 +275,108 @@ impl Holder {
         .await?;
         transaction.commit().await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::time::Duration;
+
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    use super::{Holder, Kept, Known, LANE};
+    use crate::identity_source::cache::{Bounds, PseudonymCache};
+    use crate::store::lease::{Lane, Term};
+    use crate::store::seal::{LookupKey, SealingKey};
+
+    /// The base64 of 32 bytes of `A`, made for the tests.
+    const KEY: &str = "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=";
+
+    #[tokio::test]
+    async fn a_subscription_created_under_a_lost_lease_is_deleted() {
+        if !ferrobridge_testkit::containers::e2e_enabled() {
+            return;
+        }
+        let postgres = ferrobridge_testkit::containers::postgres()
+            .await
+            .expect("a PostgreSQL");
+        let store = crate::store::Store::open(&crate::store::Settings {
+            connection: omop_cdm::connection::CdmConnection::new(postgres.url(), None)
+                .expect("a connection"),
+            max_connections: 4,
+            acquire_timeout: Duration::from_secs(5),
+            identity_copy_entries: 0,
+            seal: None,
+        })
+        .await
+        .expect("a migrated store");
+        let registry = MockServer::start().await;
+        let location = format!("{}/fhir/Subscription/s1", registry.uri());
+        Mock::given(method("POST"))
+            .and(path("/fhir/Subscription"))
+            .respond_with(ResponseTemplate::new(201).insert_header("location", location.as_str()))
+            .expect(1)
+            .mount(&registry)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/fhir/Subscription/s1"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&registry)
+            .await;
+        Mock::given(method("DELETE"))
+            .and(path("/fhir/Subscription/s1"))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&registry)
+            .await;
+        let text = format!(
+            "[identity_source]\npseudonym_domain = \"urn:oid:2.999.9\"\nsource_domains = [\"urn:oid:2.999.1\"]\n\n\
+             [identity_source.endpoint]\nurl = \"{}/fhir\"\n\n\
+             [identity_source.cache]\nfeed_url = \"https://bridge.example.org/pmir/feed\"\nfeed_clients = [\"ferropix\"]\n\n\
+             [state]\nurl = \"postgres://bridge@db.invalid/state?sslmode=disable\"\n",
+            registry.uri()
+        );
+        let settings = crate::config::Config::from_sources(Some(&text), &BTreeMap::new())
+            .expect("a configuration")
+            .resolve(crate::config::Process::Job)
+            .expect("resolved settings");
+        let subscription = settings
+            .identity_source
+            .and_then(|identity| identity.cache_settings().cloned())
+            .expect("the cache is configured")
+            .subscription;
+        let cache = PseudonymCache::new(
+            Bounds {
+                entries: 4,
+                max_age: Duration::from_secs(60),
+                status_every: Duration::from_secs(30),
+            },
+            LookupKey::new(&SealingKey::from_base64(KEY).expect("a 32-byte key")),
+            store.pool().clone(),
+        );
+        let holder = Holder::new(subscription, cache, &store).expect("a holder");
+        let generation = holder
+            .lease
+            .claim()
+            .await
+            .expect("a claim")
+            .expect("the lane is free");
+        let term = Term::new(holder.lease.clone(), generation);
+        holder.lease.release(generation).await.expect("a release");
+        let other = store.lease(Lane::new(LANE).expect("a lane"), Duration::from_secs(90));
+        assert!(
+            other.claim().await.expect("a claim").is_some(),
+            "another replica takes the lane"
+        );
+
+        let mut known = Known::default();
+        assert_eq!(Kept::Lost, holder.period(&term, &mut known).await);
+        assert!(
+            known.subscribed.is_none(),
+            "the holder forgets what it withdrew"
+        );
+        registry.verify().await;
     }
 }

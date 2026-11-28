@@ -492,7 +492,10 @@ async fn start_hl7v2(
     let maps = ferrobridge_hl7v2::map::maps::Maps::corrected()
         .maps()
         .count();
-    let terminology = state.terminology().cloned();
+    let terminology = state.terminology().cloned().map(|client| {
+        ferrobridge_hl7v2::map::terminology::Terminology::new(client)
+            .with_max_age(lane.authority_max_age)
+    });
     let tls = match lane.tls.as_ref() {
         Some(_) => {
             let socket = TcpListener::bind(lane.listen)
