@@ -505,39 +505,16 @@ render_page() {
   done
 }
 
-# Fails for each badge file of a corpus whose upstream rows hold failing
-# cases and whose colour is not the one its pass list gives with those cases
-# out of the count.
-upstream_color_check() {
-  local file corpus color want fraction passed total held failures=0
-  for file in "$@"; do
-    corpus="$(basename "$file" .json)"
-    [[ -f "$root/$corpus/upstream.tsv" ]] || continue
-    held="$(held_of "$corpus")" || return 1
-    [[ "$held" -gt 0 ]] || continue
-    fraction="$(fraction_of_list "$corpus")" || return 1
-    read -r passed total <<<"$fraction"
-    want="$(badge_count_color "$passed" "$total" "$held")"
-    color="$(jq -r .color "$file")"
-    if [[ "$color" != "$want" ]]; then
-      echo "conformance: $file is $color, and $passed of $total with $held held upstream asks for $want" >&2
-      failures=$((failures + 1))
-    fi
-  done
-  [[ "$failures" -eq 0 ]]
-}
-
-# The badge files of $@ whose corpus holds no failing case upstream, for the
-# shared colour check, which reads the fraction alone.
-without_upstream() {
+# Prints each badge file of $@ for the shared colour check, as FILE=HELD
+# when its corpus's upstream rows hold HELD failing cases, else as FILE.
+held_entries() {
   local file corpus held
   for file in "$@"; do
     corpus="$(basename "$file" .json)"
     held=0
     [[ ! -f "$root/$corpus/upstream.tsv" ]] || held="$(held_of "$corpus")" || return 1
-    [[ "$held" -gt 0 ]] || echo "$file"
+    if [[ "$held" -gt 0 ]]; then echo "$file=$held"; else echo "$file"; fi
   done
-  return 0
 }
 
 # Holds the upstream rows of corpus $1 to its pass list and, when given, its
@@ -683,16 +660,18 @@ run_self_test() {
   printf '%s\n' a b 'total 4' >"$work/$corpus/pass-list.txt"
   st_upstream $'c\t632' $'d\t632'
   jq -n '{message: "2/4", color: "yellowgreen"}' >"$work/$corpus.json"
-  upstream_color_check "$work/$corpus.json" 2>/dev/null || { st_fail "a yellowgreen badge whose rest all pass is refused"; return 1; }
-  jq -n '{message: "2/4", color: "brightgreen"}' >"$work/green.json"
-  cp "$work/green.json" "$work/$corpus.json"
-  if upstream_color_check "$work/$corpus.json" 2>/dev/null; then st_fail "a green badge with held cases passes"; return 1; fi
+  [[ "$(held_entries "$work/$corpus.json")" == "$work/$corpus.json=2" ]] || { st_fail "the held count of an upstream badge is not passed on"; return 1; }
+  # shellcheck disable=SC2046 # one entry per line, none with a space
+  badge_color_check $(held_entries "$work/$corpus.json") 2>/dev/null || { st_fail "a yellowgreen badge whose rest all pass is refused"; return 1; }
+  jq -n '{message: "2/4", color: "brightgreen"}' >"$work/$corpus.json"
+  # shellcheck disable=SC2046 # one entry per line, none with a space
+  if badge_color_check $(held_entries "$work/$corpus.json") 2>/dev/null; then st_fail "a green badge with held cases passes"; return 1; fi
   jq -n '{message: "2/4", color: "yellowgreen"}' >"$work/$corpus.json"
-  [[ -z "$(without_upstream "$work/$corpus.json")" ]] || { st_fail "the shared colour check reads an upstream badge"; return 1; }
   st_upstream $'c\t632'
-  if upstream_color_check "$work/$corpus.json" 2>/dev/null; then st_fail "a yellowgreen badge with an unheld failing case passes"; return 1; fi
+  # shellcheck disable=SC2046 # one entry per line, none with a space
+  if badge_color_check $(held_entries "$work/$corpus.json") 2>/dev/null; then st_fail "a yellowgreen badge with an unheld failing case passes"; return 1; fi
   rm "$work/$corpus/upstream.tsv"
-  [[ -n "$(without_upstream "$work/$corpus.json")" ]] || { st_fail "the shared colour check skips a plain badge"; return 1; }
+  [[ "$(held_entries "$work/$corpus.json")" == "$work/$corpus.json" ]] || { st_fail "a plain badge carries a held count"; return 1; }
 
   local name
   for name in "${CORPORA[@]}" "${EXTERNAL_CORPORA[@]}"; do
@@ -1030,9 +1009,9 @@ badge_length_readme README.md || failed=1
 badge_block_check README.md || failed=1
 badge_render_check README.md || failed=1
 
-mapfile -t plain_badges < <(without_upstream "$BADGES"/*.json)
+mapfile -t colour_entries < <(held_entries "$BADGES"/*.json)
 if ! badge_logo_check "$BADGES"/*.json || ! badge_logo_readme README.md || ! badge_caption_check README.md ||
-  ! badge_color_check ${plain_badges[@]+"${plain_badges[@]}"} || ! upstream_color_check "$BADGES"/*.json; then
+  ! badge_color_check "${colour_entries[@]}"; then
   if [[ "$mode" = check ]]; then failed=1; fi
 fi
 
