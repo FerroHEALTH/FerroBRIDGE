@@ -66,9 +66,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let openehr = locked_versions(&lock, |name, registry| {
         registry && name.starts_with("openehr-")
     });
-    // TODO(#2404): read the path copy again once the workspace takes 0.5.0; until
-    // then the bridge builds on the published copy and the path one is unused.
-    let fhir_types = locked_versions(&lock, |name, registry| registry && name == "fhir-types");
+    // NOTE: a registry copy of `fhir-types` on an older line, which a crates.io
+    // dependency pulls in, is that crate's own model, never the bridge's.
+    let fhir_types = locked_versions(&lock, |name, registry| !registry && name == "fhir-types");
     for (key, versions) in [
         ("FERROBRIDGE_BUILD_OPENEHR_CRATES", openehr),
         ("FERROBRIDGE_BUILD_FHIR_TYPES", fhir_types),
