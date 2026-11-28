@@ -2105,7 +2105,7 @@ version = "0.0.30"
 dependencies = [
  "anyhow",
  "clap",
- "fhir-types 0.5.0",
+ "fhir-types 0.6.0",
  "generated-tree",
  "hl7v2-types",
  "insta",
@@ -2141,7 +2141,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "quick-xml",
  "regex",

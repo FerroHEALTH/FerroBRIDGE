@@ -537,6 +537,40 @@ fn overlay_parts(
         });
         parameter.part.push(part);
     }
+    if url == CODE_SYSTEM_LOOKUP && parameter.usage == ParameterUse::Out && owner == "property" {
+        for part in &mut parameter.part {
+            if part.name == "subproperty" && !has(part, "subproperty") {
+                let nested = nested_subproperty(part);
+                added.push(Added {
+                    usage: part.usage,
+                    name: String::from("property.subproperty.subproperty"),
+                    source: ParameterSource::Ecosystem,
+                });
+                part.part.push(nested);
+            }
+        }
+    }
+}
+
+/// The subproperty a `$lookup` subproperty nests, with the parts of `parent`.
+// NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Properties: a `value` "for a `/`
+// member … carries the member's own `postcoordination` subproperties, one level down".
+fn nested_subproperty(parent: &OperationParameter) -> OperationParameter {
+    OperationParameter {
+        name: String::from("subproperty"),
+        usage: parent.usage,
+        min: 0,
+        max: String::from("*"),
+        documentation: Some(format!(
+            "Defined by the terminology ecosystem (<{IG_REQUIREMENTS}>), declared by no FHIR version. A subproperty of this subproperty, one level down: the ICD-11 page (`icd-11.html`, Properties) carries a cluster member's own `postcoordination` subproperties in the `value` subproperty that names the member."
+        )),
+        type_name: None,
+        target_profile: Vec::new(),
+        search_type: None,
+        binding: None,
+        scope: Vec::new(),
+        part: parent.part.clone(),
+    }
 }
 
 fn declares(definition: &OperationDefinition, usage: ParameterUse, name: &str) -> bool {

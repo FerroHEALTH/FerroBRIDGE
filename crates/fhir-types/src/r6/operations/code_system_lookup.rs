@@ -149,6 +149,29 @@ pub struct CodeSystemLookupResponsePropertySubproperty {
     /// additional subproperty or subproperty value), then this parameter must
     /// assert the url of the supplement.
     pub source: Option<super::super::primitives::Canonical>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. A subproperty of this subproperty, one level down:
+    /// the ICD-11 page (\`icd-11.html\`, Properties) carries a cluster member's
+    /// own \`postcoordination\` subproperties in the \`value\` subproperty that
+    /// names the member.
+    pub subproperty: Vec<CodeSystemLookupResponsePropertySubpropertySubproperty>,
+}
+
+/// The parts of the `subproperty` parameter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeSystemLookupResponsePropertySubpropertySubproperty {
+    /// Identifies the sub-property returned
+    pub code: super::super::primitives::Code,
+    /// The value of the sub-property returned
+    pub value: super::super::parameters::ParametersParameterValue,
+    /// Human Readable representation of the sub-property value (e.g. display
+    /// for a code)
+    pub description: Option<super::super::primitives::String>,
+    /// If information from a supplement is included as a subproperty (e.g. any
+    /// additional subproperty or subproperty value), then this parameter must
+    /// assert the url of the supplement.
+    pub source: Option<super::super::primitives::Canonical>,
 }
 
 impl CodeSystemLookupRequest {
@@ -1691,6 +1714,8 @@ impl CodeSystemLookupResponsePropertySubproperty {
         let mut field_value: Option<super::super::parameters::ParametersParameterValue> = None;
         let mut field_description: Option<super::super::primitives::String> = None;
         let mut field_source: Option<super::super::primitives::Canonical> = None;
+        let mut field_subproperty: Vec<CodeSystemLookupResponsePropertySubpropertySubproperty> =
+            Vec::new();
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -1837,6 +1862,9 @@ impl CodeSystemLookupResponsePropertySubproperty {
                         }
                     });
                 }
+                "subproperty" => {
+                    field_subproperty.push(CodeSystemLookupResponsePropertySubpropertySubproperty::from_parameter_list(&parameter.part)?);
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -1855,6 +1883,245 @@ impl CodeSystemLookupResponsePropertySubproperty {
             value: field_value.ok_or(super::super::super::operation::ParametersError::Missing {
                 operation: OPERATION,
                 name: "property.subproperty.value",
+            })?,
+            description: field_description,
+            source: field_source,
+            subproperty: field_subproperty,
+        })
+    }
+    /// Writes the fields as a parameter list, by move.
+    #[must_use]
+    pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
+        let mut out = Vec::with_capacity(5);
+        {
+            let value = self.code;
+            out.push(super::super::parameters::ParametersParameter {
+                name: "code".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::Code(
+                    value,
+                )),
+                ..Default::default()
+            });
+        }
+        {
+            let value = self.value;
+            out.push(super::super::parameters::ParametersParameter {
+                name: "value".into(),
+                value: Some(value),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.description {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "description".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::String(
+                    value,
+                )),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.source {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "source".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::Canonical(value)),
+                ..Default::default()
+            });
+        }
+        for value in self.subproperty {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "subproperty".into(),
+                part: value.into_parameter_list(),
+                ..Default::default()
+            });
+        }
+        out
+    }
+    /// Writes the fields as a parameter list, from a reference.
+    #[must_use]
+    pub fn to_parameter_list(&self) -> Vec<super::super::parameters::ParametersParameter> {
+        self.clone().into_parameter_list()
+    }
+}
+
+impl CodeSystemLookupResponsePropertySubpropertySubproperty {
+    /// Reads the fields from a parameter list.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error for an undeclared, repeated, missing, or wrongly typed parameter.
+    pub fn from_parameter_list(
+        list: &[super::super::parameters::ParametersParameter],
+    ) -> Result<Self, super::super::super::operation::ParametersError> {
+        const OPERATION: &str = "CodeSystem/$lookup";
+        const PREFIX: &str = "property.subproperty.subproperty.";
+        let mut field_code: Option<super::super::primitives::Code> = None;
+        let mut field_value: Option<super::super::parameters::ParametersParameterValue> = None;
+        let mut field_description: Option<super::super::primitives::String> = None;
+        let mut field_source: Option<super::super::primitives::Canonical> = None;
+        for parameter in list {
+            let parameter_name = parameter.name.value.as_deref().ok_or(
+                super::super::super::operation::ParametersError::Unnamed {
+                    operation: OPERATION,
+                },
+            )?;
+            match parameter_name {
+                "code" => {
+                    if field_code.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "property.subproperty.subproperty.code",
+                        });
+                    }
+                    field_code = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::Code(value)) => {
+                            value.clone()
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::String(value)) => {
+                            super::super::primitives::Code {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "property.subproperty.subproperty.code",
+                                    expected: "Code",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "property.subproperty.subproperty.code",
+                                },
+                            );
+                        }
+                    });
+                }
+                "value" => {
+                    if field_value.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "property.subproperty.subproperty.value",
+                        });
+                    }
+                    field_value = Some(parameter.value.clone().ok_or(
+                        super::super::super::operation::ParametersError::MissingValue {
+                            operation: OPERATION,
+                            name: "property.subproperty.subproperty.value",
+                        },
+                    )?);
+                }
+                "description" => {
+                    if field_description.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "property.subproperty.subproperty.description",
+                        });
+                    }
+                    field_description = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::String(value)) => {
+                            value.clone()
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Code(value)) => {
+                            super::super::primitives::String {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Id(value)) => {
+                            super::super::primitives::String {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::Markdown(
+                            value,
+                        )) => super::super::primitives::String {
+                            id: value.id.clone(),
+                            extension: value.extension.clone(),
+                            value: value.value.clone(),
+                        },
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "property.subproperty.subproperty.description",
+                                    expected: "String",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "property.subproperty.subproperty.description",
+                                },
+                            );
+                        }
+                    });
+                }
+                "source" => {
+                    if field_source.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "property.subproperty.subproperty.source",
+                        });
+                    }
+                    field_source = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::Canonical(
+                            value,
+                        )) => value.clone(),
+                        Some(super::super::parameters::ParametersParameterValue::Uri(value)) => {
+                            super::super::primitives::Canonical {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "property.subproperty.subproperty.source",
+                                    expected: "Canonical",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "property.subproperty.subproperty.source",
+                                },
+                            );
+                        }
+                    });
+                }
+                other => {
+                    return Err(
+                        super::super::super::operation::ParametersError::Undeclared {
+                            operation: OPERATION,
+                            name: [PREFIX, other].concat(),
+                        },
+                    );
+                }
+            }
+        }
+        Ok(Self {
+            code: field_code.ok_or(super::super::super::operation::ParametersError::Missing {
+                operation: OPERATION,
+                name: "property.subproperty.subproperty.code",
+            })?,
+            value: field_value.ok_or(super::super::super::operation::ParametersError::Missing {
+                operation: OPERATION,
+                name: "property.subproperty.subproperty.value",
             })?,
             description: field_description,
             source: field_source,
@@ -2239,6 +2506,71 @@ pub const CODE_SYSTEM_LOOKUP: super::super::super::operation::Operation =
                                 scope: &[],
                                 source: super::super::super::operation::ParameterSource::Version,
                                 parts: &[],
+                            },
+                            super::super::super::operation::Parameter {
+                                name: "subproperty",
+                                usage: super::super::super::operation::ParameterUse::Out,
+                                cardinality: super::super::super::operation::Cardinality {
+                                    min: 0,
+                                    max: None,
+                                },
+                                type_code: None,
+                                scope: &[],
+                                source: super::super::super::operation::ParameterSource::Ecosystem,
+                                parts: &[
+                                    super::super::super::operation::Parameter {
+                                        name: "code",
+                                        usage: super::super::super::operation::ParameterUse::Out,
+                                        cardinality: super::super::super::operation::Cardinality {
+                                            min: 1,
+                                            max: Some(1),
+                                        },
+                                        type_code: Some("code"),
+                                        scope: &[],
+                                        source:
+                                            super::super::super::operation::ParameterSource::Version,
+                                        parts: &[],
+                                    },
+                                    super::super::super::operation::Parameter {
+                                        name: "value",
+                                        usage: super::super::super::operation::ParameterUse::Out,
+                                        cardinality: super::super::super::operation::Cardinality {
+                                            min: 1,
+                                            max: Some(1),
+                                        },
+                                        type_code: Some("Element"),
+                                        scope: &[],
+                                        source:
+                                            super::super::super::operation::ParameterSource::Version,
+                                        parts: &[],
+                                    },
+                                    super::super::super::operation::Parameter {
+                                        name: "description",
+                                        usage: super::super::super::operation::ParameterUse::Out,
+                                        cardinality: super::super::super::operation::Cardinality {
+                                            min: 0,
+                                            max: Some(1),
+                                        },
+                                        type_code: Some("string"),
+                                        scope: &[],
+                                        source:
+                                            super::super::super::operation::ParameterSource::Version,
+                                        parts: &[],
+                                    },
+                                    super::super::super::operation::Parameter {
+                                        name: "source",
+                                        usage: super::super::super::operation::ParameterUse::Out,
+                                        cardinality: super::super::super::operation::Cardinality {
+                                            min: 0,
+                                            max: Some(1),
+                                        },
+                                        type_code: Some("canonical"),
+                                        scope: &[],
+                                        source:
+                                            super::super::super::operation::ParameterSource::Version,
+                                        parts: &[],
+                                    },
+                                ],
                             },
                         ],
                     },
