@@ -3,18 +3,22 @@
 
 //! What a received imaging report carries into no structured element: each
 //! section and element the run declares in its outcome, the performing
-//! organization the imaging service slot carries, and a performer of another
-//! type declared.
+//! organization the imaging service slot carries, a performer of another
+//! type declared, and the composition's comment naming what it does not carry.
 
 use std::error::Error;
 
 use eehrxf::mapping::Mapping;
 use eehrxf::mappings::IMAGING;
+use eehrxf::receive::ReceivedDocument;
+use eehrxf::receive::openehr::COMMENT_LEAD;
 use fhir_types::r4::practitioner::Practitioner;
+use openehr_mapping_core::index::WebTemplateIndex;
 use serde_json::Value;
 
 use super::{
-    CONTEXT, expressions_by, mapping, only, received_text, received_text_with, report, template,
+    CONTEXT, expressions_by, mapping, only, received_text, received_text_with, report, settings,
+    template,
 };
 
 /// The expressions of the issues the run over the received `text` declares
@@ -204,5 +208,29 @@ fn each_report_and_study_element_and_narrative_section_is_declared() -> Result<(
             "{carried} is carried, not declared: {declared:?}"
         );
     }
+    Ok(())
+}
+
+// NOTE: openEHR-EHR-COMPOSITION.report-result.v1 at0007 is the composition's Comment, a DV_TEXT
+// in other_context, where the record's reader sees each element the composition does not carry.
+#[test]
+fn the_composition_names_what_it_does_not_carry_in_its_comment_and_validates()
+-> Result<(), Box<dyn Error>> {
+    let document = ReceivedDocument::read(&received_text()?)?;
+    let composition = mapping()?.to_openehr(&document, &settings())?;
+    assert!(!composition.not_carried().is_empty(), "the report's losses");
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let comment = canonical["context"]["other_context"]["items"]
+        .as_array()
+        .ok_or("the context's items")?
+        .iter()
+        .find(|item| item["archetype_node_id"] == "at0007")
+        .ok_or("the comment")?;
+    assert_eq!(
+        comment["value"]["value"],
+        format!("{COMMENT_LEAD}{}", composition.not_carried().join("; ")),
+        "{comment}"
+    );
+    WebTemplateIndex::build(&template()?)?.accept(canonical)?;
     Ok(())
 }
