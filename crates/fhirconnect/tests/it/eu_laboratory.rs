@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The HL7 Europe Laboratory Report 2.0.0 round trip: a FerroBRIDGE context
+//! The HL7 Europe Laboratory Report 2.1.0 round trip: a FerroBRIDGE context
 //! over the published `KDS_Laborbericht` template. The report is a
 //! `DiagnosticReport-eu-lab`, and each analyte an
 //! `Observation-resultslab-eu-lab` the report references, a profile that
-//! derives from Base and Core 2.0.0 `medicalTestResult-eu-core`.
+//! derives from Base and Core 2.0.1 `medicalTestResult-eu-core`.
 //!
 //! The mapping library's own `eehrxf_lab` context targets Laboratory 0.1.1
 //! and its template does not parse strictly (#1235), so the published

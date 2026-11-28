@@ -4,7 +4,7 @@
 //! The eHN Patient Summary §4 preferred systems held to the vendored
 //! MyHealth@EU Master Value Sets Catalogue 9.1.0, and NPU, which the
 //! catalogue does not include, to the vendored HL7 Europe Laboratory Report
-//! 2.0.0: each URI is the system the value set its documentation names
+//! 2.1.0: each URI is the system the value set its documentation names
 //! includes.
 
 #![expect(
@@ -48,7 +48,7 @@ struct Include {
 pub(super) const CATALOGUE: &str = "ehdsi-mvc/myhealth.eu.fhir.mvc-package-9.1.0.tgz";
 
 /// The vendored HL7 Europe Laboratory Report guide.
-const LABORATORY: &str = "eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.0.0.tgz";
+const LABORATORY: &str = "eu-hl7-laboratory/hl7.fhir.eu.laboratory-2.1.0.tgz";
 
 /// The system and version of each include of a value set.
 pub(super) type Included = Vec<(String, Option<String>)>;

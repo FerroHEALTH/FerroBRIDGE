@@ -99,7 +99,7 @@ fails when it names a different commit, tag or pin-set digest.
 | HL7 Europe Base and Core | package `hl7.fhir.eu.base` 2.0.1, pin-set digest `b84f7ba0799903e6bf4d2bf0ecaeeaefd0f71510238c7e30d63244ff6c603c67`, tarball sha256 `3fb23b64d70656ea809e1ad66d84d5d008400e18424266debf176cb46fba0b4a` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-base/PROVENANCE.md` |
 | HL7 Europe Patient Summary | package `hl7.fhir.eu.eps` 1.0.0-ballot, pin-set digest `ba59282865c06a3819a25d92b4110f5d6c84b2df2b0f4e0ae34092a66659f038`, tarball sha256 `e0fff1fb20d3daf75609259faa6b860131ebf4fc8890bb68f0da882307afc33c` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-eps/PROVENANCE.md` |
 | HL7 Europe Medication Prescription and Dispense | package `hl7.fhir.eu.mpd` 1.0.0, pin-set digest `4c4ea5572812dbacfc87573af4165742284a0825b0a200fa606df07393ea9758`, tarball sha256 `f1bc1084efc93e16ae4b45c1bb71340385d314a72031949c4a7e0d97aea5fd6b` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-mpd/PROVENANCE.md` |
-| HL7 Europe Laboratory Report | package `hl7.fhir.eu.laboratory` 2.0.0, pin-set digest `716111c5e8d1a60490dd0ac34f5e98534fd83cce8055218e05f7d675778af682`, tarball sha256 `097aa45c6efcdbc3f25ead8b7d448fee5011b5e7ecf264aa400c5e2c69c5c488`, held: 2.1.0 (2026-10-16) depends on hl7.terminology.r4 7.4.0, hl7.fhir.uv.ips 2.0.1 and hl7.fhir.eu.base 2.0.1, outside the dependency closure of the MyHealth@EU catalogue 9.1.0 (hl7.terminology.r4 7.1.0) that the laboratory documents are validated in | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-laboratory/PROVENANCE.md` |
+| HL7 Europe Laboratory Report | package `hl7.fhir.eu.laboratory` 2.1.0, pin-set digest `d33d96d7d27d9ea869d3a1ce045e87482c8f383b04a81156f8ca694bcb904d27`, tarball sha256 `87019c396f4cff934ec5230ce1f97d76b79b40591be08161e694ad661129379c` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-laboratory/PROVENANCE.md` |
 | HL7 Europe Imaging Report | package `hl7.fhir.eu.imaging` 1.0.0-ballot, pin-set digest `aad98731a1f2597d6a7defa2c7f6ab7297781b677398383346c5592f913c9f4b`, tarball sha256 `bb6012bd7a019ac82f5e939dd6e892e6db6b15fd2931dcf7cc445c1ad92c3d70` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-imaging/PROVENANCE.md` |
 | HL7 Europe Hospital Discharge Report | package `hl7.fhir.eu.hdr` 1.0.0, pin-set digest `8193d59700b891ed87e1e0da87bc62517dba751a449c9c65e7b7c8eb1982fba8`, tarball sha256 `eedf9af9f66b68cd66f7d6c678a36dfba86b0920df4ef15e8d2da900c4134879` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-hdr/PROVENANCE.md` |
 | HL7 Europe EU Health Data API | package `hl7.fhir.eu.health-data-api` 1.0.0-ballot, pin-set digest `253ebbce321fc294ae582c3c3abb67274ad53de6578c3eb3360e1566697691ac`, tarball sha256 `5204af60bf7f74f301a627e641a34683d392014f53d5df8ba3651c964e92977b` | `scripts/vendor/eehrxf.sh`, `docs/specs/eu-hl7-health-data-api/PROVENANCE.md` |
@@ -292,8 +292,8 @@ only each `PROVENANCE.md` is, and CI restores the trees from a cache keyed on
 `scripts/vendor/profile-packages.sh --cache-key`. The thirteen roots are `hl7.fhir.eu.eps` 1.0.0-ballot (its
 one published version), `hl7.fhir.eu.base` 2.0.1, `hl7.fhir.uv.ips` 2.0.1,
 the two guides the EU profile contexts target, `hl7.fhir.eu.laboratory`
-2.0.0 and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set already
-held, `hl7.fhir.eu.imaging` 1.0.0-ballot, the guide a received imaging
+2.1.0 (#2384) and `hl7.fhir.eu.mpd` 1.0.0 (#116), whose dependencies the set
+already held, `hl7.fhir.eu.imaging` 1.0.0-ballot, the guide a received imaging
 report is validated against (#1601), `hl7.fhir.eu.hdr` 1.0.0, the
 discharge report a received document is validated against (#1600), and
 `hl7.eu.fhir.xshare-yb` 0.3.0, the xShare Yellow Button guide whose
@@ -347,7 +347,7 @@ every `PROVENANCE.md` back against its row.
 contexts target `condition-eu-core` and `patient-eu-core` 2.0.0 of
 `hl7.fhir.eu.base` and the `DiagnosticReport-eu-lab`,
 `Observation-resultslab-eu-lab` and `Specimen-eu-lab` profiles of
-`hl7.fhir.eu.laboratory` 2.0.0;
+`hl7.fhir.eu.laboratory` 2.1.0;
 the mapping library's own contexts target the MII Kerndatensatz modules at
 2025.0.0.
 
@@ -358,7 +358,7 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `hl7.fhir.eu.base` | 2.0.0 files `77` digest `0b2e85a498e4f0df5ed8f122d97737c824250cb247792db9e392f4186245ea01` | `docs/specs/fhir-packages/hl7.fhir.eu.base#2.0.0/PROVENANCE.md` |
 | `hl7.fhir.uv.ips` | 2.0.1 files `155` digest `7a4670ea917702532f6c82f6c7df1089ebb26c99fb3149fe4972c3e552108250` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#2.0.1/PROVENANCE.md` (a root) |
 | `hl7.fhir.uv.ips` | 2.0.0 files `154` digest `86dbd916617c60642e0296c33bea0d1aa6497c4ca46a2db285a0e5c975f28316` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#2.0.0/PROVENANCE.md` |
-| `hl7.fhir.eu.laboratory` | 2.0.0 files `94` digest `f142bbdac038895d90841bb92b7865fdf0eb16b9b0b84a8db702998b36636263` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.0.0/PROVENANCE.md` (a root) |
+| `hl7.fhir.eu.laboratory` | 2.0.0 files `94` digest `f142bbdac038895d90841bb92b7865fdf0eb16b9b0b84a8db702998b36636263` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.0.0/PROVENANCE.md` |
 | `hl7.fhir.eu.mpd` | 1.0.0 files `51` digest `e44ea93f6506fc118287051120ae9bfa737cff3a2791cde5ea1f222bf43e88fa` | `docs/specs/fhir-packages/hl7.fhir.eu.mpd#1.0.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.eu.hdr` | 1.0.0 files `120` digest `184630f1c3f11ac5b27b3d024347fc68cfc4aa55abcb545255a3fa5b4c9f3834` | `docs/specs/fhir-packages/hl7.fhir.eu.hdr#1.0.0/PROVENANCE.md` (a root) |
 | `hl7.eu.fhir.xshare-yb` | 0.3.0 files `13` digest `a411d731a3fa7a1f28f29083b4db10cc6f581c92f7b7b2bece8fee642ae4ae65` tarball `https://hl7.eu/fhir/ig/xshare-yb/0.3.0/package.tgz` sha256 `ba0ced94b5d4bdb463e46375404f805c433640d07604f518a434a58af3c18682` | `docs/specs/fhir-packages/hl7.eu.fhir.xshare-yb#0.3.0/PROVENANCE.md` (a root, from the guide's canonical site: the registry lists 0.2.0 alone) |
@@ -403,7 +403,7 @@ the mapping library's own contexts target the MII Kerndatensatz modules at
 | `myhealth.eu.fhir.euvac` | 10.0.0-preview files `28` digest `e49726139bce7a8120eee801905ba45c8394839e44758097b5da26994a9c521e` | `docs/specs/fhir-packages/myhealth.eu.fhir.euvac#10.0.0-preview/PROVENANCE.md` (a root, a preview and not a release, CC-BY-4.0) |
 | `myhealth.eu.fhir.core` | 1.0.0 files `128` digest `e39cf821244120cf6b54133c7e86ce3f5076c0a2d0568b3d12c569bd2a3b7512` | `docs/specs/fhir-packages/myhealth.eu.fhir.core#1.0.0/PROVENANCE.md` |
 | `xtehr.eu.ehds.models` | 0.3.0 files `49` digest `c9ca078a854e0777f4a4d02afe826556b8cfeb3591ec83819c6a1d99a556597c` | `docs/specs/fhir-packages/xtehr.eu.ehds.models#0.3.0/PROVENANCE.md` (FHIR 5.0.0, held and never read) |
-| `hl7.fhir.eu.laboratory` | 2.1.0 files `110` digest `bffb6f7bb6972965d22e53f4b80be1f626f739dc42b116eb24c204b31230a9f9` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.1.0/PROVENANCE.md` |
+| `hl7.fhir.eu.laboratory` | 2.1.0 files `110` digest `bffb6f7bb6972965d22e53f4b80be1f626f739dc42b116eb24c204b31230a9f9` | `docs/specs/fhir-packages/hl7.fhir.eu.laboratory#2.1.0/PROVENANCE.md` (a root) |
 | `hl7.fhir.uv.ips` | 1.1.0 files `191` digest `20aaad2ef11eb0323cdb932d23c90ec3a563c65a705a5e434f9ef33bf76140a1` | `docs/specs/fhir-packages/hl7.fhir.uv.ips#1.1.0/PROVENANCE.md` |
 | `hl7.terminology.r4` | 7.5.0 files `4235` digest `d6e3916c8eee0ff581a50cc19ca1183a847d1891dbc2f96ad172fc884d4bf298` | `docs/specs/fhir-packages/hl7.terminology.r4#7.5.0/PROVENANCE.md` |
 | `hl7.fhir.uv.extensions.r4` | 5.4.0 files `1647` digest `6fd1c64e6da1c0b8cfb070c82702f1e8d1c1a5753cfffed14340b0a699e6ad7c` | `docs/specs/fhir-packages/hl7.fhir.uv.extensions.r4#5.4.0/PROVENANCE.md` |

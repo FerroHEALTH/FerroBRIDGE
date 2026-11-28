@@ -35,7 +35,7 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   `laboratory`) and the discharge report (`crosswalk::discharge`, feature
   `discharge`) carry one, the two medication ones against the HL7 Europe MPD
   1.0.0 `MedicationRequest-eu-mpd` and `MedicationDispense-eu-mpd` profiles,
-  the laboratory report against the HL7 Europe Laboratory Report 2.0.0
+  the laboratory report against the HL7 Europe Laboratory Report 2.1.0
   `Composition-eu-lab` with its `DiagnosticReport-eu-lab` companion
   (`Crosswalk::check_with`), and the discharge report against the HL7
   Europe Hospital Discharge Report 1.0.0 `composition-eu-hdr` profile.
@@ -62,7 +62,7 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   under `mappings/` in its package, each embedded as text with the context
   mappings it compiles: `MPD` (features `prescription` or `dispensation`),
   the HL7 Europe MPD 1.0.0 request and dispense, and `LABORATORY` (feature
-  `laboratory`), the HL7 Europe Laboratory Report 2.0.0 report with its
+  `laboratory`), the HL7 Europe Laboratory Report 2.1.0 report with its
   results and specimens over the published `KDS_Laborbericht` template, and
   `HDR` (feature `discharge`), the HL7 Europe Hospital Discharge Report
   1.0.0 composition, encounter, diagnostic summary, significant procedures

@@ -70,23 +70,23 @@ fn the_laboratory_and_mpd_profiles_resolve_by_canonical_and_version() -> TestRes
     let Some(set) = eu_set()? else { return Ok(()) };
     for (canonical, kind) in [
         (
-            "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab|2.0.0",
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Bundle-eu-lab|2.1.0",
             "Bundle",
         ),
         (
-            "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab|2.0.0",
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab|2.1.0",
             "Composition",
         ),
         (
-            "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab|2.0.0",
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab|2.1.0",
             "DiagnosticReport",
         ),
         (
-            "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab|2.0.0",
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Observation-resultslab-eu-lab|2.1.0",
             "Observation",
         ),
         (
-            "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab|2.0.0",
+            "http://hl7.eu/fhir/laboratory/StructureDefinition/Specimen-eu-lab|2.1.0",
             "Specimen",
         ),
         (

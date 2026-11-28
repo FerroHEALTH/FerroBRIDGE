@@ -92,10 +92,10 @@ pinned_corpus eu-hl7-mpd "HL7 Europe Medication Prescription and Dispense" \
   "The European ePrescription and eDispensation guide, canonical
 \`http://hl7.eu/fhir/mpd\`, committed under CC0-1.0." "" "$read_by"
 
-pin commit hl7.fhir.eu.laboratory-2.0.0.tgz "2.0.0 (FHIR 4.0.1, 2026-05-05)" \
-  "$registry/hl7.fhir.eu.laboratory/2.0.0" \
-  097aa45c6efcdbc3f25ead8b7d448fee5011b5e7ecf264aa400c5e2c69c5c488 "$cc0" \
-  "$whole The version MyHealth@EU Laboratory 9.1.1 derives from, which the component reads."
+pin commit hl7.fhir.eu.laboratory-2.1.0.tgz "2.1.0 (FHIR 4.0.1, 2026-10-16)" \
+  "$registry/hl7.fhir.eu.laboratory/2.1.0" \
+  87019c396f4cff934ec5230ce1f97d76b79b40591be08161e694ad661129379c "$cc0" \
+  "$whole The version MyHealth@EU Laboratory 9.2.0 depends on, which the component reads."
 pinned_corpus eu-hl7-laboratory "HL7 Europe Laboratory Report" \
   "the HL7 Europe Laboratory Report guide hl7.fhir.eu.laboratory" \
   "The European laboratory report guide, canonical
