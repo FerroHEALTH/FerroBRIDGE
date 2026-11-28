@@ -1,0 +1,1 @@
+- The operator console moves to `ferrohealth-session` 0.36, whose `[oidc]` table takes an `algorithms` list of the signature algorithms an ID Token may be signed with, ML-DSA among them (RFC 9964).
