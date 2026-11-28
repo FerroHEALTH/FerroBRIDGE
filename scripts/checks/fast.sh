@@ -12,6 +12,7 @@
 #
 # Usage:
 #   scripts/checks/fast.sh [--base <rev>] [--all] [--no-emit] [--no-fetch] [--dry-run]
+#   scripts/checks/fast.sh --self-test
 #
 #   --base <rev>   measure from this revision instead of the merge base
 #   --all          every package, as a push to main runs them
@@ -24,6 +25,7 @@
 #                  linked worktree the fetch first copies each corpus the
 #                  primary checkout holds and this tree lacks
 #   --dry-run      print the plan and run nothing
+#   --self-test    check the package naming against fixed metadata
 #
 # Each step is one cargo invocation over the whole reached set, so a shared
 # dependency builds once under one feature set. The steps run rustfmt, then
@@ -31,7 +33,9 @@
 # the doctests, so a lint failure is reported before the long test runs.
 # Features unify across the set; the CI lanes run each package on its own
 # through cargo hack and catch a feature one package forgets. Cargo picks
-# the job count.
+# the job count. A member whose name the lock holds twice, as while
+# crates/fhir-types moves ahead of the release the workspace builds on, is
+# named `name@version`, since cargo refuses a bare `-p` for it.
 # Exit 0 when every step passed, 1 when one failed, 2 on a usage error.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -39,6 +43,42 @@ cd "$(dirname "$0")/../.."
 die() {
   echo "fast: $*" >&2
   exit 1
+}
+
+# `name=name@version` for each workspace member whose name cargo metadata on
+# stdin lists more than once.
+duplicated_members() {
+  jq -r '.workspace_members as $members
+    | [.packages | group_by(.name)[] | select(length > 1) | .[0].name] as $twice
+    | .packages[]
+    | select(.id as $id | $members | index($id))
+    | select(.name as $name | $twice | index($name))
+    | "\(.name)=\(.name)@\(.version)"'
+}
+
+# The `-p` value of package $1: its entry in $specs, or its bare name.
+spec() {
+  local named
+  named="$(printf '%s\n' "$specs" | sed -n "s/^$1=//p")"
+  printf '%s\n' "${named:-$1}"
+}
+
+self_test() {
+  local metadata got
+  metadata='{"workspace_members":["path+file:///w/crates/fhir-types#0.5.0","path+file:///w/crates/fhirconnect#0.15.1"],
+    "packages":[
+      {"name":"fhir-types","version":"0.5.0","id":"path+file:///w/crates/fhir-types#0.5.0"},
+      {"name":"fhir-types","version":"0.4.0","id":"registry+https://github.com/rust-lang/crates.io-index#fhir-types@0.4.0"},
+      {"name":"fhirconnect","version":"0.15.1","id":"path+file:///w/crates/fhirconnect#0.15.1"},
+      {"name":"serde","version":"1.0.0","id":"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.0"}]}'
+  specs="$(printf '%s' "$metadata" | duplicated_members)"
+  got="$(spec fhir-types) $(spec fhirconnect) $(spec serde)"
+  [[ "$got" = "fhir-types@0.5.0 fhirconnect serde" ]] ||
+    die "self-test: expected 'fhir-types@0.5.0 fhirconnect serde', got '$got'"
+  specs="$(printf '%s' '{"workspace_members":[],"packages":[]}' | duplicated_members)"
+  [[ "$(spec fhir-types)" = fhir-types ]] ||
+    die "self-test: an empty workspace should leave every name bare"
+  echo "fast: self-test passed"
 }
 
 usage() {
@@ -58,6 +98,7 @@ while [[ $# -gt 0 ]]; do
     --no-emit) emit=false; shift ;;
     --no-fetch) fetch=false; shift ;;
     --dry-run) dry=true; shift ;;
+    --self-test) self_test; exit 0 ;;
     *) usage ;;
   esac
 done
@@ -151,8 +192,9 @@ if [[ "$fetch" = true ]]; then
   fi
 fi
 
+specs="$(cargo metadata --format-version 1 --locked | duplicated_members)"
 args=()
-for package in $packages; do args+=(-p "$package"); done
+for package in $packages; do args+=(-p "$(spec "$package")"); done
 # A package with a feature its default set leaves off is linted and tested
 # with every feature on as well, as the CI lanes do, so a file only those
 # features compile is never skipped.
@@ -161,11 +203,11 @@ featured="$(scripts/checks/featured.sh $packages)"
 run cargo fmt --check "${args[@]}"
 run cargo clippy --locked "${args[@]}" --all-targets -- -D warnings
 for package in $featured; do
-  run cargo clippy --locked -p "$package" --all-features --all-targets -- -D warnings
+  run cargo clippy --locked -p "$(spec "$package")" --all-features --all-targets -- -D warnings
 done
 run cargo nextest run --locked "${args[@]}" --no-tests=pass
 for package in $featured; do
-  run cargo nextest run --locked -p "$package" --all-features --no-tests=pass
+  run cargo nextest run --locked -p "$(spec "$package")" --all-features --no-tests=pass
 done
 # `cargo test --doc` refuses a package without a library target; a `cdylib`
 # beside an `rlib` (the console) still has one.
@@ -174,7 +216,7 @@ libraries="$(cargo metadata --no-deps --format-version 1 --locked |
   tr '\n' ' ')"
 docs=()
 for package in $packages; do
-  if has "$libraries" "$package"; then docs+=(-p "$package"); fi
+  if has "$libraries" "$package"; then docs+=(-p "$(spec "$package")"); fi
 done
 if [[ "${#docs[@]}" -gt 0 ]]; then
   run cargo test --doc --locked "${docs[@]}"
