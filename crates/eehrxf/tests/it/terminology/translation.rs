@@ -504,3 +504,17 @@ async fn a_laboratory_result_no_loinc_translation_reaches_is_unbound() -> TestRe
     assert_eq!(unbound.binding.systems, [ehn::LOINC]);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_snomed_ct_allergen_meets_the_core_binding_and_is_not_asked() -> TestResult {
+    // NOTE: MyHealth@EU Core 1.0.1 eHDSIAllergenWithExceptions draws on SNOMED CT beside ATC.
+    let terminology = scripted(Script::Refuse(StatusCode::INTERNAL_SERVER_ERROR));
+    let mut translator = Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_CORE);
+    let recorded = allergy(vec![coding(ehn::SNOMED_CT, "762952008")]);
+    let translated = translator
+        .translate(&recorded, |system| system == ehn::SNOMED_CT)
+        .await?;
+    assert_eq!(translated, recorded);
+    assert_eq!(translator.unbound().len(), 0);
+    Ok(())
+}

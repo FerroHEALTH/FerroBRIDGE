@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The MyHealth@EU Laboratory 9.2.0 binding set held against the guide and
-//! the value sets it binds, read from the packages
-//! `scripts/vendor/profile-packages.sh` fetches: each binding the set carries
-//! is a `required` binding of the guide whose value set draws on exactly the
-//! systems the binding names, and each one left out draws on SNOMED CT, the
-//! system the source records it in. The value sets resolve through MyHealth@EU
-//! Core 1.0.1 and the Master Value Sets Catalogue 9.1.0 the guide depends on.
+//! The MyHealth@EU binding sets held against their guides and the value
+//! sets they bind, read from the packages `scripts/vendor/profile-packages.sh`
+//! fetches: each binding a set carries is a `required` binding of its guide
+//! whose value set draws on exactly the systems the binding names, and each
+//! Laboratory 9.2.0 binding left out draws on SNOMED CT, the system the source
+//! records it in. The value sets resolve through MyHealth@EU Core 1.0.1 and
+//! the Master Value Sets Catalogue 9.1.0 the guides depend on.
 
 #![expect(
     clippy::panic_in_result_fn,
@@ -20,6 +20,8 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use eehrxf::terminology::ehn;
+use eehrxf::terminology::translation::Binding;
+use eehrxf::terminology::translation::MYHEALTH_EU_CORE;
 use eehrxf::terminology::translation::MYHEALTH_EU_LABORATORY;
 use serde_json::Value;
 
@@ -28,7 +30,10 @@ use crate::support::profile_set;
 /// The guide.
 const LABORATORY: &str = "myhealth.eu.fhir.laboratory#9.2.0";
 
-/// The packages the guide's value sets resolve in.
+/// MyHealth@EU Core, the guide `MYHEALTH_EU_CORE` is held to.
+const CORE: &str = "myhealth.eu.fhir.core#1.0.1";
+
+/// The packages the guides' value sets resolve in.
 const VALUE_SETS: [&str; 2] = [
     "myhealth.eu.fhir.core#1.0.1",
     "myhealth.eu.fhir.mvc-package#9.1.0",
@@ -78,10 +83,11 @@ fn resources(package: &str, kind: &str) -> Result<Vec<Value>, Box<dyn Error>> {
     Ok(found)
 }
 
-/// The guide's `required` bindings, by element path, each with its value set.
-fn required_bindings() -> Result<BTreeSet<(String, String)>, Box<dyn Error>> {
+/// The `required` bindings of the guide `package`, by element path, each
+/// with its value set.
+fn required_bindings(package: &str) -> Result<BTreeSet<(String, String)>, Box<dyn Error>> {
     let mut found = BTreeSet::new();
-    for profile in resources(LABORATORY, "StructureDefinition")? {
+    for profile in resources(package, "StructureDefinition")? {
         let elements = profile["differential"]["element"]
             .as_array()
             .cloned()
@@ -138,15 +144,20 @@ fn systems(sets: &BTreeMap<String, Value>, url: &str) -> Result<BTreeSet<String>
     Ok(found)
 }
 
-#[test]
-fn each_laboratory_binding_is_a_required_binding_of_the_guide_on_its_systems()
--> Result<(), Box<dyn Error>> {
-    if profile_set()?.is_none() {
-        return Ok(());
-    }
-    let required = required_bindings()?;
+/// Holds each of `bindings` to a `required` binding of `package` whose value
+/// set draws on exactly its systems, with its targets among them.
+fn hold(package: &str, bindings: &[Binding]) -> Result<(), Box<dyn Error>> {
+    let required = required_bindings(package)?;
     let sets = value_sets()?;
-    for binding in &MYHEALTH_EU_LABORATORY {
+    for binding in bindings {
+        assert!(
+            binding
+                .targets
+                .iter()
+                .all(|target| binding.systems.contains(target)),
+            "{}: a target outside its systems",
+            binding.element
+        );
         assert!(
             required.contains(&(binding.element.to_owned(), binding.value_set.to_owned())),
             "{} is not bound required to {}",
@@ -165,11 +176,28 @@ fn each_laboratory_binding_is_a_required_binding_of_the_guide_on_its_systems()
 }
 
 #[test]
+fn each_laboratory_binding_is_a_required_binding_of_the_guide_on_its_systems()
+-> Result<(), Box<dyn Error>> {
+    if profile_set()?.is_none() {
+        return Ok(());
+    }
+    hold(LABORATORY, &MYHEALTH_EU_LABORATORY)
+}
+
+#[test]
+fn each_core_binding_is_a_required_binding_of_core_on_its_systems() -> Result<(), Box<dyn Error>> {
+    if profile_set()?.is_none() {
+        return Ok(());
+    }
+    hold(CORE, &MYHEALTH_EU_CORE)
+}
+
+#[test]
 fn each_laboratory_binding_left_out_draws_on_snomed_ct() -> Result<(), Box<dyn Error>> {
     if profile_set()?.is_none() {
         return Ok(());
     }
-    let required = required_bindings()?;
+    let required = required_bindings(LABORATORY)?;
     let sets = value_sets()?;
     for (element, name) in LEFT_OUT {
         let url = format!("http://fhir.ehdsi.eu/core/ValueSet/{name}");
