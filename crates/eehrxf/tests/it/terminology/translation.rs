@@ -22,11 +22,13 @@ use eehrxf::terminology::Terminology;
 use eehrxf::terminology::TerminologyError;
 use eehrxf::terminology::ehn;
 use eehrxf::terminology::translation::MYHEALTH_EU_CORE;
+use eehrxf::terminology::translation::MYHEALTH_EU_LABORATORY;
 use eehrxf::terminology::translation::TranslationError;
 use eehrxf::terminology::translation::Translator;
 use fhir_types::r4::allergy_intolerance::AllergyIntolerance;
 use fhir_types::r4::codeable_concept::CodeableConcept;
 use fhir_types::r4::coding::Coding;
+use fhir_types::r4::observation::Observation;
 use fhir_types::r4::reference::Reference;
 use fhir_types::r4::resource::Resource;
 use http::StatusCode;
@@ -410,5 +412,91 @@ async fn no_designation_is_asked_without_a_requested_language() -> TestResult {
         codes(&translated),
         [pair(LOCAL, "L-1"), pair(PREFERRED, "P-1")]
     );
+    Ok(())
+}
+
+/// A laboratory result whose code carries `codings`.
+fn result(codings: Vec<Coding>) -> Resource {
+    Resource::Observation(Box::new(Observation {
+        status: "final".into(),
+        code: CodeableConcept {
+            coding: codings,
+            ..CodeableConcept::default()
+        },
+        ..Observation::default()
+    }))
+}
+
+/// The codings of the result's code, each as system and code.
+fn result_codes(resource: &Resource) -> Vec<(String, String)> {
+    let Resource::Observation(result) = resource else {
+        return Vec::new();
+    };
+    result
+        .code
+        .coding
+        .iter()
+        .filter_map(|coding| {
+            Some((
+                coding.system.as_ref()?.value.clone()?,
+                coding.code.as_ref()?.value.clone()?,
+            ))
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_laboratory_result_recorded_in_npu_gains_its_loinc_code() -> TestResult {
+    // NOTE: MyHealth@EU Laboratory 9.2.0 binds Observation.code required to
+    // eHDSILabCodeWithExceptions, whose members are LOINC codes.
+    let terminology = scripted(Script::Translate(vec![(
+        "equivalent",
+        ehn::LOINC,
+        "2345-7",
+    )]));
+    let mut translator =
+        Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_LABORATORY);
+    let translated = translator
+        .translate(&result(vec![coding(ehn::NPU, "NPU02192")]), |system| {
+            system == ehn::NPU
+        })
+        .await?;
+    assert_eq!(
+        result_codes(&translated),
+        [pair(ehn::NPU, "NPU02192"), pair(ehn::LOINC, "2345-7")],
+        "draft EEHRxF Art 6(2): the original stays and the mapped coding follows it"
+    );
+    assert_eq!(translator.unbound().len(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_laboratory_result_already_in_loinc_is_not_asked() -> TestResult {
+    let terminology = scripted(Script::Refuse(StatusCode::INTERNAL_SERVER_ERROR));
+    let mut translator =
+        Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_LABORATORY);
+    let recorded = result(vec![coding(ehn::LOINC, "2345-7")]);
+    let translated = translator
+        .translate(&recorded, |system| system == ehn::LOINC)
+        .await?;
+    assert_eq!(translated, recorded);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_laboratory_result_no_loinc_translation_reaches_is_unbound() -> TestResult {
+    let terminology = scripted(Script::Translate(vec![("wider", ehn::LOINC, "2345")]));
+    let mut translator =
+        Translator::new(&terminology, &TARGETS).with_bindings(&MYHEALTH_EU_LABORATORY);
+    let recorded = result(vec![coding(ehn::NPU, "NPU02192")]);
+    let translated = translator
+        .translate(&recorded, |system| system == ehn::NPU)
+        .await?;
+    assert_eq!(translated, recorded, "no code is invented");
+    let [unbound] = translator.unbound() else {
+        return Err("one unbound concept".into());
+    };
+    assert_eq!(unbound.binding.element, "Observation.code");
+    assert_eq!(unbound.binding.systems, [ehn::LOINC]);
     Ok(())
 }

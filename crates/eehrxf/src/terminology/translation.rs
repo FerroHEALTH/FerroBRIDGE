@@ -28,8 +28,10 @@
 //! concept is in a preferred system. A document bound for the MyHealth@EU
 //! Core profiles ([`MYHEALTH_EU_CORE`]) so carries the source's SNOMED CT
 //! coding and the ICD-10 or ATC coding the server maps it to, the original
-//! and the mapped coding draft `EEHRxF` Art 6(2) keeps side by side. A bound
-//! concept no translation reaches is an [`Unbound`] outcome.
+//! and the mapped coding draft `EEHRxF` Art 6(2) keeps side by side; a
+//! laboratory report bound for MyHealth@EU Laboratory
+//! ([`MYHEALTH_EU_LABORATORY`]) so carries the LOINC code of a result recorded
+//! in NPU. A bound concept no translation reaches is an [`Unbound`] outcome.
 //!
 //! A translator given a language ([`Translator::with_designations`]) gives
 //! each coding a translation adds the server's designation in that language,
@@ -103,7 +105,13 @@ pub struct Binding {
 /// The MyHealth@EU Core 1.0.1 required bindings that take no SNOMED CT code.
 ///
 /// Each names the system its members come from in the Master Value Sets
-/// Catalogue 9.1.0 Core depends on.
+/// Catalogue 9.1.0 Core depends on. The Hospital Discharge Report 9.2.0 and
+/// Vaccination 10.0.0-preview guides add no binding beyond these on an element
+/// the shipped mappings write: the discharge report's `Condition.code` is the
+/// binding here and its `Condition.bodySite` takes SNOMED CT
+/// (`eHDSIBodySiteWithExceptions`); the vaccination's `Immunization.vaccineCode`
+/// takes SNOMED CT and ATC (`eHDSIVaccine`), and no shipped mapping writes its
+/// `Immunization.protocolApplied.targetDisease`.
 // NOTE: MyHealth@EU Core 1.0.1 binds Condition.code to eHDSIProblemWithExceptions (ICD-10
 // members) and AllergyIntolerance.code to eHDSIAllergenWithExceptions (ATC drug members).
 pub const MYHEALTH_EU_CORE: [Binding; 2] = [
@@ -116,6 +124,36 @@ pub const MYHEALTH_EU_CORE: [Binding; 2] = [
         element: "AllergyIntolerance.code",
         value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSIAllergenWithExceptions",
         systems: &[ehn::ATC],
+    },
+];
+
+/// The MyHealth@EU Laboratory 9.2.0 required bindings, on elements the shipped
+/// mappings write, whose value set takes no system a source records beside it.
+///
+/// `Observation-resultslab-lab-myhealtheu` binds `Observation.code`, and
+/// `ServiceRequest-lab-myhealtheu` binds `ServiceRequest.code`, to
+/// `eHDSILabCodeWithExceptions`, whose members are LOINC codes (MyHealth@EU
+/// Core 1.0.1 over the Master Value Sets Catalogue 9.1.0 the guide depends
+/// on), so a result recorded in NPU is asked for its LOINC code. The guide's
+/// other required bindings on written elements take SNOMED CT, the system the
+/// source records them in, and need no translation: `Observation.value[x]`
+/// (`eHDSIResultsCodedValueLaboratory`), `Observation.method`
+/// (`eHDSILabTechniqueWithExceptions`), `Specimen.type`
+/// (`eHDSILabSpecimenTypeWithExceptions`), `Specimen.collection.bodySite`
+/// (`eHDSIBodySiteWithExceptions`) and `ServiceRequest.reasonCode`
+/// (`eHDSIOrderReasonWithExceptions`, ICD-10, SNOMED CT and Orphacode). The
+/// report's `DiagnosticReport.code` and the composition's type and category
+/// are LOINC codes the document assembly writes.
+pub const MYHEALTH_EU_LABORATORY: [Binding; 2] = [
+    Binding {
+        element: "Observation.code",
+        value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSILabCodeWithExceptions",
+        systems: &[ehn::LOINC],
+    },
+    Binding {
+        element: "ServiceRequest.code",
+        value_set: "http://fhir.ehdsi.eu/core/ValueSet/eHDSILabCodeWithExceptions",
+        systems: &[ehn::LOINC],
     },
 ];
 
