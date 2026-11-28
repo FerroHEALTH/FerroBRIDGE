@@ -69,9 +69,11 @@ fn an_enabled_hl7v2_face_resolves_its_listeners() -> Result<(), Box<dyn std::err
         "idle_timeout = \"0s\"\n",
         "frame_timeout = \"5s\"\n",
         "frame_limit = \"64KiB\"\n",
+        "authority_max_age = \"1min\"\n",
     ));
     let settings = Config::from_sources(Some(&text), &BTreeMap::new())?.resolve(Process::Server)?;
     let face = settings.hl7v2.ok_or("the face is on")?;
+    assert_eq!(Duration::from_secs(60), face.authority_max_age);
     assert_eq!("0.0.0.0:2576", face.listen.to_string());
     assert_eq!(None, face.timeouts.idle);
     assert_eq!(Some(Duration::from_secs(5)), face.timeouts.frame);
@@ -92,6 +94,11 @@ fn an_hl7v2_key_is_set_through_its_environment_name() -> Result<(), Box<dyn std:
         .hl7v2
         .ok_or("the face is on")?;
     assert_eq!("0.0.0.0:2577", face.listen.to_string());
+    assert_eq!(
+        Duration::from_secs(600),
+        face.authority_max_age,
+        "an assigning authority is held for 10 minutes unless set"
+    );
     Ok(())
 }
 

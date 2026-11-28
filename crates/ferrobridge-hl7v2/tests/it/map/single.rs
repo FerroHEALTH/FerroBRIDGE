@@ -192,7 +192,9 @@ async fn a_refused_translation_fails_the_segment_with_the_upstream_status() {
     let base = url::Url::parse(&format!("{}/", server.uri())).expect("a url");
     let config =
         ferrobridge_term::config::Config::new(base, ferrobridge_term::config::WireVersion::R4);
-    let client = ferrobridge_term::client::Client::new(config).expect("a client");
+    let client = ferrobridge_hl7v2::map::terminology::Terminology::new(
+        ferrobridge_term::client::Client::new(config).expect("a client"),
+    );
     let refused = segment(&parsed, PID, "Patient", corpus, Some(&client)).await;
     assert!(
         matches!(

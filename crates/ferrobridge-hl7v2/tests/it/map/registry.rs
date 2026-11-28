@@ -5,6 +5,8 @@
 //! `system`: a universal id names its system, any other assigning authority
 //! is searched as an identifier `NamingSystem`.
 
+use std::time::Duration;
+
 use ferrobridge_hl7v2::map::{MapError, Mapped, Outcome, map};
 use ferrobridge_testkit::stubs::terminology;
 use wiremock::{Mock, ResponseTemplate};
@@ -171,4 +173,109 @@ async fn with_no_terminology_server_the_registry_row_is_counted() {
         outcome,
         Outcome::NoTerminology { row, .. } if row.target == "system"
     )));
+}
+
+/// The registry searches `server` received.
+async fn searches(server: &wiremock::MockServer) -> usize {
+    server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .filter(|request| request.url.path() == "/r4/NamingSystem")
+        .count()
+}
+
+#[tokio::test]
+async fn an_authority_is_searched_once_per_max_age_across_messages() {
+    let tables = tables();
+    let (server, terminology) = tables.serve().await;
+    let terminology = terminology.with_max_age(Duration::from_secs(1));
+    support::mount_registry(&server, &[("NORTHHOSP", NORTHHOSP)]).await;
+    let message = support::parsed(&admission("PAT-0002^^^NORTHHOSP^MR"));
+    let first = map(&message, support::corpus(), Some(&terminology))
+        .await
+        .expect("the message maps");
+    assert_eq!(Some(String::from(NORTHHOSP)), system(first));
+    let again = map(&message, support::corpus(), Some(&terminology.clone()))
+        .await
+        .expect("the message maps");
+    assert_eq!(Some(String::from(NORTHHOSP)), system(again));
+    assert_eq!(
+        1,
+        searches(&server).await,
+        "no second search within the max age"
+    );
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    let later = map(&message, support::corpus(), Some(&terminology))
+        .await
+        .expect("the message maps");
+    assert_eq!(Some(String::from(NORTHHOSP)), system(later));
+    assert_eq!(
+        2,
+        searches(&server).await,
+        "a search again after the max age"
+    );
+}
+
+#[tokio::test]
+async fn an_unregistered_answer_is_held_like_a_system() {
+    let tables = tables();
+    let (server, terminology) = tables.serve().await;
+    support::mount_registry(&server, &[]).await;
+    let message = support::parsed(&admission("PAT-0002^^^NORTHHOSP^MR"));
+    for _ in 0..2 {
+        let mapped = map(&message, support::corpus(), Some(&terminology))
+            .await
+            .expect("the message maps");
+        assert!(
+            mapped
+                .outcomes()
+                .iter()
+                .any(|outcome| matches!(outcome, Outcome::Unregistered { .. })),
+            "{:?}",
+            mapped.outcomes()
+        );
+    }
+    assert_eq!(1, searches(&server).await);
+}
+
+#[tokio::test]
+async fn a_refused_search_is_never_held() {
+    let tables = tables();
+    let (server, terminology) = tables.serve().await;
+    Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path("/r4/NamingSystem"))
+        .respond_with(ResponseTemplate::new(503))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    support::mount_registry(&server, &[("NORTHHOSP", NORTHHOSP)]).await;
+    let message = support::parsed(&admission("PAT-0002^^^NORTHHOSP^MR"));
+    let refused = map(&message, support::corpus(), Some(&terminology)).await;
+    assert!(
+        matches!(refused, Err(MapError::Registry { .. })),
+        "{refused:?}"
+    );
+    let mapped = map(&message, support::corpus(), Some(&terminology))
+        .await
+        .expect("the message maps");
+    assert_eq!(Some(String::from(NORTHHOSP)), system(mapped));
+    assert_eq!(2, searches(&server).await, "the refusal held nothing");
+}
+
+#[tokio::test]
+async fn a_zero_max_age_searches_on_every_message() {
+    let tables = tables();
+    let (server, terminology) = tables.serve().await;
+    let terminology = terminology.with_max_age(Duration::ZERO);
+    support::mount_registry(&server, &[("NORTHHOSP", NORTHHOSP)]).await;
+    let message = support::parsed(&admission("PAT-0002^^^NORTHHOSP^MR"));
+    for _ in 0..2 {
+        map(&message, support::corpus(), Some(&terminology))
+            .await
+            .expect("the message maps");
+    }
+    assert_eq!(2, searches(&server).await);
 }

@@ -8,11 +8,10 @@
 
 use std::collections::BTreeMap;
 
-use ferrobridge_term::client::Client;
-
 use crate::map::maps::Row;
 use crate::map::run::datum::Datum;
 use crate::map::run::{Base, Lookup, Pending, Run, Scope};
+use crate::map::terminology::Terminology;
 use crate::map::{MapError, Outcome, RowRef};
 
 /// The universal id types the `HD` to `uri` map writes as a URN
@@ -87,9 +86,12 @@ impl<'a> Run<'a> {
         Ok(())
     }
 
-    /// Searches the terminology server's identifier registry for every
-    /// assigning authority the walk recorded, each once, and returns how
-    /// many searches it sent.
+    /// Resolves every assigning authority the walk recorded, each once, and
+    /// returns how many registry searches it sent.
+    ///
+    /// An authority `terminology` resolved within its max age takes the
+    /// held answer; any other is searched on the server's identifier
+    /// registry, and the answer is held ([`Terminology`]).
     ///
     /// One `NamingSystem` answers the authority with its `uri`; none is
     /// [`Outcome::Unregistered`] and more than one
@@ -103,7 +105,7 @@ impl<'a> Run<'a> {
     /// cannot be reached.
     pub(in crate::map) async fn register(
         &mut self,
-        terminology: Option<&Client>,
+        terminology: Option<&Terminology>,
     ) -> Result<usize, MapError> {
         let Some(terminology) = terminology else {
             let unanswered: Vec<Outcome> = self
@@ -118,17 +120,26 @@ impl<'a> Run<'a> {
             return Ok(0);
         };
         let mut answered: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut searches = 0usize;
         for lookup in &self.lookups {
             if answered.contains_key(&lookup.authority) {
                 continue;
             }
-            let systems = terminology
-                .identifier_systems(&lookup.authority)
-                .await
-                .map_err(|source| MapError::Registry {
-                    authority: lookup.authority.clone(),
-                    source: Box::new(source),
-                })?;
+            let systems = if let Some(held) = terminology.held(&lookup.authority) {
+                held
+            } else {
+                let systems = terminology
+                    .client()
+                    .identifier_systems(&lookup.authority)
+                    .await
+                    .map_err(|source| MapError::Registry {
+                        authority: lookup.authority.clone(),
+                        source: Box::new(source),
+                    })?;
+                searches = searches.saturating_add(1);
+                terminology.hold(&lookup.authority, &systems);
+                systems
+            };
             answered.insert(lookup.authority.clone(), systems);
         }
         let mut outcomes = Vec::new();
@@ -153,6 +164,6 @@ impl<'a> Run<'a> {
             }
         }
         self.outcomes.extend(outcomes);
-        Ok(answered.len())
+        Ok(searches)
     }
 }
