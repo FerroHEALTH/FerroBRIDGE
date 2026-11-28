@@ -170,6 +170,17 @@ pub struct Unbound {
     pub originals: Vec<(String, String)>,
 }
 
+/// A concept in no preferred system that no translation covered: where it
+/// is and its codings, the mapping gap a run report counts and a consumer
+/// finds again in the resource by its location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Untranslated {
+    /// Where the concept is, as an element path with indexes.
+    pub location: String,
+    /// The concept's codings, as system and code.
+    pub originals: Vec<(String, String)>,
+}
+
 /// A concept to translate: where it is, its codings as system and code, the
 /// systems to ask for, and the binding it must meet, when bound.
 struct Pending<'t> {
@@ -193,7 +204,7 @@ pub struct Translator<'t> {
     english: bool,
     designations: Option<&'t str>,
     mapped: Vec<Mapping>,
-    unmapped: Vec<(String, String)>,
+    unmapped: Vec<Untranslated>,
     unbound: Vec<Unbound>,
 }
 
@@ -269,10 +280,10 @@ impl<'t> Translator<'t> {
         &self.mapped
     }
 
-    /// Returns each original coding, as system and code, of a concept no
-    /// translation covered: the mapping gaps the run report counts.
+    /// Returns each concept in no preferred system that no translation
+    /// covered, with its location and its original codings.
     #[must_use]
-    pub fn unmapped(&self) -> &[(String, String)] {
+    pub fn unmapped(&self) -> &[Untranslated] {
         &self.unmapped
     }
 
@@ -336,7 +347,10 @@ impl<'t> Translator<'t> {
             })?;
             if added.is_empty() {
                 if !concept.preferred {
-                    self.unmapped.extend(concept.originals.iter().cloned());
+                    self.unmapped.push(Untranslated {
+                        location: concept.location.clone(),
+                        originals: concept.originals.clone(),
+                    });
                     if self.english {
                         changed |= self.designate(codings, "en").await?;
                     }
