@@ -132,6 +132,13 @@ pub struct CodeSystemValidateCodeResponse {
     /// by no FHIR version. The status of the validated concept when its code
     /// system states one (\`retired\`, \`deprecated\`, …).
     pub status: Option<super::super::primitives::Code>,
+    /// Defined by the terminology ecosystem
+    /// (\<<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>\>), declared
+    /// by no FHIR version. The short classification code of the normal form,
+    /// when the code was given with entity ids, so for an expression written
+    /// out of order it matches \`normalized-code\`; a code given with
+    /// classification codes gets none (ICD-11 and ICF, \`icd-11.html\`).
+    pub classification_code: Option<super::super::primitives::Code>,
 }
 
 impl CodeSystemValidateCodeRequest {
@@ -788,6 +795,7 @@ impl CodeSystemValidateCodeResponse {
         let mut field_x_unknown_system: Vec<super::super::primitives::Canonical> = Vec::new();
         let mut field_inactive: Option<super::super::primitives::Boolean> = None;
         let mut field_status: Option<super::super::primitives::Code> = None;
+        let mut field_classification_code: Option<super::super::primitives::Code> = None;
         for parameter in list {
             let parameter_name = parameter.name.value.as_deref().ok_or(
                 super::super::super::operation::ParametersError::Unnamed {
@@ -1301,6 +1309,43 @@ impl CodeSystemValidateCodeResponse {
                         }
                     });
                 }
+                "classificationCode" => {
+                    if field_classification_code.is_some() {
+                        return Err(super::super::super::operation::ParametersError::Repeated {
+                            operation: OPERATION,
+                            name: "classificationCode",
+                        });
+                    }
+                    field_classification_code = Some(match &parameter.value {
+                        Some(super::super::parameters::ParametersParameterValue::Code(value)) => {
+                            value.clone()
+                        }
+                        Some(super::super::parameters::ParametersParameterValue::String(value)) => {
+                            super::super::primitives::Code {
+                                id: value.id.clone(),
+                                extension: value.extension.clone(),
+                                value: value.value.clone(),
+                            }
+                        }
+                        Some(_) => {
+                            return Err(
+                                super::super::super::operation::ParametersError::WrongType {
+                                    operation: OPERATION,
+                                    name: "classificationCode",
+                                    expected: "Code",
+                                },
+                            );
+                        }
+                        None => {
+                            return Err(
+                                super::super::super::operation::ParametersError::MissingValue {
+                                    operation: OPERATION,
+                                    name: "classificationCode",
+                                },
+                            );
+                        }
+                    });
+                }
                 other => {
                     return Err(
                         super::super::super::operation::ParametersError::Undeclared {
@@ -1330,12 +1375,13 @@ impl CodeSystemValidateCodeResponse {
             x_unknown_system: field_x_unknown_system,
             inactive: field_inactive,
             status: field_status,
+            classification_code: field_classification_code,
         })
     }
     /// Writes the fields as a parameter list, by move.
     #[must_use]
     pub fn into_parameter_list(self) -> Vec<super::super::parameters::ParametersParameter> {
-        let mut out = Vec::with_capacity(13);
+        let mut out = Vec::with_capacity(14);
         {
             let value = self.result;
             out.push(super::super::parameters::ParametersParameter {
@@ -1446,6 +1492,15 @@ impl CodeSystemValidateCodeResponse {
         if let Some(value) = self.status {
             out.push(super::super::parameters::ParametersParameter {
                 name: "status".into(),
+                value: Some(super::super::parameters::ParametersParameterValue::Code(
+                    value,
+                )),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.classification_code {
+            out.push(super::super::parameters::ParametersParameter {
+                name: "classificationCode".into(),
                 value: Some(super::super::parameters::ParametersParameterValue::Code(
                     value,
                 )),
@@ -1743,6 +1798,18 @@ pub const CODE_SYSTEM_VALIDATE_CODE: super::super::super::operation::Operation =
             },
             super::super::super::operation::Parameter {
                 name: "status",
+                usage: super::super::super::operation::ParameterUse::Out,
+                cardinality: super::super::super::operation::Cardinality {
+                    min: 0,
+                    max: Some(1),
+                },
+                type_code: Some("code"),
+                scope: &[],
+                source: super::super::super::operation::ParameterSource::Ecosystem,
+                parts: &[],
+            },
+            super::super::super::operation::Parameter {
+                name: "classificationCode",
                 usage: super::super::super::operation::ParameterUse::Out,
                 cardinality: super::super::super::operation::Cardinality {
                     min: 0,
