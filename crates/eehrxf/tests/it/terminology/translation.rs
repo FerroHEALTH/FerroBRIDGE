@@ -202,7 +202,11 @@ async fn an_unmapped_national_code_carries_its_english_designation_and_is_counte
         .translate(&allergy(vec![national]), preferred)
         .await?;
     assert_eq!(codes(&translated), [pair(LOCAL, "L-1")]);
-    assert_eq!(translator.unmapped(), [pair(LOCAL, "L-1")]);
+    let [unmapped] = translator.unmapped() else {
+        return Err("one unmapped concept".into());
+    };
+    assert_eq!(unmapped.location, "AllergyIntolerance.code");
+    assert_eq!(unmapped.originals, [pair(LOCAL, "L-1")]);
     let json = serde_json::to_value(&translated)?;
     let coding = &json["code"]["coding"][0];
     assert_eq!(coding["display"], "Pinda-allergie");
