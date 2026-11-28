@@ -30,6 +30,13 @@ pub(crate) const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fi
 pub(crate) const SHIPPED: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/eehrxf/mappings");
 
+/// The template the shipped laboratory project maps over,
+/// `ferrobridge_laborbericht.v1.0.0`, which ships beside its files.
+pub(crate) const SHIPPED_LABORATORY_TEMPLATE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../crates/eehrxf/mappings/laboratory/ferrobridge_laborbericht.opt"
+));
+
 /// Builds the index over the testkit's diagnosis template.
 pub(crate) fn template() -> Result<WebTemplateIndex, Box<dyn Error>> {
     let opt = openehr_its::opt14::from_xml(ferrobridge_testkit::fixtures::DIAGNOSE_OPT)?;

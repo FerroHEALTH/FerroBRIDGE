@@ -401,8 +401,11 @@ pub const IMAGING: Project = Project {
 
 /// The HL7 Europe Laboratory Report 2.1.0 project.
 ///
-/// It maps over the published `KDS_Laborbericht` template. Its two contexts
-/// map that one template, so a run compiles one of them with
+/// It maps over `ferrobridge_laborbericht.v1.0.0`, the published
+/// `KDS_Laborbericht` template with the composition's Comment added, which
+/// ships beside the project's files as `ferrobridge_laborbericht.opt`; a CDR
+/// that stores the received compositions needs that template uploaded. Its
+/// two contexts map that one template, so a run compiles one of them with
 /// [`Project::with_context`]: `ferrobridge_eu_laboratory.context` maps the
 /// laboratory test result to the `DiagnosticReport-eu-lab` the document holds
 /// beside its composition, each analyte to an `Observation-resultslab-eu-lab`
@@ -443,7 +446,13 @@ pub const LABORATORY: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
-    note: None,
+    note: Some(Note {
+        tree: "at0001",
+        tree_name: "Tree",
+        element: "at0007",
+        element_name: "Comment",
+        slice: None,
+    }),
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.

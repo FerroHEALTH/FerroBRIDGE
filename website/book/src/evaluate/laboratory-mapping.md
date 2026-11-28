@@ -14,7 +14,7 @@ in Art 14(1)(e).
 The crate ships the FHIRconnect 1.0.0 projects it runs under `mappings/` in
 its package, and `eehrxf::mappings` embeds them as text. `MPD` is the
 [prescription and dispensation](prescription-mapping.md) project.
-`LABORATORY` is the laboratory project over the published `KDS_Laborbericht`
+`LABORATORY` is the laboratory project over FerroBRIDGE's laboratory report
 template, whose laboratory result, analyte and specimen archetypes are
 CKM's. `Mapping::compile_project` compiles a project from its embedded
 text with no file written, and `Project::write_to` writes a project's files
@@ -29,6 +29,26 @@ published crate runs the files those tests prove.
 
 `LABORATORY` compiles the report context. The composition context maps the
 same template, so a mapping compiles it on its own.
+
+## The template
+
+The project maps over `ferrobridge_laborbericht.v1.0.0`, which the crate
+ships beside the project's files as
+`mappings/laboratory/ferrobridge_laborbericht.opt`. It is the published
+`KDS_Laborbericht` operational template with one node added: the Comment
+(`at0007`, free text) of `COMPOSITION.report-result.v1` revision 1.1.0 in
+the composition's `other_context`. `KDS_Laborbericht` leaves that Comment
+out, and it has no other free-text element outside the clinical content.
+Every other constraint is `KDS_Laborbericht`'s. The template is a modified
+copy under the Apache License 2.0 of its source, and `PROVENANCE.md` beside
+it records the source and the change.
+
+A CDR that stores received laboratory reports needs
+`ferrobridge_laborbericht.opt` uploaded, through the openEHR ITS-REST
+template upload or the CDR's own tool, before the first report is
+committed. Both directions of the project read this template.
+Compositions a CDR holds under the unmodified `KDS_Laborbericht` are not
+read by this project.
 
 ## Mapping out of openEHR
 
@@ -61,8 +81,8 @@ carries LOINC `11502-2` a laboratory report. `Composition-eu-lab` binds
 that one code. `Category::profiles` then names `Bundle-eu-lab` and
 `Composition-eu-lab`, which `ReceivedDocument::check` holds the document
 to. `Mapping::to_openehr` maps the document's report into one
-`KDS_Laborbericht` composition and keeps the document as received in the
-composition's `FEEDER_AUDIT.original_content`.
+`ferrobridge_laborbericht.v1.0.0` composition and keeps the document as
+received in the composition's `FEEDER_AUDIT.original_content`.
 
 `KDS_Laborbericht` holds one report identifier. A report in a
 `Bundle-eu-lab` carries its own identifier and the document's
@@ -97,3 +117,7 @@ carries into no structured element is a `warning` issue in the
 composition's `OperationOutcome`, its `expression` the element's path: a
 range's `text`, the order a result answers, or an
 order named by `reference` alone. The original document still holds them.
+The composition names the same elements twice: in its feeder audit, and in
+its Comment, which opens with `receive::openehr::COMMENT_LEAD` and lists
+each element by its FHIRPath, so a clinician reading the record sees what
+the composition does not carry.
