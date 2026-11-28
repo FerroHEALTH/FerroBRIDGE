@@ -3,6 +3,8 @@ source: crates/fhirconnect/tests/it/medikationsverabreichung.rs
 expression: declared
 ---
 {
+  "added": [],
+  "changed": [],
   "first_leg": [
     "the engine filled /composer",
     "the engine filled /context/start_time",
@@ -10,10 +12,8 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
+  "lost": [],
   "second_leg": [
     "the mapping administered did not run: its unidirectional marker names the other direction"
-  ],
-  "lost": [],
-  "added": [],
-  "changed": []
+  ]
 }

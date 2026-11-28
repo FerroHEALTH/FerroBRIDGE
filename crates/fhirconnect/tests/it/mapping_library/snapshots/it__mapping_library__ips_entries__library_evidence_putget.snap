@@ -3,6 +3,11 @@ source: crates/fhirconnect/tests/it/mapping_library/ips_entries.rs
 expression: declared
 ---
 {
+  "added": [
+    "code.text = \"Hypertensive disorder\"",
+    "evidence[0].code[0].text = \"Systolic blood pressure\""
+  ],
+  "changed": [],
   "first_leg": [
     "DV_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
     "DV_CODED_TEXT against CodeableConcept filled DV_TEXT.value by a rule that runs one way",
@@ -12,13 +17,8 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [
     "subject.reference = \"Patient/synthetic-1\""
   ],
-  "added": [
-    "code.text = \"Hypertensive disorder\"",
-    "evidence[0].code[0].text = \"Systolic blood pressure\""
-  ],
-  "changed": []
+  "second_leg": []
 }

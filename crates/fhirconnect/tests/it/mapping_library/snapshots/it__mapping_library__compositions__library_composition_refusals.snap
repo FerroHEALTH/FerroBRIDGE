@@ -3,6 +3,31 @@ source: crates/fhirconnect/tests/it/mapping_library/compositions.rs
 expression: refused
 ---
 {
+  "model/composition/org.highmed/fall.v1.Encounter.yml": [
+    "model/composition/org.highmed/fall.v1.Encounter.yml:55 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:57 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:59 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:78 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:80 fc-unknown-template-node",
+    "model/composition/org.highmed/fall.v1.Encounter.yml:82 fc-unknown-template-node"
+  ],
+  "model/composition/org.highmed/person.v1.Patient.yml": [
+    "model/composition/org.highmed/person.v1.Patient.yml:11 fc-archetype-revision-mismatch",
+    "model/composition/org.highmed/person.v1.Patient.yml:18 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:23 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:30 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:34 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:45 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:55 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:57 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:59 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:64 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:69 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:73 fc-unknown-fhir-element",
+    "model/composition/org.highmed/person.v1.Patient.yml:78 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:80 fc-unknown-template-node",
+    "model/composition/org.highmed/person.v1.Patient.yml:82 fc-unknown-template-node"
+  ],
   "model/composition/org.openehr/report.v1.Condition.yml": [
     "model/composition/org.openehr/report.v1.Condition.yml:74 fc-duplicate-method-name",
     "model/composition/org.openehr/report.v1.Condition.yml:62 fc-unknown-template-node",
@@ -51,31 +76,6 @@ expression: refused
     "model/composition/org.openehr/report.v1.Procedure.yml:110 fc-unknown-template-node",
     "model/composition/org.openehr/report.v1.Procedure.yml:112 fc-unknown-template-node",
     "model/composition/org.openehr/report.v1.Procedure.yml:114 fc-unknown-template-node"
-  ],
-  "model/composition/org.highmed/fall.v1.Encounter.yml": [
-    "model/composition/org.highmed/fall.v1.Encounter.yml:55 fc-unknown-template-node",
-    "model/composition/org.highmed/fall.v1.Encounter.yml:57 fc-unknown-template-node",
-    "model/composition/org.highmed/fall.v1.Encounter.yml:59 fc-unknown-template-node",
-    "model/composition/org.highmed/fall.v1.Encounter.yml:78 fc-unknown-template-node",
-    "model/composition/org.highmed/fall.v1.Encounter.yml:80 fc-unknown-template-node",
-    "model/composition/org.highmed/fall.v1.Encounter.yml:82 fc-unknown-template-node"
-  ],
-  "model/composition/org.highmed/person.v1.Patient.yml": [
-    "model/composition/org.highmed/person.v1.Patient.yml:11 fc-archetype-revision-mismatch",
-    "model/composition/org.highmed/person.v1.Patient.yml:18 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:23 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:30 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:34 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:45 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:55 fc-unknown-template-node",
-    "model/composition/org.highmed/person.v1.Patient.yml:57 fc-unknown-template-node",
-    "model/composition/org.highmed/person.v1.Patient.yml:59 fc-unknown-template-node",
-    "model/composition/org.highmed/person.v1.Patient.yml:64 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:69 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:73 fc-unknown-fhir-element",
-    "model/composition/org.highmed/person.v1.Patient.yml:78 fc-unknown-template-node",
-    "model/composition/org.highmed/person.v1.Patient.yml:80 fc-unknown-template-node",
-    "model/composition/org.highmed/person.v1.Patient.yml:82 fc-unknown-template-node"
   ],
   "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml": [
     "model/composition/org.openehr/report_result.v1.DiagnosticReport.yml:37 fc-uncarried-tail",

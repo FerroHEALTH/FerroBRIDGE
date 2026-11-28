@@ -3,6 +3,12 @@ source: crates/fhirconnect/tests/it/mapping_library/clusters.rs
 expression: declared
 ---
 {
+  "added": [
+    "diagnosis[0].use.coding[0].display = \"AD\"",
+    "diagnosis[0].use.coding[1].display = \"surgery-diagnosis\"",
+    "reasonCode[0].text = \"A synthetic problem\""
+  ],
+  "changed": [],
   "first_leg": [
     "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
     "DV_CODED_TEXT against Coding filled DV_TEXT.value by a rule that runs one way",
@@ -13,12 +19,6 @@ expression: declared
     "the engine filled /language",
     "the engine filled /territory"
   ],
-  "second_leg": [],
   "lost": [],
-  "added": [
-    "diagnosis[0].use.coding[0].display = \"AD\"",
-    "diagnosis[0].use.coding[1].display = \"surgery-diagnosis\"",
-    "reasonCode[0].text = \"A synthetic problem\""
-  ],
-  "changed": []
+  "second_leg": []
 }

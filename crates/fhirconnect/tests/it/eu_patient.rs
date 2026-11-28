@@ -187,6 +187,6 @@ fn the_profile_elements_of_patient_eu_core_survive_the_round_trip() -> Result<()
 fn putget_holds_on_the_eu_patient() -> Result<(), Box<dyn Error>> {
     let (program, index) = eu_patient_program()?;
     let declared = laws::putget(&program, &index, &patient(), &laws::untouched)?;
-    insta::assert_json_snapshot!("eu_patient_putget", declared);
+    json_snapshot!("eu_patient_putget", declared);
     Ok(())
 }

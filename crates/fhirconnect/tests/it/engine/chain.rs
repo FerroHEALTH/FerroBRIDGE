@@ -65,7 +65,7 @@ fn the_minimal_diagnosis_chain_maps_both_ways() -> Result<(), Box<dyn Error>> {
         &defaults(),
         &CallContext::new(),
     )?;
-    insta::assert_json_snapshot!("diagnosis_composition", inbound.value().value());
+    json_snapshot!("diagnosis_composition", inbound.value().value());
     let outbound = to_fhir(
         &program,
         &SCHEMAS,
@@ -74,7 +74,7 @@ fn the_minimal_diagnosis_chain_maps_both_ways() -> Result<(), Box<dyn Error>> {
         &Seams::default(),
         &CallContext::new(),
     )?;
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "diagnosis_condition",
         outbound
             .value()

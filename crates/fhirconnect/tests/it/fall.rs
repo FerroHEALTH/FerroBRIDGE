@@ -200,7 +200,7 @@ fn kds_encounter() -> serde_json::Value {
 fn putget_holds_on_the_kds_encounter() -> Result<(), Box<dyn Error>> {
     let (program, index) = kds_fall_program()?;
     let declared = laws::putget(&program, &index, &kds_encounter(), &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_fall_putget", declared);
+    json_snapshot!("kds_fall_putget", declared);
     Ok(())
 }
 
@@ -257,7 +257,7 @@ fn the_kds_fall_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Er
     )
     .err()
     .ok_or("the case chain as published compiles")?;
-    insta::assert_json_snapshot!("kds_fall_chain_as_published", rows(&diagnostics));
+    json_snapshot!("kds_fall_chain_as_published", rows(&diagnostics));
     Ok(())
 }
 

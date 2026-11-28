@@ -3,7 +3,10 @@ source: crates/fhirconnect/tests/it/folded_event_time.rs
 expression: "laws::getput(&program, &index, &interval, &laws::untouched)?"
 ---
 {
+  "added": [],
+  "changed": [],
   "first_leg": [],
+  "lost": [],
   "second_leg": [
     "the mapping status did not run: its unidirectional marker names the other direction",
     "the mapping code did not run: its unidirectional marker names the other direction",
@@ -12,8 +15,5 @@ expression: "laws::getput(&program, &index, &interval, &laws::untouched)?"
     "the engine filled /context/setting",
     "the engine filled /language",
     "the engine filled /territory"
-  ],
-  "lost": [],
-  "added": [],
-  "changed": []
+  ]
 }

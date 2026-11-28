@@ -174,7 +174,7 @@ fn the_kds_person_flat_fixture_builds_a_composition_the_template_admits()
 fn putget_holds_on_the_kds_patient() -> Result<(), Box<dyn Error>> {
     let (program, index) = kds_person_program()?;
     let declared = laws::putget(&program, &index, &kds_patient()?, &laws::untouched)?;
-    insta::assert_json_snapshot!("kds_person_putget", declared);
+    json_snapshot!("kds_person_putget", declared);
     Ok(())
 }
 
@@ -187,7 +187,7 @@ fn getput_holds_on_the_kds_person_composition() -> Result<(), Box<dyn Error>> {
         &kds_person_composition(&index)?,
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("kds_person_getput", declared);
+    json_snapshot!("kds_person_getput", declared);
     Ok(())
 }
 
@@ -316,7 +316,7 @@ fn the_published_admin_entry_extension_names_a_function_the_engine_lacks()
 ///   address to `$resource`.
 #[test]
 fn the_kds_person_chain_as_published_is_refused_exactly() -> Result<(), Box<dyn Error>> {
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "kds_person_chain_as_published",
         person_chain_as_published()?
     );
@@ -461,7 +461,7 @@ fn the_published_address_model_is_refused_for_its_type_paths() -> Result<(), Box
     )
     .err()
     .ok_or("the published address model compiles")?;
-    insta::assert_json_snapshot!("kds_person_address_as_published", rows(&diagnostics));
+    json_snapshot!("kds_person_address_as_published", rows(&diagnostics));
     Ok(())
 }
 

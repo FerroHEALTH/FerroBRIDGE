@@ -270,7 +270,7 @@ fn putget_holds_for_a_folded_point_and_interval_event() -> Result<(), Box<dyn Er
         &observation("effectiveDateTime", json!("2026-09-12T08:30:00+02:00")),
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("folded_event_time_point_putget", point);
+    json_snapshot!("folded_event_time_point_putget", point);
     let interval = laws::putget(
         &program,
         &index,
@@ -280,7 +280,7 @@ fn putget_holds_for_a_folded_point_and_interval_event() -> Result<(), Box<dyn Er
         ),
         &laws::untouched,
     )?;
-    insta::assert_json_snapshot!("folded_event_time_interval_putget", interval);
+    json_snapshot!("folded_event_time_interval_putget", interval);
     Ok(())
 }
 
@@ -292,7 +292,7 @@ fn getput_holds_for_a_folded_point_and_interval_event() -> Result<(), Box<dyn Er
         &index,
         &observation("effectiveDateTime", json!("2026-09-12T08:30:00+02:00")),
     )?;
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "folded_event_time_point_getput",
         laws::getput(&program, &index, &point, &laws::untouched)?
     );
@@ -303,7 +303,7 @@ fn getput_holds_for_a_folded_point_and_interval_event() -> Result<(), Box<dyn Er
             json!({"start": "2026-09-12T06:00:00+02:00", "end": "2026-09-12T08:30:00+02:00"}),
         ),
     )?;
-    insta::assert_json_snapshot!(
+    json_snapshot!(
         "folded_event_time_interval_getput",
         laws::getput(&program, &index, &interval, &laws::untouched)?
     );

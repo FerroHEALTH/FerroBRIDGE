@@ -287,6 +287,6 @@ fn putget_holds_on_a_synthetic_patient_gender() -> Result<(), Box<dyn Error>> {
     let (program, index) = program(REPORT, "ferrobridge_library_gender.context", GENDER, &[])?;
     let patient = serde_json::json!({"resourceType": "Patient", "gender": "female"});
     let declared = laws::putget(&program, &index, &patient, &laws::untouched)?;
-    insta::assert_json_snapshot!("library_gender_putget", declared);
+    json_snapshot!("library_gender_putget", declared);
     Ok(())
 }
