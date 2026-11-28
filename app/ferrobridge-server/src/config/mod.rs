@@ -234,6 +234,32 @@ impl Config {
             || (self.operations.enabled && self.mappings.directory.is_some())
     }
 
+    /// Refuses `[identity_source.cache]` without `[auth]` or `[state]`: its
+    /// feed receiver admits only the identity source's access token, and its
+    /// subscription is held and announced through the state store.
+    fn pseudonym_cache_guarded(&self) -> Result<(), Error> {
+        let Some(source) = self.identity_source.as_ref() else {
+            return Ok(());
+        };
+        if source.cache.is_none() {
+            return Ok(());
+        }
+        let key = String::from("identity_source.cache");
+        if !self.auth.enabled {
+            return Err(Error::Needs {
+                key,
+                needs: String::from("[auth]"),
+            });
+        }
+        if self.state.is_none() {
+            return Err(Error::Needs {
+                key,
+                needs: String::from("[state]"),
+            });
+        }
+        Ok(())
+    }
+
     /// Refuses operations over a mapping directory with neither a template
     /// directory nor a CDR to take the templates from, before any network
     /// call.
@@ -334,6 +360,7 @@ impl Config {
         self.onward_guarded(serves)?;
         self.assurance_guarded(serves)?;
         self.consent_onward()?;
+        self.pseudonym_cache_guarded()?;
         let identity_source = resolve::identity_source::resolve(self)?;
         Ok(Settings {
             server: self.server.clone(),

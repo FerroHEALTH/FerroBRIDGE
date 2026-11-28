@@ -9,6 +9,7 @@
 //! corpus verdicts the conformance gate reads; [`containers`] starts the
 //! PostgreSQL and the reference CDR the end-to-end lane runs against;
 //! [`examples`] finds the HL7 examples packages fetched at build time;
+//! [`ferropix`] starts the patient identity source on the host network;
 //! [`fixtures`] holds the synthetic documents the suites commit and map;
 //! [`laws`] compares the two ends of a round trip; [`net`] reserves a port
 //! no server answers on; [`oidc`] is the test OpenID Provider the operator
@@ -25,6 +26,7 @@ pub mod conformance;
 pub mod containers;
 pub mod examples;
 pub mod facility_cdr;
+pub mod ferropix;
 pub mod ferrosmart;
 pub mod fixtures;
 pub mod laws;

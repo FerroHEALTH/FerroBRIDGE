@@ -10,22 +10,16 @@
 //! value or a body. No specification governs the operator surface: our own
 //! design.
 
-use axum::extract::MatchedPath;
 use axum::response::Response;
 use ferrohealth_smart::guard::AuthLayer;
-use ferrohealth_smart::guard::Classify;
 use ferrohealth_smart::guard::Render;
 use ferrohealth_smart::guard::Requirement;
-use ferrohealth_smart::guard::Target;
 use ferrohealth_smart::refusal::Denied;
 use ferrohealth_smart::refusal::Refusal;
-use http::Extensions;
-use http::Method;
-use http::Uri;
 use http::request::Parts;
 
 use crate::problem::{Kind, respond};
-use crate::smart::Smart;
+use crate::smart::{Routed, Smart};
 
 /// The `tracing` target of the change record a save or a reload writes
 /// beside the layer's audit line, so a deployment can route it apart.
@@ -50,21 +44,6 @@ pub(crate) use audited;
 
 /// The interaction the audit line records for every operator route.
 const OPERATOR: &str = "operator";
-
-/// How the layer reads an operator request: every route the operator router
-/// matched requires the operator scope.
-#[derive(Debug, Clone)]
-pub struct Classifier {
-    /// The operator scope.
-    scope: String,
-}
-
-impl Classify for Classifier {
-    fn classify(&self, _method: &Method, _uri: &Uri, extensions: &Extensions) -> Option<Target> {
-        let template = extensions.get::<MatchedPath>()?.as_str();
-        Some(Target::new(OPERATOR, Requirement::Scope(self.scope.clone())).route(template))
-    }
-}
 
 /// The problem details every refusal of the layer answers with (RFC 9457).
 ///
@@ -98,13 +77,14 @@ impl Render for Body {
 /// Returns the layer that guards the operator routes with the gate of
 /// `smart` and the operator scope.
 #[must_use]
-pub fn layer(smart: &Smart) -> AuthLayer<Classifier> {
+pub fn layer(smart: &Smart) -> AuthLayer<Routed> {
     let gate = smart.gate().clone();
     let body = Body {
         realm: gate.realm().map(str::to_owned),
     };
-    let classifier = Classifier {
-        scope: smart.operator_scope().to_owned(),
-    };
+    let classifier = Routed::new(
+        OPERATOR,
+        Requirement::Scope(smart.operator_scope().to_owned()),
+    );
     AuthLayer::new(gate, classifier).with_render(body)
 }

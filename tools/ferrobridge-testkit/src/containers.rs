@@ -6,8 +6,8 @@
 //! A container-backed test asks [`e2e_enabled`] first and returns without
 //! touching Docker when the gate is unset, so the ordinary suite stays offline.
 //! Every image is pinned by tag and digest in [`POSTGRES`], [`CDR`],
-//! [`CDR_POSTGRES`], [`CDR_MAIN`], [`CDR_MAIN_POSTGRES`], [`TERMINOLOGY`] and
-//! [`FERROSMART`], which `docs/VERSIONS.md` repeats and
+//! [`CDR_POSTGRES`], [`CDR_MAIN`], [`CDR_MAIN_POSTGRES`], [`TERMINOLOGY`],
+//! [`FERROSMART`] and [`FERROPIX`], which `docs/VERSIONS.md` repeats and
 //! `scripts/checks/versions.sh` compares.
 //!
 //! No specification governs the harness; it is FerroBRIDGE's own design.
@@ -205,6 +205,14 @@ pub const FERROSMART: PinnedImage = PinnedImage {
     repository: "ghcr.io/ferrohealth/ferrosmart",
     tag: "0.7.0",
     digest: "sha256:dddde7e14fcdd85ce50dad9040ae3a83fefb7a358d37e33e1d09be9a22403dbb",
+};
+
+/// `FerroPIX`, the `FerroHEALTH` patient identity source: a `PIXm` Manager and
+/// PMIR Patient Identity Registry.
+pub const FERROPIX: PinnedImage = PinnedImage {
+    repository: "ghcr.io/ferrohealth/ferropix",
+    tag: "0.0.43",
+    digest: "sha256:94fa0f395de800e51f5dc34fb01c9f4d8443c2c4adaec1c22ce85b3f66dba3d9",
 };
 
 /// The reference FHIR terminology server.
@@ -800,8 +808,8 @@ pub async fn rabbitmq() -> Result<RabbitMq, HarnessError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CDR, CDR_MAIN, CDR_MAIN_POSTGRES, CDR_POSTGRES, FERROSMART, POSTGRES, PinnedImage,
-        TERMINOLOGY, TERMINOLOGY_FIXTURES, cdr_request, terminology_request,
+        CDR, CDR_MAIN, CDR_MAIN_POSTGRES, CDR_POSTGRES, FERROPIX, FERROSMART, POSTGRES,
+        PinnedImage, TERMINOLOGY, TERMINOLOGY_FIXTURES, cdr_request, terminology_request,
     };
 
     #[test]
@@ -814,6 +822,7 @@ mod tests {
             CDR_MAIN_POSTGRES,
             TERMINOLOGY,
             FERROSMART,
+            FERROPIX,
         ] {
             assert!(!image.tag.is_empty(), "{} has no tag", image.repository);
             assert!(

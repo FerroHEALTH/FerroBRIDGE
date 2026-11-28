@@ -9,7 +9,9 @@
 //! signs the ID Tokens a test chooses (OpenID Connect Core 1.0 §2), and
 //! answers the token endpoint's authorization code and refresh token grants
 //! (RFC 6749 §4.1.3, §6) with the [`TokenAnswer`] a test mounts, or refuses
-//! them (RFC 6749 §5.2). Its authorization and end-session endpoints answer
+//! them (RFC 6749 §5.2). [`Provider::issue_client_credentials`] makes it sign
+//! an RFC 9068 access token for each client credentials grant of a client it
+//! knows (RFC 6749 §4.4). Its authorization and end-session endpoints answer
 //! nothing until [`Provider::approve`] makes them sign a real browser in, as
 //! the console's browser journeys need; until then the console redirects a
 //! browser there and a test reads the redirect. No specification governs
@@ -278,9 +280,14 @@ impl Provider {
             "token_endpoint": self.token_endpoint(),
             "end_session_endpoint": self.end_session_endpoint(),
             "response_types_supported": ["code"],
+            "grant_types_supported": [
+                "authorization_code",
+                "refresh_token",
+                "client_credentials"
+            ],
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": ["ES256"],
-            "token_endpoint_auth_methods_supported": ["client_secret_basic"],
+            "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
             "code_challenge_methods_supported": ["S256"],
         })
         .to_string();
@@ -363,6 +370,33 @@ impl Provider {
                 .map(|request| request.url.query_pairs().into_owned().collect())
                 .collect(),
         )
+    }
+
+    /// Makes the token endpoint answer the client credentials grant (RFC 6749
+    /// §4.4) of each client in `clients`, its id and secret, authenticated by
+    /// `client_secret_basic` or `client_secret_post` (RFC 6749 §2.3.1), with
+    /// a fresh RFC 9068 access token: `typ` `at+jwt`, its subject the client,
+    /// addressed to every one of `audiences`, granting the `scope` the
+    /// request asks, valid for an hour. Any other client is refused
+    /// `invalid_client` (RFC 6749 §5.2).
+    pub async fn issue_client_credentials(&self, clients: &[(&str, &str)], audiences: &[&str]) {
+        Mock::given(method("POST"))
+            .and(path(TOKEN_PATH))
+            .and(body_string_contains("grant_type=client_credentials"))
+            .respond_with(Issue {
+                issuer: self.issuer(),
+                encoding: self.encoding.clone(),
+                clients: clients
+                    .iter()
+                    .map(|(id, secret)| ((*id).to_owned(), (*secret).to_owned()))
+                    .collect(),
+                audiences: audiences
+                    .iter()
+                    .map(|&audience| audience.to_owned())
+                    .collect(),
+            })
+            .mount(&self.server)
+            .await;
     }
 
     /// Answers every token request whose form carries `grant` with `answer`;
@@ -510,6 +544,86 @@ impl Respond for Trade {
     }
 }
 
+/// The token endpoint of [`Provider::issue_client_credentials`].
+struct Issue {
+    /// The issuer identifier every token names.
+    issuer: String,
+    /// The key every token is signed with.
+    encoding: EncodingKey,
+    /// Each known client's id to its secret.
+    clients: BTreeMap<String, String>,
+    /// The audiences every token is addressed to.
+    audiences: Vec<String>,
+}
+
+impl Issue {
+    /// The client id and secret `request` authenticates with: its Basic
+    /// credential, each half form-encoded (RFC 6749 §2.3.1), or the
+    /// `client_id` and `client_secret` of its form.
+    fn credential(request: &Request, form: &BTreeMap<String, String>) -> Option<(String, String)> {
+        let basic = request
+            .headers
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.strip_prefix("Basic "));
+        if let Some(encoded) = basic {
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(encoded.trim())
+                .ok()?;
+            let decoded = String::from_utf8(decoded).ok()?;
+            let (id, secret) = decoded.split_once(':')?;
+            let unescaped = |half: &str| {
+                url::form_urlencoded::parse(format!("v={half}").as_bytes())
+                    .next()
+                    .map(|(_, value)| value.into_owned())
+            };
+            return Some((unescaped(id)?, unescaped(secret)?));
+        }
+        Some((
+            form.get("client_id")?.clone(),
+            form.get("client_secret")?.clone(),
+        ))
+    }
+}
+
+impl Respond for Issue {
+    fn respond(&self, request: &Request) -> ResponseTemplate {
+        let form: BTreeMap<String, String> = url::form_urlencoded::parse(&request.body)
+            .into_owned()
+            .collect();
+        let known = Self::credential(request, &form)
+            .filter(|(id, secret)| self.clients.get(id).is_some_and(|known| known == secret));
+        let Some((client_id, _)) = known else {
+            let body = serde_json::json!({ "error": "invalid_client" }).to_string();
+            return json(401, body);
+        };
+        let scope = form.get("scope").cloned().unwrap_or_default();
+        let now = jiff::Timestamp::now().as_second();
+        let mut header = Provider::header();
+        header.typ = Some(String::from("at+jwt"));
+        let claims = serde_json::json!({
+            "iss": self.issuer,
+            "aud": self.audiences,
+            "sub": client_id,
+            "client_id": client_id,
+            "iat": now,
+            "exp": now.saturating_add(3600),
+            "jti": fresh_code(),
+            "scope": scope,
+        });
+        let Ok(token) = jsonwebtoken::encode(&header, &claims, &self.encoding) else {
+            return refused(500, "the access token could not be signed");
+        };
+        let body = serde_json::json!({
+            "access_token": token,
+            "token_type": "Bearer",
+            "expires_in": 3600,
+            "scope": scope,
+        });
+        json(200, body.to_string())
+    }
+}
+
 /// The end-session endpoint of [`Provider::approve`].
 struct EndSession;
 
@@ -621,6 +735,57 @@ mod tests {
     use jsonwebtoken::{DecodingKey, Validation};
 
     use super::{IdTokenClaims, KID, Provider};
+
+    #[tokio::test]
+    async fn a_known_client_trades_its_credentials_for_an_access_token_and_others_are_refused() {
+        let provider = Provider::start().await.unwrap();
+        provider
+            .issue_client_credentials(
+                &[("synthetic-machine", "s3cret")],
+                &["https://a.example.org/fhir", "https://b.example.org/fhir"],
+            )
+            .await;
+        let client = reqwest::Client::new();
+        let answer: serde_json::Value = client
+            .post(provider.token_endpoint())
+            .basic_auth("synthetic-machine", Some("s3cret"))
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body("grant_type=client_credentials&scope=system%2FPatient.rs")
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        let token = answer["access_token"].as_str().unwrap();
+        let key = DecodingKey::from_jwk(provider.jwks().find(KID).unwrap()).unwrap();
+        let mut validation = Validation::new(jsonwebtoken::Algorithm::ES256);
+        validation.set_audience(&["https://b.example.org/fhir"]);
+        validation.set_issuer(&[provider.issuer()]);
+        let decoded = jsonwebtoken::decode::<serde_json::Value>(token, &key, &validation).unwrap();
+        assert_eq!(Some("at+jwt"), decoded.header.typ.as_deref());
+        assert_eq!("synthetic-machine", decoded.claims["client_id"]);
+        assert_eq!("synthetic-machine", decoded.claims["sub"]);
+        assert_eq!("system/Patient.rs", decoded.claims["scope"]);
+
+        let posted = client
+            .post(provider.token_endpoint())
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body("grant_type=client_credentials&client_id=synthetic-machine&client_secret=s3cret")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(reqwest::StatusCode::OK, posted.status());
+        let refused = client
+            .post(provider.token_endpoint())
+            .basic_auth("synthetic-machine", Some("wrong"))
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body("grant_type=client_credentials")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(reqwest::StatusCode::UNAUTHORIZED, refused.status());
+    }
 
     #[tokio::test]
     async fn a_signed_id_token_verifies_under_the_published_key_set() {

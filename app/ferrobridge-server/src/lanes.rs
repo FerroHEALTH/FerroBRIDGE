@@ -15,6 +15,7 @@ use axum::Router;
 use tokio::net::TcpListener;
 
 mod inbound;
+mod subjects;
 
 use crate::config::{self, Settings};
 use crate::serve_until;
@@ -85,12 +86,10 @@ pub(crate) async fn start(settings: &Settings) -> anyhow::Result<Started> {
         let mut lane = lane.clone();
         if let Some(audit) = settings.audit.as_ref() {
             let log = start_audit(audit, settings, &lane, &state).await?;
-            let identity = lane.settings.subject.identity().clone();
-            lane.settings.subject = crate::identity::subject::SubjectLink::new(Arc::new(
-                identity.audited(Arc::clone(log.recorder())),
-            ));
+            subjects::audited(&mut lane, &log);
             state = state.with_access_log(Arc::new(log));
         }
+        state = subjects::cached(&mut lane, state)?;
         let (mounted, counts) = build_facade(settings, &lane, &state)
             .await
             .context("starting the FHIR facade")?;
@@ -221,6 +220,9 @@ pub(crate) fn spawn_followers(
     }
     if let Some(links) = state.links() {
         followers.push(links.spawn_sweeper(&stop.subscribe()));
+    }
+    if let Some(running) = state.pseudonyms() {
+        followers.push(running.holder.clone().spawn(&stop.subscribe()));
     }
     followers
 }

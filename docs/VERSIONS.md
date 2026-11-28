@@ -193,7 +193,7 @@ in code is the matching constant in
 | FerroEHR main CDR database image | `ghcr.io/ferrohealth/ferroehr-postgres:main@sha256:7d71098414533dadb712d01a4ca5846a1b1a88b11dfcbffec6e6a8a2bcd59fd2` | the `CDR_MAIN_POSTGRES` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 | FerroTERM terminology server image | `ghcr.io/ferrohealth/ferroterm:0.4.7@sha256:52411e76ea664f9470fda0a7a08202a0ad6f7c39069322f42a754d971cf37a82` | the `TERMINOLOGY` constant in `tools/ferrobridge-testkit/src/containers.rs`, and `scripts/perf/gate.sh` |
 | FerroSMART authorization server image | `ghcr.io/ferrohealth/ferrosmart:0.7.0@sha256:dddde7e14fcdd85ce50dad9040ae3a83fefb7a358d37e33e1d09be9a22403dbb` | the `FERROSMART` constant in `tools/ferrobridge-testkit/src/containers.rs` |
-| FerroPIX identity source image | `ghcr.io/ferrohealth/ferropix:0.0.43@sha256:94fa0f395de800e51f5dc34fb01c9f4d8443c2c4adaec1c22ce85b3f66dba3d9` | `scripts/perf/gate.sh`, the head arm's ITI-83 identity source |
+| FerroPIX identity source image | `ghcr.io/ferrohealth/ferropix:0.0.43@sha256:94fa0f395de800e51f5dc34fb01c9f4d8443c2c4adaec1c22ce85b3f66dba3d9` | `scripts/perf/gate.sh`, the head arm's ITI-83 identity source; the `FERROPIX` constant in `tools/ferrobridge-testkit/src/containers.rs` |
 | Stub OpenID Provider image | `ghcr.io/navikt/mock-oauth2-server:6.1.5@sha256:d88e445d55c4ff6eed59b02d86adfece47d985233b1616fb712669b98328c8a2` | `scripts/perf/gate.sh`, the issuer of the identity source's tokens |
 
 The CDR runs against its own published database image rather than the plain

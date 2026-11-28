@@ -87,6 +87,18 @@ CREATE TABLE resource_identifier (
     PRIMARY KEY (resource_type, value_hmac, system, internal_id)
 );
 
+CREATE TABLE pmir_subscription (
+    singleton boolean PRIMARY KEY DEFAULT true CONSTRAINT pmir_subscription_singleton_check CHECK (singleton),
+    -- Where the identity source holds the subscription, once known.
+    location text,
+    -- The subscription status as last read, or unreachable.
+    status text NOT NULL,
+    checked_at timestamptz NOT NULL,
+    -- The lease generation of the last write.
+    generation bigint NOT NULL
+);
+
+COMMENT ON TABLE pmir_subscription IS 'The deployment''s PMIR subscription to the identity source''s feed and its status as last read, written under the lane lease. No specification governs the storage: our own design.';
 COMMENT ON TABLE person_ehr IS 'The EHR of each person, keyed by the HMAC of the person identifier. No specification governs the storage: our own design.';
 COMMENT ON TABLE ehr_subject IS 'The person each EHR was first recorded for, sealed. No specification governs the storage: our own design.';
 COMMENT ON TABLE party_person IS 'The pseudonym of each Patient party, sealed, keyed by the party''s versioned_object_uid and found again by the HMAC of the pseudonym. No specification governs the storage: our own design.';

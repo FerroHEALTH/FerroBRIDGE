@@ -7,7 +7,8 @@
 # perf/arm.env and over its own FerroEHR CDR. The
 # gate seeds each arm's CDR through its facade and gives each arm the values
 # of the upper-case placeholders between at signs, so the committed plan names
-# no id and the read names the Condition each arm's CDR stored. The creates
+# no id and the read names the Condition each arm's CDR stored. Every facade
+# request carries the stub issuer's token, which an arm without [auth] ignores. The creates
 # write into one subject's EHR and the read and the search read another's,
 # whose content never changes, so a read is as fast at the end of the window
 # as at its start. The ORU^R01 goes to the HL7 v2 face over MLLP with TLS as
@@ -38,6 +39,7 @@ group = "metadata"
 method = "GET"
 path = "/fhir/metadata"
 status = 200
+headers = { authorization = "Bearer @TOKEN@" }
 
 # A create mapped through FHIRconnect and committed as one composition
 # (R4 http.html "create").
@@ -47,7 +49,7 @@ method = "POST"
 path = "/fhir/Condition"
 status = 201
 body = '''@CREATE_BODY@'''
-headers = { content-type = "application/fhir+json" }
+headers = { authorization = "Bearer @TOKEN@", content-type = "application/fhir+json" }
 
 # A read of the seeded Condition, its composition mapped back to FHIR
 # (R4 http.html "read").
@@ -56,6 +58,7 @@ group = "read"
 method = "GET"
 path = "/fhir/Condition/@READ_ID@"
 status = 200
+headers = { authorization = "Bearer @TOKEN@" }
 
 # A search over the AQL projection the search file declares, held to the
 # seeded subject (R4 search.html).
@@ -64,6 +67,7 @@ group = "search"
 method = "GET"
 path = "/fhir/Condition?@SEARCH@"
 status = 200
+headers = { authorization = "Bearer @TOKEN@" }
 
 # A laboratory result written through the HL7 v2 face's Observation context,
 # acknowledged AA (HL7 v2.5.1 chapter 2 §2.9.2.2).
