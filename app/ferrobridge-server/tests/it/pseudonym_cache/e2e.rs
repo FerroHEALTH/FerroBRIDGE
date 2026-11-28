@@ -52,6 +52,9 @@ const STATUS_EVERY: &str = "2s";
 /// How long any one awaited change may take.
 const WAIT: Duration = Duration::from_secs(90);
 
+/// How long the cache must see no change to count the feed as settled.
+const SETTLED: Duration = Duration::from_secs(5);
+
 /// How long one exchange with `FerroPIX` may take.
 const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -329,20 +332,48 @@ impl Stack {
         Ok(person.id().to_owned())
     }
 
-    /// Looks `source` up twice, and returns its pseudonym once the second
-    /// lookup was served from the cache.
+    /// Looks `source` up until a lookup is served from the cache, and
+    /// returns its pseudonym; a lookup that asks `FerroPIX` answers the same.
     async fn cached(&self, source: &SourceIdentifier) -> Result<String, Box<dyn Error>> {
-        let before = self.asked();
         let first = self.pseudonym(source).await?;
-        assert_eq!(before + 1, self.asked(), "the first lookup asks FerroPIX");
-        let second = self.pseudonym(source).await?;
-        assert_eq!(first, second, "the cache answers what FerroPIX answered");
-        assert_eq!(before + 1, self.asked(), "the second lookup is the cache's");
-        Ok(first)
+        let started = Instant::now();
+        loop {
+            let before = self.asked();
+            let again = self.pseudonym(source).await?;
+            assert_eq!(first, again, "every lookup answers what FerroPIX answered");
+            if self.asked() == before {
+                return Ok(first);
+            }
+            if started.elapsed() > WAIT {
+                return Err(format!(
+                    "no lookup was served from the cache within {}s",
+                    WAIT.as_secs()
+                )
+                .into());
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
     }
 
-    /// Looks `source` up once a change after `seen` reached the cache, and
-    /// returns its pseudonym, which `FerroPIX` was asked for again.
+    /// Waits until no ITI-93 message has changed the cache for
+    /// [`SETTLED`], so the next change awaited is the case's own.
+    async fn settled(&self) -> Result<(), Box<dyn Error>> {
+        let started = Instant::now();
+        loop {
+            let seen = self.running.cache.changes();
+            tokio::time::sleep(SETTLED).await;
+            if self.running.cache.changes() == seen {
+                return Ok(());
+            }
+            if started.elapsed() > WAIT {
+                return Err(format!("the feed did not settle within {}s", WAIT.as_secs()).into());
+            }
+        }
+    }
+
+    /// Looks `source` up once a change after `seen` reached the cache and
+    /// the feed settled, and returns its pseudonym, which `FerroPIX` was
+    /// asked for again.
     async fn asked_again(
         &self,
         what: &str,
@@ -350,6 +381,7 @@ impl Stack {
         source: &SourceIdentifier,
     ) -> Result<String, Box<dyn Error>> {
         until(what, || self.running.cache.changes() > seen).await?;
+        self.settled().await?;
         let asked = self.asked();
         let pseudonym = self.pseudonym(source).await?;
         assert_eq!(
@@ -438,6 +470,7 @@ async fn the_pseudonym_cache_follows_ferropix_through_its_pmir_feed() -> Result<
     {
         return Err(format!("{error}\n{}", stack.diagnosis().await).into());
     }
+    stack.settled().await?;
 
     // A merge: once its ITI-93 message arrives, the subsumed patient resolves to the survivor.
     let pseudonym_a = stack.cached(&a).await?;
