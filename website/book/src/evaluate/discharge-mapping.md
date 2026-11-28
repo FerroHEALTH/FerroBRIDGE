@@ -14,7 +14,7 @@ The openEHR international CKM publishes no discharge report template. By
 the owner ruling on #116 of 2026-11-06, FerroBRIDGE writes its own ADL 2
 template over published CKM archetypes only, as it does for the medication
 template, and never a new archetype. The template is
-`openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.0.0`:
+`openEHR-EHR-COMPOSITION.ferrobridge_discharge_report.v1.1.0`:
 
 | Node | CKM archetype | HDR section |
 |---|---|---|
@@ -22,6 +22,7 @@ template, and never a new archetype. The template is
 | Diagnostic summary | `SECTION.adhoc.v1` holding `EVALUATION.problem_diagnosis.v1` | `sectionDiagnosticSummary` |
 | Significant procedures | `SECTION.adhoc.v1` holding `ACTION.procedure.v1` | `sectionSignificantProcedures` |
 | Discharge medications | `SECTION.adhoc.v1` holding `INSTRUCTION.medication_order.v3` | `sectionDischargeMedications` |
+| Comment | an `ELEMENT` (`at0.1`, free text) the template adds to the composition's open `other_context` tree | none: a received report's composition names there the elements it does not carry, and a sent report names the comment in the hospital course narrative |
 
 The CKM describes the transfer of care summary as a clinical report about "an
 episode, or period, of care", conveying "diagnoses, investigation results,
