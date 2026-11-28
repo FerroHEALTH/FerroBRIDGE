@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's context for the HL7 Europe Laboratory Report 2.1.0
-# DiagnosticReport-eu-lab profile over the published KDS_Laborbericht
-# template, whose laboratory result and analyte archetypes are CKM's. Each
+# DiagnosticReport-eu-lab profile over ferrobridge_laborbericht.v1.0.0, the
+# published KDS_Laborbericht template with the composition's Comment added,
+# whose laboratory result and analyte archetypes are CKM's. Each
 # analyte becomes an Observation-resultslab-eu-lab the report references,
 # and that profile derives from Base and Core 2.0.1 medicalTestResult-eu-core.
 # The library's own eehrxf_lab context is refused (#1235).
@@ -19,7 +20,7 @@ context:
     url: "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab"
     version: "2.1.0"
   template:
-    id: "KDS_Laborbericht"
+    id: "ferrobridge_laborbericht.v1.0.0"
   archetypes:
     - "OBSERVATION.laboratory_test_result.v1"
     - "CLUSTER.laboratory_test_analyte.v1"

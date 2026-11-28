@@ -3,18 +3,23 @@
 
 //! The received reference range and order of a laboratory report: each maps
 //! into the element `KDS_Laborbericht` provides for it, and an instance the
-//! run carries into no structured element is declared in its outcome.
+//! run carries into no structured element is declared in its outcome, in the
+//! feeder audit and in the composition's comment.
 
 use std::error::Error;
 
 use eehrxf::receive::ReceivedDocument;
+use eehrxf::receive::openehr::COMMENT_LEAD;
+use openehr_mapping_core::index::WebTemplateIndex;
+use openehr_mapping_core::template::TemplateSource;
 use serde_json::Value;
 
 use fhirconnect::engine::context::CallContext;
 use fhirconnect::operations::run::Settings;
 
 use super::{
-    NOW, committed, mapping, only, received_text, received_text_of, report, result, settings,
+    LAB_TEMPLATE, NOW, committed, mapping, only, received_text, received_text_of, report, result,
+    settings,
 };
 
 /// The element paths the run's outcome declares not carried into the
@@ -310,6 +315,7 @@ fn a_report_carried_whole_names_nothing_in_its_feeder_audit() -> Result<(), Box<
         canonical["feeder_audit"]["feeder_system_audit"]
     );
     assert!(canonical["feeder_audit"]["original_content"].is_object());
+    assert!(comments(&canonical).is_empty(), "{}", canonical["context"]);
     Ok(())
 }
 
@@ -334,9 +340,38 @@ fn a_reference_range_text_is_named_in_the_feeder_audit_and_the_composition_valid
             .collect::<Vec<_>>(),
         ["Observation.referenceRange[0].text"]
     );
-    let template = openehr_mapping_core::template::TemplateSource::opt14(
-        ferrobridge_testkit::fixtures::KDS_LABORBERICHT_OPT,
-    )?;
-    openehr_mapping_core::index::WebTemplateIndex::build(&template)?.accept(canonical)?;
+    WebTemplateIndex::build(&TemplateSource::opt14(LAB_TEMPLATE)?)?.accept(canonical)?;
+    Ok(())
+}
+
+/// The comments `canonical`, a composition, holds in its context.
+fn comments(canonical: &Value) -> Vec<&Value> {
+    canonical["context"]["other_context"]["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|item| item["archetype_node_id"] == "at0007")
+        .collect()
+}
+
+// NOTE: openEHR-EHR-COMPOSITION.report-result.v1 revision 1.1.0 at0007 is the composition's
+// Comment, a DV_TEXT in other_context, where the record's reader sees what it does not carry.
+#[test]
+fn a_reference_range_text_is_named_in_the_comment_the_reader_sees_and_the_composition_validates()
+-> Result<(), Box<dyn Error>> {
+    let mut described = result();
+    described["referenceRange"][0]["text"] = Value::from("Synthetic range text.");
+    let composition = received(&described, &report())?;
+    let canonical: Value = serde_json::from_str(composition.composition())?;
+    let [comment] = comments(&canonical)[..] else {
+        return Err(format!("one comment: {}", canonical["context"]).into());
+    };
+    assert_eq!(comment["value"]["_type"], "DV_TEXT", "{comment}");
+    assert_eq!(
+        comment["value"]["value"],
+        format!("{COMMENT_LEAD}Observation.referenceRange[0].text"),
+        "{comment}"
+    );
+    WebTemplateIndex::build(&TemplateSource::opt14(LAB_TEMPLATE)?)?.accept(canonical)?;
     Ok(())
 }

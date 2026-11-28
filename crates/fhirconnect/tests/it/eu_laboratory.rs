@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The HL7 Europe Laboratory Report 2.1.0 round trip: a FerroBRIDGE context
-//! over the published `KDS_Laborbericht` template. The report is a
+//! over `ferrobridge_laborbericht.v1.0.0`, the published `KDS_Laborbericht`
+//! template with the composition's Comment added. The report is a
 //! `DiagnosticReport-eu-lab`, and each analyte an
 //! `Observation-resultslab-eu-lab` the report references, a profile that
 //! derives from Base and Core 2.0.1 `medicalTestResult-eu-core`.
 //!
 //! The mapping library's own `eehrxf_lab` context targets Laboratory 0.1.1
-//! and its template does not parse strictly (#1235), so the published
-//! `KDS_Laborbericht` template, which carries the same CKM archetypes, is the
-//! one this context compiles against.
+//! and its template does not parse strictly (#1235), so a template over the
+//! published `KDS_Laborbericht`, which carries the same CKM archetypes, is
+//! the one this context compiles against.
 
 use core::error::Error;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
 use crate::support::SHIPPED;
+use crate::support::SHIPPED_LABORATORY_TEMPLATE;
 use crate::support::render;
 
 /// The files the context loads from the shipped laboratory project, the
@@ -70,9 +72,17 @@ fn kds_laborbericht_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
     )))?)
 }
 
-/// Compiles the context against the published template.
+/// Builds the index over the template the shipped project maps over.
+fn laboratory_template() -> Result<WebTemplateIndex, Box<dyn Error>> {
+    let opt = openehr_its::opt14::from_xml(SHIPPED_LABORATORY_TEMPLATE)?;
+    Ok(WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(
+        opt,
+    )))?)
+}
+
+/// Compiles the context against its template.
 fn eu_laboratory_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
-    let index = kds_laborbericht_template()?;
+    let index = laboratory_template()?;
     let files: Vec<String> = SHIPPED_LABORATORY
         .iter()
         .map(|file| format!("{SHIPPED}/laboratory/{file}"))
@@ -91,10 +101,12 @@ fn eu_laboratory_program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn E
 }
 
 #[test]
-fn the_eu_laboratory_context_compiles_against_the_published_template() -> Result<(), Box<dyn Error>>
-{
+fn the_eu_laboratory_context_compiles_against_its_template() -> Result<(), Box<dyn Error>> {
     let (program, _) = eu_laboratory_program()?;
-    assert_eq!(program.template().id().as_str(), "KDS_Laborbericht");
+    assert_eq!(
+        program.template().id().as_str(),
+        "ferrobridge_laborbericht.v1.0.0"
+    );
     assert_eq!(program.resource().as_str(), "DiagnosticReport");
     insta::assert_snapshot!("eu_laboratory_program", program.to_string());
     Ok(())
@@ -127,7 +139,7 @@ mappings:
 /// Compiles the shipped context with the analyte extension `extension`
 /// beside the shipped ones.
 fn compiled_with_tail(extension: &str) -> Result<Arc<Program>, Vec<String>> {
-    let index = kds_laborbericht_template().map_err(|error| vec![error.to_string()])?;
+    let index = laboratory_template().map_err(|error| vec![error.to_string()])?;
     let mut files: Vec<(String, String)> = SHIPPED_LABORATORY
         .iter()
         .map(|file| {

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The HL7 Europe Laboratory Report 2.1.0 `Composition-eu-lab` round trip: a
-//! FerroBRIDGE document context over the published `KDS_Laborbericht`
-//! template. The report composition is the Composition, whose one section
+//! FerroBRIDGE document context over `ferrobridge_laborbericht.v1.0.0`, the
+//! published `KDS_Laborbericht` template with the composition's Comment
+//! added. The report composition is the Composition, whose one section
 //! carries the test's code and references the `DiagnosticReport-eu-lab`, which
 //! references its results and specimens.
 
@@ -28,6 +29,7 @@ use openehr_mapping_core::template::TemplateSource;
 
 use crate::laws;
 use crate::support::SHIPPED;
+use crate::support::SHIPPED_LABORATORY_TEMPLATE;
 use crate::support::render;
 
 /// The files this context loads, the context first, each in the shipped
@@ -55,9 +57,9 @@ const COMPOSITION_EU_LAB: &str =
 const DIAGNOSTIC_REPORT_EU_LAB: &str =
     "http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab";
 
-/// Compiles the context against the published `KDS_Laborbericht` template.
+/// Compiles the context against the template the shipped project maps over.
 fn program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
-    let opt = openehr_its::opt14::from_xml(ferrobridge_testkit::fixtures::KDS_LABORBERICHT_OPT)?;
+    let opt = openehr_its::opt14::from_xml(SHIPPED_LABORATORY_TEMPLATE)?;
     let index = WebTemplateIndex::build(&TemplateSource::Opt14(Box::new(opt)))?;
     let files: Vec<String> = FILES
         .iter()
@@ -77,9 +79,12 @@ fn program() -> Result<(Arc<Program>, WebTemplateIndex), Box<dyn Error>> {
 }
 
 #[test]
-fn the_composition_context_compiles_against_the_published_template() -> Result<(), Box<dyn Error>> {
+fn the_composition_context_compiles_against_its_template() -> Result<(), Box<dyn Error>> {
     let (program, _) = program()?;
-    assert_eq!(program.template().id().as_str(), "KDS_Laborbericht");
+    assert_eq!(
+        program.template().id().as_str(),
+        "ferrobridge_laborbericht.v1.0.0"
+    );
     assert_eq!(program.resource().as_str(), "Composition");
     Ok(())
 }

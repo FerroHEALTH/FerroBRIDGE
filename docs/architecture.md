@@ -1382,8 +1382,10 @@ Its round trip asserts the code, both slices and the two status bindings
 template (its person, structured name and address clusters are CKM's),
 loading the KDS person chain with a gender extension that names the EU
 profile and leaves out the German gender-amtlich extension; its round trip
-asserts the required name and birth date. Laboratory Report 2.1.0 follows over the published
-`KDS_Laborbericht` template, which carries the CKM laboratory result,
+asserts the required name and birth date. Laboratory Report 2.1.0 follows over
+`ferrobridge_laborbericht.v1.0.0`, the published `KDS_Laborbericht` template
+with the composition's Comment (`at0007` of `COMPOSITION.report-result.v1`
+revision 1.1.0) added (#2438), which carries the CKM laboratory result,
 analyte and specimen archetypes: the mapping library's own `eehrxf_lab`
 context targets Laboratory 0.1.1, names a `sem_ver` its template does not
 carry, and its template does not parse strictly (#1235), so it is recorded as

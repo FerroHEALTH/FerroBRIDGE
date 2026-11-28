@@ -3,7 +3,8 @@
 
 //! The laboratory report mapped between openEHR and the HL7 Europe
 //! Laboratory Report 2.1.0 document through the shipped laboratory project,
-//! over the published `KDS_Laborbericht` template.
+//! over `ferrobridge_laborbericht.v1.0.0`, the published `KDS_Laborbericht`
+//! template with the composition's Comment added.
 //!
 //! A synthetic `Bundle-eu-lab` is received, held to the vendored `Bundle`
 //! and `Composition` profiles, and mapped into one openEHR composition; the
@@ -27,7 +28,6 @@ use eehrxf::mapping::Mapping;
 use eehrxf::mappings::LABORATORY;
 use eehrxf::receive::ReceivedDocument;
 use eehrxf::receive::category::Uncategorised;
-use ferrobridge_testkit::fixtures::KDS_LABORBERICHT_OPT;
 use fhir_types::codec::{Json, Path};
 use fhir_types::r4::bundle::Bundle;
 use fhir_types::r4::device::{Device, DeviceDeviceName};
@@ -47,6 +47,14 @@ use serde_json::Value;
 use super::support::{annex_iii, emit, lab};
 
 mod accounted;
+mod template;
+
+/// The template the shipped project maps over, beside its files.
+const LAB_TEMPLATE: &str =
+    include_str!("../../../mappings/laboratory/ferrobridge_laborbericht.opt");
+
+/// The identifier [`LAB_TEMPLATE`] declares.
+const LAB_TEMPLATE_ID: &str = "ferrobridge_laborbericht.v1.0.0";
 
 /// The base the test documents name their entries under, in the
 /// `example.org` domain RFC 6761 §6.5 reserves.
@@ -89,12 +97,10 @@ fn files() -> Vec<PathBuf> {
 }
 
 /// The laboratory result context of the shipped project, compiled from its
-/// files on disk against `KDS_Laborbericht`.
+/// files on disk against its template.
 fn mapping() -> Result<Mapping, Box<dyn Error>> {
-    Ok(
-        Mapping::compile(KDS_LABORBERICHT_OPT, &files(), &[RESULT_CONTEXT])?
-            .accounting(LABORATORY.accounted()),
-    )
+    Ok(Mapping::compile(LAB_TEMPLATE, &files(), &[RESULT_CONTEXT])?
+        .accounting(LABORATORY.accounted()))
 }
 
 /// The run settings: a synthetic engine device, a fixed instant and the
@@ -309,7 +315,7 @@ fn round_trip() -> Result<(String, String), Box<dyn Error>> {
     let received = received_text()?;
     let document = ReceivedDocument::read(&received)?;
     let composition = mapping.to_openehr(&document, &settings())?;
-    assert_eq!(composition.template_id(), "KDS_Laborbericht");
+    assert_eq!(composition.template_id(), LAB_TEMPLATE_ID);
     let (mut out, subject, device) = lab_document("urn:uuid:5b0c3f7e-0000-4000-8000-00000000b002")?;
     let context = CallContext::new()
         .with_patient(reference(&subject))
@@ -345,7 +351,7 @@ fn only<'a>(bundle: &'a Value, kind: &str) -> Result<&'a Value, Box<dyn Error>> 
 }
 
 #[test]
-fn the_shipped_project_compiles_against_the_published_template() -> Result<(), Box<dyn Error>> {
+fn the_shipped_project_compiles_against_its_template() -> Result<(), Box<dyn Error>> {
     let mapping = mapping()?;
     let contexts: Vec<_> = mapping
         .contexts()
@@ -353,7 +359,7 @@ fn the_shipped_project_compiles_against_the_published_template() -> Result<(), B
         .collect();
     assert_eq!(
         contexts,
-        [(RESULT_CONTEXT, "KDS_Laborbericht", DIAGNOSTIC_REPORT_EU_LAB)]
+        [(RESULT_CONTEXT, LAB_TEMPLATE_ID, DIAGNOSTIC_REPORT_EU_LAB)]
     );
     Ok(())
 }
@@ -365,7 +371,7 @@ fn the_project_lists_its_two_contexts_and_compiles_each_from_its_embedded_files(
         LABORATORY.contexts(),
         &[RESULT_CONTEXT, COMPOSITION_CONTEXT]
     );
-    let template = TemplateSource::opt14(KDS_LABORBERICHT_OPT)?;
+    let template = TemplateSource::opt14(LAB_TEMPLATE)?;
     for (name, profile) in [
         (RESULT_CONTEXT, DIAGNOSTIC_REPORT_EU_LAB),
         (COMPOSITION_CONTEXT, LAB_COMPOSITION),
@@ -375,7 +381,7 @@ fn the_project_lists_its_two_contexts_and_compiles_each_from_its_embedded_files(
             .contexts()
             .map(|context| (context.name, context.template, context.profile))
             .collect();
-        assert_eq!(contexts, [(name, "KDS_Laborbericht", profile)]);
+        assert_eq!(contexts, [(name, LAB_TEMPLATE_ID, profile)]);
     }
     Ok(())
 }
@@ -399,7 +405,7 @@ fn a_received_laboratory_report_maps_into_one_composition_that_keeps_it()
     let text = received_text()?;
     let document = ReceivedDocument::read(&text)?;
     let composition = mapping()?.to_openehr(&document, &settings())?;
-    assert_eq!(composition.template_id(), "KDS_Laborbericht");
+    assert_eq!(composition.template_id(), LAB_TEMPLATE_ID);
     let canonical: Value = serde_json::from_str(composition.composition())?;
     let written = canonical.to_string();
     for value in ["A synthetic conclusion.", "synthetic-report-0001", "2093-3"] {
@@ -608,7 +614,7 @@ fn the_report_identifier_the_template_holds_one_of_is_declared_lost() -> Result<
 #[test]
 fn the_embedded_project_compiles_and_maps_as_its_files_do() -> Result<(), Box<dyn Error>> {
     let embedded = Mapping::compile_project(
-        &TemplateSource::opt14(KDS_LABORBERICHT_OPT)?,
+        &TemplateSource::opt14(LAB_TEMPLATE)?,
         &LABORATORY.with_context(RESULT_CONTEXT)?,
     )?;
     let from_disk = mapping()?;

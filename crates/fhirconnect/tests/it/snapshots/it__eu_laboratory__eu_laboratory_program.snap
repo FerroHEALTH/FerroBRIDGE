@@ -4,7 +4,7 @@ expression: program.to_string()
 ---
 program ferrobridge_eu_laboratory.context
   profile http://hl7.eu/fhir/laboratory/StructureDefinition/DiagnosticReport-eu-lab version 2.1.0
-  template KDS_Laborbericht sem_ver unpinned generation adl1.4
+  template ferrobridge_laborbericht.v1.0.0 sem_ver unpinned generation adl1.4
   resource DiagnosticReport
   start OBSERVATION.laboratory_test_result.v1
   model OBSERVATION.laboratory_test_result.v1 version 0.0.1-alpha archetype openEHR-EHR-OBSERVATION.laboratory_test_result.v1 revision 1.2.5

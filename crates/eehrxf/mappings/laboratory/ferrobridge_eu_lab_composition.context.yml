@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # FerroBRIDGE's context for the HL7 Europe Laboratory Report 2.1.0
-# Composition-eu-lab profile over the published KDS_Laborbericht template:
+# Composition-eu-lab profile over ferrobridge_laborbericht.v1.0.0, the
+# published KDS_Laborbericht template with the composition's Comment added:
 # the report composition becomes the document's Composition, whose one
 # section references the DiagnosticReport-eu-lab, which references its
 # Observation-resultslab-eu-lab results and Specimen-eu-lab specimens.
@@ -18,7 +19,7 @@ context:
     url: "http://hl7.eu/fhir/laboratory/StructureDefinition/Composition-eu-lab"
     version: "2.1.0"
   template:
-    id: "KDS_Laborbericht"
+    id: "ferrobridge_laborbericht.v1.0.0"
   archetypes:
     - "COMPOSITION.report_result.v1.Composition"
     - "OBSERVATION.laboratory_test_result.v1"

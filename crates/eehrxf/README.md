@@ -63,7 +63,9 @@ published proxies carry it until the Art 15(1) implementing act is adopted.
   mappings it compiles: `MPD` (features `prescription` or `dispensation`),
   the HL7 Europe MPD 1.0.0 request and dispense, and `LABORATORY` (feature
   `laboratory`), the HL7 Europe Laboratory Report 2.1.0 report with its
-  results and specimens over the published `KDS_Laborbericht` template, and
+  results and specimens over `ferrobridge_laborbericht.v1.0.0`, the published
+  `KDS_Laborbericht` template with the composition's Comment added, which
+  ships as `mappings/laboratory/ferrobridge_laborbericht.opt`, and
   `HDR` (feature `discharge`), the HL7 Europe Hospital Discharge Report
   1.0.0 composition, encounter, diagnostic summary, significant procedures
   and discharge medications over FerroBRIDGE's discharge report template, and
