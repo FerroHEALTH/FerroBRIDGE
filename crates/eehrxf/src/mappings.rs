@@ -317,6 +317,18 @@ pub const MPD: Project = Project {
     note: None,
 };
 
+/// The Comment (`at0007`, `DV_TEXT`) in the `other_context` tree of
+/// `openEHR-EHR-COMPOSITION.report-result.v1` revision 1.1.0, which the
+/// imaging, medical test and laboratory report templates keep.
+#[cfg(any(feature = "imaging", feature = "laboratory"))]
+const REPORT_RESULT_COMMENT: Note = Note {
+    tree: "at0001",
+    tree_name: "Tree",
+    element: "at0007",
+    element_name: "Comment",
+    slice: None,
+};
+
 /// The HL7 Europe Imaging Report 1.0.0-ballot project.
 ///
 /// It maps over FerroBRIDGE's imaging report template: the imaging
@@ -390,13 +402,7 @@ pub const IMAGING: Project = Project {
     followed: &["DiagnosticReport.performer"],
     left_out: left_out::IMAGING_LEFT_OUT,
     slices: &[],
-    note: Some(Note {
-        tree: "at0001",
-        tree_name: "Tree",
-        element: "at0007",
-        element_name: "Comment",
-        slice: None,
-    }),
+    note: Some(REPORT_RESULT_COMMENT),
 };
 
 /// The HL7 Europe Laboratory Report 2.1.0 project.
@@ -446,13 +452,7 @@ pub const LABORATORY: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
-    note: Some(Note {
-        tree: "at0001",
-        tree_name: "Tree",
-        element: "at0007",
-        element_name: "Comment",
-        slice: None,
-    }),
+    note: Some(REPORT_RESULT_COMMENT),
 };
 
 /// The HL7 Europe Patient Summary 1.0.0-ballot project.
@@ -674,13 +674,7 @@ pub const TEST_REPORT: Project = Project {
     followed: &[],
     left_out: &[],
     slices: &[],
-    note: Some(Note {
-        tree: "at0001",
-        tree_name: "Tree",
-        element: "at0007",
-        element_name: "Comment",
-        slice: None,
-    }),
+    note: Some(REPORT_RESULT_COMMENT),
 };
 
 /// The draft `EEHRxF` Annex X project: the common data groups served as
