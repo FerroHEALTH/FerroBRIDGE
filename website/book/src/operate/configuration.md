@@ -848,8 +848,9 @@ serves only while the identity source's PMIR feed reaches the bridge:
   every Patient change to be sent to `feed_url`. It reads the subscription's
   status every `status_every`.
 - The bridge receives each ITI-93 message at `POST /pmir/feed`. It forgets
-  the identifiers of every merged, updated or deleted patient on every
-  replica before it acknowledges the message.
+  the identifiers of every updated patient on every replica before it
+  acknowledges the message. A merge or a delete may name the person without
+  the identifiers that resolved to it, so it forgets every pseudonym.
 - While the subscription is not `active`, its status is older than two
   periods, or a replica's `LISTEN` session is down, every lookup asks the
   identity source, and the replica drops what it held, since a message may

@@ -2928,7 +2928,9 @@ draft upstream change.
   deployment's PMIR subscription (ITI-94, held by one replica under a lane
   lease) is `active`, and drops them whenever it is not. Each ITI-93 message received at `/pmir/feed`, admitted
   only for a listed client's token, forgets the identifiers of the patients
-  it merged, updated or deleted on every replica before it is acknowledged,
+  it updated, and every answer for a merge or a delete (which may name the
+  person without the identifiers that resolved to it), on every replica
+  before it is acknowledged,
   because a merge or an unmerge changes what ITI-83 answers (PIXm 3.1.0
   §2:3.83.4.2.2.5, PMIR 1.6.0 §2:3.93.4.1.3; our own design). Under `[audit]` the bridge records each ITI-83
   exchange in the audit outbox as the PIXm Query Consumer `AuditEvent`

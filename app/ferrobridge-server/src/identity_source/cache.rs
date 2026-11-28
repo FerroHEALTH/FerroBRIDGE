@@ -41,6 +41,9 @@ const SOURCE: &str = "pseudonym.source";
 /// The payload prefix that forgets one source identifier.
 const FORGET: &str = "forget:";
 
+/// The payload that forgets every pseudonym.
+const CLEAR: &str = "clear";
+
 /// The payload prefix that announces the subscription's status.
 const STATUS: &str = "status:";
 
@@ -154,6 +157,8 @@ impl Subscriber for Shared {
             } else if let Some(status) = payload.strip_prefix(STATUS) {
                 self.announced(status);
             } else {
+                // NOTE: no specification governs this: our own design; `clear`, and any payload
+                // this version cannot read, empties the cache.
                 self.clear();
             }
         })
@@ -306,6 +311,18 @@ impl PseudonymCache {
             PSEUDONYMS.notify(&mut connection, payload).await?;
         }
         Ok(())
+    }
+
+    /// Forgets every pseudonym on this replica at once and on every other
+    /// through [`PSEUDONYMS`].
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the notification cannot be sent; this
+    /// replica has forgotten them already.
+    pub async fn forget_all(&self) -> Result<(), sqlx::Error> {
+        self.shared.clear();
+        let mut connection = self.shared.pool.acquire().await?;
+        PSEUDONYMS.notify(&mut connection, CLEAR).await
     }
 
     /// Announces the subscription's `status` to every replica.

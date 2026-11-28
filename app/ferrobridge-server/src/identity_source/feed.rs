@@ -5,7 +5,8 @@
 //! §2:3.93), the channel endpoint of the deployment's subscription.
 //!
 //! Each message forgets, on every replica, the source identifiers whose
-//! pseudonym it may have changed, and only then is acknowledged, so the
+//! pseudonym it may have changed (every pseudonym, for a merge or a
+//! delete), and only then is acknowledged, so the
 //! identity source sends again a message whose change did not reach every
 //! cache. The route admits only an access token whose `client_id` the
 //! deployment lists. No specification governs the route's path: our own
@@ -79,16 +80,20 @@ async fn receive(State(receiver): State<Receiver>, headers: HeaderMap, body: Byt
             };
         }
     };
-    let changed = changed_identifiers(&feed);
-    if let Err(error) = receiver
-        .cache
-        .forget(
-            changed
-                .iter()
-                .map(|(system, value)| (system.as_str(), value.as_str())),
-        )
-        .await
-    {
+    let forgotten = match changed(&feed) {
+        Changed::Identifiers(changed) => {
+            receiver
+                .cache
+                .forget(
+                    changed
+                        .iter()
+                        .map(|(system, value)| (system.as_str(), value.as_str())),
+                )
+                .await
+        }
+        Changed::Everything => receiver.cache.forget_all().await,
+    };
+    if let Err(error) = forgotten {
         tracing::warn!(error = %ferrohealth_server::run::chain(&error), "a PMIR feed message could not reach every replica; it is refused for the identity source to send again");
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     }
@@ -111,18 +116,26 @@ async fn receive(State(receiver): State<Receiver>, headers: HeaderMap, body: Byt
     }
 }
 
-/// Returns the identifiers whose pseudonym `feed` may have changed, each
-/// its system and value.
-fn changed_identifiers(feed: &Feed) -> Vec<(String, String)> {
+/// What one message may have changed.
+#[derive(Debug, PartialEq, Eq)]
+enum Changed {
+    /// The pseudonyms of these identifiers, each its system and value.
+    Identifiers(Vec<(String, String)>),
+    /// Any pseudonym.
+    Everything,
+}
+
+/// Returns what `feed` may have changed.
+fn changed(feed: &Feed) -> Changed {
     let mut changed = Vec::new();
     for event in feed.events() {
         let identity = match event {
-            // NOTE: FerroPIX docs/architecture.md section 8: after a merge the subsumed
-            // patient's identifiers resolve to the survivor, so they are forgotten.
-            Event::Merged { subsumed, .. } => subsumed,
+            // NOTE: no specification governs this: our own design; a merge or a delete may name
+            // the person without the source identifiers that resolved to it, so it forgets all.
+            Event::Merged { .. } | Event::Deleted(_) => return Changed::Everything,
             // NOTE: PMIR 1.6.0 §2:3.93.4.1.3: an update that reinstates a merged patient is
             // its unmerge, and any update may move a link, so its identifiers are forgotten.
-            Event::Updated(identity) | Event::Deleted(identity) => identity,
+            Event::Updated(identity) => identity,
             _ => continue,
         };
         for identifier in identity.identifiers() {
@@ -134,7 +147,7 @@ fn changed_identifiers(feed: &Feed) -> Vec<(String, String)> {
             }
         }
     }
-    changed
+    Changed::Identifiers(changed)
 }
 
 /// Returns `body` as FHIR JSON with `status`.
@@ -151,7 +164,7 @@ fn fhir(status: StatusCode, body: Vec<u8>) -> Response {
 mod tests {
     use ihe_iti::pmir::feed::Feed;
 
-    use super::changed_identifiers;
+    use super::{Changed, changed};
 
     /// A synthetic ITI-93 message whose history carries `entries`.
     fn message(entries: &serde_json::Value) -> Vec<u8> {
@@ -197,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn a_merge_and_an_update_forget_their_identifiers_and_a_create_none() {
+    fn an_update_forgets_its_identifiers_and_a_create_none() {
         let body = message(&serde_json::json!([
             entry(
                 "POST",
@@ -205,15 +218,6 @@ mod tests {
                 &serde_json::json!({
                     "active": true,
                     "identifier": [{ "system": "urn:oid:2.999.1", "value": "created-1" }]
-                })
-            ),
-            entry(
-                "PUT",
-                "p2",
-                &serde_json::json!({
-                    "active": false,
-                    "identifier": [{ "system": "urn:oid:2.999.1", "value": "subsumed-1" }],
-                    "link": [{ "other": { "reference": "Patient/p1" }, "type": "replaced-by" }]
                 })
             ),
             entry(
@@ -227,11 +231,37 @@ mod tests {
         ]));
         let feed = Feed::read(Some("application/fhir+json"), &body).expect("a PMIR feed message");
         assert_eq!(
-            vec![
-                (String::from("urn:oid:2.999.1"), String::from("subsumed-1")),
-                (String::from("urn:oid:2.999.1"), String::from("unmerged-1")),
-            ],
-            changed_identifiers(&feed)
+            Changed::Identifiers(vec![(
+                String::from("urn:oid:2.999.1"),
+                String::from("unmerged-1")
+            )]),
+            changed(&feed)
         );
+    }
+
+    #[test]
+    fn a_merge_forgets_every_pseudonym() {
+        // The subsumed patient as FerroPIX sends it: its master identity alone.
+        let body = message(&serde_json::json!([
+            entry(
+                "PUT",
+                "p2",
+                &serde_json::json!({
+                    "active": false,
+                    "identifier": [{ "system": "https://pix.example.org", "value": "p2" }],
+                    "link": [{ "other": { "reference": "Patient/p1" }, "type": "replaced-by" }]
+                })
+            ),
+            entry(
+                "PUT",
+                "p1",
+                &serde_json::json!({
+                    "active": true,
+                    "identifier": [{ "system": "urn:oid:2.999.1", "value": "survivor-1" }]
+                })
+            ),
+        ]));
+        let feed = Feed::read(Some("application/fhir+json"), &body).expect("a PMIR feed message");
+        assert_eq!(Changed::Everything, changed(&feed));
     }
 }
