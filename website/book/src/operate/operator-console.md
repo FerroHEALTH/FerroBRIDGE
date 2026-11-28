@@ -58,9 +58,15 @@ place of the discovered one. `config check` never contacts the provider: it
 checks the written keys, and builds the sign-in only when the authorization,
 token and key-set endpoints are all written. `revocation_endpoint` names
 where a sign-out revokes the operator's token (RFC 7009), `tls.trust_roots_file` adds PEM
-trust roots for a provider behind a private certificate authority
-(`tls.client_identity_file` and `tls.min_version` complete the table), and
-`timeout` (default `"10s"`) bounds one call to the provider.
+trust roots for a provider behind a private certificate authority (or
+`tls.trust_roots_without_revocation_file` for one that publishes no
+revocation service)
+(`tls.client_identity_file` and `tls.min_version` complete the table),
+`timeout` (default `"10s"`) bounds one call to the provider, and
+`algorithms` lists the signature algorithms an ID Token may be signed with,
+ML-DSA-44, ML-DSA-65 and ML-DSA-87 among them (RFC 9964); unset, the
+console's own list applies. No symmetric algorithm and no `none` is
+accepted.
 
 The access token the provider issues is the one the bridge receives, so its
 audience and scopes must be ones the bridge's `[auth]` accepts, the console
