@@ -11,6 +11,7 @@
 //! specification governs the declaration: our own design.
 
 use openehr_rm::v1_2::typing::base_name;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use openehr_mapping_core::composition::CanonicalComposition;
@@ -50,7 +51,7 @@ pub(super) fn instance_of(flat_id: &FlatId, positions: &[RmPosition]) -> Instanc
 
 /// Returns a warning for each archetype element `composition` holds below
 /// the program's start archetype at `instance` that is not in `read`, in
-/// document order.
+/// template order, and the instances of one node in the order of their positions.
 ///
 /// An element is a template node with an archetype node identifier
 /// (openEHR AOM 1.4 §Node identifiers, an `at` code) or one of the
@@ -81,6 +82,13 @@ pub(super) fn unread(
     let root = program.root().map(|root| format!("{}/", root.as_str()));
     let pinned: Vec<u32> = instance.iter().map(|position| position.get()).collect();
     let mut seen: BTreeSet<Instance> = BTreeSet::new();
+    // NOTE: the FLAT map keeps its keys in the order `serde_json` gives it, so the order
+    // is taken from the template, whose nodes the index holds in template order.
+    let ordinals: BTreeMap<&FlatId, usize> = index
+        .nodes()
+        .enumerate()
+        .map(|(ordinal, node)| (node.flat_id(), ordinal))
+        .collect();
     let mut warnings = Vec::new();
     for key in flat.keys() {
         let Some(held) = held_instance(key, root.as_deref(), &pinned) else {
@@ -112,14 +120,19 @@ pub(super) fn unread(
             path.push('/');
             path.push_str(attribute);
         }
-        warnings.push(Warning::new(
-            Loss::Unread {
-                node: String::from(node_id),
-            },
-            Location::default().with_openehr(path),
+        let ordinal = ordinals.get(node.flat_id()).copied().unwrap_or(usize::MAX);
+        warnings.push((
+            (ordinal, held.1.clone()),
+            Warning::new(
+                Loss::Unread {
+                    node: String::from(node_id),
+                },
+                Location::default().with_openehr(path),
+            ),
         ));
     }
-    Ok(warnings)
+    warnings.sort_by(|(left, _), (right, _)| left.cmp(right));
+    Ok(warnings.into_iter().map(|(_, warning)| warning).collect())
 }
 
 /// Returns the node instance a FLAT key names, when it lies below `root` at
