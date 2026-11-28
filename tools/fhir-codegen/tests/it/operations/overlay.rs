@@ -294,8 +294,16 @@ fn the_ecosystem_defined_outputs_join_every_version_and_r6_pre_adopts_nothing() 
                 .iter()
                 .find(|f| f.fhir_name == "classificationCode")
                 .expect("classificationCode");
-            assert_eq!(classification.source, ParameterSource::Ecosystem, "{module}");
-            assert_eq!(classification.type_code.as_deref(), Some("code"), "{module}");
+            assert_eq!(
+                classification.source,
+                ParameterSource::Ecosystem,
+                "{module}"
+            );
+            assert_eq!(
+                classification.type_code.as_deref(),
+                Some("code"),
+                "{module}"
+            );
             let unknown = contract
                 .outputs
                 .iter()
